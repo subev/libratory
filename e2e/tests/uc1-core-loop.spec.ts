@@ -3,7 +3,11 @@ import { test, expect, createApiBook, uploadFixtureBook } from "./fixtures.ts";
 test("UC1: uploaded PDF becomes a readable book with raw text", async ({ page }) => {
   await uploadFixtureBook(page);
   await expect(page.getByTestId("raw-book-block")).toContainText(/Raw text extracted — [\d,]+ words/);
-  await expect(page.getByTestId("extract-chapters")).toBeEnabled();
+  // Offered, not enabled: whether it is depends on the 5 GB Marker bundle being on this machine,
+  // and useModelBundle reports ready until the status call says otherwise — so asserting enabled
+  // here passes on a race where the models are absent. UC9 owns the disabled-and-explained case,
+  // and the @slow tier below owns the enabled one by clicking it.
+  await expect(page.getByTestId("extract-chapters")).toBeVisible();
 });
 
 // Real TTS (macOS say) + ffmpeg — full tier only
