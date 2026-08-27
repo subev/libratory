@@ -51,3 +51,87 @@ jobs:
       - run: pnpm test
         env:
           DATABASE_URL: postgres://libratory:libratory@localhost:5433/libratory
+
+  # Everything above is the unit tiers. This drives the real app in a browser, in the shape a
+  # package runs in — one port, the built bundle, no Vite — which is also the only shape where the
+  # SPA fallback exists at all.
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: libratory
+          POSTGRES_PASSWORD: libratory
+          POSTGRES_DB: libratory
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd="pg_isready -U libratory"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # Every upload runs raw extraction, which shells out to pdftotext — the first thing the
+      # suite does, and the runner image has no poppler.
+      - run: sudo apt-get update && sudo apt-get install -y poppler-utils
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+
+      # The model gates ask scripts/models.py whether a bundle is installed. Its status path
+      # imports huggingface_hub and platformdirs and nothing else — torch, mlx and surya are all
+      # imported lazily inside the functions that need them — so CI needs a 19 MB environment
+      # rather than the ~5 GB `uv sync --frozen` builds on a real machine. Deliberately not the
+      # pinned env: nothing here runs a model, and the two packages it does load are the only
+      # thing standing between a fresh runner and "the gate says it could not ask".
+      - name: Python, only enough of it to answer the model-status probe
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet huggingface_hub==0.36.2 platformdirs
+
+      - run: pnpm --filter @libratory/e2e exec playwright install --with-deps chromium
+
+      # Detached, because the suite drives an already-running server; the health poll is what makes
+      # "already running" true before the first test rather than hopefully soon after.
+      - name: Start the server on one port
+        run: |
+          mkdir -p "$RUNNER_TEMP/server"
+          cd packages/server
+          nohup node_modules/.bin/tsx src/main.ts > "$RUNNER_TEMP/server/server.log" 2>&1 &
+          for _ in $(seq 1 60); do
+            curl -sf http://127.0.0.1:3034/health > /dev/null && exit 0
+            sleep 1
+          done
+          echo "the server never answered /health" >&2
+          cat "$RUNNER_TEMP/server/server.log" >&2
+          exit 1
+        env:
+          DATABASE_URL: postgres://libratory:libratory@localhost:5433/libratory
+          HOST: 127.0.0.1
+          PORT: 3034
+          CONDA_ENV_PATH: ${{ runner.temp }}/venv/bin
+          WEB_DIR: ${{ github.workspace }}/packages/web/dist
+
+      # The @slow tier stays out: it runs marker and Kokoro for real, which is twenty minutes and
+      # several gigabytes of models.
+      - run: pnpm e2e:smoke
+        env:
+          E2E_BASE_URL: http://127.0.0.1:3034
+          E2E_API_URL: http://127.0.0.1:3034
+
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-failure
+          path: |
+            e2e/test-results
+            ${{ runner.temp }}/server/server.log
+          retention-days: 7
