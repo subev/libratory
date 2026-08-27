@@ -20,7 +20,9 @@ export type ModelBundle = {
 
 type PythonBundle = Omit<ModelBundle, "downloading" | "progress" | "error">;
 
-const MODELS_SCRIPT = scriptPath("models.py");
+// Lazy like python() below: marker.ts now imports this file, so worker tests that mock paths.ts
+// would otherwise hit a module-level scriptPath() call before their mock can answer it.
+const modelsScript = () => scriptPath("models.py");
 const python = () => path.join(env.CONDA_ENV_PATH, "python");
 
 // In-flight runs live only in memory: a finished download is read straight from the cache by the
@@ -40,7 +42,7 @@ const FORCED_MISSING_FILE = path.resolve(env.SCRIPTS_DIR, "..", ".models-missing
 
 // The two read paths, which need stdout back; downloads go through DownloadTracker.
 function run(args: string[], onExit: (code: number | null, stderr: string) => void) {
-  const proc = spawn(python(), [MODELS_SCRIPT, ...args], {
+  const proc = spawn(python(), [modelsScript(), ...args], {
     // The one path allowed to reach the network; everything else runs HF_HUB_OFFLINE=1
     env: { ...process.env, HF_HUB_OFFLINE: "0" },
   });
@@ -84,18 +86,18 @@ async function readStatus(): Promise<PythonBundle[]> {
   return bundles;
 }
 
-// Whether MLX works cannot change while the process runs, so this is asked once and kept.
-let capabilities: Promise<{ mlx: boolean }> | null = null;
+// Whether MLX or CUDA works cannot change while the process runs, so this is asked once and kept.
+let capabilities: Promise<{ mlx: boolean; cuda: boolean }> | null = null;
 
-export function readCapabilities(): Promise<{ mlx: boolean }> {
+export function readCapabilities(): Promise<{ mlx: boolean; cuda: boolean }> {
   // Same rule as readStatus: the dev marker skips the cache outright, because a debugging aid that
   // takes a process restart to apply is a bad debugging aid.
   if (existsSync(FORCED_MISSING_FILE)) capabilities = null;
-  capabilities ??= new Promise<{ mlx: boolean }>((resolve, reject) => {
+  capabilities ??= new Promise<{ mlx: boolean; cuda: boolean }>((resolve, reject) => {
     run(["--capabilities"], (code, out) => {
       if (code !== 0) return reject(new Error(out.trim().split("\n").at(-1) || `exit ${code ?? "?"}`));
       try {
-        resolve(JSON.parse(out) as { mlx: boolean });
+        resolve(JSON.parse(out) as { mlx: boolean; cuda: boolean });
       } catch {
         reject(new Error("models.py did not return JSON"));
       }
@@ -128,7 +130,7 @@ export async function bundleInstalled(id: string): Promise<boolean> {
 }
 
 export function startBundleDownload(id: string): { started: boolean } {
-  return downloads.start(id, python(), [MODELS_SCRIPT, "--download", id], () => {
+  return downloads.start(id, python(), [modelsScript(), "--download", id], () => {
     cache = null;
     void onBundleInstalled?.(id);
   });

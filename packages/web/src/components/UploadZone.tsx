@@ -56,13 +56,13 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
   // Raw-text-only is the default: pdftotext lands in seconds, marker takes minutes — extract chapters later from the book page
   const [fullExtract, setFullExtract] = useState(false);
   const [llmChapterDetection, setLlmChapterDetection] = useState(false);
-  const [chapterModel, setChapterModel] = useState<string>("flash");
+  const [chapterModel, setChapterModel] = useState<string>("");
   const [autoSynthesize, setAutoSynthesize] = useState(false);
   const [separateBooks, setSeparateBooks] = useState(false);
   const [askAi, setAskAi] = useState(false);
   const [notePreset, setNotePreset] = useState<string>("summarize");
   const [notePrompt, setNotePrompt] = useState<string>(AI_PRESETS[0].prompt("book"));
-  const [noteModel, setNoteModel] = useState<string>("flash");
+  const [noteModel, setNoteModel] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);

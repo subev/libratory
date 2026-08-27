@@ -2,9 +2,13 @@
 import json
 import sys
 
+import torch
 from FlagEmbedding import BGEM3FlagModel
 
-model = BGEM3FlagModel("BAAI/bge-m3", use_fp16=True)
+# fp16 halves memory where a GPU runs the math; on a plain CPU it runs the same math slower,
+# through emulated half-precision. Ask the hardware instead of assuming.
+_has_gpu = torch.cuda.is_available() or torch.backends.mps.is_available()
+model = BGEM3FlagModel("BAAI/bge-m3", use_fp16=_has_gpu)
 print(json.dumps({"type": "ready"}), flush=True)
 
 for line in sys.stdin:

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { trpc } from "../trpc.ts";
 import type { RouterInputs } from "../../../server/src/router.ts";
 import { useBodyScrollLock } from "../lib/use-body-scroll-lock.ts";
+import { useLlmModels } from "../lib/use-llm-models.ts";
 import { formatTokens } from "../lib/ai-presets.ts";
 import { TOOLBAR_BUTTON } from "../lib/button-classes.ts";
 
@@ -103,6 +104,16 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   });
   const startServerMutation = trpc.llmModels.startLocalServer.useMutation({ onSuccess: refreshModels });
 
+  const models = useLlmModels();
+  const { data: defaultModel } = trpc.llmModels.getDefault.useQuery();
+  const setDefaultMutation = trpc.llmModels.setDefault.useMutation({
+    onSuccess: () => utils.llmModels.getDefault.invalidate(),
+  });
+  const chosenDefault = defaultModel?.chosen ?? "";
+  // A chosen model that is not among the available ones (its server stopped, its key removed)
+  // still needs an option to sit on — otherwise the select silently displays "Automatic".
+  const chosenMissing = chosenDefault !== "" && !models.some((m) => m.key === chosenDefault);
+
   const keyCard = (k: { envVar: SecretVar; label: string; note: string; configured: boolean; keyHint: string | null }) => (
     <KeyCard
       key={k.envVar}
@@ -137,6 +148,44 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="p-4 space-y-6 overflow-y-auto">
+          <section data-testid="settings-default-model">
+            <h3 className="text-sm font-semibold text-(--text-primary) mb-2">Default AI model</h3>
+            <div className="rounded-md border border-(--border) p-3">
+              <select
+                value={chosenDefault}
+                onChange={(e) => setDefaultMutation.mutate({ key: e.target.value || null })}
+                disabled={setDefaultMutation.isPending || (models.length === 0 && !chosenMissing)}
+                className="w-full text-sm rounded-md border border-(--border-input) bg-(--bg-input) text-(--text-primary) px-2 py-1.5"
+                data-testid="settings-default-model-select"
+              >
+                <option value="">Automatic — V4 Flash when configured, else the first available model</option>
+                {chosenMissing && <option value={chosenDefault}>{chosenDefault} (not available right now)</option>}
+                {[...new Set(models.map((m) => m.source))].map((source) => (
+                  <optgroup key={source} label={source}>
+                    {models
+                      .filter((m) => m.source === source)
+                      .map((m) => (
+                        <option key={m.key} value={m.key} title={`${m.hint} · ${formatTokens(m.contextTokens)} context`}>
+                          {m.label}
+                        </option>
+                      ))}
+                  </optgroup>
+                ))}
+              </select>
+              <p className="mt-2 text-xs text-(--text-muted)">
+                Preselected wherever a model is picked — cleanup, Ask AI, translations, digests, chat, chapter detection.
+              </p>
+              {chosenMissing && (
+                <p className="mt-1 text-xs text-amber-600" data-testid="settings-default-model-warning">
+                  Not available right now — requests fall back to the automatic choice until it is.
+                </p>
+              )}
+              {setDefaultMutation.error && (
+                <p className="mt-1 text-xs text-red-600">{setDefaultMutation.error.message}</p>
+              )}
+            </div>
+          </section>
+
           <section>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold text-(--text-primary)">Local models — offline, auto-detected</h3>

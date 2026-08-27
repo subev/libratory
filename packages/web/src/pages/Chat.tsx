@@ -40,7 +40,7 @@ export function Chat() {
   const folderId = searchParams.get("folderId") ?? undefined;
   const bookId = searchParams.get("bookId") ?? undefined;
   const { data: scopedBook } = trpc.books.get.useQuery({ id: bookId! }, { enabled: !!bookId });
-  const [model, setModel] = useState<string>("flash");
+  const [model, setModel] = useState<string>("");
   const [input, setInput] = useState("");
   const [pdfPreview, setPdfPreview] = useState<{ fileId: string; page?: number; filename?: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);

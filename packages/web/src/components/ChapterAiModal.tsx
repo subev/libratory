@@ -53,7 +53,7 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
   const subject = kind === "book-raw" ? "book" : chapterSelection.length === 1 ? "chapter" : "chapters";
   const [activePreset, setActivePreset] = useState<string>("summarize");
   const [prompt, setPrompt] = useState<string>(AI_PRESETS[0].prompt(subject));
-  const [model, setModel] = useState<string>("flash");
+  const [model, setModel] = useState<string>("");
 
   const transport = useMemo(
     () => new DefaultChatTransport({ api: "/chat/ask", headers: () => profileHeaders() }),

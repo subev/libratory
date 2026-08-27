@@ -194,7 +194,7 @@ export function ExtractModal({
               <div className="flex items-center gap-2 pl-6 text-xs text-(--text-muted)">
                 <span>Model</span>
                 <ModelPicker
-                  value={chapterModel ?? "flash"}
+                  value={chapterModel ?? ""}
                   onChange={(key) => onUpdateBook({ chapterModel: key })}
                   testId="extract-chapter-model"
                 />

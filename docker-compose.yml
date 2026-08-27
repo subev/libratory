@@ -12,6 +12,38 @@ services:
     volumes:
       # pgdata17 (glibc) replaced the alpine-era pgdata volume on 2026-08-08; old volume kept as rollback
       - pgdata17:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U libratory"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  app:
+    # Behind a profile so `pnpm db:up` keeps meaning "Postgres and nothing else" on a Mac.
+    # The headless path opts in:  docker compose --profile app up -d --build
+    profiles: ["app"]
+    build: .
+    ports:
+      # Published on localhost for the same reason HOST defaults to 127.0.0.1 — there is no login.
+      # To serve the LAN, override with e.g. "3034:3034" in a docker-compose.override.yml and mind
+      # who is on that network.
+      - "127.0.0.1:3034:3034"
+    environment:
+      DATABASE_URL: postgres://libratory:libratory@postgres:5432/libratory
+    volumes:
+      # Named volumes rather than ./data — a bind mount the daemon creates on first `up` arrives
+      # owned by root, and the server (running as node) cannot write into it. To keep the library
+      # in a directory instead, mkdir it yourself and override the mount.
+      - data:/data
+      - models:/models
+    depends_on:
+      # main.ts applies pending migrations at boot, so a plain depends_on races the first `up` and
+      # leaves restart: unless-stopped to paper over it. test.yml gates on health for this reason.
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   pgdata17:
+  data:
+  models:

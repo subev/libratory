@@ -16,6 +16,7 @@ storyteller/ADMIN_CREDENTIALS.txt
 
 e2e/test-results/
 e2e/playwright-report/
+docker-compose.override.yml
 .models-missing
 .uv/
 .bun/

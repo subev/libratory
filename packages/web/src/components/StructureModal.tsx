@@ -52,7 +52,7 @@ export function StructureModal({
 }) {
   useBodyScrollLock();
   const { data: structure, isLoading } = trpc.books.structure.useQuery({ id: bookId });
-  const [model, setModel] = useState<string>(chapterModel ?? "flash");
+  const [model, setModel] = useState<string>(chapterModel ?? "");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pdfPreview, setPdfPreview] = useState<{ fileId: string; page: number; filename?: string } | null>(null);
   const initialized = useRef(false);

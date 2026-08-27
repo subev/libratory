@@ -35,6 +35,12 @@ dependencies = [
 [tool.uv.sources]
 nanocodec-mlx = { git = "https://github.com/nineninesix-ai/nanocodec-mlx.git" }
 en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
+# PyPI's Linux torch is the CUDA build — a 532 MB wheel towing ~3 GB of nvidia-* packages that a
+# CPU-only server never loads. The cpu index serves the same torch without the freight; a Linux box
+# with an NVIDIA card points this at /whl/cu130 instead and re-locks. macOS keeps PyPI either way.
+torch = [
+  { index = "pytorch-cpu", marker = "sys_platform == 'linux'" },
+]
 
 [tool.uv]
 # The pins above deliberately contradict what mlx-audio declares: transformers 5.x breaks
@@ -48,3 +54,9 @@ override-dependencies = [
   # nanocodec-mlx pins mlx 0.29.2; mlx-audio 0.4.5 needs 0.32. --no-deps hid this entirely.
   "mlx==0.32.0",
 ]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+# explicit: only packages routed here by [tool.uv.sources] may use it — everything else stays PyPI.
+explicit = true

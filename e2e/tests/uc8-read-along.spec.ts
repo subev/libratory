@@ -1,4 +1,21 @@
+import type { Page } from "@playwright/test";
 import { test, expect, createApiBook, uploadFixtureBook, FIXTURE_CONTAINER } from "./fixtures.ts";
+
+// pdf.js sizes the canvas before it paints, so a page that failed to render is not a missing box —
+// it is a correctly sized empty one, which is what Safari drew and what toBeVisible() cannot see.
+// Ink is the only witness: a canvas that never rendered is transparent, and one that rendered
+// nothing is flat white, so a dark opaque pixel is the single thing neither of them has.
+function printPainted(page: Page) {
+  return page.getByTestId("reader-page").first().locator("canvas").evaluate((canvas: HTMLCanvasElement) => {
+    const context = canvas.getContext("2d");
+    if (!context || canvas.width === 0) return false;
+    const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] > 0 && data[i] < 200 && data[i + 1] < 200 && data[i + 2] < 200) return true;
+    }
+    return false;
+  });
+}
 
 test("UC8: read along is offered only once a chapter is on a page", async ({ page, request, profileId }) => {
   // Written rather than extracted, so there is no print behind it — the one case with nothing to open
@@ -22,10 +39,36 @@ test("UC8: a book sent as a file reads along from the file itself", async ({ pag
   await page.locator("input[type=file]").setInputFiles(FIXTURE_CONTAINER);
 
   await expect(page.getByTestId("reader-page").first()).toBeVisible();
+  await expect.poll(() => printPainted(page)).toBe(true);
   await expect(page.getByTestId("cue-rect").first()).toBeVisible();
   await expect(page.getByTestId("reader-granularity")).toHaveText("word");
   await expect(page.locator("audio")).toHaveAttribute("src", /^blob:/);
   await expect(page.getByTestId("reader-chapter").locator("option")).toHaveCount(3);
+});
+
+test("UC8: the print still paints where Map.prototype.getOrInsertComputed is missing", async ({ page }) => {
+  // Removing the pair before any script runs puts preparePdfWorker on its blob branch, which is
+  // the entry only Safari ever takes and so the one nothing else here would load. Chromium's
+  // worker realm keeps the native method — unreachable from here — so this does not prove the
+  // polyfill works; map-get-or-insert.test.ts does that. What it proves is the part no unit test
+  // can: that a blob module worker with a top-level await and a dynamic import really does start
+  // and render in a browser.
+  await page.addInitScript(() => {
+    for (const proto of [Map.prototype, WeakMap.prototype]) {
+      const target = proto as unknown as Record<string, unknown>;
+      delete target.getOrInsert;
+      delete target.getOrInsertComputed;
+    }
+  });
+  const failures: string[] = [];
+  page.on("console", (message) => { if (message.type() === "error") failures.push(message.text()); });
+
+  await page.goto("/open");
+  await page.locator("input[type=file]").setInputFiles(FIXTURE_CONTAINER);
+
+  await expect(page.getByTestId("reader-page").first()).toBeVisible();
+  await expect.poll(() => printPainted(page)).toBe(true);
+  expect(failures.filter((text) => text.includes("PDF page render failed"))).toEqual([]);
 });
 
 test("UC8: an EPUB with no read-along layer says so instead of failing obscurely", async ({ page }) => {

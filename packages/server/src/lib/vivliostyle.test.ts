@@ -41,9 +41,12 @@ describe("rendererInstalled", () => {
 
   it("is true once the browser executable is in there", async () => {
     const dir = path.join(await scratch(), "chrome");
-    const macos = path.join(dir, "mac_arm-150.0.7871.115", "chrome-mac-arm64", "Google Chrome for Testing.app", "Contents", "MacOS");
-    await mkdir(macos, { recursive: true });
-    await writeFile(path.join(macos, "Google Chrome for Testing"), "");
+    // The running platform's own layout — the scan looks for exactly one shape per OS.
+    const exe = process.platform === "darwin"
+      ? path.join(dir, "mac_arm-150.0.7871.115", "chrome-mac-arm64", "Google Chrome for Testing.app", "Contents", "MacOS", "Google Chrome for Testing")
+      : path.join(dir, "linux-150.0.7871.115", "chrome-linux64", "chrome");
+    await mkdir(path.dirname(exe), { recursive: true });
+    await writeFile(exe, "");
     expect(await rendererInstalled(dir)).toBe(true);
   });
 });

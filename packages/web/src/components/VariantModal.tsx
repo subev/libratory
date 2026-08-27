@@ -30,7 +30,7 @@ export function VariantModal({
   const [activeKey, setActiveKey] = useState<string | null>(initialKey ?? "Bulgarian");
   const [draft, setDraft] = useState<Draft | null>(null);
   const [thinkingEnabled, setThinkingEnabled] = useState(false);
-  const [model, setModel] = useState<string>("flash");
+  const [model, setModel] = useState<string>("");
   const [selectedId, setSelectedId] = useState<string | null>(initialChapterId ?? chapters[0]?.id ?? null);
   const outputPane = useRef<HTMLDivElement>(null);
   const selectedChapterRef = useRef<HTMLButtonElement>(null);

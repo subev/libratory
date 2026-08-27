@@ -1,6 +1,6 @@
 import { env } from "./env.ts";
-import Fastify from "fastify";
-import cors from "@fastify/cors";
+import Fastify, { type FastifyRequest } from "fastify";
+import cors, { type FastifyCorsOptions } from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import { existsSync } from "node:fs";
@@ -17,6 +17,7 @@ import { registerApiRoutes } from "./api-routes.ts";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { registerScriptRunRoutes } from "./script-run-routes.ts";
 import { ensureDataDirs, outputDir, previewsDir } from "./lib/paths.ts";
+import { isAllowedOrigin, parseTrustedHosts } from "./lib/cors.ts";
 import { registerSpaFallback } from "./lib/spa-fallback.ts";
 import { db } from "./db.ts";
 import { books, bookFiles, assemblies, documents, chapters, chapterVariants } from "./schema.ts";
@@ -40,27 +41,15 @@ async function sweepStalePreviews() {
   );
 }
 
-function isLocalOrigin(origin: string): boolean {
-  try {
-    const { hostname } = new URL(origin);
-    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]" || hostname === "::1";
-  } catch {
-    return false;
-  }
-}
-
 async function main() {
   await ensureDataDirs();
   await sweepStalePreviews();
 
   const fastify = Fastify(createFastifyOptions());
 
-  // Reflecting any origin let any web page the user happened to have open drive this server from
-  // their browser — deleting books, spending credits, and since `secrets.set`, rewriting API keys
-  // on disk. Nothing legitimate needs it: the UI is same-origin in the app and proxied by Vite in
-  // development, and non-browser callers (the external /api scripts) send no Origin at all.
-  await fastify.register(cors, {
-    origin: (origin, cb) => cb(null, origin === undefined || isLocalOrigin(origin)),
+  const trustedHosts = parseTrustedHosts(env.TRUSTED_HOSTS);
+  await fastify.register(cors, () => (req: FastifyRequest, callback: (error: Error | null, options: FastifyCorsOptions) => void) => {
+    callback(null, { origin: isAllowedOrigin(req.headers.origin, req.headers.host, trustedHosts) });
   });
   await fastify.register(multipart, { limits: { fileSize: 500 * 1024 * 1024 } });
 

@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import * as pdfjs from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import type { PDFDocumentProxy } from "pdfjs-dist";
+import { preparePdfWorker } from "../../lib/map-get-or-insert.ts";
 
-pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+pdfjs.GlobalWorkerOptions.workerSrc = preparePdfWorker(new URL(workerUrl, import.meta.url).href);
 
 // A retained document pins its bytes and pdf.js's page and font caches — tens of MB each. The
 // reader shows one book at a time, so anything older than the last two is a leak.
@@ -84,7 +85,13 @@ export function PdfCanvas({
       canvas.width = Math.round(width * scale);
       canvas.height = Math.round(height * scale);
       await page.render({ canvas, canvasContext: canvas.getContext("2d")!, viewport }).promise;
-    })().catch(() => {});
+    })().catch((error) => {
+      // A cancelled render is routine — pages leave the viewport. Everything else used to be
+      // swallowed too, and a Safari missing one Map method drew blank pages with a clean console.
+      if (!(error instanceof pdfjs.RenderingCancelledException)) {
+        console.error("PDF page render failed:", error);
+      }
+    });
 
     return () => { cancelled = true; };
   }, [url, pageNumber, visible, x, y, width, height]);

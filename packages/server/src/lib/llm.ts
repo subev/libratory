@@ -6,7 +6,8 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
-import { env } from "../env.ts";
+import { env, envFilePath } from "../env.ts";
+import { updateEnvFile } from "./env-file.ts";
 import { LLM_SECRETS, isConfigured, type SecretVar, type LlmSecretProvider } from "./secrets.ts";
 import { describeError } from "./errors.ts";
 
@@ -32,7 +33,10 @@ export type LlmModelDef = {
   supportsJsonFormat: boolean;
 };
 
-export const modelKeySchema = z.string().min(1).max(64);
+// A key is written to .env as DEFAULT_LLM_MODEL, and applyEnvEdit writes `KEY=value` verbatim, so
+// a newline here would be extra env lines. Ollama ids carry "/" and ":" ("ollama:hf.co/u/r:Q4"),
+// which is why this rejects the one dangerous character class rather than allowing a charset.
+export const modelKeySchema = z.string().min(1).max(64).refine((k) => !/[\r\n]/.test(k), "Model key must be a single line");
 
 const DEEPSEEK_URL = "https://api.deepseek.com";
 
@@ -368,8 +372,20 @@ export async function availableModels(): Promise<LlmModelDef[]> {
   return (await allModels()).filter(isAvailable);
 }
 
+// Persisted the way the API keys are, and for the same reason: written to the .env file and
+// applied to the in-memory env, so a Settings choice survives a restart without needing one.
+export function setDefaultModelKey(key: string | null): void {
+  updateEnvFile(envFilePath, "DEFAULT_LLM_MODEL", key);
+  env.DEFAULT_LLM_MODEL = key ?? undefined;
+}
+
 export async function defaultModelKey(): Promise<string | undefined> {
   const models = await availableModels();
+  // The user's pick (Settings → Default AI model) wins while its model is actually available;
+  // a stopped Ollama or a removed key falls through to the automatic choice rather than erroring.
+  if (env.DEFAULT_LLM_MODEL && models.some((m) => m.key === env.DEFAULT_LLM_MODEL)) {
+    return env.DEFAULT_LLM_MODEL;
+  }
   return (models.find((m) => m.key === "flash") ?? models[0])?.key;
 }
 
@@ -382,7 +398,8 @@ function openAiCompatName(def: LlmModelDef): string {
 }
 
 export async function resolveLlm(key?: string): Promise<{ model: LanguageModel; def: LlmModelDef }> {
-  const wanted = key ?? (await defaultModelKey());
+  // || not ??: a picker that has not resolved yet submits "", which means "the default", not a model
+  const wanted = key || (await defaultModelKey());
   if (!wanted) {
     throw new Error(
       "No AI model is available — start Ollama or LM Studio, or add an API key (e.g. DEEPSEEK_API_KEY) to .env",

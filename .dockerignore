@@ -1,0 +1,22 @@
+# The image builds from source and its own installs — nothing machine-local belongs in the context.
+.git
+node_modules
+**/node_modules
+**/dist
+.venv
+.venv-pocket
+.uv
+.bun
+.turbo
+# `data` alone matches only the context root; a checkout that has ever run `pnpm dev` from
+# packages/server keeps its whole library there, and COPY . . would bake it into the image.
+data
+**/data
+.env
+.models-missing
+e2e/test-results
+e2e/playwright-report
+storyteller
+*.mov
+__pycache__
+**/__pycache__

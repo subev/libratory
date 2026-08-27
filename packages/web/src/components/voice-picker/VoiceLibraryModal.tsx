@@ -342,7 +342,10 @@ export function VoiceLibraryModal({
                   )}
 
                   {language === "bg" && (
-                    <div className="mx-1 mb-3"><ModelBundleNotice id="bulgarian" verb="Narrating in Bulgarian" /></div>
+                    <div className="mx-1 mb-3 space-y-2">
+                      <ModelBundleNotice id="bulgarian" verb="Narrating in Bulgarian" />
+                      <ModelBundleNotice id="bulgarian-narrator" verb="Narrating with the BG-TTS V5 voice" />
+                    </div>
                   )}
 
                   {shown.length > 0

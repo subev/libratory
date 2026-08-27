@@ -18,7 +18,7 @@ export function DigestModal({
   const navigate = useNavigate();
   const [title, setTitle] = useState(`Digest — ${sourceBooks.length} books`);
   const [prompt, setPrompt] = useState(DIGEST_LISTENING_PROMPT);
-  const [model, setModel] = useState<string>("flash");
+  const [model, setModel] = useState<string>("");
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
 
   const { data: availability } = trpc.books.textAvailability.useQuery({

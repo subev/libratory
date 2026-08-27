@@ -1,0 +1,53 @@
+# The Linux job release.yml said the server tests would need: they want a live Postgres on 5433,
+# and GitHub's macOS runners have no Docker. It is also what keeps "runs on Linux" a property a
+# PR cannot silently break — the strict tsconfigs are the only linter this repo has, so the build
+# step is the lint step.
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: libratory
+          POSTGRES_PASSWORD: libratory
+          POSTGRES_DB: libratory
+        ports: ["5433:5432"]
+        # The template database is created before the first test file runs; without a health gate
+        # that race is lost on exactly the runners where it matters.
+        options: >-
+          --health-cmd="pg_isready -U libratory"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # The read-along EPUB tests shell out to the real zip and unzip; asking apt is cheaper than
+      # trusting the runner image's inventory.
+      - run: sudo apt-get update && sudo apt-get install -y zip unzip
+
+      - run: pnpm install --frozen-lockfile
+
+      # Server tsc is noEmit type-checking; the web build type-checks and bundles.
+      - run: pnpm -r build
+
+      # All three packages: the server suite clones its template database per file, web and
+      # desktop are plain vitest. Python is never spawned — subprocess seams are mocked. The URL
+      # is set here because env.ts requires one and a runner has no .env to read it from.
+      - run: pnpm test
+        env:
+          DATABASE_URL: postgres://libratory:libratory@localhost:5433/libratory

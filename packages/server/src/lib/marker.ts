@@ -7,6 +7,7 @@ import os from "node:os";
 import { env } from "../env.ts";
 import { describeError } from "./errors.ts";
 import { detectChaptersWithLlm } from "./toc-detect.ts";
+import { readCapabilities } from "./model-bundles.ts";
 
 const CONDA_BIN = env.CONDA_ENV_PATH;
 
@@ -363,7 +364,7 @@ export class ExtractAbortedError extends Error {
   }
 }
 
-function runMarkerSingle(pdfPath: string, outDir: string, device: "mps" | "cpu", log: LogFn, forceOcr: boolean, signal?: AbortSignal): Promise<void> {
+function runMarkerSingle(pdfPath: string, outDir: string, device: "mps" | "cuda" | "cpu", log: LogFn, forceOcr: boolean, signal?: AbortSignal): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     if (signal?.aborted) {
       reject(new ExtractAbortedError());
@@ -543,11 +544,20 @@ export async function extractPdf(pdfPath: string, outDir: string, log: LogFn = n
   const forceOcr = options.forceOcr ?? false;
   await log(`Running marker_single on "${path.basename(pdfPath)}"${forceOcr ? " (forcing OCR)" : " (OCR disabled)"}`);
 
+  // A Mac starts on Metal. Elsewhere the capabilities probe answers whether torch can see CUDA —
+  // letting marker guess would spend the first half-hour attempt finding out the hard way.
+  const capabilities = process.platform === "darwin" ? null : await readCapabilities().catch(() => null);
+  const firstDevice = process.platform === "darwin" ? "mps" : capabilities?.cuda ? "cuda" : "cpu";
   try {
-    await runMarkerSingle(pdfPath, outDir, "mps", log, forceOcr, options.signal);
-  } catch (mpsError) {
-    if (mpsError instanceof ExtractAbortedError) throw mpsError;
-    await log(`MPS extraction failed — known PyTorch MPS bug with certain PDFs. Retrying with CPU...`);
+    await runMarkerSingle(pdfPath, outDir, firstDevice, log, forceOcr, options.signal);
+  } catch (deviceError) {
+    if (deviceError instanceof ExtractAbortedError) throw deviceError;
+    // Only a non-CPU failure gets a second chance: the MPS bug is real, and a CUDA install can be
+    // broken in ways a book upload should not have to care about. A CPU failure is the real thing.
+    if (firstDevice === "cpu") throw deviceError;
+    await log(firstDevice === "mps"
+      ? `MPS extraction failed — known PyTorch MPS bug with certain PDFs. Retrying with CPU...`
+      : `CUDA extraction failed. Retrying with CPU...`);
     await runMarkerSingle(pdfPath, outDir, "cpu", log, forceOcr, options.signal);
   }
 
