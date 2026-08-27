@@ -1,8 +1,8 @@
 # Libratory
 
-Turns PDF books into audiobooks — and more. Upload PDFs, pick a voice, and get chapter-marked M4B audiobooks, AI digests, translations, AI rewrites (ELI5, summaries, custom prompts), PDF/EPUB exports, and read-along synced EPUBs (audio + highlighted text) you can listen to offline on a phone.
+**Library + laboratory** — a workbench for the PDFs you already own. Take a book apart, clean up the OCR, translate or rewrite a chapter, pick a voice, and put it back together as a chapter-marked M4B audiobook or a read-along book where the narration is highlighted on the page it was printed on. Also AI digests, PDF/EPUB exports, notes, and chat with cited sources across everything on your shelves.
 
-Built for local use on Apple Silicon Macs and Linux — natively or as a Docker container on a headless server. Fully offline after the initial model downloads — AI features run on a local model (Ollama and LM Studio are auto-discovered, no configuration) or a cloud provider (DeepSeek, OpenAI, Anthropic, Gemini) if you add an API key.
+Runs on your own machine: an Apple Silicon Mac, a Linux box (x86_64 or arm64, CPU is enough), or a single Docker container on a headless server. Fully offline after the initial model downloads — AI features run on a local model (Ollama and LM Studio are auto-discovered, no configuration) or a cloud provider (DeepSeek, OpenAI, Anthropic, Gemini) if you add an API key.
 
 ## Intro videos
 
@@ -124,7 +124,7 @@ data/previews/                    Voice preview M4As
 
 ## Prerequisites
 
-An Apple Silicon Mac, or a Linux machine (x86_64 or arm64, CPU is enough). The two MLX narrators (KugelAudio, BG-TTS V5) need Metal and stay Mac-only — the UI greys them out with the reason; Kokoro, Pocket, Meta MMS and the cloud voices run everywhere.
+An Apple Silicon Mac, or a Linux machine (x86_64 or arm64, CPU is enough), or Windows through Docker Desktop and WSL2. The two MLX narrators (KugelAudio, BG-TTS V5) need Metal and stay Mac-only — the UI greys them out with the reason; Kokoro, Pocket, Meta MMS and the cloud voices run everywhere.
 
 - **Mac**: [Homebrew](https://brew.sh), then: `brew install ffmpeg poppler espeak-ng python@3.12 node pnpm` — for running from source, which spawns `ffmpeg` and `pdftotext` off your `PATH`. The packaged app carries its own copies and needs none of this.
 - **Linux (from source)**: `ffmpeg espeak-ng poppler-utils zip unzip python3.12 node pnpm` from your package manager — `pnpm run setup` names whatever is missing. Or skip all of it and run the Docker image below.
@@ -145,7 +145,7 @@ pnpm dev          # server on :3034, web on :3033
 
 `pnpm run setup` is idempotent — rerun it after failures. It works the same on Linux, minus the KugelAudio prompt (Metal-only). (Note: it must be `pnpm run setup`; bare `pnpm setup` triggers pnpm's unrelated builtin.) It creates `.env` with working defaults and skips the ~17 GB KugelAudio narrator download unless you answer yes (or run `pnpm run setup --kugel`). Python packages install into a repo-local `.venv` from `pyproject.toml` + `uv.lock` (`uv sync --frozen`, with the whole graph pinned; point `CONDA_ENV_PATH` in `.env` at another env's `bin` dir if you manage your own). For the AI features you need at least one model. **Offline-first (recommended):** install [LM Studio](https://lmstudio.ai) or [Ollama](https://ollama.com) and download a chat model — a current ~27-30B reasoning model (e.g. Qwen3.8 27B, ~16 GB) is a strong offline pick on 32 GB+ Macs; use an 8B-class model on smaller machines. Running servers and their models are auto-discovered, zero config. **Cloud:** add an API key for DeepSeek / OpenAI / Anthropic / Gemini. The ⚙️ button on the home page opens Settings: it shows which local servers were detected (with each model's usable context size), can start a stopped server, and holds every API key — AI providers and the Cartesia/ElevenLabs cloud voices alike (written to `.env`, applied without a restart). Custom OpenAI-compatible servers (`mlx_lm.server`, llama.cpp) can be added via `LOCAL_LLM_URL` + `LOCAL_LLM_MODEL`. Every available model appears in the in-app model pickers.
 
-### Headless Linux, in Docker
+### In Docker — Linux, Windows, or a headless server
 
 ```bash
 git clone https://github.com/subev/libratory.git && cd libratory
@@ -153,7 +153,9 @@ docker compose --profile app up -d --build   # Postgres + the app on one port
 ```
 
 One container holds the server, the built web UI and both Python environments (CPU-only torch,
-so no multi-gigabyte nvidia downloads). Web UI and API share http://localhost:3034; migrations
+so no multi-gigabyte nvidia downloads). Nothing in the image is Linux-specific, so the same two
+commands are also the Windows route, through Docker Desktop with the WSL2 backend — that path is
+new, so [open an issue](https://github.com/subev/libratory/issues/new) if it does not work. Web UI and API share http://localhost:3034; migrations
 apply at boot, and the first boot caches the essential Kokoro voice (~350 MB) before the server
 starts. The library lives in the `data` volume, every lazily-downloaded model in the
 `models` volume — backing those two up is the whole story. API keys set in ⚙️ Settings persist
