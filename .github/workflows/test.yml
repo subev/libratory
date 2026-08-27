@@ -99,6 +99,11 @@ jobs:
 
       - run: pnpm --filter @libratory/e2e exec playwright install --with-deps chromium
 
+      # settings-env-roundtrip snapshots this file, writes a key through Settings and asserts it
+      # comes back byte-identical; a runner has no checkout that ever ran setup.sh. dotenv does not
+      # override what the step below already puts in the environment, so this is only a file to own.
+      - run: echo "DATABASE_URL=postgres://libratory:libratory@localhost:5433/libratory" > .env
+
       # Detached, because the suite drives an already-running server; the health poll is what makes
       # "already running" true before the first test rather than hopefully soon after.
       - name: Start the server on one port

@@ -11,9 +11,12 @@ export function LogDock({ bookId, isProcessing, files }: { bookId: string; isPro
   const utils = trpc.useUtils();
   const isMultiFile = files && files.length > 1;
 
+  // Also while there is nothing to show: a job that is queued but not yet picked up has not
+  // touched the book, so isProcessing is still false, and the dock would stay hidden until a
+  // reload — for the whole first run on a cold worker.
   const { data: logs = [] } = trpc.books.logs.useQuery(
     { bookId },
-    { refetchInterval: isProcessing ? 1000 : false }
+    { refetchInterval: (query) => (isProcessing || (query.state.data?.length ?? 0) === 0 ? 1000 : false) }
   );
 
   const clearLogs = trpc.books.clearLogs.useMutation({
