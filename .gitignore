@@ -15,6 +15,9 @@ storyteller/ADMIN_CREDENTIALS.txt
 *.mov
 
 e2e/test-results/
+# Playwright writes here when it is run from a package rather than e2e/, and it is where
+# throwaway screenshots land — never anything the repo should carry.
+**/test-results/
 e2e/playwright-report/
 docker-compose.override.yml
 .models-missing
