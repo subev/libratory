@@ -21,6 +21,7 @@
   "build": {
     "appId": "dev.libratory.app",
     "productName": "Libratory",
+    "artifactName": "${productName}-${arch}.${ext}",
     "directories": {
       "output": "release"
     },
