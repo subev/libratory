@@ -12,6 +12,21 @@ export function scriptPath(name: string): string {
   return path.resolve(env.SCRIPTS_DIR, name);
 }
 
+// Every file this app owns lives under DATA_DIR, so that prefix is the one part of a path the
+// database has no business remembering: it moves with the checkout, and it is /data in the
+// container. Storing it cost 2547 rows pointing at a directory that no longer existed the day this
+// repo was renamed. `schema.ts` puts these on the path columns themselves, so nothing else has to
+// know. A value outside DATA_DIR is kept absolute and resolves to itself, which is also what makes
+// every row written before this keep working.
+export function toStoredPath(absolute: string): string {
+  const relative = path.relative(path.resolve(DATA_DIR), absolute);
+  return relative.startsWith("..") || path.isAbsolute(relative) ? absolute : relative;
+}
+
+export function fromStoredPath(stored: string): string {
+  return path.resolve(DATA_DIR, stored);
+}
+
 export const uploadsDir = path.resolve(DATA_DIR, "uploads");
 export const tmpDir = path.resolve(DATA_DIR, "tmp");
 export const outputDir = path.resolve(DATA_DIR, "output");

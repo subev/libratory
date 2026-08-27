@@ -239,6 +239,13 @@
       "when": 1787663560238,
       "tag": "0033_drop_pg_trgm",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1787663561238,
+      "tag": "0034_relative_data_paths",
+      "breakpoints": true
     }
   ]
 }

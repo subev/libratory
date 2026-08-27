@@ -1,7 +1,16 @@
 import { sql } from "drizzle-orm";
+import { fromStoredPath, toStoredPath } from "./lib/paths.ts";
 import { pgTable, uuid, text, real, integer, timestamp, boolean, jsonb, unique, index, vector, customType, type AnyPgColumn } from "drizzle-orm/pg-core";
 
 const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
+
+// Stored relative to DATA_DIR, handed out absolute — see toStoredPath. Drizzle never routes null
+// through a custom type, so the nullable columns need nothing extra.
+const dataPath = customType<{ data: string; driverData: string }>({
+  dataType: () => "text",
+  toDriver: toStoredPath,
+  fromDriver: fromStoredPath,
+});
 
 export type ChapterProposalBoundary = {
   fileIndex: number | null;
@@ -113,8 +122,8 @@ export const books = pgTable("books", {
   // "pdf" books have filename/pdfPath; synthetic kinds (digest, ...) have neither
   kind: text("kind").$type<"pdf" | "digest" | "api">().notNull().default("pdf"),
   filename: text("filename"),
-  pdfPath: text("pdf_path"),
-  outputPath: text("output_path"),
+  pdfPath: dataPath("pdf_path"),
+  outputPath: dataPath("output_path"),
   status: text("status", {
     enum: ["pending", "extracting", "synthesizing", "assembling", "done", "failed", "suspended"],
   }).notNull().default("pending"),
@@ -153,7 +162,7 @@ export const chapters = pgTable("chapters", {
   rawText: text("raw_text").notNull(),
   cleanText: text("clean_text"),
   customText: text("custom_text"),
-  audioPath: text("audio_path"),
+  audioPath: dataPath("audio_path"),
   durationMs: integer("duration_ms"),
   progress: text("progress"),
   status: text("status", {
@@ -194,7 +203,7 @@ export const chapterVariants = pgTable("chapter_translations", {
   sourceHash: text("source_hash"),
   // Fencing token: each translate run writes only while its token is current
   runToken: text("run_token"),
-  audioPath: text("audio_path"),
+  audioPath: dataPath("audio_path"),
   audioDurationMs: integer("audio_duration_ms"),
   audioStatus: text("audio_status", {
     enum: ["pending", "synthesizing", "done", "failed", "suspended"],
@@ -219,7 +228,7 @@ export const bookFiles = pgTable("book_files", {
   bookId: uuid("book_id").notNull().references(() => books.id, { onDelete: "cascade" }),
   index: integer("index").notNull(),
   filename: text("filename").notNull(),
-  pdfPath: text("pdf_path").notNull(),
+  pdfPath: dataPath("pdf_path").notNull(),
   // "raw" = raw text only, marker extraction neither queued nor planned
   status: text("status", {
     enum: ["raw", "pending", "extracting", "done", "failed", "suspended"],
@@ -236,7 +245,7 @@ export const assemblies = pgTable("assemblies", {
   id: uuid("id").primaryKey().defaultRandom(),
   bookId: uuid("book_id").notNull().references(() => books.id, { onDelete: "cascade" }),
   language: text("language"),
-  outputPath: text("output_path").notNull(),
+  outputPath: dataPath("output_path").notNull(),
   durationMs: integer("duration_ms").notNull(),
   chapterCount: integer("chapter_count").notNull(),
   chapterSummary: text("chapter_summary").notNull(),
@@ -249,7 +258,7 @@ export const documents = pgTable("documents", {
   bookId: uuid("book_id").notNull().references(() => books.id, { onDelete: "cascade" }),
   language: text("language"),
   format: text("format", { enum: ["pdf", "epub", "epub-sync"] }).notNull(),
-  outputPath: text("output_path").notNull(),
+  outputPath: dataPath("output_path").notNull(),
   chapterCount: integer("chapter_count").notNull(),
   chapterSummary: text("chapter_summary").notNull(),
   chapterIds: text("chapter_ids").notNull(),
