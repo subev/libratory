@@ -75,13 +75,18 @@ function main() {
   const tags = git("tag", "--list", "v*").split("\n").filter(Boolean);
   const isNewest = !tags.some((t) => newer(t, tag));
 
-  // The workflow opens every draft with this, so anything else is notes someone wrote on purpose.
-  const placeholder = !release.body?.trim() || release.body.trim() === "Build in progress…";
+  // What the workflow writes: the first when it opens the draft, the second once the build is
+  // done. Anything else is notes someone wrote on purpose and this must not overwrite them. Both
+  // strings live in .github/workflows/release.yml — change either one and change it there too.
+  const PLACEHOLDERS = ["Build in progress…", "Built. Not published yet — `pnpm ship` publishes it."];
+  const placeholder = !release.body?.trim() || PLACEHOLDERS.includes(release.body.trim());
   const previous = tags.filter((t) => newer(tag, t)).sort((a, b) => (newer(a, b) ? -1 : 1))[0];
   // No previous tag on a first release, or in a clone fetched without them — the range would be
   // "undefined..v1" and die with a raw stack after every check had passed.
+  // --no-merges: a merge subject is the name of a branch nobody outside this repo has heard of,
+  // and the commits it brought in are already in the range on their own.
   const subjects = placeholder && previous
-    ? git("log", `${previous}..${tag}`, "--format=%s").split("\n")
+    ? git("log", "--no-merges", `${previous}..${tag}`, "--format=%s").split("\n")
         .filter((s) => s && !/^Release\b/.test(s)).map((s) => `- ${s}`)
     : [];
   const notes = placeholder
