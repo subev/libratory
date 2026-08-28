@@ -43,9 +43,14 @@ hdiutil detach "$MOUNT" -quiet
 APP=$(ls -d /Applications/Libratory.app 2>/dev/null)
 check "app is in /Applications" 'test -d "$APP"'
 
-# Gatekeeper will refuse an unsigned build. Clearing quarantine is what a person does by
-# right-click → Open; doing it here keeps the test about the app rather than about signing.
-xattr -dr com.apple.quarantine "$APP" 2>/dev/null && echo "  cleared quarantine (stands in for right-click → Open)"
+# Surviving the quarantine flag *is* the test for a released build, so it is deliberately left on.
+# A locally built DMG is still ad-hoc and has to be stood down by hand, exactly as a person would.
+if xcrun stapler validate "$APP" >/dev/null 2>&1; then
+  check "Gatekeeper accepts it, quarantine and all" "spctl -a -t exec '$APP'"
+else
+  echo "  NOTE  ad-hoc build, not notarised — clearing quarantine, which is what right-click → Open does"
+  xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
+fi
 
 echo
 echo "=== the bundled tools, with no Homebrew to fall back on ==="

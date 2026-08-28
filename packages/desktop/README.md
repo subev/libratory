@@ -179,11 +179,25 @@ gh release create tools-2 libratory-tools-arm64.tar.gz --latest=false
 # then put the new url + sha256 in pins.json
 ```
 
-### Ad-hoc signing, and why "damaged" is not the same as "unsigned"
+### Signing: Developer ID for releases, ad-hoc locally
 
-There is no Developer ID yet, but leaving the app *unsigned* is not the neutral choice it sounds
-like. electron-builder without an identity leaves only the linker's partial signature, and macOS
-assesses that as
+Since **v26.828.0** the release workflow signs with a Developer ID certificate and notarises with
+Apple, so a downloaded DMG opens with no warning and no Terminal command. What makes updates work
+is the designated requirement on a released build — an identity, not a hash:
+
+```
+designated => identifier "dev.libratory.app" and anchor apple generic
+              and certificate leaf[subject.OU] = M72SXNJ42P
+```
+
+Local builds stay **ad-hoc on purpose**. `scripts/desktop-build.sh` sets
+`CSC_IDENTITY_AUTO_DISCOVERY=false` and passes `-c.mac.identity=-`, because signing for real means
+~45 timestamped round-trips to Apple and turns a 15-second `pnpm app` into minutes. The real
+identity is reachable only from the workflow's `release` environment.
+
+That is why `pnpm app` still clears the quarantine flag, and why *unsigned* and *ad-hoc* have to
+stay distinct in your head. electron-builder with no identity at all leaves only the linker's
+partial signature, and macOS assesses that as
 
 ```
 code has no resources but signature indicates they must be present
@@ -199,29 +213,20 @@ Gatekeeper's verdict drops to a plain `rejected` — the ordinary "unidentified 
 which **Open Anyway** in Privacy & Security can override. Same absence of a certificate, a
 recoverable wall instead of a dead end.
 
-### The note an unsigned release needs
+### What a release note has to say
 
-Without an Apple certificate macOS refuses the download, and the message it shows —
-*"Libratory is damaged and can't be opened"* — is a lie that costs you most of your downloads
-unless the release says otherwise. Paste this:
+Nothing about Gatekeeper any more. Every release before v26.828.0 carried a paragraph explaining
+that "damaged" was a lie; that paragraph is now false and must not be copied forward. What is still
+worth saying:
 
-> **First time opening it:** macOS will say the app is damaged or from an unidentified developer.
-> It is neither — this build just is not signed with an Apple certificate yet.
->
-> 1. Drag **Libratory** to your Applications folder.
-> 2. Open **System Settings → Privacy & Security**, scroll to the bottom, and click **Open Anyway**
->    next to the message about libratory.
-> 3. Confirm **Open**.
->
-> On older macOS you can instead right-click the app → **Open** → **Open**.
->
 > You also need **Docker Desktop** or **OrbStack** installed and running — the app explains this on
 > first launch and links to both. The first start downloads about 2.4 GB and takes a while; later
 > ones take seconds.
 
-Until the certificate exists the in-app updater can find and download a new version but **cannot
-install it**, so each release means downloading the DMG again. That is the whole argument for the
-$99 account, in one sentence.
+One transition is worth calling out once: updating *to* v26.828.0 from any earlier build still
+fails. An ad-hoc signature's designated requirement is a hash of its own code, so no later build
+can ever satisfy it — v26.828.0 is the last version anybody installs by hand. From it onward the
+updater installs cleanly, because the requirement names the team rather than the build.
 
 The shape is forced by `electron-updater`, which parses both versions with `semver` and throws
 `ERR_UPDATER_INVALID_VERSION` on anything else — `isUpdateAvailable` is private, so there is no
@@ -249,14 +254,10 @@ Two constraints, both from `electron-updater` comparing with semver:
   the escape is `YY.M.N` — month plus a counter, `26.8.0`, `26.8.1` — which keeps the "how old"
   reading and lifts the limit.
 
-**Until there is an Apple certificate the download is quarantined**, and macOS says "Libratory is
-damaged and can't be opened" — which is a lie, but it is the lie Gatekeeper tells about unsigned
-apps that came from a browser. The release notes have to say: right-click the app → Open → Open.
-That instruction is the entire reason the $99 Developer account is worth buying; with it the
-workflow signs and notarises and nobody ever sees this. Until then, expect to lose people here.
-
-The updater does not depend on signing, but the *installation* of an update does: an unsigned
-update is quarantined the same way. So treat everything before the certificate as pre-release.
+A notarised app is accepted **with the quarantine flag still attached**, which is the whole point:
+the browser still marks the download, and Gatekeeper waves it through anyway. `scripts/vm-verify.sh`
+now asserts exactly that instead of clearing the flag, because clearing it would have tested
+nothing.
 
 ### How an update actually lands
 

@@ -244,9 +244,9 @@ app's data and offers to open a prefilled GitHub issue. Updates come from GitHub
 `electron-updater`, and the launch after one brings the Python environment forward to match —
 see `tasks/desktop-updates.md`.
 
-It is **not signed yet**, so macOS refuses the download until you allow it in System Settings →
-Privacy & Security → Open Anyway. Releasing is a version bump and a `v*` tag; the steps and the
-note that has to go with an unsigned release are in [packages/desktop/README.md](packages/desktop/README.md#releasing). `scripts/vm-verify.sh`
+It is signed with a Developer ID certificate and notarised by Apple, so the download opens with no
+warning and the in-app updater can install what it finds. Releasing is a version bump and a `v*`
+tag; the steps are in [packages/desktop/README.md](packages/desktop/README.md#releasing). `scripts/vm-verify.sh`
 runs the whole thing inside a fresh macOS VM, checking first that the VM has no Homebrew, no Python
 and no cached models — this machine has all three and hides bugs because of it.
 
