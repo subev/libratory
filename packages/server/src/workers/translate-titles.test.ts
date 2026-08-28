@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getDb, resetDb } from "../../test/setup.ts";
+import { getDb, resetDb, row as firstRow } from "../../test/setup.ts";
 import { books, chapters, chapterVariants } from "../schema.ts";
 import { eq } from "drizzle-orm";
 
@@ -39,15 +39,15 @@ describe("translateTitles worker", () => {
   it("fills in titles for finished translations that lack one", async () => {
     const db = getDb();
     const { bookId, chapterId } = await insertFixture(db);
-    const [row] = await db
+    const row = firstRow(await db
       .insert(chapterVariants)
       .values({ chapterId, key: "Bulgarian", status: "done", text: "Преведен текст." })
-      .returning();
+      .returning());
     mockTranslateTitle.mockResolvedValue("Глава");
 
     await translateTitles({ bookId, language: "Bulgarian" });
 
-    const [updated] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, row.id));
+    const updated = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.id, row.id)));
     expect(updated.title).toBe("Глава");
     expect(mockTranslateTitle).toHaveBeenCalledWith({
       title: "Ch",

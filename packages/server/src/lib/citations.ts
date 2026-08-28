@@ -2,8 +2,8 @@ import type { CitationCatalog, CitationSource } from "./chat-tools.ts";
 
 export function extractCitationIds(text: string): string[] {
   const seen = new Set<string>();
-  for (const match of text.matchAll(/\[(c_\d+)\]/g)) {
-    seen.add(match[1]);
+  for (const [, id] of text.matchAll(/\[(c_\d+)\]/g)) {
+    if (id) seen.add(id);
   }
   return [...seen];
 }

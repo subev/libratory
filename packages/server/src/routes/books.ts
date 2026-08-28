@@ -40,13 +40,21 @@ function digestJobRunning(digestJob: Book["digestJob"]): boolean {
   return Date.now() - new Date(digestJob.updatedAt).getTime() < NOTE_JOB_STALE_MS;
 }
 
+// Procedures that mutate a book answer with its fresh row; the row is known to exist
+// because every one of them looked it up before touching it.
+async function reloadBook(id: string): Promise<Book> {
+  const [book] = await db.select().from(books).where(eq(books.id, id));
+  if (!book) throw new Error("Book not found");
+  return book;
+}
+
 // Assemble jobs have no per-row DB state; the queue is the only signal that one is
 // pending but not yet running (books.status only flips once the worker picks it up).
 async function hasQueuedAssembleJob(bookId: string): Promise<boolean> {
-  const [{ jobs_table }] = (await db.execute(
+  const [probe] = (await db.execute(
     sql`SELECT to_regclass('graphile_worker._private_jobs') AS jobs_table`,
   )) as unknown as Array<{ jobs_table: string | null }>;
-  if (!jobs_table) return false;
+  if (!probe?.jobs_table) return false;
 
   const rows = (await db.execute(sql`
     SELECT 1
@@ -258,10 +266,9 @@ export const booksRouter = router({
         }
         const descendantBooks = allBooks.filter((b) => b.folderId && subtree.has(b.folderId));
         const stats = descendantBooks.map((b) => deriveBookStats(b));
-        const failedCount = descendantBooks.filter((_b, i) => {
-          const f = stats[i].failures;
-          return stats[i].failed || f.files + f.chapters + f.translations + f.cleanup > 0;
-        }).length;
+        const failedCount = stats.filter(
+          ({ failed, failures: f }) => failed || f.files + f.chapters + f.translations + f.cleanup > 0,
+        ).length;
         const sizes = await Promise.all(descendantBooks.map((b) => bookTotalSizeCached(b.id)));
         return {
           id: folder.id,
@@ -592,6 +599,7 @@ export const booksRouter = router({
         })
         .returning();
 
+      if (!digestBook) throw new Error("Failed to create the digest book");
       await appendLog(digestBook.id, `Creating digest from ${input.sourceBookIds.length} books`);
       await quickAddJob({ connectionString }, "digest", { bookId: digestBook.id }, { maxAttempts: 1 });
 
@@ -621,8 +629,7 @@ export const booksRouter = router({
       await appendLog(input.id, "Resuming digest — already-summarized books are skipped");
       await quickAddJob({ connectionString }, "digest", { bookId: input.id }, { maxAttempts: 1 });
 
-      const [updated] = await db.select().from(books).where(eq(books.id, input.id));
-      return updated;
+      return reloadBook(input.id);
     }),
 
   rawTextStats: publicProcedure
@@ -675,8 +682,7 @@ export const booksRouter = router({
       await appendLog(input.id, "Queued chapter extraction");
       await quickAddJob({ connectionString }, "extract", { bookId: input.id }, { maxAttempts: 1 });
 
-      const [updated] = await db.select().from(books).where(eq(books.id, input.id));
-      return updated;
+      return reloadBook(input.id);
     }),
 
   redetectChapters: publicProcedure
@@ -711,8 +717,7 @@ export const booksRouter = router({
       await appendLog(input.id, "Queued chapter re-detection");
       await quickAddJob({ connectionString }, "redetect", { bookId: input.id }, { maxAttempts: 1 });
 
-      const [updated] = await db.select().from(books).where(eq(books.id, input.id));
-      return updated;
+      return reloadBook(input.id);
     }),
 
   structure: publicProcedure
@@ -746,8 +751,7 @@ export const booksRouter = router({
 
         const headings = [];
         let cumWords = 0;
-        for (let i = 0; i < allBlocks.length; i++) {
-          const b = allBlocks[i];
+        for (const [i, b] of allBlocks.entries()) {
           if (b.included && b.type === "SectionHeader") {
             headings.push({
               blockIndex: i,
@@ -799,8 +803,7 @@ export const booksRouter = router({
       await appendLog(input.id, `Queued ${input.method === "llm" ? "LLM" : "deterministic"} chapter proposal`);
       await quickAddJob({ connectionString }, "propose", { bookId: input.id, method: input.method }, { maxAttempts: 1 });
 
-      const [updated] = await db.select().from(books).where(eq(books.id, input.id));
-      return updated;
+      return reloadBook(input.id);
     }),
 
   applyChapterBoundaries: publicProcedure
@@ -887,8 +890,7 @@ export const booksRouter = router({
 
       await appendLog(input.id, `Applied chapter boundaries: ${chapterOffset} chapters — chapters are suspended. Queue selected chapters when ready.`);
 
-      const [updated] = await db.select().from(books).where(eq(books.id, input.id));
-      return updated;
+      return reloadBook(input.id);
     }),
 
   processSelected: publicProcedure
@@ -944,8 +946,7 @@ export const booksRouter = router({
 
       await db.update(books).set({ error: null, updatedAt: new Date() }).where(eq(books.id, input.id));
 
-      const [updated] = await db.select().from(books).where(eq(books.id, input.id));
-      return updated;
+      return reloadBook(input.id);
     }),
 
   assemble: publicProcedure
@@ -984,8 +985,7 @@ export const booksRouter = router({
         { maxAttempts: 1, jobKey: assembleJobKey(input.id), jobKeyMode: "replace" },
       );
 
-      const [updated] = await db.select().from(books).where(eq(books.id, input.id));
-      return updated;
+      return reloadBook(input.id);
     }),
 
   // Lets the client show where "copy to import folder" would land; null = not configured

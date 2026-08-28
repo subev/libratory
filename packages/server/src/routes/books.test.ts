@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ensureGraphileTables, getDb, insertJob, resetDb } from "../../test/setup.ts";
+import { ensureGraphileTables, getDb, insertJob, resetDb, row } from "../../test/setup.ts";
 import { books, bookFiles, chapters, folders, profiles } from "../schema.ts";
 
 const { mockQuickAddJob, mockDeepseekChat } = vi.hoisted(() => ({
@@ -96,7 +96,7 @@ describe("booksRouter.updateSettings", () => {
       { maxAttempts: 1 }
     );
 
-    const [chapter] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
+    const chapter = row(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
     expect(chapter.status).toBe("pending");
     expect(chapter.audioPath).toBeNull();
     expect(chapter.durationMs).toBeNull();
@@ -151,10 +151,10 @@ describe("booksRouter.structure", () => {
     const { files } = await caller.structure({ id: bookId });
 
     expect(files).toHaveLength(1);
-    expect(files[0].fileIndex).toBeNull();
-    expect(files[0].totalWords).toBe(18);
-    expect(files[0].totalPages).toBe(11);
-    expect(files[0].headings).toEqual([
+    expect(files[0]?.fileIndex).toBeNull();
+    expect(files[0]?.totalWords).toBe(18);
+    expect(files[0]?.totalPages).toBe(11);
+    expect(files[0]?.headings).toEqual([
       { blockIndex: 1, page: 2, level: null, text: "Chapter 1 Beginning", wordsBefore: 4, isChapterStart: true },
       { blockIndex: 3, page: 10, level: null, text: "Chapter 2 Middle", wordsBefore: 12, isChapterStart: false },
     ]);
@@ -167,8 +167,8 @@ describe("booksRouter.structure", () => {
     const caller = booksRouter.createCaller({});
     const { files } = await caller.structure({ id: bookId });
 
-    expect(files[0].missing).toBe(true);
-    expect(files[0].headings).toEqual([]);
+    expect(files[0]?.missing).toBe(true);
+    expect(files[0]?.headings).toEqual([]);
   });
 });
 
@@ -234,7 +234,7 @@ describe("booksRouter.applyChapterBoundaries", () => {
 
     const chs = await db.select().from(chapters).where(eq(chapters.bookId, bookId));
     expect(chs).toHaveLength(1);
-    expect(chs[0].title).toBe("Chapter 1 Beginning");
+    expect(chs[0]?.title).toBe("Chapter 1 Beginning");
   });
 });
 
@@ -483,7 +483,7 @@ describe("synthetic book guards", () => {
     await expect(caller.redetectChapters({ id: bookId })).rejects.toThrow(/synthetic/i);
 
     const db = getDb();
-    const [book] = await db.select().from(books).where(eq(books.id, bookId));
+    const book = row(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.status).toBe("pending");
     expect(mockQuickAddJob).not.toHaveBeenCalled();
   });
@@ -553,7 +553,7 @@ describe("booksRouter.createDigest", () => {
 
   it("places the digest in the given folder", async () => {
     const db = getDb();
-    const [folder] = await db.insert(folders).values({ name: "Digests" }).returning();
+    const folder = row(await db.insert(folders).values({ name: "Digests" }).returning());
     const a = await insertSourceWithRawText("A", "text a");
     const b = await insertSourceWithRawText("B", "text b");
 
@@ -582,7 +582,7 @@ describe("booksRouter.createDigest", () => {
   it("resumeDigest re-queues a failed digest and rejects fresh-running ones", async () => {
     const db = getDb();
     const now = new Date().toISOString();
-    const [digestBook] = await db
+    const digestBook = row(await db
       .insert(books)
       .values({
         title: "D",
@@ -590,7 +590,7 @@ describe("booksRouter.createDigest", () => {
         origin: { type: "digest", sourceBookIds: [crypto.randomUUID(), crypto.randomUUID()], prompt: "p", model: "flash" },
         digestJob: { status: "failed", error: "boom", createdAt: now, updatedAt: now },
       })
-      .returning();
+      .returning());
 
     const caller = booksRouter.createCaller({});
     const resumed = await caller.resumeDigest({ id: digestBook.id });
@@ -608,8 +608,8 @@ describe("booksRouter.search", () => {
 
   it("matches all words case-insensitively and returns the folder path", async () => {
     const db = getDb();
-    const [root] = await db.insert(folders).values({ name: "History" }).returning();
-    const [sub] = await db.insert(folders).values({ name: "Ancient", parentId: root.id }).returning();
+    const root = row(await db.insert(folders).values({ name: "History" }).returning());
+    const sub = row(await db.insert(folders).values({ name: "Ancient", parentId: root.id }).returning());
     await db.insert(books).values([
       { title: "The Empire of the City", folderId: sub.id },
       { title: "Empire Falls" },
@@ -619,7 +619,7 @@ describe("booksRouter.search", () => {
     const caller = booksRouter.createCaller({});
     const results = await caller.search({ query: "empire CITY" });
     expect(results.map((b) => b.title)).toEqual(["The Empire of the City"]);
-    expect(results[0].folderPath.map((f) => f.name)).toEqual(["History", "Ancient"]);
+    expect(results[0]?.folderPath.map((f) => f.name)).toEqual(["History", "Ancient"]);
 
     const both = await caller.search({ query: "empire" });
     expect(both.map((b) => b.title).sort()).toEqual(["Empire Falls", "The Empire of the City"]);
@@ -636,7 +636,7 @@ describe("booksRouter.search", () => {
 
   it("is scoped to the caller's profile", async () => {
     const db = getDb();
-    const [other] = await db.insert(profiles).values({ name: "Wife" }).returning();
+    const other = row(await db.insert(profiles).values({ name: "Wife" }).returning());
     await db.insert(books).values([
       { title: "Shared title" },
       { title: "Shared title", profileId: other.id },
@@ -644,7 +644,7 @@ describe("booksRouter.search", () => {
 
     const results = await booksRouter.createCaller({ profileId: other.id }).search({ query: "shared" });
     expect(results).toHaveLength(1);
-    expect(results[0].folderPath).toEqual([]);
+    expect(results[0]?.folderPath).toEqual([]);
   });
 });
 

@@ -57,7 +57,8 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
 
     const { files, fields } = await saveUploadedFiles(request, pdfDir, 0);
 
-    if (files.length === 0) {
+    const [firstFile] = files;
+    if (!firstFile) {
       return reply.code(400).send({ error: "No PDF files uploaded" });
     }
 
@@ -66,7 +67,6 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
       return reply.code(400).send({ error: note.error });
     }
 
-    const firstFile = files[0];
     const title = fields.title
       || firstFile.filename.replace(/\.pdf$/i, "").replace(/[_-]/g, " ");
     const voice = fields.voice ?? "kokoro:af_heart";
@@ -177,7 +177,7 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
       .where(eq(bookFiles.bookId, bookId))
       .orderBy(desc(bookFiles.index))
       .limit(1);
-    const startIndex = lastFile.length > 0 ? lastFile[0].index + 1 : 0;
+    const startIndex = lastFile[0] ? lastFile[0].index + 1 : 0;
 
     const { files } = await saveUploadedFiles(request, pdfDir, startIndex);
 

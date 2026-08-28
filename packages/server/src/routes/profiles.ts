@@ -17,6 +17,7 @@ export const profilesRouter = router({
     .input(z.object({ name: z.string().trim().min(1).max(100) }))
     .mutation(async ({ input }) => {
       const [profile] = await db.insert(profiles).values({ name: input.name }).returning();
+      if (!profile) throw new Error("Failed to create the profile");
       return profile;
     }),
 

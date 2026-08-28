@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getDb, resetDb } from "../../test/setup.ts";
+import { getDb, resetDb, row as firstRow } from "../../test/setup.ts";
 import { books, chapters, chapterVariants } from "../schema.ts";
 import { eq } from "drizzle-orm";
 
@@ -41,7 +41,7 @@ async function insertFixture(
   await db.insert(books).values({ id: bookId, title: "Book", filename: "b.pdf", pdfPath: "/tmp/b.pdf" });
   const chapterId = crypto.randomUUID();
   await db.insert(chapters).values({ id: chapterId, bookId, index: 0, title: "Ch", rawText: SOURCE });
-  const [row] = await db
+  const row = firstRow(await db
     .insert(chapterVariants)
     .values({
       chapterId,
@@ -52,7 +52,7 @@ async function insertFixture(
       sourceHash: opts?.sourceHash,
       params: opts?.params,
     })
-    .returning();
+    .returning());
   return { bookId, chapterId, translationId: row.id };
 }
 
@@ -73,7 +73,7 @@ describe("translate worker", () => {
 
     await translate({ translationId, bookId }, helpers);
 
-    const [row] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId));
+    const row = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId)));
     expect(row.status).toBe("done");
     expect(row.progress).toBe(`${total}/${total}`);
     expect(row.text.split("\n\n")).toHaveLength(total);
@@ -100,7 +100,7 @@ describe("translate worker", () => {
 
     await translate({ translationId, bookId }, helpers);
 
-    const [row] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId));
+    const row = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId)));
     expect(row.status).toBe("suspended");
     expect(row.text).toBe("BG-1");
     expect(row.progress).toBe(`1/${total}`);
@@ -119,7 +119,7 @@ describe("translate worker", () => {
 
     await translate({ translationId, bookId }, helpers);
 
-    const [row] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId));
+    const row = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId)));
     expect(row.status).toBe("done");
     expect(row.text.startsWith("BG-DONE-1")).toBe(true);
     expect(mockTranslateChunk).toHaveBeenCalledTimes(total - 1);
@@ -132,7 +132,7 @@ describe("translate worker", () => {
 
     await translate({ translationId, bookId }, helpers);
 
-    const [row] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId));
+    const row = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId)));
     expect(row.status).toBe("done");
     expect(row.text.includes("STALE")).toBe(false);
     expect(mockTranslateChunk).toHaveBeenCalledTimes(splitIntoChunks(SOURCE).length);
@@ -150,7 +150,7 @@ describe("translate worker", () => {
 
     await translate({ translationId, bookId }, helpers);
 
-    const [row] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId));
+    const row = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId)));
     expect(row.status).toBe("done");
     expect(row.text.includes("OLD-SOURCE-PARTIAL")).toBe(false);
     expect(row.sourceHash).toBe(SOURCE_HASH);
@@ -164,7 +164,7 @@ describe("translate worker", () => {
     await translate({ translationId, bookId }, helpers);
 
     expect(mockTranslateChunk).not.toHaveBeenCalled();
-    const [row] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId));
+    const row = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId)));
     expect(row.status).toBe("suspended");
   });
 
@@ -203,7 +203,7 @@ describe("translate worker", () => {
 
     await translate({ translationId, bookId }, helpers);
 
-    const [row] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId));
+    const row = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId)));
     expect(row.title).toBe("Глава");
     expect(mockTranslateTitle).toHaveBeenCalledWith({
       title: "Ch",
@@ -237,7 +237,7 @@ describe("translate worker", () => {
 
     await translate({ translationId, bookId }, helpers);
 
-    const [row] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId));
+    const row = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId)));
     expect(row.title).toBe("Стара глава");
     expect(mockTranslateTitle).not.toHaveBeenCalled();
   });
@@ -262,7 +262,7 @@ describe("translate worker", () => {
 
     await translate({ translationId, bookId }, helpers);
 
-    const [row] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId));
+    const row = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId)));
     expect(row.text).toBe("BG-1");
     expect(row.runToken).toBe("newer-run");
     expect(mockTranslateChunk).toHaveBeenCalledTimes(2);
@@ -289,7 +289,7 @@ describe("translate worker", () => {
     expect(events.filter((e) => e.type === "thinking").length).toBeGreaterThan(0);
     expect(events.at(-1)).toEqual({ type: "status", status: "done" });
 
-    const [row] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId));
+    const row = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId)));
     const streamed = events.reduce(
       (text, e) => (e.type === "snapshot" ? e.text : e.type === "delta" ? text + e.text : text),
       "",
@@ -316,7 +316,7 @@ describe("translate worker", () => {
 
     await expect(translate({ translationId, bookId }, helpers)).rejects.toThrow("API down");
 
-    const [row] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId));
+    const row = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId)));
     expect(row.status).toBe("failed");
     expect(row.error).toBe("API down");
   });

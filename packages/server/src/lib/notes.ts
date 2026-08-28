@@ -19,5 +19,6 @@ export async function saveNote(input: {
     .insert(notes)
     .values({ ...input, profileId: profileId ?? DEFAULT_PROFILE_ID })
     .returning({ id: notes.id });
+  if (!note) throw new Error("Failed to save note");
   return note.id;
 }

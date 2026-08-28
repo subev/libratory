@@ -92,8 +92,7 @@ async function buildTocWindowText(window: PageWindow, pdfPath: string | undefine
 
 export function buildHeadingCatalog(blocks: FlatBlock[], excludePages: Set<number> = new Set()): HeadingCatalogEntry[] {
   const catalog: HeadingCatalogEntry[] = [];
-  for (let i = 0; i < blocks.length; i++) {
-    const b = blocks[i];
+  for (const [i, b] of blocks.entries()) {
     if (!b.included || b.type !== "SectionHeader" || excludePages.has(b.page)) continue;
     if (catalog.length >= MAX_CATALOG_ENTRIES) break;
     catalog.push({

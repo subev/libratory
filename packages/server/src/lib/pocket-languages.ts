@@ -25,7 +25,7 @@ export async function listPocketLanguages(): Promise<PocketLanguageState[]> {
     approxMb: language.approxMb,
     realtimeFactor: language.realtimeFactor,
     note: language.note,
-    installed: installed[i],
+    installed: installed[i] ?? false,
     downloading: downloads.downloading(language.code),
     error: downloads.error(language.code),
   }));

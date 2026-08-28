@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getDb, resetDb } from "../../test/setup.ts";
+import { getDb, resetDb, row } from "../../test/setup.ts";
 import { books, bookFiles, chapters } from "../schema.ts";
 import { eq, asc } from "drizzle-orm";
 
@@ -75,7 +75,7 @@ describe("extract worker", () => {
       expect.objectContaining({ jobKey: `assemble:${bookId}:original` }),
     );
 
-    const [book] = await db.select().from(books).where(eq(books.id, bookId));
+    const book = row(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.totalChapters).toBe(3);
   });
 
@@ -113,7 +113,7 @@ describe("extract worker", () => {
     const files = await db.select().from(bookFiles).where(eq(bookFiles.bookId, bookId)).orderBy(asc(bookFiles.index));
     expect(files.map((f) => f.status)).toEqual(["done", "done"]);
 
-    const [book] = await db.select().from(books).where(eq(books.id, bookId));
+    const book = row(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.totalChapters).toBe(5);
   });
 
@@ -205,9 +205,9 @@ describe("extract worker", () => {
     expect(chs).toHaveLength(2); // Only from the good file
 
     const files = await db.select().from(bookFiles).where(eq(bookFiles.bookId, bookId)).orderBy(asc(bookFiles.index));
-    expect(files[0].status).toBe("done");
-    expect(files[1].status).toBe("failed");
-    expect(files[1].error).toContain("corrupt");
+    expect(files[0]?.status).toBe("done");
+    expect(files[1]?.status).toBe("failed");
+    expect(files[1]?.error).toContain("corrupt");
   });
 
   it("fails the whole book when all files fail", async () => {
@@ -231,7 +231,7 @@ describe("extract worker", () => {
 
     await expect(extract({ bookId }, { addJob } as any)).rejects.toThrow();
 
-    const [book] = await db.select().from(books).where(eq(books.id, bookId));
+    const book = row(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.status).toBe("failed");
     expect(book.error).toContain("All 2 file(s) failed");
   });

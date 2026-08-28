@@ -21,14 +21,14 @@ describe("parseSayVoiceList", () => {
       locale: "bg_BG",
       sample: "Hello! My name is Daria.",
     });
-    expect(voices[2].slug).toBe("daria-enhanced");
-    expect(voices[2].name).toBe("Daria (Enhanced)");
+    expect(voices[2]?.slug).toBe("daria-enhanced");
+    expect(voices[2]?.name).toBe("Daria (Enhanced)");
   });
 
   it("keeps names with nested parentheses intact", () => {
     const voices = parseSayVoiceList(SAMPLE_OUTPUT);
-    expect(voices[3].name).toBe("Eddy (English (United States))");
-    expect(voices[3].slug).toBe("eddy-english-united-states");
+    expect(voices[3]?.name).toBe("Eddy (English (United States))");
+    expect(voices[3]?.slug).toBe("eddy-english-united-states");
   });
 
   it("handles dashed locales", () => {

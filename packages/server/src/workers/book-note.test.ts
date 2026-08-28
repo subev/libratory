@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getDb, resetDb } from "../../test/setup.ts";
+import { getDb, resetDb, row } from "../../test/setup.ts";
 import { books, bookFiles, notes } from "../schema.ts";
 import { eq } from "drizzle-orm";
 
@@ -63,18 +63,18 @@ describe("bookNote worker", () => {
     await bookNote({ bookId, prompt: "List the villains", model: "pro" });
 
     const db = getDb();
-    const [book] = await db.select().from(books).where(eq(books.id, bookId));
+    const book = row(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.noteJob?.status).toBe("done");
     expect(book.noteJob?.noteId).toBeTruthy();
 
-    const [note] = await db.select().from(notes).where(eq(notes.bookId, bookId));
+    const note = row(await db.select().from(notes).where(eq(notes.bookId, bookId)));
     expect(note).toMatchObject({
       prompt: "List the villains",
       model: "pro",
       result: "AI answer",
       scope: { kind: "book-raw", files: 1 },
     });
-    const userMessage = mockDeepseekChat.mock.calls[0][1] as string;
+    const userMessage = mockDeepseekChat.mock.calls[0]?.[1] as string;
     expect(userMessage).toContain("List the villains");
     expect(userMessage).toContain("Some raw book text.");
   });
@@ -86,7 +86,7 @@ describe("bookNote worker", () => {
     await expect(bookNote({ bookId, prompt: "Summarize", model: "flash" })).rejects.toThrow(/DEEPSEEK_API_KEY/);
 
     const db = getDb();
-    const [book] = await db.select().from(books).where(eq(books.id, bookId));
+    const book = row(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.noteJob?.status).toBe("failed");
     expect(mockDeepseekChat).not.toHaveBeenCalled();
   });
@@ -97,7 +97,7 @@ describe("bookNote worker", () => {
     await expect(bookNote({ bookId, prompt: "Summarize", model: "flash" })).rejects.toThrow(/no raw text/i);
 
     const db = getDb();
-    const [book] = await db.select().from(books).where(eq(books.id, bookId));
+    const book = row(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.noteJob?.status).toBe("failed");
   });
 
@@ -108,7 +108,7 @@ describe("bookNote worker", () => {
     await expect(bookNote({ bookId, prompt: "Summarize", model: "flash" })).rejects.toThrow(/500/);
 
     const db = getDb();
-    const [book] = await db.select().from(books).where(eq(books.id, bookId));
+    const book = row(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.noteJob?.status).toBe("failed");
     expect(book.noteJob?.error).toContain("500");
     expect(await db.select().from(notes)).toHaveLength(0);

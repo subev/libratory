@@ -35,8 +35,9 @@ const askSchema = z.object({
 
 function lastUserText(messages: UIMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role !== "user") continue;
-    return (messages[i].parts ?? [])
+    const message = messages[i];
+    if (message?.role !== "user") continue;
+    return (message.parts ?? [])
       .filter((p): p is { type: "text"; text: string } => p.type === "text")
       .map((p) => p.text)
       .join("\n")

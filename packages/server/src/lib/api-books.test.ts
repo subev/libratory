@@ -49,12 +49,12 @@ describe("createApiBook", () => {
 
     const rows = await db.select().from(chapters).where(eq(chapters.bookId, book.id)).orderBy(asc(chapters.index));
     expect(rows.map((r) => r.status)).toEqual(["suspended", "suspended"]);
-    expect(rows[0].cleanText).toBe("Chapter one text.");
-    expect(rows[0].source).toEqual({ kind: "url", url: "https://example.com/one", title: "Story one" });
-    expect(rows[1].source).toEqual({ kind: "api", client: "hn-top10" });
+    expect(rows[0]?.cleanText).toBe("Chapter one text.");
+    expect(rows[0]?.source).toEqual({ kind: "url", url: "https://example.com/one", title: "Story one" });
+    expect(rows[1]?.source).toEqual({ kind: "api", client: "hn-top10" });
 
     expect(mockQuickAddJob).toHaveBeenCalledTimes(1);
-    expect(mockQuickAddJob.mock.calls[0][1]).toBe("indexBook");
+    expect(mockQuickAddJob.mock.calls[0]?.[1]).toBe("indexBook");
   });
 
   it("queues synthesize directly when synthesize is set — chapters are pre-normalized", async () => {

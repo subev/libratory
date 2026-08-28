@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { getDb, resetDb, ensureGraphileTables } from "../../test/setup.ts";
+import { getDb, resetDb, ensureGraphileTables, row as firstRow } from "../../test/setup.ts";
 import { books, chapters, chapterVariants } from "../schema.ts";
 import { eq } from "drizzle-orm";
 
@@ -53,7 +53,7 @@ describe("variants router", () => {
       { translationId: row!.id, bookId },
       { maxAttempts: 1 },
     );
-    const [book] = await db.select().from(books).where(eq(books.id, bookId));
+    const book = firstRow(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.translationLanguage).toBe("Bulgarian");
   });
 
@@ -160,17 +160,17 @@ describe("variants router", () => {
     const row = await caller.stop({ chapterId, key: "Bulgarian" });
 
     expect(row).toBeNull();
-    const [kept] = await db.select().from(chapterVariants).where(eq(chapterVariants.chapterId, chapterId));
+    const kept = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.chapterId, chapterId)));
     expect(kept.status).toBe("done");
   });
 
   it("queueAudio enqueues synthesis for a finished translation", async () => {
     const db = getDb();
     const { bookId, chapterId } = await insertFixture(db);
-    const [row] = await db
+    const variant = firstRow(await db
       .insert(chapterVariants)
       .values({ chapterId, key: "Bulgarian", status: "done", text: "bg text" })
-      .returning();
+      .returning());
 
     const updated = await caller.queueAudio({ chapterId, key: "Bulgarian" });
 
@@ -178,7 +178,7 @@ describe("variants router", () => {
     expect(mockQuickAddJob).toHaveBeenCalledWith(
       expect.anything(),
       "synthesizeTranslation",
-      { translationId: row.id, bookId, resume: false },
+      { translationId: variant.id, bookId, resume: false },
       { maxAttempts: 1 },
     );
   });
@@ -211,12 +211,12 @@ describe("variants router", () => {
 
     expect(result.queued).toBe(2);
     expect(mockQuickAddJob).toHaveBeenCalledTimes(2);
-    const [created] = await db.select().from(chapterVariants).where(eq(chapterVariants.chapterId, chapterId));
+    const created = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.chapterId, chapterId)));
     expect(created.status).toBe("pending");
-    const [resumed] = await db.select().from(chapterVariants).where(eq(chapterVariants.chapterId, suspendedId));
+    const resumed = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.chapterId, suspendedId)));
     expect(resumed.status).toBe("pending");
     expect(resumed.text).toBe("partial");
-    const [book] = await db.select().from(books).where(eq(books.id, bookId));
+    const book = firstRow(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.translationLanguage).toBe("Bulgarian");
   });
 
@@ -265,7 +265,7 @@ describe("variants router", () => {
     expect(result.queued).toBe(2);
     expect(result.deferred).toBe(1);
     expect(mockQuickAddJob).toHaveBeenCalledTimes(1);
-    const [translating] = await db.select().from(chapterVariants).where(eq(chapterVariants.chapterId, chapterId));
+    const translating = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.chapterId, chapterId)));
     expect(translating.audioStatus).toBe("pending");
     expect(translating.status).toBe("translating");
   });
@@ -284,8 +284,8 @@ describe("variants router", () => {
     const result = await caller.stopAudio({ bookId, key: "Bulgarian" });
 
     expect(result.stopped).toBe(1);
-    const [row] = await db.select().from(chapterVariants).where(eq(chapterVariants.chapterId, chapterId));
-    expect(row.audioStatus).toBe("suspended");
+    const stopped = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.chapterId, chapterId)));
+    expect(stopped.audioStatus).toBe("suspended");
   });
 
   it("list aggregates per-variant counts with kind and label", async () => {
@@ -317,7 +317,7 @@ describe("variants router", () => {
 
     const list = await caller.listForBook({ bookId, key: "Bulgarian" });
     expect(list).toHaveLength(1);
-    expect(list[0].key).toBe("Bulgarian");
+    expect(list[0]?.key).toBe("Bulgarian");
   });
 
   it("listForBook counts words in the translated text", async () => {
@@ -354,7 +354,7 @@ describe("variants router", () => {
       { translationId: row!.id, bookId },
       { maxAttempts: 1 },
     );
-    const [book] = await db.select().from(books).where(eq(books.id, bookId));
+    const book = firstRow(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.translationLanguage).toBe("eli5");
   });
 
@@ -432,7 +432,7 @@ describe("variants router", () => {
     const result = await caller.processSelected({ bookId, key: "custom-noir" });
 
     expect(result.queued).toBe(1);
-    const [cloned] = await db.select().from(chapterVariants).where(eq(chapterVariants.chapterId, secondId));
+    const cloned = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.chapterId, secondId)));
     expect(cloned.kind).toBe("transform");
     expect(cloned.label).toBe("Noir");
     expect(cloned.prompt).toBe("Rewrite as noir.");
@@ -453,7 +453,7 @@ describe("variants router", () => {
     await caller.setVoice({ bookId, key: "Bulgarian", speed: 1.2 });
     await caller.setVoice({ bookId, key: "eli5", voice: "af_bella" });
 
-    const [book] = await db.select().from(books).where(eq(books.id, bookId));
+    const book = firstRow(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.variantVoices).toEqual({
       Bulgarian: { voice: "bg-mlx:narrator", speed: 1.2 },
       eli5: { voice: "af_bella" },

@@ -41,7 +41,7 @@ describe("searchLibrary (keyword mode, real Postgres)", () => {
     await insertBookWithChunk("Bitwise tricks count subsets in binary representation.");
     const result = await searchLibrary({ profileId: DEFAULT_PROFILE_ID, query: "binary subsets", mode: "keyword" });
     expect(result.hits).toHaveLength(1);
-    expect(result.hits[0].text).toContain("binary");
+    expect(result.hits[0]?.text).toContain("binary");
   });
 
   it("folder scope restricts to the folder subtree (regression: array param SQL shape)", async () => {
@@ -53,7 +53,7 @@ describe("searchLibrary (keyword mode, real Postgres)", () => {
 
     const scoped = await searchLibrary({ profileId: DEFAULT_PROFILE_ID, folderId, query: "binary", mode: "keyword" });
     expect(scoped.hits).toHaveLength(1);
-    expect(scoped.hits[0].text).toContain("inside the folder");
+    expect(scoped.hits[0]?.text).toContain("inside the folder");
   });
 
   it("book scope restricts to one book", async () => {
@@ -62,6 +62,6 @@ describe("searchLibrary (keyword mode, real Postgres)", () => {
 
     const result = await searchLibrary({ profileId: DEFAULT_PROFILE_ID, bookId: target, query: "binary", mode: "keyword" });
     expect(result.hits).toHaveLength(1);
-    expect(result.hits[0].bookId).toBe(target);
+    expect(result.hits[0]?.bookId).toBe(target);
   });
 });

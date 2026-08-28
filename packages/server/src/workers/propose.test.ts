@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getDb, resetDb } from "../../test/setup.ts";
+import { getDb, resetDb, row } from "../../test/setup.ts";
 import { books } from "../schema.ts";
 import { eq } from "drizzle-orm";
 
@@ -72,7 +72,7 @@ describe("propose worker", () => {
 
     await propose({ bookId, method: "deterministic" });
 
-    const [book] = await db.select().from(books).where(eq(books.id, bookId));
+    const book = row(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.chapterProposal?.status).toBe("done");
     expect(book.chapterProposal?.detection).toBe("numbered-headings");
     expect(book.chapterProposal?.boundaries).toEqual([
@@ -104,7 +104,7 @@ describe("propose worker", () => {
 
     expect(mockLlm).toHaveBeenCalledWith(expect.anything(), expect.anything(), { translateTo: "English" });
 
-    const [book] = await db.select().from(books).where(eq(books.id, bookId));
+    const book = row(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.chapterProposal?.status).toBe("done");
     expect(book.chapterProposal?.detection).toBe("llm");
     expect(book.chapterProposal?.boundaries).toEqual([
@@ -121,7 +121,7 @@ describe("propose worker", () => {
 
     await propose({ bookId, method: "llm" });
 
-    const [book] = await db.select().from(books).where(eq(books.id, bookId));
+    const book = row(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.chapterProposal?.status).toBe("done");
     expect(book.chapterProposal?.boundaries).toEqual([]);
   });
@@ -133,7 +133,7 @@ describe("propose worker", () => {
 
     await expect(propose({ bookId, method: "deterministic" })).rejects.toThrow("no marker output");
 
-    const [book] = await db.select().from(books).where(eq(books.id, bookId));
+    const book = row(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.chapterProposal?.status).toBe("failed");
     expect(book.chapterProposal?.error).toContain("no marker output");
   });

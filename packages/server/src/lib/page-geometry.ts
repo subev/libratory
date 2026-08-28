@@ -147,7 +147,7 @@ function findGutter(boxes: GeometryLine["b"][], content: Rect, pageWidth: number
   for (const box of boxes) {
     const from = Math.max(0, Math.floor(box[0] - content[0]));
     const to = Math.min(bins, Math.ceil(box[2] - content[0]));
-    for (let i = from; i < to; i++) coverage[i]++;
+    for (let i = from; i < to; i++) coverage[i] = (coverage[i] ?? 0) + 1;
   }
 
   const tolerance = Math.max(1, Math.round(boxes.length * GUTTER_TOLERANCE_FRACTION));
@@ -156,7 +156,7 @@ function findGutter(boxes: GeometryLine["b"][], content: Rect, pageWidth: number
   let runStart = -1;
 
   for (let i = 0; i <= bins; i++) {
-    const empty = i < bins && coverage[i] <= tolerance;
+    const empty = i < bins && (coverage[i] ?? 0) <= tolerance;
     if (empty && runStart < 0) runStart = i;
     if (!empty && runStart >= 0) {
       const width = i - runStart;
@@ -189,7 +189,9 @@ function clampLeft(rect: Rect, x: number): Rect {
 }
 
 function union(boxes: GeometryLine["b"][]): Rect {
-  let [x0, y0, x1, y1] = boxes[0];
+  const [head] = boxes;
+  if (!head) return [0, 0, 0, 0];
+  let [x0, y0, x1, y1] = head;
   for (const box of boxes) {
     x0 = Math.min(x0, box[0]);
     y0 = Math.min(y0, box[1]);

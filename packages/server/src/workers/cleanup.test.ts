@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getDb, resetDb } from "../../test/setup.ts";
+import { getDb, resetDb, row as firstRow } from "../../test/setup.ts";
 import { books, chapters, type ChapterCleanup } from "../schema.ts";
 import { eq } from "drizzle-orm";
 
@@ -59,7 +59,7 @@ describe("cleanup worker", () => {
 
     await cleanup({ chapterId, bookId });
 
-    const [row] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
+    const row = firstRow(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
     expect(row.cleanup?.status).toBe("done");
     expect(row.cleanup?.progress).toBe(`${total}/${total}`);
     expect(row.customText?.split("\n\n")).toHaveLength(total);
@@ -75,7 +75,7 @@ describe("cleanup worker", () => {
     await cleanup({ chapterId, bookId });
 
     expect(mockCleanupChunk).toHaveBeenCalledWith({ text: "Edited once." });
-    const [row] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
+    const row = firstRow(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
     expect(row.customText).toBe("Edited once, cleaned.");
   });
 
@@ -89,7 +89,7 @@ describe("cleanup worker", () => {
 
     await cleanup({ chapterId, bookId });
 
-    const [row] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
+    const row = firstRow(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
     expect(row.cleanup?.status).toBe("done");
     expect(row.customText?.split("\n\n")).toHaveLength(total - 1);
   });
@@ -101,7 +101,7 @@ describe("cleanup worker", () => {
 
     await expect(cleanup({ chapterId, bookId })).rejects.toThrow("removed all text");
 
-    const [row] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
+    const row = firstRow(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
     expect(row.cleanup?.status).toBe("failed");
     expect(row.cleanup?.error).toContain("removed all text");
     expect(row.customText).toBeNull();
@@ -117,7 +117,7 @@ describe("cleanup worker", () => {
     await cleanup({ chapterId, bookId });
 
     expect(mockCleanupChunk).not.toHaveBeenCalled();
-    const [row] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
+    const row = firstRow(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
     expect(row.cleanup?.status).toBe("suspended");
   });
 
@@ -131,7 +131,7 @@ describe("cleanup worker", () => {
     mockCleanupChunk.mockImplementation(async () => {
       calls++;
       if (calls === 1) {
-        const [current] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
+        const current = firstRow(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
         await db
           .update(chapters)
           .set({ cleanup: { ...current.cleanup!, status: "suspended" } })
@@ -142,7 +142,7 @@ describe("cleanup worker", () => {
 
     await cleanup({ chapterId, bookId });
 
-    const [row] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
+    const row = firstRow(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
     expect(row.cleanup?.status).toBe("suspended");
     expect(row.customText).toBeNull();
     expect(mockCleanupChunk).toHaveBeenCalledTimes(1);
@@ -158,7 +158,7 @@ describe("cleanup worker", () => {
     mockCleanupChunk.mockImplementation(async () => {
       calls++;
       if (calls === 1) {
-        const [current] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
+        const current = firstRow(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
         await db
           .update(chapters)
           .set({ cleanup: { ...current.cleanup!, runToken: "newer-run" } })
@@ -169,7 +169,7 @@ describe("cleanup worker", () => {
 
     await cleanup({ chapterId, bookId });
 
-    const [row] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
+    const row = firstRow(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
     expect(row.cleanup?.runToken).toBe("newer-run");
     expect(row.customText).toBeNull();
     expect(mockCleanupChunk).toHaveBeenCalledTimes(1);
@@ -182,7 +182,7 @@ describe("cleanup worker", () => {
 
     await expect(cleanup({ chapterId, bookId })).rejects.toThrow("API down");
 
-    const [row] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
+    const row = firstRow(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
     expect(row.cleanup?.status).toBe("failed");
     expect(row.cleanup?.error).toBe("API down");
     expect(row.customText).toBeNull();

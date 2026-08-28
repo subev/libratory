@@ -87,6 +87,7 @@ export function groupHits(hits: SearchHit[], query: string, limit: number): Sear
   for (const [key, group] of byGroup) {
     void key;
     const [top] = group;
+    if (!top) continue;
     const twin = sorted.find(
       (h) =>
         h !== top &&
@@ -111,14 +112,15 @@ export function groupHits(hits: SearchHit[], query: string, limit: number): Sear
     if (count >= PER_BOOK) continue;
     if (hit.source === "raw") {
       const twinIdx = out.findIndex((o) => o.bookId === hit.bookId && o.source !== "raw" && pagesOverlap(o, hit));
-      if (twinIdx !== -1) {
-        out[twinIdx] = { ...out[twinIdx], pageStart: hit.pageStart, pageEnd: hit.pageEnd };
+      const twin = out[twinIdx];
+      if (twin) {
+        out[twinIdx] = { ...twin, pageStart: hit.pageStart, pageEnd: hit.pageEnd };
         continue;
       }
     } else {
       const rawTwinIdx = out.findIndex((o) => o.bookId === hit.bookId && o.source === "raw" && pagesOverlap(o, hit));
-      if (rawTwinIdx !== -1) {
-        const raw = out[rawTwinIdx];
+      const raw = out[rawTwinIdx];
+      if (raw) {
         out[rawTwinIdx] = { ...hit, pageStart: raw.pageStart, pageEnd: raw.pageEnd, score: raw.score };
         continue;
       }

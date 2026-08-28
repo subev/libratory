@@ -58,7 +58,7 @@ export async function buildSyncMapFromChunks(chunkDir: string, totalMs: number):
   let prevEnd = 0;
   const chunks: SyncChunk[] = previews.map((preview, i) => {
     const startMs = prevEnd;
-    cursor += durations[i] * scale + gap;
+    cursor += (durations[i] ?? 0) * scale + gap;
     const endMs = Math.min(Math.max(Math.round(cursor), startMs + 1), totalMs);
     prevEnd = endMs;
     // Word timings are relative to the chunk's own audio, so they take the same scale

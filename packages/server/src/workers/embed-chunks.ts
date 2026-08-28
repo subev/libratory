@@ -28,10 +28,11 @@ export async function embedChunks({ bookId }: EmbedChunksPayload) {
     return;
   }
 
-  const [{ total }] = await db
+  const [pending] = await db
     .select({ total: sql<number>`count(*)::int` })
     .from(bookChunks)
     .where(and(eq(bookChunks.bookId, bookId), isNull(bookChunks.embedding)));
+  const total = pending?.total ?? 0;
 
   try {
     let done = 0;
@@ -46,8 +47,10 @@ export async function embedChunks({ bookId }: EmbedChunksPayload) {
       if (rows.length === 0) break;
 
       const vectors = await embedTexts(rows.map((r) => r.text));
-      for (let i = 0; i < rows.length; i++) {
-        await db.update(bookChunks).set({ embedding: vectors[i] }).where(eq(bookChunks.id, rows[i].id));
+      // Short of a vector each the batch would re-select the same rows forever
+      if (vectors.length !== rows.length) throw new Error("Embedding model returned fewer vectors than chunks");
+      for (const [i, chunk] of rows.entries()) {
+        await db.update(bookChunks).set({ embedding: vectors[i] }).where(eq(bookChunks.id, chunk.id));
       }
       done += rows.length;
       if (++batches % 5 === 0) await setJob(bookId, { progress: `embedded ${done}/${total}` });

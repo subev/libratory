@@ -46,14 +46,15 @@ export async function buildAskContext(scope: AskScope): Promise<AskContext> {
     .from(chapters)
     .where(inArray(chapters.id, scope.chapterIds))
     .orderBy(chapters.index);
-  if (rows.length === 0) throw new Error("Chapters not found");
+  const [firstChapter] = rows;
+  if (!firstChapter) throw new Error("Chapters not found");
 
   return {
     system: chaptersSystem(rows.length),
     corpus: rows
       .map((ch) => `Chapter ${ch.index + 1}: "${ch.title}"\n\n${ch.customText ?? ch.cleanText ?? ch.rawText}`)
       .join("\n\n---\n\n"),
-    bookId: rows[0].bookId,
+    bookId: firstChapter.bookId,
     noteScope: { kind: "chapters", chapters: rows.map((ch) => ({ id: ch.id, title: ch.title })) },
   };
 }

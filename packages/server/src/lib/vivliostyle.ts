@@ -12,7 +12,9 @@ function resolveCliBin(): string {
   const require = createRequire(import.meta.url);
   const pkgPath = require.resolve("@vivliostyle/cli/package.json");
   const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { bin: Record<string, string> };
-  return path.join(path.dirname(pkgPath), pkg.bin.vivliostyle);
+  const bin = pkg.bin.vivliostyle;
+  if (!bin) throw new Error("@vivliostyle/cli exposes no vivliostyle binary");
+  return path.join(path.dirname(pkgPath), bin);
 }
 
 // Vivliostyle fetches its own browser on first use, into this cache. Knowing whether it is there

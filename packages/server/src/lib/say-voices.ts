@@ -14,10 +14,10 @@ export function sayVoiceSlug(name: string): string {
 export function parseSayVoiceList(output: string): SayVoice[] {
   const voices: SayVoice[] = [];
   for (const line of output.split("\n")) {
-    const match = line.match(/^(.+?)\s+([a-z]{2,3}[_-][A-Za-z0-9_-]+)\s*#\s?(.*)$/);
-    if (!match) continue;
-    const name = match[1].trim();
-    voices.push({ slug: sayVoiceSlug(name), name, locale: match[2], sample: match[3].trim() });
+    const [, rawName, locale, sample] = line.match(/^(.+?)\s+([a-z]{2,3}[_-][A-Za-z0-9_-]+)\s*#\s?(.*)$/) ?? [];
+    if (rawName === undefined || locale === undefined || sample === undefined) continue;
+    const name = rawName.trim();
+    voices.push({ slug: sayVoiceSlug(name), name, locale, sample: sample.trim() });
   }
   return voices;
 }

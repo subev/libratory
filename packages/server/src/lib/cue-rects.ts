@@ -50,16 +50,10 @@ export function rectsForRange(
 type Box = [number, number, number, number];
 
 function polygonBox(polygon: number[][] | undefined): Box | null {
-  if (!polygon || polygon.length === 0) return null;
-  let [x0, y0] = polygon[0];
-  let [x1, y1] = polygon[0];
-  for (const [x, y] of polygon) {
-    x0 = Math.min(x0, x);
-    y0 = Math.min(y0, y);
-    x1 = Math.max(x1, x);
-    y1 = Math.max(y1, y);
-  }
-  return [x0, y0, x1, y1];
+  const xs = polygon?.map((point) => point[0]).filter((v) => v !== undefined) ?? [];
+  const ys = polygon?.map((point) => point[1]).filter((v) => v !== undefined) ?? [];
+  if (xs.length === 0 || ys.length === 0) return null;
+  return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
 }
 
 type BlockAlignment = {
@@ -101,7 +95,7 @@ function alignment(
         const comparable = Math.min(block.value.length, linesProjection.value.length);
         if (matched < comparable * MIN_ALIGNMENT) return null;
 
-        const map = aligned.map((at) => (at === -1 ? -1 : linesProjection.map[at]));
+        const map = aligned.map((at) => (at === -1 ? -1 : (linesProjection.map[at] ?? -1)));
         return { lines, origin: joined.origin, map, blockMap: block.map };
       })()
     : null;
@@ -119,7 +113,7 @@ const RESYNC_WINDOW = 64;
 const MIN_ALIGNMENT = 0.6;
 
 function alignProjections(block: string, lines: string): number[] {
-  const map = new Array<number>(block.length).fill(-1);
+  const map: number[] = Array.from({ length: block.length }, () => -1);
   let i = 0;
   let j = 0;
 
@@ -144,23 +138,35 @@ function rectsFromLines(aligned: BlockAlignment, from: number, to: number): Box[
 
   let first = -1;
   let last = -1;
-  for (let i = start; i < end; i++) if (aligned.map[i] !== -1) { first = aligned.map[i]; break; }
-  for (let i = end - 1; i >= start; i--) if (aligned.map[i] !== -1) { last = aligned.map[i]; break; }
+  for (let i = start; i < end; i++) {
+    const at = aligned.map[i];
+    if (at !== undefined && at !== -1) { first = at; break; }
+  }
+  for (let i = end - 1; i >= start; i--) {
+    const at = aligned.map[i];
+    if (at !== undefined && at !== -1) { last = at; break; }
+  }
   if (first === -1 || last < first) return null;
 
   const spans = new Map<number, { from: number; to: number }>();
   for (let i = first; i <= last; i++) {
     const at = aligned.origin[i];
+    if (!at) continue;
     const current = spans.get(at.line);
     if (current) current.to = at.column + 1;
     else spans.set(at.line, { from: at.column, to: at.column + 1 });
   }
 
-  const rects = [...spans.entries()].map(([index, span]) => lineRect(aligned.lines[index], span.from, span.to));
-  if (rects.length <= 3) return rects;
+  const rects = [...spans.entries()].flatMap(([index, span]) => {
+    const line = aligned.lines[index];
+    return line ? [lineRect(line, span.from, span.to)] : [];
+  });
+  const [head, ...rest] = rects;
+  const tail = rest.at(-1);
+  if (rects.length <= 3 || !head || !tail) return rects;
 
   // The shape a text selection takes: partial first line, solid middle, partial last line
-  return [rects[0], unionBox(rects.slice(1, -1)), rects[rects.length - 1]];
+  return [head, unionBox(rest.slice(0, -1)), tail];
 }
 
 function centreInside(line: GeometryLine["b"], box: Box): boolean {
@@ -173,18 +179,19 @@ function centreInside(line: GeometryLine["b"], box: Box): boolean {
 }
 
 function lineRect(line: GeometryLine, from: number, to: number): Box {
-  if (!line.xs || from >= to) return [line.b[0], line.b[1], line.b[2], line.b[3]];
-  const x0 = line.xs[Math.min(from, line.xs.length - 1)];
-  const x1 = line.xs[Math.min(to, line.xs.length - 1)];
+  const xs = line.xs;
+  const x0 = xs?.[Math.min(from, xs.length - 1)];
+  const x1 = xs?.[Math.min(to, xs.length - 1)];
+  if (from >= to || x0 === undefined || x1 === undefined) return [line.b[0], line.b[1], line.b[2], line.b[3]];
   return [Math.min(x0, x1), line.b[1], Math.max(x0, x1), line.b[3]];
 }
 
 function joinLines(lines: GeometryLine[]): { text: string; origin: { line: number; column: number }[] } {
   let text = "";
   const origin: { line: number; column: number }[] = [];
-  for (let line = 0; line < lines.length; line++) {
-    for (let column = 0; column < lines[line].t.length; column++) {
-      text += lines[line].t[column];
+  for (const [line, { t }] of lines.entries()) {
+    for (let column = 0; column < t.length; column++) {
+      text += t[column] ?? "";
       origin.push({ line, column });
     }
   }
@@ -197,7 +204,7 @@ function projectedIndex(map: number[], sourceIndex: number): number {
   let high = map.length;
   while (low < high) {
     const mid = (low + high) >> 1;
-    if (map[mid] < sourceIndex) low = mid + 1;
+    if ((map[mid] ?? Number.POSITIVE_INFINITY) < sourceIndex) low = mid + 1;
     else high = mid;
   }
   return low;
@@ -208,15 +215,18 @@ function project(text: string): { value: string; map: number[] } {
   let value = "";
   const map: number[] = [];
   for (let i = 0; i < text.length; i++) {
-    if (!/[\p{L}\p{N}]/u.test(text[i])) continue;
-    value += text[i].toLowerCase();
+    const ch = text[i];
+    if (!ch || !/[\p{L}\p{N}]/u.test(ch)) continue;
+    value += ch.toLowerCase();
     map.push(i);
   }
   return { value, map };
 }
 
 function unionBox(boxes: Box[]): Box {
-  let [x0, y0, x1, y1] = boxes[0];
+  const [head] = boxes;
+  if (!head) return [0, 0, 0, 0];
+  let [x0, y0, x1, y1] = head;
   for (const box of boxes) {
     x0 = Math.min(x0, box[0]);
     y0 = Math.min(y0, box[1]);
@@ -250,5 +260,5 @@ function capRects(perBlock: CueRect[][]): CueRect[] {
 
 function coverRects(rects: CueRect[]): CueRect {
   const box = unionBox(rects.map((rect) => [rect[1], rect[2], rect[1] + rect[3], rect[2] + rect[4]]));
-  return [rects[0][0], box[0], box[1], box[2] - box[0], box[3] - box[1]];
+  return [rects[0]?.[0] ?? 0, box[0], box[1], box[2] - box[0], box[3] - box[1]];
 }

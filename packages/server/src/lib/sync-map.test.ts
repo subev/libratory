@@ -33,8 +33,8 @@ describe("sync map", () => {
 
   async function writeChunks(durations: number[], withManifest = true) {
     await mkdir(dir, { recursive: true });
-    for (let i = 0; i < durations.length; i++) {
-      await writeFile(path.join(dir, `chunk-${String(i + 1).padStart(3, "0")}.wav`), wavBytes(durations[i]));
+    for (const [i, duration] of durations.entries()) {
+      await writeFile(path.join(dir, `chunk-${String(i + 1).padStart(3, "0")}.wav`), wavBytes(duration));
     }
     if (withManifest) {
       await writeFile(
@@ -92,8 +92,9 @@ describe("sync map", () => {
 
     const map = await buildSyncMapFromChunks(dir, 1500);
     expect(map!.version).toBe(2);
-    expect(map!.chunks[0].words).toBeUndefined();
-    expect(map!.chunks[1].words).toEqual([
+    expect(map!.chunks).toHaveLength(2);
+    expect(map!.chunks[0]?.words).toBeUndefined();
+    expect(map!.chunks[1]?.words).toEqual([
       { text: "Chunk", after: " ", startMs: 1000, endMs: 1200 },
       { text: "2.", after: "", startMs: 1200, endMs: 1500 },
     ]);

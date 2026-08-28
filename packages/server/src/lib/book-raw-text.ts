@@ -18,9 +18,10 @@ export async function getBookRawText(bookId: string): Promise<BookRawText | null
   const withText = files.filter((f) => f.rawText);
   if (withText.length === 0) return null;
 
+  const [only] = withText;
   const text =
-    withText.length === 1
-      ? withText[0].rawText!
+    withText.length === 1 && only?.rawText
+      ? only.rawText
       : withText.map((f) => `File ${f.index + 1}: "${f.filename}"\n\n${f.rawText}`).join("\n\n---\n\n");
 
   return { text, fileCount: withText.length, missingCount: files.length - withText.length };

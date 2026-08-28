@@ -149,8 +149,9 @@ function normalizeWithMap(text: string): { norm: string; map: number[] } {
   let norm = "";
   const map: number[] = [];
   for (let i = 0; i < text.length; i++) {
-    if (!/\s/.test(text[i])) {
-      norm += text[i];
+    const ch = text[i];
+    if (ch && !/\s/.test(ch)) {
+      norm += ch;
       map.push(i);
     }
   }
@@ -179,7 +180,10 @@ export function locateChunks(
     if (at === -1) return null;
 
     cursor = at + needle.length;
-    return { start: map[at], end: map[at + needle.length - 1] + 1 };
+    const start = map[at];
+    const end = map[at + needle.length - 1];
+    if (start === undefined || end === undefined) return null;
+    return { start, end: end + 1 };
   });
 }
 
@@ -204,7 +208,7 @@ export function pageAtOffset(sourceBlocks: SourceBlock[], rawTextLength: number,
     pos += block.text.length + 2;
     if (scaled < pos) return block.page;
   }
-  return included[included.length - 1].page;
+  return included.at(-1)?.page ?? null;
 }
 
 export function blocksAtRange(textMap: ChapterTextMap, start: number, end: number): number[] {

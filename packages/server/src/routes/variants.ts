@@ -229,6 +229,7 @@ export const variantsRouter = router({
           })
           .where(eq(chapterVariants.id, existing.id))
           .returning({ id: chapterVariants.id });
+        if (!updated) throw new Error("Failed to update the variant");
         variantId = updated.id;
         await deleteQueuedTranslateJobs([variantId]);
         await appendLog(chapter.bookId, `[Ch ${chapter.index + 1}] ${queuedLogLine(existing, input.key)}`);
@@ -243,6 +244,7 @@ export const variantsRouter = router({
           .insert(chapterVariants)
           .values({ chapterId: input.chapterId, key: input.key, ...spec })
           .returning({ id: chapterVariants.id });
+        if (!created) throw new Error("Failed to create the variant");
         variantId = created.id;
         await appendLog(chapter.bookId, `[Ch ${chapter.index + 1}] ${queuedLogLine(spec, input.key)}`);
       }
@@ -313,6 +315,7 @@ export const variantsRouter = router({
           })
           .where(eq(chapterVariants.id, existing.id))
           .returning({ id: chapterVariants.id });
+        if (!updated) throw new Error("Failed to update the variant");
         variantId = updated.id;
         await deleteQueuedTranslateJobs([variantId]);
       } else {
@@ -320,6 +323,7 @@ export const variantsRouter = router({
           .insert(chapterVariants)
           .values({ chapterId: input.chapterId, key, ...spec })
           .returning({ id: chapterVariants.id });
+        if (!created) throw new Error("Failed to create the variant");
         variantId = created.id;
       }
 
@@ -376,6 +380,7 @@ export const variantsRouter = router({
             .insert(chapterVariants)
             .values({ chapterId: r.chapterId, key: input.key, ...spec })
             .returning({ id: chapterVariants.id });
+          if (!created) throw new Error("Failed to create the variant");
           variantIds.push(created.id);
         }
       }

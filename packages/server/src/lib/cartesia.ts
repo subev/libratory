@@ -88,8 +88,9 @@ async function fetchAllCartesiaVoices(): Promise<CartesiaVoice[]> {
       gender: v.gender,
       tagline: v.tagline ?? "",
     })));
-    if (!body.has_more || body.data.length === 0) break;
-    startingAfter = body.data[body.data.length - 1].id;
+    const last = body.data.at(-1);
+    if (!body.has_more || !last) break;
+    startingAfter = last.id;
   }
   return voices;
 }
@@ -224,7 +225,7 @@ export async function cartesiaSynthesize({
   try {
     await out.write(pcm16WavHeader(0, SAMPLE_RATE));
 
-    for (let i = 0; i < chunks.length; i++) {
+    for (const [i, chunkText] of chunks.entries()) {
       if (signal?.aborted) throw new CartesiaAbortedError();
 
       const chunkPath = chunkPreviewDir ? path.join(chunkPreviewDir, `chunk-${String(i + 1).padStart(3, "0")}.wav`) : null;
@@ -232,7 +233,7 @@ export async function cartesiaSynthesize({
       if (!pcm) {
         let chunk: ChunkAudio;
         try {
-          chunk = await synthesizeChunkPcm(voiceId, language, chunks[i], speed, signal);
+          chunk = await synthesizeChunkPcm(voiceId, language, chunkText, speed, signal);
         } catch (err) {
           if (signal?.aborted) throw new CartesiaAbortedError();
           throw err;

@@ -9,10 +9,11 @@ const allBooks = await db.select({ id: books.id, title: books.title, filename: b
 
 let queued = 0;
 for (const book of allBooks) {
-  const [{ total }] = await db
+  const [counted] = await db
     .select({ total: sql<number>`count(*)::int` })
     .from(bookFiles)
     .where(eq(bookFiles.bookId, book.id));
+  const total = counted?.total ?? 0;
 
   if (total === 0) {
     if (!book.pdfPath) continue;
@@ -25,11 +26,11 @@ for (const book of allBooks) {
       status: "done",
     });
   } else {
-    const [{ missing }] = await db
+    const [uncovered] = await db
       .select({ missing: sql<number>`count(*)::int` })
       .from(bookFiles)
       .where(and(eq(bookFiles.bookId, book.id), isNull(bookFiles.rawText)));
-    if (missing === 0) continue;
+    if ((uncovered?.missing ?? 0) === 0) continue;
   }
 
   await quickAddJob({ connectionString: env.DATABASE_URL }, "rawExtract", { bookId: book.id }, { maxAttempts: 1 });

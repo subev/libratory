@@ -227,7 +227,8 @@ async function discoverOllama(): Promise<LocalServer> {
     tags.models.map(({ name }) => probeJson<OllamaShow>(`${OLLAMA_URL}/api/show`, { model: name })),
   );
   for (const [i, show] of shows.entries()) {
-    const name = tags.models[i].name;
+    const name = tags.models[i]?.name;
+    if (!name) continue;
     const capabilities = show?.capabilities ?? [];
     if (capabilities.length > 0 && !capabilities.includes("completion")) continue;
     const arch = show?.model_info?.["general.architecture"];

@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { getDb, resetDb, ensureGraphileTables } from "../../test/setup.ts";
+import { getDb, resetDb, ensureGraphileTables, row } from "../../test/setup.ts";
 import { books, chapters, type ChapterCleanup } from "../schema.ts";
 import { eq } from "drizzle-orm";
 
@@ -69,8 +69,8 @@ describe("chapters router cleanup", () => {
 
     await caller.queueCleanup({ id: chapterId });
 
-    const [row] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
-    expect(row.cleanup?.status).toBe("pending");
+    const chapter = row(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
+    expect(chapter.cleanup?.status).toBe("pending");
     expect(mockQuickAddJob).toHaveBeenCalledWith(
       expect.anything(),
       "cleanup",
@@ -85,8 +85,8 @@ describe("chapters router cleanup", () => {
 
     await caller.queueCleanup({ id: chapterId });
 
-    const [row] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
-    expect(row.cleanup?.status).toBe("pending");
+    const chapter = row(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
+    expect(chapter.cleanup?.status).toBe("pending");
     expect(mockQuickAddJob).toHaveBeenCalledTimes(1);
   });
 
@@ -114,8 +114,8 @@ describe("chapters router cleanup", () => {
 
     await caller.stopCleanup({ id: chapterId });
 
-    const [row] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
-    expect(row.cleanup?.status).toBe("suspended");
+    const chapter = row(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
+    expect(chapter.cleanup?.status).toBe("suspended");
   });
 
   it("stopCleanup rejects when nothing is running", async () => {

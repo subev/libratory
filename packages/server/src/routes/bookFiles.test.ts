@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getDb, resetDb } from "../../test/setup.ts";
+import { getDb, resetDb, row } from "../../test/setup.ts";
 import { bookFiles, books, chapters } from "../schema.ts";
 import { eq } from "drizzle-orm";
 
@@ -17,10 +17,10 @@ const caller = bookFilesRouter.createCaller({});
 
 async function twoFileBook() {
   const db = getDb();
-  const [book] = await db
+  const book = row(await db
     .insert(books)
     .values({ title: "Two volumes", filename: "one.pdf", pdfPath: "/uploads/00_one.pdf" })
-    .returning();
+    .returning());
   const rows = await db
     .insert(bookFiles)
     .values([
@@ -32,8 +32,7 @@ async function twoFileBook() {
 }
 
 async function bookRow(id: string) {
-  const [row] = await getDb().select().from(books).where(eq(books.id, id));
-  return row;
+  return row(await getDb().select().from(books).where(eq(books.id, id)));
 }
 
 beforeEach(async () => {
@@ -46,7 +45,7 @@ describe("removing a file keeps books.pdfPath describing a file that is still th
   it("follows on to the next file when the one it named is removed", async () => {
     const { book, rows } = await twoFileBook();
 
-    await caller.remove({ id: rows[0].id });
+    await caller.remove({ id: row(rows).id });
 
     expect(await bookRow(book.id)).toMatchObject({ pdfPath: "/uploads/01_two.pdf", filename: "two.pdf" });
   });
@@ -54,8 +53,8 @@ describe("removing a file keeps books.pdfPath describing a file that is still th
   it("leaves nothing behind to restore once the last file is removed", async () => {
     const { book, rows } = await twoFileBook();
 
-    await caller.remove({ id: rows[0].id });
-    await caller.remove({ id: rows[1].id });
+    await caller.remove({ id: row(rows).id });
+    await caller.remove({ id: row(rows, 1).id });
 
     expect(await bookRow(book.id)).toMatchObject({ pdfPath: null, filename: null });
     expect(await getDb().select().from(bookFiles).where(eq(bookFiles.bookId, book.id))).toEqual([]);
@@ -64,7 +63,7 @@ describe("removing a file keeps books.pdfPath describing a file that is still th
   it("is untouched when a file other than the named one goes", async () => {
     const { book, rows } = await twoFileBook();
 
-    await caller.remove({ id: rows[1].id });
+    await caller.remove({ id: row(rows, 1).id });
 
     expect(await bookRow(book.id)).toMatchObject({ pdfPath: "/uploads/00_one.pdf", filename: "one.pdf" });
   });

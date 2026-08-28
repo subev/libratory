@@ -22,8 +22,10 @@ export type PocketLanguage = {
 
 // Kyutai ships one checkpoint per language. The "_24l" builds are 24-layer previews (641 MB of
 // weights vs 209 MB) and upstream flags them as not-yet-distilled; French has no distilled build.
+const ENGLISH: PocketLanguage = { code: "en", label: "English", model: "english", approxMb: 370, realtimeFactor: 12 };
+
 export const POCKET_LANGUAGES: PocketLanguage[] = [
-  { code: "en", label: "English", model: "english", approxMb: 370, realtimeFactor: 12 },
+  ENGLISH,
   { code: "es", label: "Spanish", model: "spanish", approxMb: 370, realtimeFactor: 12 },
   { code: "it", label: "Italian", model: "italian", approxMb: 370, realtimeFactor: 12 },
   { code: "de", label: "German", model: "german", approxMb: 370, realtimeFactor: 12 },
@@ -31,7 +33,7 @@ export const POCKET_LANGUAGES: PocketLanguage[] = [
   { code: "fr", label: "French", model: "french_24l", approxMb: 800, realtimeFactor: 5, note: "Preview model — larger and ~2.5x slower; Kyutai has no distilled French build yet" },
 ];
 
-export const DEFAULT_POCKET_LANGUAGE = POCKET_LANGUAGES[0];
+export const DEFAULT_POCKET_LANGUAGE = ENGLISH;
 
 export function pocketLanguageByCode(code: string): PocketLanguage | null {
   return POCKET_LANGUAGES.find((l) => l.code === code) ?? null;

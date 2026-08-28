@@ -103,6 +103,7 @@ export async function createApiBook(
     })
     .returning();
 
+  if (!book) throw new Error("Failed to create book");
   await appendLog(book.id, `Created via API${input.client ? ` by ${input.client}` : ""} (${input.chapters.length} chapters)`);
   const inserted = await insertApiChapters(book.id, input.chapters, 0, input.client, input.synthesize);
   return { book, chapters: inserted };
@@ -115,10 +116,11 @@ export async function appendApiChapters(
   const [book] = await db.select().from(books).where(eq(books.id, bookId));
   if (!book) return null;
 
-  const [{ next }] = await db
+  const [tail] = await db
     .select({ next: sql<number>`coalesce(max(${chapters.index}) + 1, 0)::int` })
     .from(chapters)
     .where(eq(chapters.bookId, bookId));
+  const next = tail?.next ?? 0;
 
   await appendLog(bookId, `Appending ${input.chapters.length} chapter${input.chapters.length === 1 ? "" : "s"} via API${input.client ? ` by ${input.client}` : ""}`);
   const inserted = await insertApiChapters(bookId, input.chapters, next, input.client, input.synthesize);

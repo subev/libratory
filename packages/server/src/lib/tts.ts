@@ -187,7 +187,7 @@ export function parseTtsVoice(rawVoice: string): ParsedTtsVoice {
 export async function getPreviewTextForVoice(voice: string): Promise<string> {
   const resolved = parseTtsVoice(voice);
   if (resolved.engine === "kokoro") {
-    return previewTextFor(KOKORO_LANGUAGE_BY_PREFIX[resolved.voice[0]] ?? "en");
+    return previewTextFor(KOKORO_LANGUAGE_BY_PREFIX[resolved.voice[0] ?? ""] ?? "en");
   }
   if (resolved.engine === "pocket") {
     const parsed = parsePocketVoice(resolved.voice);
@@ -195,15 +195,15 @@ export async function getPreviewTextForVoice(voice: string): Promise<string> {
   }
   if (resolved.engine === "say") {
     const sayVoice = await resolveSayVoice(resolved.voice);
-    return previewTextFor(sayVoice?.locale.split(/[_-]/)[0].toLowerCase() ?? "en");
+    return previewTextFor(sayVoice?.locale.split(/[_-]/)[0]?.toLowerCase() ?? "en");
   }
   if (resolved.engine === "cartesia") {
     const cartesiaVoice = await findCartesiaVoice(resolved.voice);
-    return previewTextFor(cartesiaVoice?.language.split(/[_-]/)[0].toLowerCase() ?? "en");
+    return previewTextFor(cartesiaVoice?.language.split(/[_-]/)[0]?.toLowerCase() ?? "en");
   }
   if (resolved.engine === "elevenlabs") {
     const elevenVoice = await findElevenLabsVoice(resolved.voice);
-    return firstSentence(previewTextFor(elevenVoice?.language.split(/[_-]/)[0].toLowerCase() ?? "en"));
+    return firstSentence(previewTextFor(elevenVoice?.language.split(/[_-]/)[0]?.toLowerCase() ?? "en"));
   }
   return BULGARIAN_PREVIEW_TEXT;
 }

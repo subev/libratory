@@ -106,10 +106,11 @@ export async function digest(payload: DigestPayload) {
       continue;
     }
 
-    const [{ fileCount }] = await db
+    const [counted] = await db
       .select({ fileCount: sql<number>`count(*)::int` })
       .from(bookFiles)
       .where(and(eq(bookFiles.bookId, sourceBookId), isNotNull(bookFiles.rawText)));
+    const fileCount = counted?.fileCount ?? 0;
     await saveNote({
       bookId: sourceBookId,
       prompt: origin.prompt,

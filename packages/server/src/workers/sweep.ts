@@ -10,10 +10,10 @@ const connectionString = env.DATABASE_URL;
 // (exhausted, or still locked by a dead worker) will never run again on its own. This
 // runs once at boot, before this process's runner starts, so any lock it sees is orphaned.
 export async function sweepStrandedWork() {
-  const [{ jobs_table }] = (await db.execute(
+  const [probe] = (await db.execute(
     sql`SELECT to_regclass('graphile_worker._private_jobs') AS jobs_table`,
   )) as unknown as Array<{ jobs_table: string | null }>;
-  if (!jobs_table) return;
+  if (!probe?.jobs_table) return;
 
   const recoveredByBook = new Map<string, number>();
   const bump = (bookId: string) => recoveredByBook.set(bookId, (recoveredByBook.get(bookId) ?? 0) + 1);

@@ -187,10 +187,10 @@ export function charactersToWords(alignment: Alignment | null | undefined, reque
   const words: ChunkWord[] = [];
   let current: { text: string; startMs: number; endMs: number } | null = null;
 
-  for (let i = 0; i < chars.length; i++) {
-    const char = chars[i];
+  for (const [i, char] of chars.entries()) {
     if (/\s/.test(char)) {
-      if (words.length > 0) words[words.length - 1].after += char;
+      const previous = words.at(-1);
+      if (previous) previous.after += char;
       continue;
     }
     const startMs = Math.round((starts[i] ?? 0) * 1000);
@@ -201,7 +201,8 @@ export function charactersToWords(alignment: Alignment | null | undefined, reque
     } else {
       current = { text: char, startMs, endMs };
     }
-    const isLast = i === chars.length - 1 || /\s/.test(chars[i + 1]);
+    const next = chars[i + 1];
+    const isLast = next === undefined || /\s/.test(next);
     if (isLast) {
       words.push({ ...current, after: "" });
       current = null;
@@ -309,7 +310,7 @@ export async function elevenlabsSynthesize({
   try {
     await out.write(pcm16WavHeader(0, SAMPLE_RATE));
 
-    for (let i = 0; i < chunks.length; i++) {
+    for (const [i, chunkText] of chunks.entries()) {
       if (signal?.aborted) throw new ElevenLabsAbortedError();
 
       const chunkPath = chunkPcmPath(chunkPreviewDir, i);
@@ -317,13 +318,13 @@ export async function elevenlabsSynthesize({
       if (!pcm) {
         let chunk: ChunkAudio;
         try {
-          chunk = await synthesizeChunkPcm(voiceId, modelId, chunks[i], speed, signal);
+          chunk = await synthesizeChunkPcm(voiceId, modelId, chunkText, speed, signal);
         } catch (err) {
           if (signal?.aborted) throw new ElevenLabsAbortedError();
           throw err;
         }
         pcm = chunk.pcm;
-        recordElevenLabsSpend(Math.ceil(chunks[i].length * creditsPerChar));
+        recordElevenLabsSpend(Math.ceil(chunkText.length * creditsPerChar));
         if (chunkPath) {
           await writeFile(chunkPath, Buffer.concat([pcm16WavHeader(pcm.length, SAMPLE_RATE), pcm]));
           await writeChunkWords(chunkPreviewDir!, i + 1, chunk.words);
