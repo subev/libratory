@@ -110,8 +110,8 @@ function collectAllBlocks(block: MarkerBlock, page: number, out: FlatBlock[]) {
 }
 
 function extractHeadingLevel(html: string): number | null {
-  const match = html.match(/<h(\d)/);
-  return match ? parseInt(match[1], 10) : null;
+  const digit = html.match(/<h(\d)/)?.[1];
+  return digit ? parseInt(digit, 10) : null;
 }
 
 function blocksToSourceBlocks(blocks: FlatBlock[]): SourceBlock[] {
@@ -158,14 +158,9 @@ function isLikelyFrontOrBackMatter(text: string): boolean {
 
 function pickChapterHeadingIndices(allBlocks: FlatBlock[]): number[] {
   const headingBlocks: { index: number; level: number; text: string; page: number }[] = [];
-  for (let i = 0; i < allBlocks.length; i++) {
-    if (allBlocks[i].included && allBlocks[i].type === "SectionHeader") {
-      headingBlocks.push({
-        index: i,
-        level: allBlocks[i].level ?? 4,
-        text: allBlocks[i].text,
-        page: allBlocks[i].page,
-      });
+  for (const [i, b] of allBlocks.entries()) {
+    if (b.included && b.type === "SectionHeader") {
+      headingBlocks.push({ index: i, level: b.level ?? 4, text: b.text, page: b.page });
     }
   }
 
@@ -210,30 +205,25 @@ const CHAPTER_NUMBER_PATTERN = /^(chapter|part|глава|раздел|част)
 function parseChapterNumber(raw: string): number {
   if (/^\d+$/.test(raw)) return Number(raw);
   const values: Record<string, number> = { i: 1, v: 5, x: 10, l: 50, c: 100, d: 500, m: 1000 };
-  let total = 0;
-  const s = raw.toLowerCase();
-  for (let i = 0; i < s.length; i++) {
-    const cur = values[s[i]];
-    const next = values[s[i + 1]] ?? 0;
-    total += cur < next ? -cur : cur;
-  }
-  return total;
+  const digits = [...raw.toLowerCase()].map((ch) => values[ch] ?? 0);
+  return digits.reduce((total, cur, i) => total + (cur < (digits[i + 1] ?? 0) ? -cur : cur), 0);
 }
 
 export function pickNumberedChapterIndices(allBlocks: FlatBlock[]): number[] {
   const matches: { index: number; page: number; num: number; kind: string }[] = [];
-  for (let i = 0; i < allBlocks.length; i++) {
-    const b = allBlocks[i];
+  for (const [i, b] of allBlocks.entries()) {
     if (!b.included || b.type !== "SectionHeader") continue;
-    const m = CHAPTER_NUMBER_PATTERN.exec(b.text.trim());
-    if (m) matches.push({ index: i, page: b.page, num: parseChapterNumber(m[2]), kind: m[1].toLowerCase() });
+    const [, kind, num] = CHAPTER_NUMBER_PATTERN.exec(b.text.trim()) ?? [];
+    if (kind && num) {
+      matches.push({ index: i, page: b.page, num: parseChapterNumber(num), kind: kind.toLowerCase() });
+    }
   }
   if (matches.length < 3) return [];
 
   // Mixed part/chapter books: the dominant kind is the chapter-level unit
   const byKind = new Map<string, typeof matches>();
   for (const m of matches) byKind.set(m.kind, [...(byKind.get(m.kind) ?? []), m]);
-  const dominant = [...byKind.values()].reduce((a, b) => (b.length > a.length ? b : a));
+  const dominant = [...byKind.values()].reduce<typeof matches>((a, b) => (b.length > a.length ? b : a), []);
 
   // A ToC page lists many chapters on one page; body chapter headings are spread out
   const perPage = new Map<number, number>();
@@ -243,33 +233,35 @@ export function pickNumberedChapterIndices(allBlocks: FlatBlock[]): number[] {
   // Duplicate numbers come from ToC stragglers or endnotes sections; the body
   // copy is the one followed by the most content before the next match
   const contentWords = body.map((m, i) => {
-    const end = i + 1 < body.length ? body[i + 1].index : allBlocks.length;
+    const end = body[i + 1]?.index ?? allBlocks.length;
     let words = 0;
-    for (let j = m.index + 1; j < end; j++) {
-      if (allBlocks[j].included) words += allBlocks[j].text.split(/\s+/).filter(Boolean).length;
+    for (const block of allBlocks.slice(m.index + 1, end)) {
+      if (block.included) words += block.text.split(/\s+/).filter(Boolean).length;
     }
     return words;
   });
   const bestByNum = new Map<number, { m: (typeof matches)[number]; words: number }>();
   body.forEach((m, i) => {
     const cur = bestByNum.get(m.num);
-    if (!cur || contentWords[i] >= cur.words) bestByNum.set(m.num, { m, words: contentWords[i] });
+    const words = contentWords[i] ?? 0;
+    if (!cur || words >= cur.words) bestByNum.set(m.num, { m, words });
   });
   const deduped = [...bestByNum.values()].map((x) => x.m).sort((a, b) => a.index - b.index);
 
   // Longest strictly-increasing run of chapter numbers drops listing stragglers
-  const best: number[][] = deduped.map(() => []);
-  for (let i = 0; i < deduped.length; i++) {
-    best[i] = [i];
+  const best: (typeof deduped)[] = deduped.map((d) => [d]);
+  for (const [i, di] of deduped.entries()) {
+    let run = [di];
     for (let j = 0; j < i; j++) {
-      if (deduped[j].num < deduped[i].num && best[j].length + 1 > best[i].length) {
-        best[i] = [...best[j], i];
-      }
+      const dj = deduped[j];
+      const bj = best[j];
+      if (dj && bj && dj.num < di.num && bj.length + 1 > run.length) run = [...bj, di];
     }
+    best[i] = run;
   }
-  const increasing = best.reduce((a, b) => (b.length > a.length ? b : a), []);
+  const increasing = best.reduce<typeof deduped>((a, b) => (b.length > a.length ? b : a), []);
   if (increasing.length < 3) return [];
-  return increasing.map((i) => deduped[i].index);
+  return increasing.map((d) => d.index);
 }
 
 export function sliceChaptersAtIndices(
@@ -283,11 +275,10 @@ export function sliceChaptersAtIndices(
   }
 
   const chapters: ExtractedChapter[] = [];
-  for (let i = 0; i < sorted.length; i++) {
-    const start = sorted[i];
-    const end = i + 1 < sorted.length ? sorted[i + 1] : allBlocks.length;
+  for (const [i, start] of sorted.entries()) {
+    const end = sorted[i + 1] ?? allBlocks.length;
     const blocks = allBlocks.slice(start, end);
-    const ch = chapterFromBlocks(titleOverrides?.get(start) ?? allBlocks[start].text, blocks);
+    const ch = chapterFromBlocks(titleOverrides?.get(start) ?? allBlocks[start]?.text ?? "Untitled", blocks);
     if (ch.text.trim()) {
       chapters.push(ch);
     }
@@ -499,8 +490,7 @@ async function collectBlocksFromMarkerJson(markerJsonPath: string): Promise<Flat
 
   const allBlocks: FlatBlock[] = [];
 
-  for (let pageIdx = 0; pageIdx < doc.children.length; pageIdx++) {
-    const page = doc.children[pageIdx];
+  for (const [pageIdx, page] of doc.children.entries()) {
     if (page.block_type !== "Page" || !page.children) continue;
     const pageNum = pageIdx + 1;
     for (const block of page.children) {

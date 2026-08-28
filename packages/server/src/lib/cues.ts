@@ -43,21 +43,23 @@ function sentenceCues(words: SyncWord[], chunk: number): Cue[] {
 
   if (current.length > 0) {
     const tooShortToStandAlone = groups.length > 0 && spanMs(current) < MIN_CUE_MS;
-    if (tooShortToStandAlone) groups[groups.length - 1].push(...current);
+    const previous = groups.at(-1);
+    if (tooShortToStandAlone && previous) previous.push(...current);
     else groups.push(current);
   }
 
-  return groups.map((group) => ({
-    text: textOf(group),
-    startMs: group[0].startMs,
-    endMs: group[group.length - 1].endMs,
-    chunk,
-    words: group,
-  }));
+  return groups.flatMap((group) => {
+    const first = group[0];
+    const last = group.at(-1);
+    if (!first || !last) return [];
+    return [{ text: textOf(group), startMs: first.startMs, endMs: last.endMs, chunk, words: group }];
+  });
 }
 
 function spanMs(words: SyncWord[]): number {
-  return words[words.length - 1].endMs - words[0].startMs;
+  const first = words[0];
+  const last = words.at(-1);
+  return first && last ? last.endMs - first.startMs : 0;
 }
 
 function textOf(words: SyncWord[]): string {

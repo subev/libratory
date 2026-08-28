@@ -110,7 +110,7 @@ async function pageOffsets(sources: MarkerSource[]): Promise<Map<number | null, 
   const offsets = new Map<number | null, number>();
   let flat = 0;
   sources.forEach((source, index) => {
-    loaded.set(source, geometries[index]);
+    loaded.set(source, geometries[index] ?? null);
     offsets.set(source.fileIndex, flat);
     flat += geometries[index]?.pages.length ?? 0;
   });
@@ -176,14 +176,17 @@ export async function buildCues(chapter: Chapter): Promise<ReaderCues | null> {
     format: READER_FORMAT,
     totalMs: map.totalMs,
     granularity,
-    cues: cues.map((cue, i) => ({
-      t: [cue.startMs, cue.endMs] as [number, number],
-      s: cue.text,
-      c: cue.chunk,
-      ...(resolved[i].rects.length ? { r: resolved[i].rects } : {}),
-      ...(cue.words ? { w: cue.words.map(wordTuple) } : {}),
-      ...(resolved[i].words ? { wr: resolved[i].words! } : {}),
-    })),
+    cues: cues.map((cue, i) => {
+      const cueRects = resolved[i];
+      return {
+        t: [cue.startMs, cue.endMs] as [number, number],
+        s: cue.text,
+        c: cue.chunk,
+        ...(cueRects?.rects.length ? { r: cueRects.rects } : {}),
+        ...(cue.words ? { w: cue.words.map(wordTuple) } : {}),
+        ...(cueRects?.words ? { wr: cueRects.words } : {}),
+      };
+    }),
   };
 }
 

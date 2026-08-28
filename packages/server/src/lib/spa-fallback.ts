@@ -18,7 +18,7 @@ const CLIENT_ROUTES = [
 
 export function isClientRoute(method: string, url: string): boolean {
   if (method !== "GET") return false;
-  const pathname = url.split("?")[0].split("#")[0];
+  const pathname = url.split(/[?#]/)[0] ?? "";
   if (path.extname(pathname)) return false;
   return CLIENT_ROUTES.some((route) => route.test(pathname));
 }

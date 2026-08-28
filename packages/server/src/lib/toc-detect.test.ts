@@ -250,7 +250,7 @@ describe("detectChaptersWithLlm", () => {
       { blockIndex: 3, title: "Chapter 2", titleTranslated: null },
     ]);
     expect(mockChat).toHaveBeenCalledTimes(2);
-    const selectionUser = mockChat.mock.calls[1][1];
+    const selectionUser = mockChat.mock.calls[1]?.[1];
     expect(selectionUser).not.toContain('"Contents"');
     expect(selectionUser).toContain('h_0001 p5 l1 "Chapter 1"');
   });
@@ -290,7 +290,7 @@ describe("detectChaptersWithLlm", () => {
     const result = await detectChaptersWithLlm([{ fileIndex: null, blocks: many }], noopLog);
 
     expect(mockChat).toHaveBeenCalledTimes(3);
-    expect(mockChat.mock.calls[2][1]).toContain("A previous attempt selected only 2 headings");
+    expect(mockChat.mock.calls[2]?.[1]).toContain("A previous attempt selected only 2 headings");
     expect(result?.get(null)).toHaveLength(12);
   });
 

@@ -66,10 +66,10 @@ function renderChapterBody(text: string, dropFirstBlock: boolean): string {
 }
 
 function renderBlock(block: string): string {
-  const heading = block.match(/^(#{1,6})\s+([\s\S]*)$/);
-  if (heading) {
-    const level = Math.min(heading[1].length + 1, 3); // h1 is the chapter title
-    return `<h${level}>${renderInline(heading[2])}</h${level}>`;
+  const [, hashes, headingText] = block.match(/^(#{1,6})\s+([\s\S]*)$/) ?? [];
+  if (hashes !== undefined && headingText !== undefined) {
+    const level = Math.min(hashes.length + 1, 3); // h1 is the chapter title
+    return `<h${level}>${renderInline(headingText)}</h${level}>`;
   }
   return `<p>${renderInline(block)}</p>`;
 }

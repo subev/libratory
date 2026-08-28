@@ -51,9 +51,9 @@ export function normalizeBlocks(blocks: { text: string; included: boolean }[]): 
   const spans: BlockSpan[] = [];
   let offset = 0;
 
-  for (let block = 0; block < blocks.length; block++) {
-    if (!blocks[block].included) continue;
-    const text = normalizeForTts(blocks[block].text);
+  for (const [block, source] of blocks.entries()) {
+    if (!source.included) continue;
+    const text = normalizeForTts(source.text);
     if (!text) continue;
     if (parts.length > 0) offset += 2;
     parts.push(text);

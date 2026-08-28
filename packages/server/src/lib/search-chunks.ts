@@ -75,9 +75,9 @@ function overlapStart(text: string, boundary: number): number {
 
 function finalize(text: string, bounds: Bounds[], pageOf: ((offset: number) => number) | null): ChunkDraft[] {
   const out: ChunkDraft[] = [];
-  for (let i = 0; i < bounds.length; i++) {
-    const start = i === 0 ? bounds[i].start : overlapStart(text, bounds[i].start);
-    const end = bounds[i].end;
+  for (const [i, bound] of bounds.entries()) {
+    const start = i === 0 ? bound.start : overlapStart(text, bound.start);
+    const end = bound.end;
     const slice = text.slice(start, end);
     const leading = slice.length - slice.trimStart().length;
     const trailing = slice.length - slice.trimEnd().length;
@@ -104,7 +104,7 @@ export function chunkPagedText(rawText: string): ChunkDraft[] {
     let hi = feeds.length;
     while (lo < hi) {
       const mid = (lo + hi) >> 1;
-      if (feeds[mid] < offset) lo = mid + 1;
+      if ((feeds[mid] ?? Number.POSITIVE_INFINITY) < offset) lo = mid + 1;
       else hi = mid;
     }
     return lo + 1;
@@ -136,7 +136,7 @@ export function pageMapFromBlocks(text: string, blocks: PageBlock[]): ((offset: 
     if (!probe) continue;
     const idx = text.indexOf(probe, cursor);
     if (idx === -1) continue;
-    if (marks.length === 0 || block.page !== marks[marks.length - 1].page) {
+    if (block.page !== marks.at(-1)?.page) {
       marks.push({ offset: idx, page: block.page });
     }
     cursor = idx + probe.length;
@@ -147,9 +147,9 @@ export function pageMapFromBlocks(text: string, blocks: PageBlock[]): ((offset: 
     let hi = marks.length - 1;
     while (lo < hi) {
       const mid = (lo + hi + 1) >> 1;
-      if (marks[mid].offset <= offset) lo = mid;
+      if ((marks[mid]?.offset ?? Number.POSITIVE_INFINITY) <= offset) lo = mid;
       else hi = mid - 1;
     }
-    return marks[lo].page;
+    return marks[lo]?.page ?? 1;
   };
 }

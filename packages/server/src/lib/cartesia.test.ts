@@ -57,7 +57,7 @@ describe("listCartesiaVoices", () => {
       { id: "v2", name: "Boris", language: "bg", gender: "masculine", tagline: "" },
     ]);
     expect(mockFetch).toHaveBeenCalledTimes(2);
-    const secondUrl = String(mockFetch.mock.calls[1][0]);
+    const secondUrl = String(mockFetch.mock.calls[1]?.[0]);
     expect(secondUrl).toContain("starting_after=v1");
   });
 });

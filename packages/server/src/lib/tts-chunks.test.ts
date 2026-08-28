@@ -30,7 +30,7 @@ describe("chunkTextForTts", () => {
     const chunks = chunkTextForTts(text);
 
     expect(chunks).toHaveLength(1);
-    expect(chunks[0].length).toBeLessThanOrEqual(MAX);
+    expect(chunks[0]?.length).toBeLessThanOrEqual(MAX);
     expect(normalize(chunks.join(" "))).toBe(normalize(text));
   });
 

@@ -35,7 +35,7 @@ function context(text: string, geometry: GeometryPage | null): RectContext {
   };
 }
 
-const LINES = ["The first line of the block.", "The second line follows it.", "And a third line ends it."];
+const LINES = ["The first line of the block.", "The second line follows it.", "And a third line ends it."] as const;
 const BLOCK_TEXT = LINES.join(" ");
 
 describe("rectsForRange", () => {
@@ -45,11 +45,11 @@ describe("rectsForRange", () => {
 
     const [rect] = rectsForRange(context(BLOCK_TEXT, geometry), start, start + "first line".length);
 
-    expect(rect[0]).toBe(7);
-    expect(rect[1]).toBe(Math.round(((50 + 4 * CHAR_WIDTH) / PAGE_WIDTH) * 10_000));
-    expect(rect[3]).toBe(Math.round((("first line".length * CHAR_WIDTH) / PAGE_WIDTH) * 10_000));
-    expect(rect[2]).toBe(1000);
-    expect(rect[4]).toBe(100);
+    expect(rect?.[0]).toBe(7);
+    expect(rect?.[1]).toBe(Math.round(((50 + 4 * CHAR_WIDTH) / PAGE_WIDTH) * 10_000));
+    expect(rect?.[3]).toBe(Math.round((("first line".length * CHAR_WIDTH) / PAGE_WIDTH) * 10_000));
+    expect(rect?.[2]).toBe(1000);
+    expect(rect?.[4]).toBe(100);
   });
 
   it("gives a rect per line for a range that crosses them", () => {
@@ -68,8 +68,8 @@ describe("rectsForRange", () => {
     const rects = rectsForRange(context(many.join(" "), geometry), 0, many.join(" ").length);
 
     expect(rects).toHaveLength(3);
-    expect(rects[1][2]).toBe(1100);
-    expect(rects[1][4]).toBe(600);
+    expect(rects[1]?.[2]).toBe(1100);
+    expect(rects[1]?.[4]).toBe(600);
   });
 
   it("falls back to the block box on a scanned page, which has no lines to trim to", () => {
@@ -101,7 +101,7 @@ describe("rectsForRange", () => {
   });
 
   it("places a repeated word at the occurrence it actually is, not the first", () => {
-    const repeated = ["the first line has the word.", "the second line has it too.", "and the third line ends."];
+    const repeated = ["the first line has the word.", "the second line has it too.", "and the third line ends."] as const;
     const geometry = page(repeated.map((text, i) => line(text, 100 + i * LINE_HEIGHT)));
     const text = repeated.join(" ");
     // The "the" that opens the third line — five earlier occurrences precede it
@@ -109,8 +109,8 @@ describe("rectsForRange", () => {
 
     const [rect] = rectsForRange(context(text, geometry), start, start + 3, { linesOnly: true });
 
-    expect(rect[2]).toBe(1200);
-    expect(rect[1]).toBe(Math.round(((50 + repeated[2].indexOf("the") * CHAR_WIDTH) / PAGE_WIDTH) * 10_000));
+    expect(rect?.[2]).toBe(1200);
+    expect(rect?.[1]).toBe(Math.round(((50 + repeated[2].indexOf("the") * CHAR_WIDTH) / PAGE_WIDTH) * 10_000));
   });
 
   it("places a single word inside its line", () => {
@@ -119,8 +119,8 @@ describe("rectsForRange", () => {
 
     const [rect] = rectsForRange(context(BLOCK_TEXT, geometry), start, start + 5, { linesOnly: true });
 
-    expect(rect[1]).toBe(Math.round(((50 + LINES[0].indexOf("block") * CHAR_WIDTH) / PAGE_WIDTH) * 10_000));
-    expect(rect[3]).toBe(Math.round(((5 * CHAR_WIDTH) / PAGE_WIDTH) * 10_000));
+    expect(rect?.[1]).toBe(Math.round(((50 + LINES[0].indexOf("block") * CHAR_WIDTH) / PAGE_WIDTH) * 10_000));
+    expect(rect?.[3]).toBe(Math.round(((5 * CHAR_WIDTH) / PAGE_WIDTH) * 10_000));
   });
 });
 

@@ -18,7 +18,7 @@ describe("cleanupChunk", () => {
     chatMock.mockResolvedValue("Cleaned text.");
     const result = await cleanupChunk({ text: "F0 REWO R D\n\nSome prose." });
     expect(result).toBe("Cleaned text.");
-    const [system, user, opts] = chatMock.mock.calls[0];
+    const [system, user, opts] = chatMock.mock.calls[0] ?? [];
     expect(user).toBe("F0 REWO R D\n\nSome prose.");
     expect(opts).toEqual({ temperature: 0.3, allowEmpty: true, timeoutMs: 600_000 });
     expect(system).toContain("NEVER paraphrase");

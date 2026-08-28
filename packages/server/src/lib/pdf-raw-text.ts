@@ -23,7 +23,7 @@ const NOT_A_PERSON = /^(user|admin|owner|unknown|author|microsoft|adobe|acrobat|
 export async function extractPdfAuthor(pdfPath: string): Promise<string | null> {
   try {
     const { stdout } = await execFileAsync("pdfinfo", [pdfPath], { timeout: 15_000 });
-    const author = stdout.match(/^Author:\s*(.+)$/m)?.[1].trim() ?? "";
+    const author = stdout.match(/^Author:\s*(.+)$/m)?.[1]?.trim() ?? "";
     if (author.length < 2 || author.length > 120) return null;
     if (NOT_A_PERSON.test(author) || /[\\/]|\.pdf$/i.test(author)) return null;
     return author;

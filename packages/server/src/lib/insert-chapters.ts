@@ -9,8 +9,7 @@ export async function insertSuspendedChapters(
   chapterOffset: number,
   sourceFileIndex: number | null,
 ) {
-  for (let i = 0; i < detected.length; i++) {
-    const ch = detected[i];
+  for (const [i, ch] of detected.entries()) {
     const globalIndex = chapterOffset + i;
     const wordCount = ch.text.split(/\s+/).filter(Boolean).length;
     await appendLog(bookId, `Chapter ${globalIndex + 1}: "${ch.title}" (${wordCount.toLocaleString()} words)`);
@@ -47,7 +46,7 @@ export async function resetChaptersKeepingInserted(bookId: string): Promise<numb
 
   await db.delete(chapters).where(and(eq(chapters.bookId, bookId), isNull(chapters.source)));
 
-  for (let i = 0; i < kept.length; i++) {
+  for (const [i, chapter] of kept.entries()) {
     await db
       .update(chapters)
       .set({
@@ -59,7 +58,7 @@ export async function resetChaptersKeepingInserted(bookId: string): Promise<numb
         error: null,
         synthesizedWith: null,
       })
-      .where(eq(chapters.id, kept[i].id));
+      .where(eq(chapters.id, chapter.id));
   }
 
   if (kept.length > 0) {

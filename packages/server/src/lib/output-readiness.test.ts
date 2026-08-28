@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getDb, resetDb } from "../../test/setup.ts";
+import { getDb, resetDb, row } from "../../test/setup.ts";
 import { books, chapters, chapterVariants } from "../schema.ts";
 
 vi.mock("../db.ts", async () => {
@@ -59,8 +59,8 @@ describe("inFlightInputs", () => {
     const bookId = await insertBook([{ status: "done" }, { status: "done" }]);
     const rows = await db.select({ id: chapters.id }).from(chapters);
     await db.insert(chapterVariants).values([
-      { chapterId: rows[0].id, key: "Bulgarian", text: "t", status: "done", audioStatus: "done" },
-      { chapterId: rows[1].id, key: "Bulgarian", text: "t", status: "done", audioStatus: "synthesizing" },
+      { chapterId: row(rows).id, key: "Bulgarian", text: "t", status: "done", audioStatus: "done" },
+      { chapterId: row(rows, 1).id, key: "Bulgarian", text: "t", status: "done", audioStatus: "synthesizing" },
     ]);
     expect(await inFlightInputs(bookId, "Bulgarian", "audio")).toBe(1);
     expect(await inFlightInputs(bookId, "Bulgarian", "text")).toBe(0);

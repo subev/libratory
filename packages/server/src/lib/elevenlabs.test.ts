@@ -26,7 +26,7 @@ describe("charactersToWords", () => {
     expect(words.map((w) => w.text)).toEqual(["Such", "a", "study."]);
     expect(rebuild(words)).toBe(text);
     expect(words[0]).toEqual({ text: "Such", after: " ", startMs: 0, endMs: 200 });
-    expect(words[2].endMs).toBe(650);
+    expect(words[2]?.endMs).toBe(650);
   });
 
   it("carries a newline through as the spacing it is, rather than flattening it to a space", () => {
@@ -119,6 +119,6 @@ describe("listElevenLabsVoices", () => {
       { id: "v1", name: "Charlotte", language: "en", gender: "female", tagline: "swedish · narration" },
       { id: "v2", name: "Boris", language: "bg", gender: null, tagline: "" },
     ]);
-    expect(String(mockFetch.mock.calls[1][0])).toContain("next_page_token=page2");
+    expect(String(mockFetch.mock.calls[1]?.[0])).toContain("next_page_token=page2");
   });
 });

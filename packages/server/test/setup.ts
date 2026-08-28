@@ -117,3 +117,11 @@ export async function listJobs(db: TestDatabase) {
 export function getDb() {
   return testDb;
 }
+
+// Narrows a query result the test has already asserted the shape of; failing loudly beats
+// a cascade of "possibly undefined" guards in every assertion.
+export function row<T>(rows: T[], index = 0): T {
+  const value = rows[index];
+  if (!value) throw new Error(`expected a row at index ${index}, got ${rows.length}`);
+  return value;
+}

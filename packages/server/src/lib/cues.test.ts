@@ -47,7 +47,7 @@ describe("cuesFromSyncMap", () => {
       ["Such a study would be of interest.", 0, 2300],
       ["One is astonished.", 2300, 3800],
     ]);
-    expect(cues[1].words).toHaveLength(4);
+    expect(cues[1]?.words).toHaveLength(4);
   });
 
   it("joins a fragment too short to stand alone onto the sentence before it", () => {

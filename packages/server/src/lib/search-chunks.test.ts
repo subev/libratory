@@ -9,9 +9,9 @@ describe("chunkPagedText", () => {
     const chunks = chunkPagedText(text);
     expect(chunks.length).toBeGreaterThanOrEqual(1);
     const first = chunks[0];
-    expect(first.pageStart).toBe(1);
+    expect(first?.pageStart).toBe(1);
     const last = chunks[chunks.length - 1];
-    expect(last.pageEnd).toBe(3);
+    expect(last?.pageEnd).toBe(3);
   });
 
   it("assigns the right page to a chunk that starts after a form feed", () => {
@@ -26,8 +26,8 @@ describe("chunkPagedText", () => {
 
   it("returns null pages when the text has no form feeds", () => {
     const chunks = chunkPagedText(para(100));
-    expect(chunks[0].pageStart).toBeNull();
-    expect(chunks[0].pageEnd).toBeNull();
+    expect(chunks[0]?.pageStart).toBeNull();
+    expect(chunks[0]?.pageEnd).toBeNull();
   });
 
   it("keeps offsets true: slicing the source at chunk offsets reproduces the text", () => {
@@ -42,8 +42,9 @@ describe("chunkPagedText", () => {
     const chunks = chunkPagedText(sentences);
     expect(chunks.length).toBeGreaterThan(1);
     let overlapping = 0;
-    for (let i = 1; i < chunks.length; i++) {
-      if (chunks[i].charStart < chunks[i - 1].charEnd) overlapping++;
+    for (const [i, chunk] of chunks.entries()) {
+      const previous = chunks[i - 1];
+      if (previous && chunk.charStart < previous.charEnd) overlapping++;
     }
     expect(overlapping).toBeGreaterThan(0);
   });
@@ -74,8 +75,8 @@ describe("chunkPlainText", () => {
 
   it("defaults pages to null", () => {
     const [chunk] = chunkPlainText(para(20));
-    expect(chunk.pageStart).toBeNull();
-    expect(chunk.pageEnd).toBeNull();
+    expect(chunk?.pageStart).toBeNull();
+    expect(chunk?.pageEnd).toBeNull();
   });
 
   it("uses the offset→page map over the static range when given", () => {
@@ -85,7 +86,7 @@ describe("chunkPlainText", () => {
     const pageOf = (offset: number) => (offset < p1.length ? 10 : 11);
     const chunks = chunkPlainText(text, 5, 9, pageOf);
     const betaChunk = chunks.find((c) => c.text.startsWith("beta"));
-    expect(chunks[0].pageStart).toBe(10);
+    expect(chunks[0]?.pageStart).toBe(10);
     expect(betaChunk!.pageStart).toBe(11);
   });
 });

@@ -38,8 +38,8 @@ describe("pageLayout", () => {
 
     // The heading lands in one column; clamping at the gutter stops it spilling over the other
     expect(columns).toHaveLength(2);
-    expect(columns[0][0] + columns[0][2]).toBe(140);
-    expect(columns[1][0]).toBeGreaterThanOrEqual(140);
+    expect((columns[0]?.[0] ?? 0) + (columns[0]?.[2] ?? 0)).toBe(140);
+    expect(columns[1]?.[0]).toBeGreaterThanOrEqual(140);
   });
 
   it("treats a ragged single column as one column, not two", () => {
