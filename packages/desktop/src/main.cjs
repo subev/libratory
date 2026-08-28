@@ -1,6 +1,7 @@
 // The window: this file starts child processes and points a BrowserWindow at a local url.
 const { app, BrowserWindow, Menu, shell, dialog, ipcMain } = require("electron");
 const { execFileSync, spawn } = require("node:child_process");
+const { createWriteStream, renameSync, statSync } = require("node:fs");
 
 const path = require("node:path");
 const setup = require("./setup.cjs");
@@ -87,12 +88,43 @@ function killOrphanedServers() {
   }
 }
 
+// The server's output is the only account of what a worker actually did — marker's Python
+// traceback, an engine's stderr, the query that failed. It used to go to a stdout that a packaged
+// app does not have, and survive only as the 2000 characters below, so every failure worth
+// reporting had already been forgotten by the time anyone asked about it.
+const SERVER_LOG_MAX = 8 << 20;
+
+function serverLogPath() {
+  return path.join(HOME || "", "server.log");
+}
+
+function openServerLog() {
+  const file = serverLogPath();
+  try {
+    if (statSync(file).size > SERVER_LOG_MAX) renameSync(file, `${file}.1`);
+  } catch {
+    // No log yet, or a home we cannot stat — either way the append below decides
+  }
+  try {
+    return createWriteStream(file, { flags: "a" });
+  } catch {
+    return null; // Logging that breaks the app is worse than no logging
+  }
+}
+
 function startServer(onDied) {
   killOrphanedServers();
   const bundled = path.join(RESOURCES, "libratory-server");
   server = spawn(bundled, [], { env: serverEnv(), stdio: ["ignore", "pipe", "pipe"] });
   let tail = "";
-  const keep = (b) => { tail = (tail + String(b)).slice(-2000); process.stdout.write(String(b)); };
+  const log = openServerLog();
+  log?.write(`\n=== ${new Date().toISOString()}  Libratory ${app.getVersion()} starting the server\n`);
+  const keep = (b) => {
+    const text = String(b);
+    tail = (tail + text).slice(-2000);
+    log?.write(text);
+    process.stdout.write(text);
+  };
   server.stdout?.on("data", keep);
   server.stderr?.on("data", keep);
   // Without these the common failures are invisible: a port already taken exits immediately and
@@ -100,6 +132,7 @@ function startServer(onDied) {
   // 'error' kill the main process with no window and no message.
   server.on("error", (err) => onDied(err.message));
   server.on("exit", (code, signal) => {
+    log?.end();
     if (server?.killed || signal === "SIGTERM") return;
     onDied(tail.trim().split("\n").at(-1) || `the server exited with code ${code}`);
   });
@@ -281,10 +314,11 @@ function menu(url) {
       submenu: [
         { label: "Show data folder", click: () => shell.openPath(dataDir()) },
         { label: "Check for Updates…", click: () => void updater.checkNow() },
-        { label: "Where things live", click: () => dialog.showMessageBox({ message: `Everything the app installed: ${HOME}\nYour library: Postgres in Docker, port 5433\nServer: ${url}\nUpdates: ${updater.updatesConfigured() ? "from GitHub releases" : "not configured — this is a local build"}` }) },
+        { label: "Where things live", click: () => dialog.showMessageBox({ message: `Everything the app installed: ${HOME}\nYour library: Postgres in Docker, port 5433\nServer: ${url}\nLogs: ${serverLogPath()}\nUpdates: ${updater.updatesConfigured() ? "from GitHub releases" : "not configured — this is a local build"}` }) },
         { type: "separator" },
         { label: "Report a problem", click: () => shell.openExternal(`${crash.REPO}/issues/new`) },
         { label: "Open the crash log", click: () => shell.openPath(crash.logPath(HOME || "")) },
+        { label: "Open the server log", click: () => shell.openPath(serverLogPath()) },
       ],
     },
     { role: "windowMenu" },
@@ -319,7 +353,13 @@ app.whenReady().then(() => {
   });
   ipcMain.on("recheck", boot);
   ipcMain.on("open", (_e, url) => void shell.openExternal(url));
-  ipcMain.on("report", () => {
+  ipcMain.on("report", (_e, details) => {
+    // From the page: a render crash, already formatted. From the first-run screen: no payload, and
+    // the failure it means is the one the shell is holding.
+    if (typeof details === "string" && details.trim()) {
+      crash.show(crash.record(new Error(details), HOME || defaultHome(), "renderer"));
+      return;
+    }
     if (lastFailure) crash.show(lastFailure);
   });
 
