@@ -1,6 +1,6 @@
 # Libratory
 
-**Library + laboratory** — a workbench for the PDFs you already own. Take a book apart, clean up the OCR, translate or rewrite a chapter, pick a voice, and put it back together as a chapter-marked M4B audiobook or a read-along book where the narration is highlighted on the page it was printed on. Also AI digests, PDF/EPUB exports, notes, and chat with cited sources across everything on your shelves.
+**Your free book and audiobook laboratory** — library and laboratory, which is what the name is and what the thing is: a workbench for the PDFs you already own. Take a book apart, clean up the OCR, translate or rewrite a chapter, pick a voice, and put it back together as a chapter-marked M4B audiobook or a read-along book where the narration is highlighted on the page it was printed on. Also AI digests, PDF/EPUB exports, notes, and chat with cited sources across everything on your shelves.
 
 Runs on your own machine: an Apple Silicon Mac, a Linux box (x86_64 or arm64, CPU is enough), or a single Docker container on a headless server. Fully offline after the initial model downloads — AI features run on a local model (Ollama and LM Studio are auto-discovered, no configuration) or a cloud provider (DeepSeek, OpenAI, Anthropic, Gemini) if you add an API key.
 
