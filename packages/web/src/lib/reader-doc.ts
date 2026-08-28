@@ -96,8 +96,9 @@ export const UNMAPPED: Record<ReaderUnmapped, string> = {
   unnarrated: "This chapter hasn't been narrated yet.",
 };
 
-// The pages a chapter covers, in flat order — the same set both surfaces render
-export function chapterPages(manifest: ReaderManifest, chapter: ReaderChapter): ReaderPage[] {
+// The pages a chapter covers, in flat order — the same set both surfaces render. It reads the page
+// range and nothing else, so callers can memoize on those two fields rather than on chapter identity.
+export function chapterPages(manifest: ReaderManifest, chapter: Pick<ReaderChapter, "pageStart" | "pageEnd">): ReaderPage[] {
   if (chapter.pageStart === null) return [];
   const last = chapter.pageEnd ?? chapter.pageStart;
   return manifest.pages.filter((page) => page.i >= chapter.pageStart! && page.i <= last);

@@ -49,7 +49,8 @@ export function CuePages({
   resolve?: (url: string) => string | undefined;
 }) {
   const [hoverCue, setHoverCue] = useState(-1);
-  const pages = useMemo(() => chapterPages(manifest, chapter), [manifest, chapter.pageStart, chapter.pageEnd]);
+  const { pageStart, pageEnd } = chapter;
+  const pages = useMemo(() => chapterPages(manifest, { pageStart, pageEnd }), [manifest, pageStart, pageEnd]);
 
   const spreads = useMemo<Spread[]>(() => {
     if (!columns) return pages.map((page) => ({ key: `${page.i}`, page, crop: wholePage(page) }));

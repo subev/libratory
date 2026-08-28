@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useRef } from "react";
 import { useDefaultModelKey, useLlmModels } from "../lib/use-llm-models.ts";
 import { formatTokens } from "../lib/ai-presets.ts";
 
@@ -16,10 +16,13 @@ export const ModelPicker = memo(function ModelPicker({
 }) {
   const models = useLlmModels();
   const { key: defaultKey, pending: defaultPending } = useDefaultModelKey();
-  const usable = (key: string) => {
-    const m = models.find((entry) => entry.key === key);
-    return m !== undefined && (!requireTools || m.supportsTools);
-  };
+  const usable = useCallback(
+    (key: string) => {
+      const m = models.find((entry) => entry.key === key);
+      return m !== undefined && (!requireTools || m.supportsTools);
+    },
+    [models, requireTools],
+  );
 
   // Callers mount with value "" (unresolved): land on the default model, or the first usable one
   // when the default is missing or can't do what this picker needs (e.g. chat tools).
@@ -30,7 +33,9 @@ export const ModelPicker = memo(function ModelPicker({
   // render fires the mutation again on each one. That is a render loop that ends in React #185 and
   // a white page, which is exactly how it was found.
   const latest = useRef(onChange);
-  latest.current = onChange;
+  useEffect(() => {
+    latest.current = onChange;
+  });
   const emitted = useRef<string | null>(null);
 
   useEffect(() => {
@@ -39,7 +44,7 @@ export const ModelPicker = memo(function ModelPicker({
     if (!fallback || emitted.current === fallback) return;
     emitted.current = fallback;
     latest.current(fallback);
-  }, [models, value, requireTools, defaultKey, defaultPending]);
+  }, [models, value, requireTools, defaultKey, defaultPending, usable]);
 
   const active = models.find((m) => m.key === value);
   return (

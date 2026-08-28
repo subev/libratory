@@ -57,13 +57,10 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
   const id = bookId;
   const [searchParams, setSearchParams] = useSearchParams();
   const [manifest, setManifest] = useState<ReaderManifest | null>(null);
-  const [cues, setCues] = useState<ReaderCues | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [cueError, setCueError] = useState<string | null>(null);
-  const [ms, setMs] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(loadSpeed);
-  const [view, setView] = useState<View>("column");
+  const [chosenView, setChosenView] = useState<View>("column");
   const [width, setWidth] = useState<(typeof WIDTHS)[number]["id"]>("full");
   const [debug, setDebug] = useState({ rects: false, layout: false });
 
@@ -83,31 +80,48 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
     list[0] ??
     null;
 
+  const chapterId = chapter?.id ?? null;
+  const chapterAudio = chapter?.audio ?? null;
+  const pageStart = chapter?.pageStart ?? null;
+  const pageEnd = chapter?.pageEnd ?? null;
+
   const pages = useMemo(
-    () => (manifest && chapter ? chapterPages(manifest, chapter) : []),
-    [manifest, chapter?.id],
+    () => (manifest ? chapterPages(manifest, { pageStart, pageEnd }) : []),
+    [manifest, pageStart, pageEnd],
   );
 
   // The pages come from the PDF, so they are there long before a word is spoken. Only a chapter
-  // with no pages at all has to fall back to the reflowed text.
-  useEffect(() => {
-    if (chapter && pages.length === 0) setView("text");
-  }, [chapter?.id, pages.length]);
+  // with no pages at all has to fall back to the reflowed text, and it does so without overwriting
+  // the choice the reader made, which comes back on the next chapter that has pages.
+  const view: View = pages.length === 0 ? "text" : chosenView;
+
+  // Both the cues and the playhead belong to one chapter. They carry the chapter they were loaded
+  // or measured for, so a chapter change reads as empty during render rather than through an
+  // effect that would show the last chapter's highlight for a frame.
+  const cueUrl = chapterAudio && chapter?.cues ? chapter.cues : null;
+  const [loaded, setLoaded] = useState<{ url: string; cues: ReaderCues | null; error: string | null } | null>(null);
+  const cues = loaded && loaded.url === cueUrl ? loaded.cues : null;
+  const cueError = loaded && loaded.url === cueUrl ? loaded.error : null;
+
+  const [played, setPlayed] = useState<{ chapterId: string | null; ms: number }>({ chapterId: null, ms: 0 });
+  const ms = played.chapterId === chapterId ? played.ms : 0;
+  const setMs = useCallback((at: number) => setPlayed({ chapterId, ms: at }), [chapterId]);
 
   useEffect(() => {
-    if (!chapter) return;
-    setCues(null);
-    setMs(0);
-    setCueError(null);
-    if (!chapter.audio || !chapter.cues) return;
-    // A chapter's own failure, not the reader's — the picker has to stay usable
-    source.cues(chapter.cues).then(setCues).catch((err: Error) => setCueError(err.message));
-  }, [source, chapter?.id, chapter?.audio]);
+    if (!cueUrl) return;
+    let live = true;
+    source
+      .cues(cueUrl)
+      .then((next) => { if (live) setLoaded({ url: cueUrl, cues: next, error: null }); })
+      // A chapter's own failure, not the reader's — the picker has to stay usable
+      .catch((err: Error) => { if (live) setLoaded({ url: cueUrl, cues: null, error: err.message }); });
+    return () => { live = false; };
+  }, [source, cueUrl]);
 
   // The reader holds no database row by design, so a chapter narrated while it is open can only be
   // noticed by asking the manifest again — while there is something to wait for, and someone looking
   useEffect(() => {
-    if (!live || !chapter || chapter.audio) return;
+    if (!live || chapterId === null || chapterAudio) return;
     const check = () => {
       if (document.visibilityState !== "visible") return;
       source.manifest().then(setManifest).catch(() => {});
@@ -118,7 +132,7 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
       clearInterval(timer);
       document.removeEventListener("visibilitychange", check);
     };
-  }, [live, source, chapter?.id, chapter?.audio]);
+  }, [live, source, chapterId, chapterAudio]);
 
   useAudioTime(audioRef, playing, setMs);
 
@@ -130,7 +144,7 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
     if (!audio) return;
     audio.defaultPlaybackRate = speed;
     audio.playbackRate = speed;
-  }, [speed, chapter?.audio]);
+  }, [speed, chapterAudio]);
 
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
@@ -166,13 +180,15 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
   // Measured rather than read off a ref during render, which is a frame behind on the first paint
   // and never notices the window being resized
   const [pagesWidth, setPagesWidth] = useState(0);
+  // The host only exists once the manifest has rendered the page frame
+  const hasManifest = manifest !== null;
   useEffect(() => {
     const host = pagesRef.current;
     if (!host) return;
     const observer = new ResizeObserver(([entry]) => setPagesWidth(entry.contentRect.width));
     observer.observe(host);
     return () => observer.disconnect();
-  }, [manifest !== null]);
+  }, [hasManifest]);
 
   const fit = useMemo(() => {
     // What the reader is actually looking at: a column in column view, the whole page otherwise
@@ -236,7 +252,7 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
           <Segmented
             options={VIEWS.map((entry) => ({ id: entry.id, label: entry.label, title: entry.hint }))}
             value={view}
-            onChange={(next) => setView(next as View)}
+            onChange={(next) => setChosenView(next as View)}
             testId="reader-view"
           />
 
