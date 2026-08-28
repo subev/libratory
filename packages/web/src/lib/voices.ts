@@ -94,7 +94,7 @@ export function languageOfStaticVoice(voiceId: string): string {
   if (voiceId.startsWith("kugel:")) return MULTILINGUAL;
   if (voiceId.startsWith("bg-")) return "bg";
   if (voiceId.startsWith("kokoro:")) {
-    return KOKORO_LANGUAGE_BY_PREFIX[voiceId.slice("kokoro:".length)[0]] ?? "en";
+    return KOKORO_LANGUAGE_BY_PREFIX[voiceId.charAt("kokoro:".length)] ?? "en";
   }
   return "en";
 }
@@ -254,7 +254,7 @@ export function getVoiceLabel(voiceId: string): string {
 // System voices are discovered at runtime, so stored ids may have no static entry
 function humanizeSayVoiceId(voiceId: string): string {
   const words = voiceId.slice("say:".length).split("-").filter(Boolean);
-  return words.map((w) => w[0].toUpperCase() + w.slice(1)).join(" ") + " (macOS)";
+  return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") + " (macOS)";
 }
 
 export function sayVoiceToEntry(voice: { slug: string; name: string; locale: string }): Voice {
@@ -265,7 +265,7 @@ export function sayVoiceToEntry(voice: { slug: string; name: string; locale: str
     grade: "OS",
     supportsSpeed: true,
     note: voice.locale,
-    language: voice.locale.split(/[_-]/)[0].toLowerCase(),
+    language: voice.locale.split(/[_-]/)[0]?.toLowerCase() ?? "",
     engine: "say",
   };
 }
@@ -278,7 +278,7 @@ export function cartesiaVoiceToEntry(voice: { id: string; name: string; language
     grade: "API",
     supportsSpeed: true,
     note: voice.tagline || voice.language,
-    language: voice.language.split(/[_-]/)[0].toLowerCase(),
+    language: voice.language.split(/[_-]/)[0]?.toLowerCase() ?? "",
     engine: "cartesia",
   };
 }
@@ -291,7 +291,7 @@ export function elevenlabsVoiceToEntry(voice: { id: string; name: string; langua
     grade: "API",
     supportsSpeed: true,
     note: voice.tagline || voice.language,
-    language: voice.language.split(/[_-]/)[0].toLowerCase(),
+    language: voice.language.split(/[_-]/)[0]?.toLowerCase() ?? "",
     engine: "elevenlabs",
   };
 }

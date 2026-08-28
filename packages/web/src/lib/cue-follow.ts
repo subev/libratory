@@ -82,9 +82,10 @@ export function followCue(band: FollowBand, { jump = false } = {}): boolean {
 
   const all = (selector: string) => [...document.querySelectorAll(selector)];
   const marks = all('[data-testid="cue-rect"], [data-testid="text-cue-active"]');
-  if (marks.length === 0) return false;
+  const firstMark = marks[0];
+  if (!firstMark) return false;
 
-  const scroller = scrollParent(marks[0]);
+  const scroller = scrollParent(firstMark);
   const viewTop = scroller ? scroller.getBoundingClientRect().top : 0;
   const viewHeight = scroller ? scroller.clientHeight : window.innerHeight;
 
@@ -105,7 +106,8 @@ export function followCue(band: FollowBand, { jump = false } = {}): boolean {
 // jump the first time a cue is placed under a new chapter or view.
 export function useFollowCue(cues: ReaderCues | null, ms: number, band: FollowBand, anchor: string): void {
   const cue = cues ? cueIndexAt(cues.cues, ms) : -1;
-  const word = cues && cue >= 0 ? wordIndexAt(cues.cues[cue], ms) : -1;
+  const active = cue >= 0 ? cues?.cues[cue] : undefined;
+  const word = active ? wordIndexAt(active, ms) : -1;
   const settled = useRef("");
 
   useEffect(() => {

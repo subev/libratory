@@ -41,7 +41,8 @@ export function cueIndexAt(cues: ReaderCue[], ms: number): number {
   let found = -1;
   while (low <= high) {
     const mid = (low + high) >> 1;
-    if (cues[mid].t[0] > ms) high = mid - 1;
+    const cue = cues[mid];
+    if (!cue || cue.t[0] > ms) high = mid - 1;
     else {
       found = mid;
       low = mid + 1;
@@ -54,7 +55,8 @@ export function cueIndexAt(cues: ReaderCue[], ms: number): number {
 export function wordIndexAt(cue: ReaderCue, ms: number): number {
   if (!cue.w) return -1;
   for (let i = cue.w.length - 1; i >= 0; i--) {
-    if (ms >= cue.w[i][0]) return ms < cue.w[i][1] ? i : -1;
+    const word = cue.w[i];
+    if (word && ms >= word[0]) return ms < word[1] ? i : -1;
   }
   return -1;
 }
