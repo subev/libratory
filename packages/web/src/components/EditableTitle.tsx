@@ -19,17 +19,12 @@ export function EditableTitle({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setValue(title);
-  }, [title]);
-
-  useEffect(() => {
     if (editing) inputRef.current?.select();
   }, [editing]);
 
   function save() {
     const trimmed = value.trim();
     if (trimmed !== title && (trimmed || placeholder)) onRename(trimmed);
-    else setValue(title);
     setEditing(false);
   }
 
@@ -42,7 +37,7 @@ export function EditableTitle({
         onBlur={save}
         onKeyDown={(e) => {
           if (e.key === "Enter") save();
-          if (e.key === "Escape") { setValue(title); setEditing(false); }
+          if (e.key === "Escape") setEditing(false);
         }}
         placeholder={placeholder}
         className={`${className} bg-transparent border-b-2 border-blue-500 outline-none w-full`}
@@ -53,7 +48,7 @@ export function EditableTitle({
   const Tag = placeholder ? "span" : "h1";
   return (
     <Tag
-      onClick={() => setEditing(true)}
+      onClick={() => { setValue(title); setEditing(true); }}
       className={`${title ? className : "text-(--text-faint)"} cursor-pointer hover:text-blue-700`}
       title={hint}
     >

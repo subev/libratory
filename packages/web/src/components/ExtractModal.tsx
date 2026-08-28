@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { AfterExtractChoice } from "./AfterExtractChoice.tsx";
 import { BOOK_LANGUAGE_OPTIONS } from "../lib/languages.ts";
@@ -71,9 +71,10 @@ export function ExtractModal({
   // Every scope replaces chapters — and with them any edits, audio and assemblies. Spelling the
   // count out and requiring a tick is the difference between reading a warning and acting on it.
   const losing = scope === "selected" ? chaptersForSelected : chaptersTotal;
-  const [confirmed, setConfirmed] = useState(false);
+  // The tick is against one scope's count, so changing the scope withdraws it
+  const [confirmedScope, setConfirmedScope] = useState<ExtractScope | null>(null);
+  const confirmed = confirmedScope === scope;
   const [autoSynthesize, setAutoSynthesize] = useState(false);
-  useEffect(() => setConfirmed(false), [scope]);
   const blocked = disabledReason(scope) ?? (losing > 0 && !confirmed ? "Confirm the chapters you're replacing" : null);
 
   return (
@@ -220,7 +221,7 @@ export function ExtractModal({
             <input
               type="checkbox"
               checked={confirmed}
-              onChange={(e) => setConfirmed(e.target.checked)}
+              onChange={(e) => setConfirmedScope(e.target.checked ? scope : null)}
               className="mt-0.5 rounded"
               data-testid="extract-confirm"
             />

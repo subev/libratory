@@ -11,6 +11,12 @@ function todayIso(): string {
 
 type PreviewStory = { id: string; ymd: string; points: number; comments: number; title: string; url: string };
 
+// A preview answers one set of parameters; changing them makes it a misdescription of what Build
+// would create, so it is held against the parameters it answered and read as absent once they move.
+type Preview = { key: string; stories: PreviewStory[] | null; error: string | null; excluded: ReadonlySet<string> };
+
+const NONE_EXCLUDED: ReadonlySet<string> = new Set();
+
 function storyDayLabel(ymd: string): string {
   return new Date(Date.UTC(Number(ymd.slice(0, 4)), Number(ymd.slice(4, 6)) - 1, Number(ymd.slice(6, 8))))
     .toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
@@ -28,20 +34,18 @@ export function HnDigestModal({ onClose }: { onClose: () => void }) {
   const [lines, setLines] = useState<string[]>([]);
   const [state, setState] = useState<"idle" | "running" | "done" | "failed">("idle");
   const [bookId, setBookId] = useState<string | null>(null);
-  const [preview, setPreview] = useState<PreviewStory[] | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewError, setPreviewError] = useState<string | null>(null);
-  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  const [loaded, setLoaded] = useState<Preview | null>(null);
   const sourceRef = useRef<EventSource | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
+  const previewKey = `${from}|${to}|${count}|${perDay}`;
+  const current = loaded?.key === previewKey ? loaded : null;
+  const preview = current?.stories ?? null;
+  const previewError = current?.error ?? null;
+  const excluded = current?.excluded ?? NONE_EXCLUDED;
+
   useEffect(() => () => sourceRef.current?.close(), []);
-  // A stale preview would misrepresent what Build creates
-  useEffect(() => {
-    setPreview(null);
-    setPreviewError(null);
-    setExcluded(new Set());
-  }, [from, to, count, perDay]);
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [lines]);
@@ -88,10 +92,9 @@ export function HnDigestModal({ onClose }: { onClose: () => void }) {
 
   async function previewStories() {
     if (previewLoading || state === "running") return;
+    const key = previewKey;
     setPreviewLoading(true);
-    setPreview(null);
-    setPreviewError(null);
-    setExcluded(new Set());
+    setLoaded(null);
     try {
       const params = new URLSearchParams({ from, to, count: String(count), perDay: perDay ? "1" : "0" });
       const res = await fetch(`/scripts/hn-top10/preview?${params}`);
@@ -99,9 +102,9 @@ export function HnDigestModal({ onClose }: { onClose: () => void }) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(body?.error ?? `HTTP ${res.status}`);
       }
-      setPreview((await res.json()) as PreviewStory[]);
+      setLoaded({ key, stories: (await res.json()) as PreviewStory[], error: null, excluded: NONE_EXCLUDED });
     } catch (err) {
-      setPreviewError(err instanceof Error ? err.message : "Preview failed");
+      setLoaded({ key, stories: null, error: err instanceof Error ? err.message : "Preview failed", excluded: NONE_EXCLUDED });
     } finally {
       setPreviewLoading(false);
     }
@@ -241,11 +244,12 @@ export function HnDigestModal({ onClose }: { onClose: () => void }) {
                     type="checkbox"
                     checked={!excluded.has(story.id)}
                     onChange={() =>
-                      setExcluded((prev) => {
-                        const next = new Set(prev);
+                      setLoaded((prev) => {
+                        if (!prev) return prev;
+                        const next = new Set(prev.excluded);
                         if (next.has(story.id)) next.delete(story.id);
                         else next.add(story.id);
-                        return next;
+                        return { ...prev, excluded: next };
                       })
                     }
                     disabled={state === "running"}

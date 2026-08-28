@@ -29,6 +29,7 @@ const ALL = "all";
 // Showing 500 Cartesia voices at once answers nothing; a taste of each provider does.
 const PREVIEW_PER_PROVIDER = 6;
 const RAIL_LANGUAGE_LIMIT = 8;
+const NONE_EXPANDED: ReadonlySet<string> = new Set();
 
 // Every other engine here is free; this one is metered, and running out mid-chapter is the
 // normal case on a free month. What is left belongs where the voices are chosen.
@@ -159,11 +160,6 @@ export function VoiceLibraryModal({
 
   const pocketLanguage = pocketLanguages.find((l) => l.code === language) ?? null;
 
-  useEffect(() => {
-    setProvider(null);
-    setExpanded(new Set());
-  }, [language]);
-
   const visible = useMemo(() => {
     const pool =
       language === CLONED
@@ -190,8 +186,17 @@ export function VoiceLibraryModal({
     const current = visible.find((v) => v.id === state.selectedId);
     return current ? providerOfVoice(current) : ALL;
   }, [visible, state.selectedId]);
-  const [provider, setProvider] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // The rail and the per-provider "show all" belong to one language's list, so they are held
+  // against the language that produced them and forgotten when it changes.
+  const [picked, setPicked] = useState<{ language: string; provider: string | null; expanded: ReadonlySet<string> }>({
+    language,
+    provider: null,
+    expanded: NONE_EXPANDED,
+  });
+  const provider = picked.language === language ? picked.provider : null;
+  const expanded = picked.language === language ? picked.expanded : NONE_EXPANDED;
+  const setProvider = (name: string | null) => setPicked({ language, provider: name, expanded });
+  const expand = (name: string) => setPicked({ language, provider, expanded: new Set(expanded).add(name) });
   const activeProvider = query ? ALL : (provider ?? selectedProvider);
 
   const shown = activeProvider === ALL ? byProvider : byProvider.filter((g) => g.provider === activeProvider);
@@ -359,7 +364,7 @@ export function VoiceLibraryModal({
                             {capped && (
                               <button
                                 type="button"
-                                onClick={() => setExpanded((prev) => new Set(prev).add(name))}
+                                onClick={() => expand(name)}
                                 className="w-full text-left px-3 py-1.5 text-xs text-blue-600 hover:underline focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none rounded"
                                 data-testid={`voice-show-all-${name}`}
                               >
