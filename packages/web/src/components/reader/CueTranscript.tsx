@@ -26,7 +26,8 @@ export function CueTranscript({
   if (!cues) return <p className="text-sm text-(--text-muted)">{empty}</p>;
 
   const activeIndex = cueIndexAt(cues.cues, ms);
-  const activeWord = activeIndex >= 0 ? wordIndexAt(cues.cues[activeIndex], ms) : -1;
+  const activeCue = activeIndex >= 0 ? cues.cues[activeIndex] : undefined;
+  const activeWord = activeCue ? wordIndexAt(activeCue, ms) : -1;
 
   return (
     <article className={className} data-testid="reader-text-view">
@@ -62,8 +63,10 @@ export function CueText({ cue, word }: { cue: ReaderCue; word: number }) {
 
   let cursor = 0;
   for (let i = 0; i < word; i++) {
-    const at = cue.s.indexOf(cue.w![i][2], cursor);
-    if (at >= 0) cursor = at + cue.w![i][2].length;
+    const before = cue.w?.[i]?.[2];
+    if (before === undefined) continue;
+    const at = cue.s.indexOf(before, cursor);
+    if (at >= 0) cursor = at + before.length;
   }
   const start = cue.s.indexOf(spoken, cursor);
   if (start < 0) return <>{cue.s}</>;

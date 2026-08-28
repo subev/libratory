@@ -198,14 +198,15 @@ export function StructureModal({
         words: (next ? next.wordsBefore : file.totalWords) - h.wordsBefore,
       };
     });
-    if (chosen[0].wordsBefore > 50) {
+    const firstChosen = chosen[0];
+    if (firstChosen && firstChosen.wordsBefore > 50) {
       chapters.unshift({
         key: "preface",
         title: "Preface",
         translated: undefined,
         pageStart: 1,
-        pageEnd: chosen[0].page,
-        words: chosen[0].wordsBefore,
+        pageEnd: firstChosen.page,
+        words: firstChosen.wordsBefore,
       });
     }
     return chapters;

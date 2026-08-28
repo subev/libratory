@@ -40,7 +40,7 @@ function details(error: Error, componentStack: string | null) {
 }
 
 function issueUrl(body: string, message: string) {
-  const title = `Crash: ${redact((message || "render error").split("\n")[0]).slice(0, 90)}`;
+  const title = `Crash: ${redact((message || "render error").split("\n")[0] ?? "").slice(0, 90)}`;
   const filled = [
     "<!-- What were you doing when this happened? -->",
     "",

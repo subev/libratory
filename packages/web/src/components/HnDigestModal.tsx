@@ -72,7 +72,7 @@ export function HnDigestModal({ onClose }: { onClose: () => void }) {
       if (event.type === "line" && event.text) {
         setLines((prev) => [...prev, event.text!]);
         const match = event.text.match(/\/books\/([0-9a-f-]{36})/);
-        if (match) setBookId(match[1]);
+        if (match?.[1]) setBookId(match[1]);
       } else if (event.type === "exit") {
         source.close();
         setState(event.code === 0 ? "done" : "failed");
