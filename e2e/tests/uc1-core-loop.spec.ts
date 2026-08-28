@@ -53,6 +53,7 @@ test.describe("full extraction", { tag: "@slow" }, () => {
 
     await uploadFixtureBook(page);
     await page.getByTestId("extract-chapters").click();
+    await page.getByTestId("extract-start").click();
 
     const rows = page.getByTestId("chapter-row");
     await expect(rows.first()).toBeVisible({ timeout: 10 * 60_000 });

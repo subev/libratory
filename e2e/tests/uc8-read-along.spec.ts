@@ -88,6 +88,7 @@ test.describe("read along on the page", { tag: "@slow" }, () => {
 
     await uploadFixtureBook(page);
     await page.getByTestId("extract-chapters").click();
+    await page.getByTestId("extract-start").click();
     await expect(page.getByTestId("chapter-row").first()).toBeVisible({ timeout: 10 * 60_000 });
 
     // Before a word is spoken the chapter's pages already open — with nothing marked on them,

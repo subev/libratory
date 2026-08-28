@@ -87,7 +87,7 @@ export function ExtractModal({
         data-testid="extract-modal"
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-(--border)">
-          <h2 id="extract-modal-title" className="text-sm font-medium text-(--text-primary)">Extract</h2>
+          <h2 id="extract-modal-title" className="text-sm font-medium text-(--text-primary)">{hasChapters ? "Extract" : "Extract chapters"}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -102,36 +102,43 @@ export function ExtractModal({
         </div>
 
         <div className="p-4 space-y-4">
-          <fieldset className="space-y-2">
-            <legend className="text-xs font-medium text-(--text-secondary) mb-1">What to redo</legend>
-            {SCOPES.map((entry) => {
-              const reason = disabledReason(entry.id);
-              const label = entry.id === "selected" ? `${entry.label} (${selectedCount})` : entry.label;
-              return (
-                <label
-                  key={entry.id}
-                  title={reason ?? undefined}
-                  className={`flex gap-2 rounded-md border p-2 ${
-                    scope === entry.id ? "border-blue-500 bg-(--bg-selected)" : "border-(--border)"
-                  } ${reason ? "opacity-50" : "cursor-pointer hover:bg-(--bg-subtle)"}`}
-                >
-                  <input
-                    type="radio"
-                    name="extract-scope"
-                    checked={scope === entry.id}
-                    disabled={!!reason}
-                    onChange={() => setScope(entry.id)}
-                    className="mt-0.5"
-                    data-testid={`extract-scope-${entry.id}`}
-                  />
-                  <span className="min-w-0">
-                    <span className="block text-sm text-(--text-primary)">{label}</span>
-                    <span className="block text-xs text-(--text-muted)">{entry.detail}</span>
-                  </span>
-                </label>
-              );
-            })}
-          </fieldset>
+          {hasChapters ? (
+            <fieldset className="space-y-2">
+              <legend className="text-xs font-medium text-(--text-secondary) mb-1">What to redo</legend>
+              {SCOPES.map((entry) => {
+                const reason = disabledReason(entry.id);
+                const label = entry.id === "selected" ? `${entry.label} (${selectedCount})` : entry.label;
+                return (
+                  <label
+                    key={entry.id}
+                    title={reason ?? undefined}
+                    className={`flex gap-2 rounded-md border p-2 ${
+                      scope === entry.id ? "border-blue-500 bg-(--bg-selected)" : "border-(--border)"
+                    } ${reason ? "opacity-50" : "cursor-pointer hover:bg-(--bg-subtle)"}`}
+                  >
+                    <input
+                      type="radio"
+                      name="extract-scope"
+                      checked={scope === entry.id}
+                      disabled={!!reason}
+                      onChange={() => setScope(entry.id)}
+                      className="mt-0.5"
+                      data-testid={`extract-scope-${entry.id}`}
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm text-(--text-primary)">{label}</span>
+                      <span className="block text-xs text-(--text-muted)">{entry.detail}</span>
+                    </span>
+                  </label>
+                );
+              })}
+            </fieldset>
+          ) : (
+            <p className="text-sm text-(--text-secondary)" data-testid="extract-first-run">
+              Marker reads {selectedCount === 1 ? "the selected file" : `the ${selectedCount} selected files`} and
+              finds the chapter boundaries — minutes per book. Nothing is replaced: this book has no chapters yet.
+            </p>
+          )}
 
           <div className="border-t border-(--border) pt-3">
             <AfterExtractChoice
@@ -144,7 +151,9 @@ export function ExtractModal({
 
           <div className="space-y-2 border-t border-(--border) pt-3">
             {/* Not app preferences — these describe the source and its text, and outlive any one run. */}
-            <p className="text-xs font-medium text-(--text-secondary)">About this book</p>
+            <p className="text-xs font-medium text-(--text-secondary)">
+              About this book <span className="font-normal text-(--text-faint)">— saved as you change them, and used by every extraction</span>
+            </p>
 
             <label className="flex items-center gap-2 text-xs text-(--text-muted)">
               <span className="text-(--text-secondary) w-28 shrink-0">Language</span>
@@ -227,7 +236,7 @@ export function ExtractModal({
             onClick={onClose}
             className="px-4 py-2 rounded-md text-sm font-medium border border-(--border-input) text-(--text-secondary) hover:bg-(--bg-subtle) focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
           >
-            Cancel
+            Close
           </button>
           <button
             type="button"

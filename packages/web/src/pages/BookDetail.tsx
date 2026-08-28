@@ -119,7 +119,6 @@ export function BookDetail() {
   const cancelMutation = trpc.books.cancel.useMutation({ onSuccess: invalidate });
   const retryMutation = trpc.books.retry.useMutation({ onSuccess: invalidate });
   const redetectMutation = trpc.books.redetectChapters.useMutation({ onSuccess: invalidate });
-  const extractChaptersMutation = trpc.books.extractChapters.useMutation({ onSuccess: invalidate });
   const resumeDigestMutation = trpc.books.resumeDigest.useMutation({ onSuccess: invalidate });
   const processSelectedMutation = trpc.books.processSelected.useMutation({ onSuccess: invalidate });
   const deleteMutation = trpc.books.delete.useMutation({
@@ -153,6 +152,8 @@ export function BookDetail() {
   const reExtractSelectedMutation = trpc.bookFiles.reExtractSelected.useMutation({ onSuccess: invalidate });
   const cancelFileMutation = trpc.bookFiles.cancel.useMutation({ onSuccess: invalidate });
 
+  // Opened from the toolbar and from the raw-text block, so it cannot live in either of them.
+  const [extractOpen, setExtractOpen] = useState(false);
   const [showStructure, setShowStructure] = useState(false);
   const [showTranslation, setShowTranslation] = useState(false);
   const [showSynthesize, setShowSynthesize] = useState(false);
@@ -524,6 +525,8 @@ export function BookDetail() {
           onRemove={(fid) => removeFileMutation.mutate({ id: fid })}
           onReExtract={(fid) => reExtractFileMutation.mutate({ id: fid })}
           voiceLabel={getVoiceLabel(book.voice)}
+          extractOpen={extractOpen}
+          onExtractOpenChange={setExtractOpen}
           onStartExtraction={async (scope, autoSynthesize) => {
             await setAutoSynthesizeMutation.mutateAsync({ id: book.id, autoSynthesize });
             if (scope === "selected") reExtractSelectedMutation.mutate({ bookId: book.id });
@@ -811,15 +814,15 @@ export function BookDetail() {
                 </p>
                 <div className="flex gap-3 flex-wrap">
                   <button
-                    onClick={() => extractChaptersMutation.mutate({ id: book.id })}
-                    disabled={extractChaptersMutation.isPending || !extractionReady}
+                    onClick={() => setExtractOpen(true)}
+                    disabled={!extractionReady}
                     title={extractionReady
-                      ? "Run the full extraction (Marker) to detect chapters — takes minutes; uses the Force OCR and LLM chapter detection settings above"
+                      ? "Choose what to read and with which settings, then start — Marker takes minutes per book"
                       : "Full extraction needs the Marker models — download them below"}
                     className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     data-testid="extract-chapters"
                   >
-                    {extractChaptersMutation.isPending ? "Queuing..." : "Extract chapters"}
+                    Extract chapters...
                   </button>
                   <button
                     onClick={() => setAskScope({ kind: "book-raw", bookId: book.id, bookTitle: book.title })}
@@ -836,9 +839,6 @@ export function BookDetail() {
                   </button>
                 </div>
                 <ModelBundleNotice id="extraction" verb="Extracting chapters" />
-                {extractChaptersMutation.error && (
-                  <p className="text-red-600 text-sm">{extractChaptersMutation.error.message}</p>
-                )}
               </div>
             )
           ) : (

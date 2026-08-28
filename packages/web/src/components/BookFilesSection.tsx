@@ -28,6 +28,8 @@ export function BookFilesSection({
   chapterModel,
   language,
   voiceLabel,
+  extractOpen,
+  onExtractOpenChange,
   onStartExtraction,
   onUpdateExtractionSettings,
   onSetSelected,
@@ -48,6 +50,8 @@ export function BookFilesSection({
   chapterModel: string | null;
   language: string | null;
   voiceLabel: string;
+  extractOpen: boolean;
+  onExtractOpenChange: (open: boolean) => void;
   onStartExtraction: (scope: ExtractScope, autoSynthesize: boolean) => void;
   onUpdateExtractionSettings: (settings: { forceOcr?: boolean; llmChapterDetection?: boolean; chapterModel?: string; language?: string | null }) => void;
   onSetSelected: (id: string, selected: boolean) => void;
@@ -61,7 +65,6 @@ export function BookFilesSection({
 }) {
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
-  const [extractOpen, setExtractOpen] = useState(false);
 
   // Chapters belonging to the currently selected files — what a scoped re-extract would replace.
   const selectedFileIndexes = new Set(files.filter((f) => f.selected).map((f) => f.index));
@@ -123,7 +126,7 @@ export function BookFilesSection({
       <div className="flex items-center gap-2 mb-2 flex-wrap">
         <AddFilesButton bookId={bookId} onFilesAdded={onFilesAdded} />
         <button
-          onClick={() => setExtractOpen(true)}
+          onClick={() => onExtractOpenChange(true)}
           disabled={isEmpty}
           title={isEmpty ? "Add a PDF first" : "Extract files again, or re-detect chapter boundaries"}
           className="px-3 py-1.5 bg-(--bg-subtle) text-(--text-secondary) rounded-md text-xs font-medium hover:bg-(--border) disabled:opacity-50 disabled:cursor-not-allowed"
@@ -294,9 +297,9 @@ export function BookFilesSection({
           language={language}
           voiceLabel={voiceLabel}
           onUpdateBook={onUpdateExtractionSettings}
-          onClose={() => setExtractOpen(false)}
+          onClose={() => onExtractOpenChange(false)}
           onStart={(scope: ExtractScope, autoSynthesize: boolean) => {
-            setExtractOpen(false);
+            onExtractOpenChange(false);
             onStartExtraction(scope, autoSynthesize);
           }}
         />
