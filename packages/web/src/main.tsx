@@ -7,6 +7,7 @@ import { httpBatchStreamLink } from "@trpc/client";
 import { trpc } from "./trpc.ts";
 import { profileHeaders } from "./lib/profile.ts";
 import { installExclusiveAudio } from "./lib/exclusive-audio.ts";
+import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
 import { Home } from "./pages/Home.tsx";
 import { BookDetail } from "./pages/BookDetail.tsx";
 import { Chat } from "./pages/Chat.tsx";
@@ -38,14 +39,16 @@ createRoot(document.getElementById("root")!).render(
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/folders/:folderId" element={<Home />} />
-            <Route path="/books/:id" element={<BookDetail />} />
-            <Route path="/books/:id/read" element={<Suspense fallback={null}><Reader /></Suspense>} />
-            <Route path="/open" element={<Suspense fallback={null}><ReaderOpen /></Suspense>} />
-            <Route path="/chat" element={<Chat />} />
-          </Routes>
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/folders/:folderId" element={<Home />} />
+              <Route path="/books/:id" element={<BookDetail />} />
+              <Route path="/books/:id/read" element={<Suspense fallback={null}><Reader /></Suspense>} />
+              <Route path="/open" element={<Suspense fallback={null}><ReaderOpen /></Suspense>} />
+              <Route path="/chat" element={<Chat />} />
+            </Routes>
+          </ErrorBoundary>
         </BrowserRouter>
       </QueryClientProvider>
     </trpc.Provider>
