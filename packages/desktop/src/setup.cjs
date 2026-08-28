@@ -1,7 +1,7 @@
 // Everything scripts/setup.sh does, minus the terminal. Each function reports progress through a
 // callback and is safe to run again — a first run that dies halfway resumes rather than restarts.
 const { spawn } = require("node:child_process");
-const { existsSync, mkdirSync, copyFileSync, cpSync, rmSync, readFileSync, readdirSync, writeFileSync } = require("node:fs");
+const { existsSync, mkdirSync, copyFileSync, cpSync, rmSync, readFileSync } = require("node:fs");
 const path = require("node:path");
 
 // Pinned and checksummed rather than `curl | sh`: piping an installer into a shell gives errors
@@ -111,62 +111,4 @@ async function fetchEssentialModels(python, home, onOutput) {
   });
 }
 
-// A virtualenv writes its own absolute path into every console script it installs, so moving the
-// home breaks all of them at once. Renaming pdf2audio to Libratory did exactly that: 109 of 114
-// scripts went on exec'ing a python that no longer existed, and the only symptom anything reported
-// was "marker_single exited with code 126" — 126 being the shell refusing to run the file.
-//
-// The lock hash still matched, so the python step said "up to date" and never looked. This does
-// look, on every launch, and costs one read when nothing is wrong.
-function repairVenvPaths(home) {
-  const root = path.join(home, "python");
-  const bin = path.join(root, "bin");
-  let names;
-  try {
-    names = readdirSync(bin);
-  } catch {
-    return 0; // No venv yet — the python step is about to make one
-  }
-
-  let stale = null;
-  for (const name of names) {
-    let head;
-    try {
-      head = readFileSync(path.join(bin, name), "utf8").slice(0, 512);
-    } catch {
-      continue;
-    }
-    // "Application Support" has a space in it, so the path is only unambiguous inside the quotes
-    // the generated wrapper puts it in. Matching without them captures from the space onwards.
-    const found = /['"]([^'"]+)\/bin\/python(?:\d[\d.]*)?['"]/.exec(head)
-      ?? /(?:^|=|\s)(\/[^\s'"=]+)\/bin\/python(?:\d[\d.]*)?(?:\s|$)/.exec(head);
-    if (!found) continue;
-    if (found[1] === root) return 0; // Points here already; nothing to do
-    stale = found[1];
-    break;
-  }
-  if (!stale) return 0;
-
-  let fixed = 0;
-  for (const name of names) {
-    const file = path.join(bin, name);
-    let text;
-    try {
-      text = readFileSync(file, "utf8");
-    } catch {
-      continue;
-    }
-    // Reading a compiled binary as utf8 and writing it back would corrupt it, and a NUL is the
-    // cheapest thing that tells them apart.
-    if (!text.includes(stale) || text.includes("\0")) continue;
-    try {
-      writeFileSync(file, text.split(stale).join(root));
-      fixed++;
-    } catch {
-      // One unwritable script is not a reason to leave the rest broken
-    }
-  }
-  return fixed;
-}
-
-module.exports = { missingTools, toolPath, stageRuntime, pythonBin, syncPython, fetchEssentialModels, repairVenvPaths };
+module.exports = { missingTools, toolPath, stageRuntime, pythonBin, syncPython, fetchEssentialModels };
