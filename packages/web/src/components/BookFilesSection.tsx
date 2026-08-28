@@ -214,9 +214,11 @@ export function BookFilesSection({
                       {file.rawWords.toLocaleString()} words
                     </span>
                   )}
+                  {/* Thirty characters cut "marker_single could not be run (exit 126) — the Python
+                      environment looks broken" down to the half that says nothing. */}
                   {file.error && (
-                    <span className="ml-2 text-xs text-red-500 truncate" title={file.error}>
-                      {file.error.length > 30 ? file.error.slice(0, 30) + "..." : file.error}
+                    <span className="mt-0.5 block text-xs text-red-500 break-words line-clamp-2" title={file.error}>
+                      {file.error}
                     </span>
                   )}
                 </td>

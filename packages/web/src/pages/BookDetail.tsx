@@ -502,7 +502,10 @@ export function BookDetail() {
           </div>
         </div>
 
-        {book.error && (
+        {/* "All 1 file(s) failed extraction" only counts what the rows below already say, and says
+            it louder than the reason. Assembly, re-detection and export have no row of their own,
+            so those keep the banner. */}
+        {book.error && !(book.files ?? []).some((f) => f.status === "failed") && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
             <p className="text-sm text-red-700 font-mono">{book.error}</p>
           </div>
