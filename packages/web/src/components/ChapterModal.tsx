@@ -58,6 +58,27 @@ type SourceBlock = {
 // No sticky bar inside the panel, so the cue may sit closer to its top than in the reader
 const MODAL_BAND: FollowBand = { top: 24, bottom: 90, landing: 0.25 };
 
+// What the reader does inside the modal — the tab, the edit, the chunk, the open page — belongs to
+// the chapter and lane it was done in. It is held against them rather than cleared by an effect, so
+// arriving at another chapter reads as untouched in the same render that shows it.
+type ModalUi = {
+  picked: ViewMode | null;
+  isEditing: boolean;
+  selectedChunkPreviewUrl: string | null;
+  // Bumped only on an explicit user selection (clicking a chunk button or its text) so the audio
+  // auto-plays then — but NOT when a chunk is auto-selected programmatically during synthesis.
+  playNonce: number;
+  pdfPage: number | null;
+};
+
+const UNTOUCHED_UI: ModalUi = {
+  picked: null,
+  isEditing: false,
+  selectedChunkPreviewUrl: null,
+  playNonce: 0,
+  pdfPage: null,
+};
+
 type ViewMode = "pages" | "text" | "custom" | "clean" | "raw" | "split" | "blocks";
 
 export function ChapterModal({
@@ -80,38 +101,38 @@ export function ChapterModal({
   const hasPrev = chapterIndex > 0;
   const hasNext = chapterIndex < chapters.length - 1;
 
-  const [picked, setPicked] = useState<ViewMode | null>(null);
   const [speed, setSpeed] = useState(loadSpeed);
-  const [cues, setCues] = useState<ReaderCues | null>(null);
   const [manifest, setManifest] = useState<ReaderManifest | null>(null);
-  const [ms, setMs] = useState(0);
   const playerRef = useRef<{ seek: (ms: number) => void; toggle: () => boolean } | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState("");
-  const [selectedChunkPreviewUrl, setSelectedChunkPreviewUrl] = useState<string | null>(null);
-  // Bumped only on an explicit user selection (clicking a chunk button or its text) so the audio
-  // auto-plays then — but NOT when a chunk is auto-selected programmatically during synthesis.
-  const [playNonce, setPlayNonce] = useState(0);
 
-  const selectChunk = (url: string) => {
-    setSelectedChunkPreviewUrl(url);
-    setPlayNonce((n) => n + 1);
-  };
+  const uiKey = `${chapterIndex}:${variant?.key ?? ""}`;
+  const [uiState, setUiState] = useState<ModalUi & { key: string }>({ key: uiKey, ...UNTOUCHED_UI });
+  const ui = uiState.key === uiKey ? uiState : { key: uiKey, ...UNTOUCHED_UI };
+  const patchUi = useCallback(
+    (patch: (current: ModalUi) => Partial<ModalUi>) =>
+      setUiState((prev) => {
+        const current = prev.key === uiKey ? prev : { key: uiKey, ...UNTOUCHED_UI };
+        return { ...current, ...patch(current) };
+      }),
+    [uiKey],
+  );
+
+  const { picked, isEditing, selectedChunkPreviewUrl, playNonce, pdfPage } = ui;
+  const setPicked = useCallback((mode: ViewMode | null) => patchUi(() => ({ picked: mode })), [patchUi]);
+  const setIsEditing = useCallback((editing: boolean) => patchUi(() => ({ isEditing: editing })), [patchUi]);
+  const setSelectedChunkPreviewUrl = useCallback((url: string | null) => patchUi(() => ({ selectedChunkPreviewUrl: url })), [patchUi]);
+  const setPdfPage = useCallback((page: number | null) => patchUi(() => ({ pdfPage: page })), [patchUi]);
+  const selectChunk = useCallback(
+    (url: string) => patchUi((current) => ({ selectedChunkPreviewUrl: url, playNonce: current.playNonce + 1 })),
+    [patchUi],
+  );
 
   // Shared so hovering a chunk button highlights its text span and vice versa.
   const [hoveredChunkUrl, setHoveredChunkUrl] = useState<string | null>(null);
 
-  const [pdfPage, setPdfPage] = useState<number | null>(null);
   const [showCompare, setShowCompare] = useState(false);
   const [showAi, setShowAi] = useState(false);
-
-  useEffect(() => {
-    setPicked(null);
-    setIsEditing(false);
-    setSelectedChunkPreviewUrl(null);
-    setPlayNonce(0);
-    setPdfPage(null);
-  }, [chapterIndex, variant?.key]);
 
   const isVariant = !!variant;
 
@@ -132,13 +153,23 @@ export function ChapterModal({
   const cueUrl = isVariant ? null : readerChapter?.audio ? readerChapter.cues : null;
 
   // A re-synthesis leaves the cue URL untouched and its contents replaced, so the URL alone is not
-  // enough to know the timings are the ones on disk
+  // enough to know the timings are the ones on disk. The timings and the playhead carry the version
+  // they belong to, so a re-synthesis or an edit reads as unmarked until the new ones arrive.
+  const cueKey = cueUrl ? `${cueUrl}:${revision}` : null;
+  const [loadedCues, setLoadedCues] = useState<{ key: string; cues: ReaderCues | null } | null>(null);
+  const cues = loadedCues?.key === cueKey ? loadedCues.cues : null;
+  const [playhead, setPlayhead] = useState<{ key: string | null; ms: number }>({ key: null, ms: 0 });
+  const ms = playhead.key === cueKey ? playhead.ms : 0;
+  const setMs = useCallback((at: number) => setPlayhead({ key: cueKey, ms: at }), [cueKey]);
+
   useEffect(() => {
-    setCues(null);
-    setMs(0);
-    if (!cueUrl) return;
-    fetchCues(cueUrl).then(setCues).catch(() => setCues(null));
-  }, [cueUrl, revision]);
+    if (!cueUrl || !cueKey) return;
+    let live = true;
+    fetchCues(cueUrl)
+      .then((next) => { if (live) setLoadedCues({ key: cueKey, cues: next }); })
+      .catch(() => { if (live) setLoadedCues({ key: cueKey, cues: null }); });
+    return () => { live = false; };
+  }, [cueUrl, cueKey]);
 
   const canMark = readerChapter?.mode === "page" && cues !== null;
 
@@ -223,23 +254,18 @@ export function ChapterModal({
     if (variant?.key) utils.variants.detail.invalidate({ chapterId: chapter.id, key: variant.key });
   }, [audioBusy, chapter.id, variant?.key, utils]);
 
+  // The one selection here that cannot be derived during render: which chunk is chosen when nobody
+  // has chosen one depends on when the list first arrived, and it stays put as the list grows.
   useEffect(() => {
     const previews = fullChapter?.chunkPreviews ?? [];
-    if (previews.length === 0) {
-      setSelectedChunkPreviewUrl(null);
-      return;
-    }
-
+    if (selectedChunkPreviewUrl && previews.some((preview) => preview.url === selectedChunkPreviewUrl)) return;
+    if (previews.length === 0 && selectedChunkPreviewUrl === null) return;
     // While synthesizing, follow the latest chunk; otherwise default to the first so playback
     // (and the play button) starts from the beginning of the chapter.
-    const fallbackUrl = chapter.status === "synthesizing" ? previews.at(-1)!.url : previews[0].url;
-
-    setSelectedChunkPreviewUrl((current) => {
-      if (!current) return fallbackUrl;
-      const exists = previews.some((preview) => preview.url === current);
-      return exists ? current : fallbackUrl;
-    });
-  }, [fullChapter?.chunkPreviews, chapter.status]);
+    const fallback = previews.length === 0 ? null : chapter.status === "synthesizing" ? previews.at(-1)!.url : previews[0].url;
+    // eslint-disable-next-line react/set-state-in-effect -- sticky from the moment the chunks appear, so it is not a function of this render's props
+    setSelectedChunkPreviewUrl(fallback);
+  }, [fullChapter?.chunkPreviews, chapter.status, selectedChunkPreviewUrl, setSelectedChunkPreviewUrl]);
 
   const updateTextMutation = trpc.chapters.updateText.useMutation({
     onSuccess: () => {
@@ -282,7 +308,7 @@ export function ChapterModal({
       utils.chapters.get.invalidate({ id: chapter.id });
     }
     wasCleaningRef.current = cleanupRunning;
-  }, [cleanupRunning, chapter.id]);
+  }, [cleanupRunning, chapter.id, utils]);
   const cleanupLabel =
     cleanupRunning ? "Cleaning..." :
     cleanupStatus === "failed" ? "Retry cleanup" :
@@ -336,7 +362,7 @@ export function ChapterModal({
     }
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [onClose, isEditing, showCompare, hasPrev, hasNext, chapterIndex, onNavigate, pdfPage]);
+  }, [onClose, isEditing, showCompare, hasPrev, hasNext, chapterIndex, onNavigate, pdfPage, setPdfPage]);
 
   function startEditing() {
     if (!fullChapter) return;
@@ -938,15 +964,23 @@ function ChunkPreviewPanel({
   // Auto-play whenever the user explicitly picks a chunk (playNonce changes), but not on the
   // programmatic auto-select during synthesis (playNonce stays 0 then) — and not on a mount, which
   // is a panel rebuilt around another chapter rather than anyone asking to hear it.
+  //
+  // The chunk to play is read through a ref rather than declared: it is the nonce alone that says
+  // someone asked to hear one, and re-running this as chunks arrive would play one nobody picked.
   const played = useRef(false);
+  const asked = useRef({ syncMode, chunkPreviews, activeUrl });
+  useEffect(() => {
+    asked.current = { syncMode, chunkPreviews, activeUrl };
+  });
   useEffect(() => {
     if (!played.current) {
       played.current = true;
       return;
     }
     if (playNonce > 0) {
-      if (syncMode) {
-        const target = chunkPreviews.find((preview) => preview.url === activeUrl);
+      const { syncMode: sync, chunkPreviews: previews, activeUrl: url } = asked.current;
+      if (sync) {
+        const target = previews.find((preview) => preview.url === url);
         if (typeof target?.startMs === "number") pendingSeekRef.current = target.startMs / 1000;
       }
       playActive();
@@ -1353,13 +1387,10 @@ function ChunkedText({
 }
 
 function BlocksPreview({ sourceBlocks, onOpenPdf }: { sourceBlocks: SourceBlock[]; onOpenPdf?: (page: number) => void }) {
-  let lastPage = -1;
-
   return (
     <div className="flex-1 min-h-0 overflow-y-auto rounded bg-(--bg-subtle) border border-(--border) p-2 font-mono text-xs leading-relaxed">
       {sourceBlocks.map((block, i) => {
-        const showPageDivider = block.page !== lastPage && lastPage !== -1;
-        lastPage = block.page;
+        const showPageDivider = i > 0 && block.page !== sourceBlocks[i - 1].page;
         return (
           <div key={i}>
             {showPageDivider ? (
