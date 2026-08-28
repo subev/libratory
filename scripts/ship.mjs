@@ -29,7 +29,7 @@ function fail(message, fix) {
   process.exit(1);
 }
 
-const mb = (bytes) => `${Math.round(bytes / 1e6)} MB`;
+const size = (bytes) => (bytes < 1e6 ? `${Math.max(1, Math.round(bytes / 1e3))} KB` : `${Math.round(bytes / 1e6)} MB`);
 
 // v26.828.3 → [26, 828, 3], so releases sort the way their numbers read rather than as strings.
 const parts = (tag) => tag.replace(/^v/, "").split(".").map(Number);
@@ -80,12 +80,12 @@ function main() {
   const previous = tags.filter((t) => newer(tag, t)).sort((a, b) => (newer(a, b) ? -1 : 1))[0];
   const notes = placeholder
     ? git("log", `${previous}..${tag}`, "--format=%s").split("\n")
-        .filter((s) => s && !/^Release \d/.test(s)).map((s) => `- ${s}`).join("\n")
+        .filter((s) => s && !/^Release\b/.test(s)).map((s) => `- ${s}`).join("\n")
     : release.body.trim();
 
   console.log(`\n  draft     ${tag}`);
   console.log(`  build     ${build.conclusion}`);
-  console.log(`  assets    ${release.assets.map((a) => `${a.name} ${mb(a.size)}`).join("\n            ")}`);
+  console.log(`  assets    ${release.assets.map((a) => `${a.name} ${size(a.size)}`).join("\n            ")}`);
   console.log(`  notarised ${notarised}`);
   console.log(`  latest    ${isNewest ? "yes" : `no — ${tags.filter((t) => newer(t, tag)).join(", ")} is newer`}`);
   console.log(`\n  notes${placeholder ? " (from the commits — edit on GitHub if you want better)" : ""}:`);

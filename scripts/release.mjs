@@ -64,6 +64,9 @@ function main() {
   console.log(`\n  version   ${version}`);
   console.log(`  tag       v${version}`);
   console.log(`  pushing   ${ahead} commit(s) to origin/main`);
+  for (const subject of git("log", "origin/main..HEAD", "--format=%s").split("\n").filter(Boolean)) {
+    console.log(`            ${subject}`);
+  }
   console.log(`  then      the Release workflow builds a DMG and opens a draft release`);
 
   if (!go) {
