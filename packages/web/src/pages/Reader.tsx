@@ -41,7 +41,7 @@ const LEGIBLE_PERCENT = 70;
 // How often an un-narrated chapter asks whether it has been narrated since
 const NARRATION_POLL_MS = 10_000;
 
-const WARN_BANNER = "mb-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/40";
+const WARN_BANNER = "mb-3 rounded border border-(--warning) bg-(--warning-bg) px-3 py-2 text-sm text-(--warning-text)";
 const NOTE_BANNER = "mb-3 rounded border border-(--border) bg-(--bg-subtle) px-3 py-2 text-sm text-(--text-muted)";
 
 // The route the library links to. A container opened from disk renders the same reader with a
@@ -198,7 +198,7 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
     return bodyFit(manifest?.book.medianBodyPt ?? null, cropWidth, rendered);
   }, [pages, view, width, pagesWidth, manifest?.book.medianBodyPt]);
 
-  if (error) return <ReaderShell bookId={id}><p className="text-sm text-red-600">{error}</p></ReaderShell>;
+  if (error) return <ReaderShell bookId={id}><p className="text-sm text-(--danger-text)">{error}</p></ReaderShell>;
   if (!manifest || !chapter) return <ReaderShell bookId={id}><p className="text-sm text-(--text-muted)">Loading…</p></ReaderShell>;
 
   const maxWidth = WIDTHS.find((w) => w.id === width)!.px;
@@ -212,7 +212,7 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
             onClick={togglePlay}
             disabled={!chapter.audio}
             title={chapter.audio ? (playing ? "Pause (space)" : "Play the narration (space)") : "This chapter has no audio yet"}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-(--accent) text-(--on-accent) hover:bg-(--accent-hover) disabled:opacity-40"
             data-testid="reader-play"
           >
             {playing ? "❚❚" : "▶"}
@@ -279,7 +279,7 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
             )}
             {fit && view !== "text" && (
               <span
-                className={fit.percent < LEGIBLE_PERCENT ? "text-amber-600" : undefined}
+                className={fit.percent < LEGIBLE_PERCENT ? "text-(--warning-text)" : undefined}
                 title={`This book's body type is ${manifest.book.medianBodyPt}pt and renders at ${fit.px.toFixed(1)}px here, against the ${17}px a phone reads comfortably`}
                 data-testid="reader-fit"
               >
@@ -383,7 +383,7 @@ function Segmented({
           title={option.title}
           data-testid={`${testId}-${option.id}`}
           data-active={value === option.id}
-          className={`rounded px-2 py-0.5 text-xs ${value === option.id ? "bg-blue-600 text-white" : "text-(--text-tertiary) hover:bg-(--bg-subtle)"}`}
+          className={`rounded px-2 py-0.5 text-xs ${value === option.id ? "bg-(--accent) text-(--on-accent)" : "text-(--text-tertiary) hover:bg-(--bg-subtle)"}`}
         >
           {option.label}
         </button>
@@ -399,7 +399,7 @@ function ReaderShell({ bookId, chapterId, title, children }: { bookId?: string; 
     <div className="min-h-screen bg-(--bg-page) px-4 py-3">
       <div className="mx-auto max-w-5xl">
         <nav className="mb-2 flex items-center gap-2 text-sm text-(--text-muted)">
-          <Link to={back} className="text-blue-600 hover:text-blue-800" data-testid="reader-back">
+          <Link to={back} className="text-(--accent) hover:text-(--accent-hover)" data-testid="reader-back">
             ← Back
           </Link>
           {title && <span className="truncate text-(--text-secondary)">{title}</span>}

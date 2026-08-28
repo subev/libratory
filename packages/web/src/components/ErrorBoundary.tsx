@@ -94,37 +94,37 @@ export class ErrorBoundary extends Component<Props, State> {
           <div className="mt-5 flex flex-wrap gap-2">
             <a
               href="/"
-              className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              className="rounded bg-(--accent) px-4 py-2 text-sm font-medium text-(--on-accent) hover:bg-(--accent-hover)"
               data-testid="crash-home"
             >
               Back to the library
             </a>
             <button
               onClick={() => location.reload()}
-              className="rounded border border-(--border) px-4 py-2 text-sm text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-hover)"
+              className="rounded border border-(--border) px-4 py-2 text-sm text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
             >
               Reload this page
             </button>
             <button
               onClick={this.report}
-              className="rounded border border-(--border) px-4 py-2 text-sm text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-hover)"
+              className="rounded border border-(--border) px-4 py-2 text-sm text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
               data-testid="crash-report"
             >
               Report it
             </button>
             <button
               onClick={() => void navigator.clipboard.writeText(text)}
-              className="rounded border border-(--border) px-4 py-2 text-sm text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-hover)"
+              className="rounded border border-(--border) px-4 py-2 text-sm text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
             >
               Copy details
             </button>
           </div>
 
-          <p className="mt-5 font-mono text-xs break-words text-red-600">{error.message}</p>
+          <p className="mt-5 font-mono text-xs break-words text-(--danger-text)">{error.message}</p>
           {help && (
             <p className="mt-2 text-xs text-(--text-muted)">
               React shortens its messages in a release build.{" "}
-              <a href={help} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800">
+              <a href={help} target="_blank" rel="noreferrer" className="text-(--accent) hover:text-(--accent-hover)">
                 What this one means
               </a>
             </p>

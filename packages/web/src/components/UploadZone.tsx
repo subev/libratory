@@ -280,7 +280,7 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
         className={`
           border-2 border-dashed rounded-lg text-center transition-colors
           ${hasFiles ? "p-3" : "p-12"}
-          ${isDragging ? "border-blue-500 bg-(--bg-drag)" : hasFiles ? "border-(--border-input) bg-(--bg-card)" : "border-(--border-input) hover:border-(--text-faint) bg-(--bg-subtle)"}
+          ${isDragging ? "border-(--accent) bg-(--bg-drag)" : hasFiles ? "border-(--border-input) bg-(--bg-card)" : "border-(--border-input) hover:border-(--text-faint) bg-(--bg-subtle)"}
           ${isUploading ? "opacity-50 pointer-events-none" : "cursor-pointer"}
         `}
       >
@@ -318,7 +318,7 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
                 className={`
                   flex items-center gap-3 px-3 py-1.5 rounded-md transition-colors
                   ${dragIndex === index ? "opacity-40" : ""}
-                  ${dragOverIndex === index && dragIndex !== index ? "bg-(--bg-drag) border border-blue-400 border-dashed" : "hover:bg-(--bg-subtle)"}
+                  ${dragOverIndex === index && dragIndex !== index ? "bg-(--bg-drag) border border-(--accent) border-dashed" : "hover:bg-(--bg-subtle)"}
                 `}
               >
                 {isReorderable && (
@@ -331,8 +331,8 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
                 {isMultiFile && (
                   <span className="text-xs font-mono text-(--text-muted) w-5 text-right shrink-0">{index + 1}</span>
                 )}
-                <span className="shrink-0 h-6 rounded px-1.5 bg-red-50 dark:bg-red-950/50 flex items-center">
-                  <span className="text-red-600 dark:text-red-400 text-[10px] font-bold">PDF</span>
+                <span className="shrink-0 h-6 rounded px-1.5 bg-(--danger-bg) flex items-center">
+                  <span className="text-(--danger-text) text-[10px] font-bold">PDF</span>
                 </span>
                 <span className="min-w-0 flex-1 text-sm text-(--text-primary) truncate">{file.name}</span>
                 <span className="shrink-0 text-xs text-(--text-muted)">{formatFileSize(file.size)}</span>
@@ -376,7 +376,7 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
                 <label
                   key={entry.label}
                   className={`flex gap-2 rounded-md border p-2 cursor-pointer ${
-                    separateBooks === entry.separate ? "border-blue-500 bg-(--bg-selected)" : "border-(--border) hover:bg-(--bg-subtle)"
+                    separateBooks === entry.separate ? "border-(--accent) bg-(--bg-selected)" : "border-(--border) hover:bg-(--bg-subtle)"
                   }`}
                 >
                   <input
@@ -489,7 +489,7 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
                       }}
                       className={`text-xs px-2.5 py-1 rounded-full border font-medium ${
                         notePreset === p.key
-                          ? "bg-blue-600 border-blue-600 text-white"
+                          ? "bg-(--accent) border-(--accent) text-(--on-accent)"
                           : "border-(--border) text-(--text-secondary) hover:bg-(--bg-card)"
                       }`}
                     >
@@ -502,7 +502,7 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
                   onChange={(e) => setNotePrompt(e.target.value)}
                   rows={3}
                   maxLength={4000}
-                  className="w-full resize-y rounded-md border border-(--border-input) bg-(--bg-card) p-2.5 text-sm text-(--text-primary) leading-relaxed focus:outline-none focus:border-blue-500"
+                  className="w-full resize-y rounded-md border border-(--border-input) bg-(--bg-card) p-2.5 text-sm text-(--text-primary) leading-relaxed focus:outline-none focus:border-(--accent)"
                   placeholder={`What should the AI answer about ${noteTarget}?`}
                   data-testid="upload-ai-prompt"
                 />
@@ -519,7 +519,7 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
               type="button"
               onClick={upload}
               disabled={isUploading}
-              className="px-5 py-2.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              className="px-5 py-2.5 bg-(--accent) text-(--on-accent) rounded-md text-sm font-medium hover:bg-(--accent-hover) disabled:opacity-50"
             >
               {isUploading ? "Uploading..." : !fullExtract ? "Upload" : autoSynthesize ? "Extract & synthesize" : "Extract"}
               {isMultiFile ? ` (${stagedFiles.length} ${separateBooks ? "books" : "files"})` : ""}
@@ -530,7 +530,7 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
       )}
 
       {error && (
-        <p className="text-red-600 text-sm" role="alert">{error}</p>
+        <p className="text-(--danger-text) text-sm" role="alert">{error}</p>
       )}
     </div>
   );

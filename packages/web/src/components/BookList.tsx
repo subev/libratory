@@ -64,7 +64,7 @@ function FolderTableRow({
 
   return (
     <tr
-      className={`hover:bg-(--bg-card-hover) ${selected ? "bg-(--bg-selected)" : ""} ${dragOver ? "outline outline-2 -outline-offset-2 outline-blue-500" : ""}`}
+      className={`hover:bg-(--bg-card-hover) ${selected ? "bg-(--bg-selected)" : ""} ${dragOver ? "outline outline-2 -outline-offset-2 outline-(--accent)" : ""}`}
       data-testid="folder-row"
       draggable
       onDragStart={onDragStartRow}
@@ -104,10 +104,10 @@ function FolderTableRow({
                 if (e.key === "Enter") saveRename();
                 if (e.key === "Escape") { setName(folder.name); setRenaming(false); }
               }}
-              className="text-sm font-medium bg-transparent border-b border-blue-500 outline-none text-(--text-primary)"
+              className="text-sm font-medium bg-transparent border-b border-(--accent) outline-none text-(--text-primary)"
             />
           ) : (
-            <Link to={`/folders/${folder.id}`} className="text-(--text-primary) hover:text-blue-700 font-medium">
+            <Link to={`/folders/${folder.id}`} className="text-(--text-primary) hover:text-(--accent) font-medium">
               📁 {folder.name}
             </Link>
           )}
@@ -123,7 +123,7 @@ function FolderTableRow({
             onClick={deleteFolder}
             disabled={deleteMutation.isPending}
             title="Delete folder and everything in it"
-            className="text-(--text-faint) hover:text-red-600 text-xs disabled:opacity-50"
+            className="text-(--text-faint) hover:text-(--danger-text) text-xs disabled:opacity-50"
             data-testid="delete-folder"
           >
             {deleteMutation.isPending ? "…" : "🗑"}
@@ -335,7 +335,7 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
           onClick={() => setShowDigest(true)}
           disabled={selectedCount < 2}
           title={selectedCount < 2 ? "Select at least 2 books with the checkboxes" : "Create a digest book — one AI summary chapter per selected book, ready to listen to"}
-          className="px-3 py-1.5 bg-sky-600 text-white rounded-md text-xs font-medium hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 py-1.5 bg-(--accent) text-(--on-accent) rounded-md text-xs font-medium hover:bg-(--accent-hover) disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="create-digest"
         >
           Create digest ({selectedCount})
@@ -343,7 +343,7 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
         <button
           onClick={() => setShowHnDigest(true)}
           title="Build a podcast-style book from a day's top Hacker News stories"
-          className="px-3 py-1.5 bg-orange-600 text-white rounded-md text-xs font-medium hover:bg-orange-700"
+          className="px-3 py-1.5 rounded-md border border-(--border-input) bg-(--bg-card) text-(--text-secondary) text-xs font-medium hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
           data-testid="hn-digest"
         >
           HN digest
@@ -361,17 +361,17 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
           onClick={deleteSelected}
           disabled={totalSelected === 0 || deleteManyMutation.isPending || deleteFolderMutation.isPending}
           title={totalSelected === 0 ? "Select books or folders to delete with the checkboxes" : "Delete the selection with all its chapters, audio, and files"}
-          className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 py-1.5 bg-(--danger) text-(--on-danger) hover:bg-(--danger-hover) rounded-md text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="delete-selected-books"
         >
           {deleteManyMutation.isPending || deleteFolderMutation.isPending ? "Deleting..." : `Delete selected (${totalSelected})`}
         </button>
         {(deleteManyMutation.error || dropError) && (
-          <span className="text-sm text-red-600">{deleteManyMutation.error?.message ?? dropError}</span>
+          <span className="text-sm text-(--danger-text)">{deleteManyMutation.error?.message ?? dropError}</span>
         )}
         <div className="ml-auto flex items-center gap-2">
           {createFolderMutation.error && (
-            <span className="text-sm text-red-600">{createFolderMutation.error.message}</span>
+            <span className="text-sm text-(--danger-text)">{createFolderMutation.error.message}</span>
           )}
           {newFolderName !== null ? (
             <input
@@ -386,7 +386,7 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
                 if (e.key === "Escape") setNewFolderName(null);
               }}
               placeholder="Folder name…"
-              className="px-2 py-1.5 text-xs rounded-md border border-(--border) bg-(--bg-card) text-(--text-primary) outline-none focus:border-blue-500"
+              className="px-2 py-1.5 text-xs rounded-md border border-(--border) bg-(--bg-card) text-(--text-primary) outline-none focus:border-(--focus-ring)"
               data-testid="new-folder-name"
             />
           ) : (
@@ -484,16 +484,16 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
                   />
                 </td>
                 <td className="px-4 py-3 max-w-md">
-                  <Link to={`/books/${book.id}`} className="text-blue-600 hover:text-blue-800 font-medium">
+                  <Link to={`/books/${book.id}`} className="text-(--accent) hover:text-(--accent-hover) font-medium">
                     {book.title}
                   </Link>
                   {book.kind === "digest" && (
-                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300 align-middle" data-testid="digest-badge" title="Digest — AI summary chapters from other books">
+                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-(--bg-subtle) text-(--text-secondary) align-middle" data-testid="digest-badge" title="Digest — AI summary chapters from other books">
                       digest
                     </span>
                   )}
                   {book.kind === "api" && (
-                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300 align-middle" data-testid="api-badge" title="Created through the external API by a script or another project">
+                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-(--bg-subtle) text-(--text-secondary) align-middle" data-testid="api-badge" title="Created through the external API by a script or another project">
                       api
                     </span>
                   )}
@@ -531,7 +531,7 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
                   )}
                   {book.searchIndex?.status === "failed" && (
                     <span
-                      className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 align-middle"
+                      className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-(--badge-failed-bg) text-(--badge-failed-text) align-middle"
                       title={`Search indexing failed: ${book.searchIndex.error ?? "unknown error"}`}
                       data-testid="index-badge-failed"
                     >
@@ -556,7 +556,7 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
                       <ActivityPill label={`synthesizing ${book.activity.synthesizing}`} color="bg-(--badge-synthesizing-bg) text-(--badge-synthesizing-text)" />
                     )}
                     {book.activity.translating > 0 && (
-                      <ActivityPill label={`translating ${book.activity.translating}`} color="bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300" />
+                      <ActivityPill label={`translating ${book.activity.translating}`} color="bg-(--badge-synthesizing-bg) text-(--badge-synthesizing-text)" />
                     )}
                     {book.activity.cleaning > 0 && (
                       <ActivityPill label={`cleaning ${book.activity.cleaning}`} color="bg-(--badge-normalizing-bg) text-(--badge-normalizing-text)" />
@@ -565,10 +565,10 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
                       <ActivityPill label="assembling" color="bg-(--badge-assembling-bg) text-(--badge-assembling-text)" />
                     )}
                     {book.activity.aiNote && (
-                      <ActivityPill label="AI note" color="bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300" />
+                      <ActivityPill label="AI note" color="bg-(--badge-synthesizing-bg) text-(--badge-synthesizing-text)" />
                     )}
                     {book.activity.digest && (
-                      <ActivityPill label="digesting" color="bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300" />
+                      <ActivityPill label="digesting" color="bg-(--badge-synthesizing-bg) text-(--badge-synthesizing-text)" />
                     )}
                     {(totalFailures > 0 || book.failed) && (
                       <span
@@ -580,7 +580,7 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
                     )}
                     {noText && (
                       <span
-                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-(--warning-bg) text-(--warning-text)"
                         title="No text extracted — the PDF is likely scanned. Open the book and extract with Force OCR. Without text it can't be used in digests or Ask AI."
                         data-testid="no-text-pill"
                       >

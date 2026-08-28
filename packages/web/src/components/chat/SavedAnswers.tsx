@@ -42,7 +42,7 @@ export function SavedAnswers() {
                   </span>
                   <button
                     onClick={() => deleteNote.mutate({ id: note.id })}
-                    className="text-xs text-(--text-faint) hover:text-red-600 shrink-0"
+                    className="text-xs text-(--text-faint) hover:text-(--danger-text) shrink-0"
                     title="Delete saved answer"
                   >
                     ✕

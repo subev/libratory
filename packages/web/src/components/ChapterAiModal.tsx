@@ -177,7 +177,7 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
                   onClick={() => selectPreset(p.key)}
                   className={`text-xs px-2.5 py-1 rounded-full border font-medium ${
                     activePreset === p.key
-                      ? "bg-blue-600 border-blue-600 text-white"
+                      ? "bg-(--accent) border-(--accent) text-(--on-accent)"
                       : "border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)"
                   }`}
                 >
@@ -191,7 +191,7 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
               onKeyDown={(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key === "Enter") run();
               }}
-              className="flex-1 resize-none rounded-md border border-(--border-input) bg-(--bg-input) p-3 text-sm text-(--text-primary) leading-relaxed focus:outline-none focus:border-blue-500"
+              className="flex-1 resize-none rounded-md border border-(--border-input) bg-(--bg-input) p-3 text-sm text-(--text-primary) leading-relaxed focus:outline-none focus:border-(--focus-ring)"
               placeholder={`Ask anything about this ${subject === "chapters" ? "selection" : subject}...`}
               data-testid="ai-prompt-input"
             />
@@ -203,13 +203,13 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
                     {kind === "chapters" && chapterSelection.length > 1 ? ` (${chapterSelection.length} chapters)` : ""}
                     {kind === "book-raw" && rawStats && rawStats.missingFiles > 0 ? ` (${rawStats.missingFiles} file(s) without raw text excluded)` : ""}
                   </span>
-                  <span className={overContext ? "text-red-500 font-medium" : ""}>
+                  <span className={overContext ? "text-(--danger-text) font-medium" : ""}>
                     {contextPct < 0.1 ? "<0.1" : contextPct.toFixed(1)}% of {activeModel.label}'s {formatTokens(activeModel.contextTokens)} context
                   </span>
                 </div>
                 <div className="h-1 rounded-full bg-(--bg-subtle) overflow-hidden">
                   <div
-                    className={`h-full rounded-full ${contextPct > 80 ? "bg-red-500" : "bg-blue-500"}`}
+                    className={`h-full rounded-full ${contextPct > 80 ? "bg-(--danger)" : "bg-(--accent)"}`}
                     style={{ width: `${Math.min(100, Math.max(0.5, contextPct))}%` }}
                   />
                 </div>
@@ -221,7 +221,7 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
                 onClick={run}
                 disabled={!prompt.trim() || pending || overContext}
                 title={overContext ? `The ${subject === "book" ? "book's raw text" : "selected chapters"} exceed this model's context window` : "Cmd+Enter"}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2 bg-(--accent) text-(--on-accent) rounded-md text-sm font-medium hover:bg-(--accent-hover) disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="ai-run"
               >
                 {pending ? "Answering..." : "Ask"}
@@ -234,12 +234,12 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
             <div className="flex-1 overflow-y-auto overscroll-contain p-4">
               {pending && !result ? (
                 <div className="flex items-center gap-2 text-sm text-(--text-muted)">
-                  <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                  <span className="w-2 h-2 rounded-full bg-(--accent) animate-pulse" />
                   {activeModel?.label ?? "The model"} is reading the {subject === "book" ? "book" : "chapter"}...
                   <button onClick={() => stop()} className="text-xs underline text-(--text-faint) hover:text-(--text-secondary)">Stop</button>
                 </div>
               ) : error && !result ? (
-                <p className="text-sm text-red-600 whitespace-pre-wrap">{error.message}</p>
+                <p className="text-sm text-(--danger-text) whitespace-pre-wrap">{error.message}</p>
               ) : result ? (
                 <MarkdownBlock testId="ai-result">{result}</MarkdownBlock>
               ) : (
@@ -263,7 +263,7 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
                   </button>
                 )}
                 {savedNoteId && (
-                  <span className="text-xs text-green-600 dark:text-green-400" data-testid="ai-saved-note">
+                  <span className="text-xs text-(--success-text)" data-testid="ai-saved-note">
                     Saved to notes
                   </span>
                 )}

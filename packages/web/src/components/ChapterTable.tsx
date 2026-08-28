@@ -214,7 +214,7 @@ export function ChapterTable({
             <span className={`text-xs transition-transform ${filtersOpen ? "rotate-90" : ""}`}>&#9654;</span>
             Filter
             {activeFilterCount > 0 && !filtersOpen ? (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700">
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-(--accent-subtle) text-(--accent)">
                 {activeFilterCount}
               </span>
             ) : null}
@@ -239,7 +239,7 @@ export function ChapterTable({
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Filter by title..."
-                  className="w-full px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-(--focus-ring) focus:border-(--focus-ring)"
                 />
               </label>
               <div className="flex items-center gap-3">
@@ -248,7 +248,7 @@ export function ChapterTable({
                   <select
                     value={statusOperator}
                     onChange={(e) => setStatusOperator(e.target.value as "is" | "is_not")}
-                    className="px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-(--focus-ring) focus:border-(--focus-ring)"
                   >
                     <option value="is">is</option>
                     <option value="is_not">is not</option>
@@ -256,7 +256,7 @@ export function ChapterTable({
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="flex-1 px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="flex-1 px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-(--focus-ring) focus:border-(--focus-ring)"
                   >
                     <option value="">All</option>
                     {STATUSES.map((s) => (
@@ -274,7 +274,7 @@ export function ChapterTable({
                     onChange={(e) => setWordCountMin(e.target.value)}
                     placeholder="min"
                     min={0}
-                    className="w-full px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 tabular-nums"
+                    className="w-full px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-(--focus-ring) focus:border-(--focus-ring) tabular-nums"
                   />
                   <span className="text-(--text-faint) text-xs">–</span>
                   <input
@@ -283,7 +283,7 @@ export function ChapterTable({
                     onChange={(e) => setWordCountMax(e.target.value)}
                     placeholder="max"
                     min={0}
-                    className="w-full px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 tabular-nums"
+                    className="w-full px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-(--focus-ring) focus:border-(--focus-ring) tabular-nums"
                   />
                 </div>
               </div>
@@ -296,7 +296,7 @@ export function ChapterTable({
                     onChange={(e) => setDurationMin(e.target.value)}
                     placeholder="min"
                     min={0}
-                    className="w-full px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 tabular-nums"
+                    className="w-full px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-(--focus-ring) focus:border-(--focus-ring) tabular-nums"
                   />
                   <span className="text-(--text-faint) text-xs">–</span>
                   <input
@@ -305,12 +305,12 @@ export function ChapterTable({
                     onChange={(e) => setDurationMax(e.target.value)}
                     placeholder="max"
                     min={0}
-                    className="w-full px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 tabular-nums"
+                    className="w-full px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-(--focus-ring) focus:border-(--focus-ring) tabular-nums"
                   />
                   <select
                     value={durationUnit}
                     onChange={(e) => setDurationUnit(e.target.value as "sec" | "min")}
-                    className="px-1.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 shrink-0"
+                    className="px-1.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-(--focus-ring) focus:border-(--focus-ring) shrink-0"
                   >
                     <option value="sec">sec</option>
                     <option value="min">min</option>
@@ -323,7 +323,7 @@ export function ChapterTable({
                   <select
                     value={sourceFileFilter}
                     onChange={(e) => setSourceFileFilter(e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-(--focus-ring) focus:border-(--focus-ring)"
                   >
                     <option value="">All files</option>
                     {files!.map((f) => (
@@ -347,7 +347,7 @@ export function ChapterTable({
             <div className="flex items-center gap-3">
               <button
                 onClick={() => onSetSelectedBatch(filteredChapters.map((c) => c.id), true)}
-                className="text-indigo-600 hover:text-indigo-800 font-medium"
+                className="text-(--accent) hover:text-(--accent-hover) font-medium"
               >
                 Select filtered
               </button>
@@ -374,7 +374,7 @@ export function ChapterTable({
                   type="checkbox"
                   checked={allVisibleSelected}
                   onChange={handleToggleAll}
-                  className="rounded border-(--border-input) text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-(--border-input) text-(--accent) focus:ring-(--focus-ring)"
                 />
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">#</th>
@@ -424,7 +424,7 @@ export function ChapterTable({
                     setDragOverChapterId(null);
                   }}
                   onDragEnd={() => { setDragChapterId(null); setDragOverChapterId(null); }}
-                  className={`group hover:bg-(--bg-card-hover) ${!chapter.selected ? "opacity-40" : ""} ${dragChapterId === chapter.id ? "opacity-30" : ""} ${dragOverChapterId === chapter.id && dragChapterId !== chapter.id ? "border-t-2 border-blue-400" : ""}`}
+                  className={`group hover:bg-(--bg-card-hover) ${!chapter.selected ? "opacity-40" : ""} ${dragChapterId === chapter.id ? "opacity-30" : ""} ${dragOverChapterId === chapter.id && dragChapterId !== chapter.id ? "border-t-2 border-(--accent)" : ""}`}
                 >
                   {canDrag && (
                     <td className="px-2 py-3 cursor-grab text-(--text-faint)">
@@ -451,7 +451,7 @@ export function ChapterTable({
                         }
                         lastClickedFilteredIndex.current = filteredIdx;
                       }}
-                      className="rounded border-(--border-input) text-indigo-600 focus:ring-indigo-500"
+                      className="rounded border-(--border-input) text-(--accent) focus:ring-(--focus-ring)"
                     />
                   </td>
                   <td className="px-4 py-3 text-sm text-(--text-tertiary)">{chapter.index + 1}</td>
@@ -464,20 +464,20 @@ export function ChapterTable({
                       />
                       {!variant && chapter.cleanup?.status === "done" ? (
                         <span
-                          className="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium bg-emerald-100 text-emerald-600"
+                          className="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium bg-(--success-bg) text-(--success-text)"
                           title="Cleaned by AI — the custom text holds the result"
                         >
                           cleaned
                         </span>
                       ) : chapter.hasCustomText ? (
-                        <span className="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium bg-amber-100 text-amber-600">
+                        <span className="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium bg-(--warning-bg) text-(--warning-text)">
                           edited
                         </span>
                       ) : null}
                       {chapter.source?.kind === "book" ? (
                         <Link
                           to={`/books/${chapter.source.bookId}`}
-                          className="text-xs text-sky-600 hover:text-sky-800"
+                          className="text-xs text-(--accent) hover:text-(--accent-hover)"
                           title={`Open the source book: "${chapter.source.title}"`}
                           data-testid="chapter-source-link"
                         >
@@ -488,7 +488,7 @@ export function ChapterTable({
                           href={chapter.source.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-sky-600 hover:text-sky-800"
+                          className="text-xs text-(--accent) hover:text-(--accent-hover)"
                           title={chapter.source.title ?? chapter.source.url}
                         >
                           source ↗
@@ -500,7 +500,7 @@ export function ChapterTable({
                             onClick={() =>
                               setPdfPreview({ fileId: sourceFile.id, page: chapter.pageStart!, filename: sourceFile.filename })
                             }
-                            className="text-xs text-blue-600 hover:text-blue-800 tabular-nums"
+                            className="text-xs text-(--accent) hover:text-(--accent-hover) tabular-nums"
                             title="Open the source PDF at this chapter's first page"
                           >
                             p.{chapter.pageStart}{chapter.pageEnd && chapter.pageEnd !== chapter.pageStart ? `–${chapter.pageEnd}` : ""}
@@ -534,7 +534,7 @@ export function ChapterTable({
                           onClick={() => handlePlay(chapter.id)}
                           className={`w-6 h-6 flex items-center justify-center rounded text-sm ${
                             playingChapterId === chapter.id
-                              ? "text-indigo-600 hover:text-indigo-800"
+                              ? "text-(--accent) hover:text-(--accent-hover)"
                               : "text-(--text-faint) hover:text-(--text-secondary)"
                           }`}
                           title={playingChapterId === chapter.id && isAudioPlaying ? "Pause" : "Play"}
@@ -574,7 +574,7 @@ export function ChapterTable({
                         <button
                           onClick={() => onQueue(chapter.id, true)}
                           title="Continue synthesis from where it stopped — reuses already-synthesized chunks"
-                          className="text-xs px-2 py-0.5 rounded-full border border-green-300 dark:border-green-900 text-green-700 dark:text-green-400 font-medium hover:bg-green-50 dark:hover:bg-green-950/40"
+                          className="text-xs px-2 py-0.5 rounded-full border border-(--success) text-(--success-text) font-medium hover:bg-(--success-bg)"
                         >
                           Continue
                         </button>
@@ -612,7 +612,7 @@ export function ChapterTable({
                         </button>
                       )}
                       {chapter.error ? (
-                        <span className="text-xs text-red-500" title={chapter.error}>
+                        <span className="text-xs text-(--danger-text)" title={chapter.error}>
                           error
                         </span>
                       ) : null}
@@ -636,7 +636,7 @@ export function ChapterTable({
         <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-50 w-[min(72rem,calc(100vw-2rem))] bg-(--bg-card) border border-(--border) rounded-lg px-4 py-3 flex items-center gap-4 shadow-lg">
           <button
             onClick={() => handlePlay(playingChapter.id)}
-            className="text-lg text-indigo-600 hover:text-indigo-800 w-8 h-8 flex items-center justify-center shrink-0"
+            className="text-lg text-(--accent) hover:text-(--accent-hover) w-8 h-8 flex items-center justify-center shrink-0"
           >
             {isAudioPlaying ? "\u23F8" : "\u25B6"}
           </button>
@@ -713,7 +713,7 @@ function ChapterStatusCell({ chapter, cleanup }: { chapter: ChapterRow; cleanup:
         </div>
         <div className="w-full bg-(--bg-page) rounded-full h-1">
           <div
-            className="bg-blue-500 h-1 rounded-full transition-all duration-500"
+            className="bg-(--badge-synthesizing-text) h-1 rounded-full transition-all duration-500"
             style={{ width: `${percent}%` }}
           />
         </div>
@@ -748,13 +748,13 @@ function ChapterStatusCell({ chapter, cleanup }: { chapter: ChapterRow; cleanup:
           </div>
           <div className="w-full bg-(--bg-page) rounded-full h-1">
             <div
-              className="bg-purple-500 h-1 rounded-full transition-all duration-500"
+              className="bg-(--badge-normalizing-text) h-1 rounded-full transition-all duration-500"
               style={{ width: `${percent}%` }}
             />
           </div>
         </>
       ) : (
-        <span className="text-[10px] text-red-500" title={cleanup?.error ?? undefined}>
+        <span className="text-[10px] text-(--danger-text)" title={cleanup?.error ?? undefined}>
           cleanup failed
         </span>
       )}
@@ -805,7 +805,7 @@ function EditableChapterTitle({
           if (e.key === "Enter") save();
           if (e.key === "Escape") setEditing(false);
         }}
-        className="text-sm font-medium text-(--text-primary) bg-transparent border-b border-blue-500 outline-none w-full"
+        className="text-sm font-medium text-(--text-primary) bg-transparent border-b border-(--accent) outline-none w-full"
       />
     );
   }
@@ -815,7 +815,7 @@ function EditableChapterTitle({
       {onClickTitle ? (
         <button
           onClick={onClickTitle}
-          className="text-sm font-medium text-(--text-primary) hover:text-blue-700 text-left"
+          className="text-sm font-medium text-(--text-primary) hover:text-(--accent) text-left"
         >
           {title}
         </button>

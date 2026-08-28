@@ -221,7 +221,7 @@ export function VoiceLibraryModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-(--text-faint) hover:text-(--text-tertiary) p-1 rounded focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+            className="text-(--text-faint) hover:text-(--text-tertiary) p-1 rounded focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none"
             title="Close"
             aria-label="Close voice picker"
           >
@@ -238,7 +238,7 @@ export function VoiceLibraryModal({
                 type="button"
                 onClick={() => setChosen(CLONED)}
                 aria-current={language === CLONED ? "page" : undefined}
-                className={`w-full flex items-center justify-between gap-2 text-left px-3 py-2 rounded-md mb-2 text-sm focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
+                className={`w-full flex items-center justify-between gap-2 text-left px-3 py-2 rounded-md mb-2 text-sm focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none ${
                   language === CLONED ? "bg-(--bg-selected) text-(--text-primary)" : "text-(--text-secondary) hover:bg-(--bg-subtle)"
                 }`}
                 data-testid="voice-language-cloned"
@@ -254,7 +254,7 @@ export function VoiceLibraryModal({
                 type="button"
                 onClick={() => setChosen(code)}
                 aria-current={code === language ? "page" : undefined}
-                className={`w-full flex items-center justify-between gap-2 text-left px-3 py-2 rounded-md mb-1 text-sm focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
+                className={`w-full flex items-center justify-between gap-2 text-left px-3 py-2 rounded-md mb-1 text-sm focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none ${
                   code === language ? "bg-(--bg-selected) text-(--text-primary)" : "text-(--text-secondary) hover:bg-(--bg-subtle)"
                 }`}
                 data-testid={`voice-language-${code}`}
@@ -268,7 +268,7 @@ export function VoiceLibraryModal({
               <button
                 type="button"
                 onClick={() => setShowAllLanguages(true)}
-                className="w-full text-left px-3 py-2 rounded-md text-xs text-blue-600 hover:bg-(--bg-subtle) focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+                className="w-full text-left px-3 py-2 rounded-md text-xs text-(--accent) hover:bg-(--bg-subtle) focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none"
                 data-testid="voice-show-all-languages"
               >
                 Show all {languages.length} languages
@@ -286,7 +286,7 @@ export function VoiceLibraryModal({
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={language === CLONED ? "Search your voices…" : `Search ${languageLabel(language)} voices…`}
                 aria-label="Search voices"
-                className="w-full rounded-md border border-(--border-input) bg-(--bg-input) px-3 py-1.5 text-sm focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+                className="w-full rounded-md border border-(--border-input) bg-(--bg-input) px-3 py-1.5 text-sm focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none"
                 data-testid="voice-search"
               />
             </div>
@@ -305,7 +305,7 @@ export function VoiceLibraryModal({
                           disabled={deleteCustomVoice.isPending}
                           title={`Delete ${voice.label}`}
                           aria-label={`Delete ${voice.label}`}
-                          className="shrink-0 px-2 py-1 text-xs text-(--text-faint) hover:text-red-600 disabled:opacity-50 rounded focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+                          className="shrink-0 px-2 py-1 text-xs text-(--text-faint) hover:text-(--danger-text) disabled:opacity-50 rounded focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none"
                           data-testid={`pocket-delete-${voice.id}`}
                         >
                           Delete
@@ -365,7 +365,7 @@ export function VoiceLibraryModal({
                               <button
                                 type="button"
                                 onClick={() => expand(name)}
-                                className="w-full text-left px-3 py-1.5 text-xs text-blue-600 hover:underline focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none rounded"
+                                className="w-full text-left px-3 py-1.5 text-xs text-(--accent) hover:underline focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none rounded"
                                 data-testid={`voice-show-all-${name}`}
                               >
                                 Show all {voices.length} {name} voices
@@ -400,7 +400,7 @@ export function VoiceLibraryModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-md text-sm font-medium border border-(--border-input) text-(--text-secondary) hover:bg-(--bg-subtle) focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+                className="px-4 py-2 rounded-md text-sm font-medium border border-(--border-input) text-(--text-secondary) hover:bg-(--bg-subtle) focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none"
                 data-testid="voice-library-done"
               >
                 Done
@@ -442,9 +442,9 @@ function ProviderChip({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`px-2 py-1 text-xs rounded-full border focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
+      className={`px-2 py-1 text-xs rounded-full border focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none ${
         active
-          ? "border-blue-500 text-blue-600 bg-(--bg-selected)"
+          ? "border-(--accent) text-(--accent) bg-(--bg-selected)"
           : "border-(--border) text-(--text-muted) hover:bg-(--bg-subtle)"
       }`}
       data-testid={`voice-provider-${label}`}

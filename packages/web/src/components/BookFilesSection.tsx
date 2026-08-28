@@ -97,25 +97,25 @@ export function BookFilesSection({
 
   return (
     <section className={`relative overflow-hidden mb-6 rounded-xl border border-(--border) border-t-2 bg-(--bg-card) p-4 ${
-      extractingCount > 0 ? "border-t-blue-500" : "border-t-amber-400/80"
+      extractingCount > 0 ? "border-t-(--step-work)" : "border-t-(--step-input)"
     }`}>
       {extractingCount > 0 && (
         <>
           <div className="absolute inset-x-0 top-0 h-0.5 overflow-hidden" aria-hidden>
-            <div className="h-full w-1/4 bg-blue-500 animate-[slide-indeterminate_1.4s_ease-in-out_infinite]" />
+            <div className="h-full w-1/4 bg-(--accent) animate-[slide-indeterminate_1.4s_ease-in-out_infinite]" />
           </div>
-          <div className="absolute inset-0 rounded-xl ring-2 ring-inset ring-blue-400/30 animate-pulse pointer-events-none" aria-hidden />
+          <div className="absolute inset-0 rounded-xl ring-2 ring-inset ring-(--accent)/30 animate-pulse pointer-events-none" aria-hidden />
         </>
       )}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold text-(--text-secondary)">
-            <span className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider mr-2">1 · Input</span>
+            <span className="text-xs font-medium text-(--step-input) uppercase tracking-wider mr-2">1 · Input</span>
             Source files
           </h2>
           {extractingCount > 0 && (
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400" data-testid="extracting-indicator">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-(--accent)" data-testid="extracting-indicator">
+              <span className="w-2 h-2 rounded-full bg-(--accent) animate-pulse" />
               Extracting {extractingCount} file{extractingCount === 1 ? "" : "s"}...
             </span>
           )}
@@ -142,7 +142,7 @@ export function BookFilesSection({
               ? "No files are being extracted"
               : `Stop the running extraction — ${extractingCount} file(s) will be marked as cancelled`
           }
-          className="px-3 py-1.5 bg-amber-600 text-white rounded-md text-xs font-medium hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 py-1.5 bg-(--warning) text-(--on-warning) hover:bg-(--warning-hover) rounded-md text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="cancel-extraction"
         >
           Cancel extraction
@@ -188,25 +188,25 @@ export function BookFilesSection({
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setPreviewFileId(file.id)}
-                      className="shrink-0 h-6 w-6 rounded bg-red-50 flex items-center justify-center hover:bg-red-100 transition-colors cursor-pointer"
+                      className="shrink-0 h-6 w-6 rounded bg-(--danger-bg) flex items-center justify-center hover:bg-(--danger)/20 transition-colors cursor-pointer"
                       title="Preview PDF"
                     >
-                      <span className="text-red-600 text-[8px] font-bold">PDF</span>
+                      <span className="text-(--danger-text) text-[8px] font-bold">PDF</span>
                     </button>
                     <span className="text-sm text-(--text-primary) truncate">{file.filename}</span>
                   </div>
                 </td>
                 <td className="px-3 py-2">
                   <span className={`text-xs font-medium ${
-                    file.status === "done" ? "text-green-600" :
-                    file.status === "failed" ? "text-red-600" :
-                    file.status === "suspended" ? "text-amber-600" :
-                    file.status === "extracting" ? "text-blue-600" :
+                    file.status === "done" ? "text-(--success-text)" :
+                    file.status === "failed" ? "text-(--danger-text)" :
+                    file.status === "suspended" ? "text-(--warning-text)" :
+                    file.status === "extracting" ? "text-(--accent)" :
                     "text-(--text-muted)"
                   }`}>
                     {file.status === "raw" ? "raw text" : file.status === "suspended" ? "cancelled" : file.status}
                     {file.status === "extracting" && (
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 ml-1.5 animate-pulse" />
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-(--accent) ml-1.5 animate-pulse" />
                     )}
                   </span>
                   {file.rawWords != null && file.status === "raw" && (
@@ -217,7 +217,7 @@ export function BookFilesSection({
                   {/* Thirty characters cut "marker_single could not be run (exit 126) — the Python
                       environment looks broken" down to the half that says nothing. */}
                   {file.error && (
-                    <span className="mt-0.5 block text-xs text-red-500 break-words line-clamp-2" title={file.error}>
+                    <span className="mt-0.5 block text-xs text-(--danger-text) break-words line-clamp-2" title={file.error}>
                       {file.error}
                     </span>
                   )}
@@ -232,7 +232,7 @@ export function BookFilesSection({
                       onClick={() => onCancel(file.id)}
                       disabled={file.status !== "extracting" && file.status !== "pending"}
                       title={file.status !== "extracting" && file.status !== "pending" ? "File is not extracting" : "Cancel extraction"}
-                      className="p-1 rounded text-amber-600 hover:bg-amber-50 disabled:opacity-20 disabled:cursor-not-allowed"
+                      className="p-1 rounded text-(--warning-text) hover:bg-(--warning-bg) disabled:opacity-20 disabled:cursor-not-allowed"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
                         <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5a5.5 5.5 0 110 11 5.5 5.5 0 010-11zM6 6h4v4H6V6z"/>
@@ -248,7 +248,7 @@ export function BookFilesSection({
                         file.status === "raw" ? "Extract chapters from this file" :
                         "Re-extract this file"
                       }
-                      className="p-1 rounded text-blue-600 hover:bg-(--bg-selected) disabled:opacity-20 disabled:cursor-not-allowed"
+                      className="p-1 rounded text-(--accent) hover:bg-(--bg-selected) disabled:opacity-20 disabled:cursor-not-allowed"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
                         <path d="M11.534 7h3.932a.25.25 0 01.192.41l-1.966 2.36a.25.25 0 01-.384 0l-1.966-2.36A.25.25 0 0111.534 7zM.534 9h3.932a.25.25 0 00.192-.41L2.692 6.23a.25.25 0 00-.384 0L.342 8.59A.25.25 0 00.534 9z"/>
@@ -265,7 +265,7 @@ export function BookFilesSection({
                       }}
                       disabled={file.status === "extracting"}
                       title={file.status === "extracting" ? "Cannot remove while extracting" : "Remove this file and its chapters"}
-                      className="p-1 rounded text-red-500 hover:bg-red-50 disabled:opacity-20 disabled:cursor-not-allowed"
+                      className="p-1 rounded text-(--danger-text) hover:bg-(--danger-bg) disabled:opacity-20 disabled:cursor-not-allowed"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
                         <path d="M5.75 1a.75.75 0 00-.75.75v.5H2.5a.75.75 0 000 1.5h.31l.69 9.112A1.75 1.75 0 005.246 14.5h5.508a1.75 1.75 0 001.746-1.638L13.19 3.75h.31a.75.75 0 000-1.5H11V1.75a.75.75 0 00-.75-.75h-4.5zM6.5 2.25v-.5h3v.5h-3zM4.32 3.75h7.36l-.68 9.04a.25.25 0 01-.249.21H5.249a.25.25 0 01-.249-.21L4.32 3.75z"/>

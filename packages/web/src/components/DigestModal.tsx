@@ -88,7 +88,7 @@ export function DigestModal({
                   onClick={() => setPrompt(p.prompt)}
                   className={`text-xs px-3 py-1 rounded-full border font-medium ${
                     prompt === p.prompt
-                      ? "bg-blue-600 border-blue-600 text-white"
+                      ? "bg-(--accent) border-(--accent) text-(--on-accent)"
                       : "border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)"
                   }`}
                   data-testid={`digest-preset-${p.key}`}
@@ -102,7 +102,7 @@ export function DigestModal({
               onChange={(e) => setPrompt(e.target.value)}
               rows={5}
               maxLength={4000}
-              className="w-full resize-y rounded-md border border-(--border-input) bg-(--bg-input) p-2.5 text-sm text-(--text-primary) leading-relaxed focus:outline-none focus:border-blue-500"
+              className="w-full resize-y rounded-md border border-(--border-input) bg-(--bg-input) p-2.5 text-sm text-(--text-primary) leading-relaxed focus:outline-none focus:border-(--focus-ring)"
               data-testid="digest-prompt"
             />
           </div>
@@ -114,17 +114,17 @@ export function DigestModal({
 
           {unusable.length > 0 && (
             <div
-              className="rounded-md border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 p-3 space-y-2"
+              className="rounded-md border border-(--warning) bg-(--warning-bg) p-3 space-y-2"
               data-testid="digest-no-text-warning"
             >
-              <p className="text-sm text-amber-800 dark:text-amber-300">
+              <p className="text-sm text-(--warning-text)">
                 No text available for {unusable.length} book{unusable.length === 1 ? "" : "s"}:{" "}
                 {unusable.map((b) => `"${b.title}"`).join(", ")} — the digest would fail. Extract them first
                 (with Force OCR if scanned), or leave them out.
               </p>
               <button
                 onClick={excludeUnusable}
-                className="px-3 py-1.5 rounded-md text-xs font-medium bg-amber-600 text-white hover:bg-amber-700"
+                className="px-3 py-1.5 rounded-md text-xs font-medium bg-(--warning) text-(--on-warning) hover:bg-(--warning-hover)"
                 data-testid="digest-exclude-unusable"
               >
                 Exclude {unusable.length} book{unusable.length === 1 ? "" : "s"} without text
@@ -157,7 +157,7 @@ export function DigestModal({
           </div>
 
           {createMutation.error && (
-            <p className="text-sm text-red-600 whitespace-pre-wrap">{createMutation.error.message}</p>
+            <p className="text-sm text-(--danger-text) whitespace-pre-wrap">{createMutation.error.message}</p>
           )}
         </div>
 
@@ -169,7 +169,7 @@ export function DigestModal({
             onClick={create}
             disabled={!title.trim() || !prompt.trim() || included.length < 2 || createMutation.isPending}
             title={included.length < 2 ? "A digest needs at least 2 books with text" : undefined}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            className="px-4 py-2 bg-(--accent) text-(--on-accent) rounded-md text-sm font-medium hover:bg-(--accent-hover) disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
             data-testid="digest-create"
           >
             {createMutation.isPending ? "Creating..." : "Create digest"}

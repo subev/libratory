@@ -18,7 +18,7 @@ export function SpeedSlider({ value, onChange, disabled = false }: SpeedSliderPr
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
         disabled={disabled}
-        className="w-full accent-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full accent-(--accent) disabled:opacity-50 disabled:cursor-not-allowed"
       />
     </div>
   );

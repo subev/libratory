@@ -44,10 +44,10 @@ export function NotesSection({ bookId, noteJob }: { bookId: string; noteJob: Not
   if (notes.length === 0 && !jobActive && !showFailedJob) return null;
 
   return (
-    <section className="mb-6 rounded-xl border border-(--border) border-t-2 border-t-sky-400/80 bg-(--bg-card) p-4" data-testid="notes-section">
+    <section className="mb-6 rounded-xl border border-(--border) border-t-2 border-t-(--border) bg-(--bg-card) p-4" data-testid="notes-section">
       <div className="flex items-center gap-3 mb-3">
         <h2 className="text-lg font-semibold text-(--text-secondary)">
-          <span className="text-xs font-medium text-sky-600 dark:text-sky-400 uppercase tracking-wider mr-2">Notes</span>
+          <span className="text-xs font-medium text-(--text-muted) uppercase tracking-wider mr-2">Notes</span>
           AI answers
         </h2>
         <span className="text-sm text-(--text-muted)">{notes.length}</span>
@@ -55,12 +55,12 @@ export function NotesSection({ bookId, noteJob }: { bookId: string; noteJob: Not
 
       {jobActive && (
         <div className="flex items-center gap-2 text-sm text-(--text-muted) mb-2" data-testid="note-job-running">
-          <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse" />
+          <span className="w-2 h-2 rounded-full bg-(--text-muted) animate-pulse" />
           AI is answering "{noteJob!.prompt.length > 80 ? noteJob!.prompt.slice(0, 80) + "..." : noteJob!.prompt}"...
         </div>
       )}
       {showFailedJob && (
-        <div className="text-sm text-red-600 mb-2" data-testid="note-job-failed">
+        <div className="text-sm text-(--danger-text) mb-2" data-testid="note-job-failed">
           Upload-time AI prompt failed: {noteJob!.error ?? "unknown error"}
         </div>
       )}
@@ -103,7 +103,7 @@ export function NotesSection({ bookId, noteJob }: { bookId: string; noteJob: Not
                 {note.scope.kind === "book-raw" && note.scope.digestBookId && (
                   <Link
                     to={`/books/${note.scope.digestBookId}`}
-                    className="text-xs text-sky-600 hover:text-sky-800 shrink-0"
+                    className="text-xs text-(--accent) hover:text-(--accent-hover) shrink-0"
                     title="This summary is a chapter of a digest book — open it"
                   >
                     digest ↗
@@ -118,13 +118,13 @@ export function NotesSection({ bookId, noteJob }: { bookId: string; noteJob: Not
                       onClick={() => toChapterMutation.mutate({ id: note.id })}
                       disabled={toChapterMutation.isPending}
                       title="Append this note as a new suspended chapter at the end of the book — drag it into place in the chapter table, then synthesize"
-                      className="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-50"
+                      className="text-xs text-(--accent) hover:text-(--accent-hover) font-medium disabled:opacity-50"
                       data-testid="note-to-chapter"
                     >
                       Add as chapter
                     </button>
                     {addedNoteId === note.id && (
-                      <span className="text-xs text-green-600 dark:text-green-400" data-testid="note-chapter-added">
+                      <span className="text-xs text-(--success-text)" data-testid="note-chapter-added">
                         Chapter added ✓
                       </span>
                     )}
@@ -138,7 +138,7 @@ export function NotesSection({ bookId, noteJob }: { bookId: string; noteJob: Not
                       onClick={() => {
                         if (confirm("Delete this note?")) deleteMutation.mutate({ id: note.id });
                       }}
-                      className="text-xs text-red-500 hover:text-red-600 font-medium"
+                      className="text-xs text-(--danger-text) hover:text-(--danger-hover) font-medium"
                     >
                       Delete
                     </button>

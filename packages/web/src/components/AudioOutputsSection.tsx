@@ -23,9 +23,9 @@ export function AudioOutputsSection({
   if (assemblies.length === 0) return null;
 
   return (
-    <section className="rounded-xl border border-(--border) border-t-2 border-t-indigo-400/80 bg-(--bg-card) p-4 flex flex-col">
+    <section className="rounded-xl border border-(--border) border-t-2 border-t-(--step-output)/80 bg-(--bg-card) p-4 flex flex-col">
       <h2 className="text-lg font-semibold text-(--text-secondary) mb-3">
-        <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mr-2">3 · Output</span>
+        <span className="text-xs font-medium text-(--step-output) uppercase tracking-wider mr-2">3 · Output</span>
         Assemblies
       </h2>
       {(
@@ -37,7 +37,7 @@ export function AudioOutputsSection({
                 <div className="flex items-center gap-2 text-sm text-(--text-secondary)">
                   {formatOutputDate(assembly.createdAt)}
                   {isLatest && (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-(--success-bg) text-(--success-text)">
                       latest
                     </span>
                   )}
@@ -53,7 +53,7 @@ export function AudioOutputsSection({
                   <a
                     href={`/download/assembly/${assembly.id}`}
                     download={assembly.outputPath.split("/").pop()}
-                    className="text-xs text-green-600 hover:text-green-800 font-medium shrink-0"
+                    className="text-xs text-(--success-text) hover:text-(--success-hover) font-medium shrink-0"
                     data-testid="assembly-download"
                   >
                     Download
@@ -65,7 +65,7 @@ export function AudioOutputsSection({
                       }
                     }}
                     disabled={isDeleting}
-                    className="text-xs text-red-500 hover:text-red-700 font-medium disabled:opacity-50 shrink-0"
+                    className="text-xs text-(--danger-text) hover:text-(--danger-hover) font-medium disabled:opacity-50 shrink-0"
                   >
                     Delete
                   </button>

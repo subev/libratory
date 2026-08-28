@@ -276,7 +276,7 @@ export function VariantModal({
               variant?.status === "done" && !promptEdited ? "Discard this text and generate it again" :
               isTranslationTarget ? "Translate this chapter" : "Rewrite this chapter"
             }
-            className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 bg-(--accent) text-(--on-accent) rounded-md text-sm font-medium hover:bg-(--accent-hover) disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="translation-start"
           >
             {startLabel}
@@ -292,7 +292,7 @@ export function VariantModal({
           </button>
 
           {running ? (
-            <span className="text-sm text-blue-600" data-testid="translation-progress">
+            <span className="text-sm text-(--accent)" data-testid="translation-progress">
               {thinking ? "Thinking" : isTranslationTarget ? "Translating" : "Rewriting"}{variant?.progress ? ` · ${variant.progress} chunks` : ""}...
             </span>
           ) : variant?.status === "suspended" ? (
@@ -300,12 +300,12 @@ export function VariantModal({
               Stopped{variant.progress ? ` at ${variant.progress} chunks` : ""} — partial kept
             </span>
           ) : variant?.status === "failed" ? (
-            <span className="text-sm text-red-600 truncate" title={variant.error ?? undefined}>
+            <span className="text-sm text-(--danger-text) truncate" title={variant.error ?? undefined}>
               Failed: {variant.error}
             </span>
           ) : null}
           {mutationError ? (
-            <span className="text-sm text-red-600 truncate">{mutationError.message}</span>
+            <span className="text-sm text-(--danger-text) truncate">{mutationError.message}</span>
           ) : null}
 
           <div className="flex-1" />
@@ -348,7 +348,7 @@ export function VariantModal({
                   ref={selectedId === ch.id ? selectedChapterRef : undefined}
                   onClick={() => setSelectedId(ch.id)}
                   className={`w-full text-left px-2 py-1.5 rounded text-sm flex items-center gap-2 hover:bg-(--bg-subtle) ${
-                    selectedId === ch.id ? "bg-blue-50 dark:bg-blue-950/40" : ""
+                    selectedId === ch.id ? "bg-(--bg-selected)" : ""
                   }`}
                 >
                   <span className="shrink-0 text-xs font-mono text-(--text-faint) w-6 text-right">{ch.index + 1}.</span>
@@ -356,10 +356,10 @@ export function VariantModal({
                   {t ? (
                     <span
                       className={`shrink-0 h-2 w-2 rounded-full ${
-                        t.status === "done" ? "bg-green-500" :
-                        t.status === "translating" || t.status === "pending" ? "bg-blue-500 animate-pulse" :
-                        t.status === "suspended" ? "bg-amber-500" :
-                        "bg-red-500"
+                        t.status === "done" ? "bg-(--success)" :
+                        t.status === "translating" || t.status === "pending" ? "bg-(--accent) animate-pulse" :
+                        t.status === "suspended" ? "bg-(--warning)" :
+                        "bg-(--danger)"
                       }`}
                       title={`${t.status}${t.progress ? ` (${t.progress})` : ""}`}
                     />

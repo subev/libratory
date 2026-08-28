@@ -23,7 +23,7 @@ export function UpdateProgress() {
       <p className="text-xs font-medium text-(--text-primary)">Downloading the new Libratory</p>
       <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-(--bg-subtle)">
         <div
-          className="h-full rounded-full bg-blue-600 transition-[width] duration-300"
+          className="h-full rounded-full bg-(--accent) transition-[width] duration-300"
           style={{ width: `${percent}%` }}
         />
       </div>

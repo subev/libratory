@@ -52,40 +52,48 @@ Nothing else can start until the vocabulary exists, or every agent invents its o
 - [ ] Copy the three woff2 files + `@font-face` + font stacks
 - [ ] Dark theme grounds on the site's own `#16140f` / `#1e1b14` — the strongest continuity signal
 
-## Phase 2 — the sweep (agents, parallel, partitioned by file)
+## Phase 2 — the sweep — DONE
 
-512 hardcoded palette utilities across ~35 files (`bg-blue-600`, `text-red-600`, `bg-zinc-100`…).
-Partitioned so no two agents touch one file:
+Six agents, partitioned by file. **512 hardcoded palette utilities → 3**, and **~300 `dark:` variants → 0**
+(the tokens switch themselves, so a `dark:` whose only job was a colour is dead weight).
 
-| Agent | Files | Hits |
-| --- | --- | --- |
-| A | `pages/BookDetail.tsx` | 76 |
-| B | `components/ChapterTable.tsx`, `components/ChapterModal.tsx` | 103 |
-| C | `components/BookList.tsx`, `components/LogDock.tsx`, `components/BookFilesSection.tsx` | 91 |
-| D | the modals — Digest, Structure, Settings, Variant, Extract, ChapterAi, HnDigest, FolderPicker | ~90 |
-| E | `pages/Reader*.tsx`, `components/reader/*`, `components/voice-picker/*` | ~70 |
-| F | everything remaining under `components/` | ~80 |
+The three survivors are `CueOverlay.tsx`'s debug rect outlines — sky / fuchsia / emerald behind the
+`rects` and `layout` checkboxes. They need to be mutually distinguishable and no user ever sees them.
 
-**Rules for every agent:**
-1. Use only the tokens Phase 1 defines. Needing a new one means stopping and saying so — a
-   one-off hex is how a token system dies.
-2. Semantic mapping, not mechanical: `bg-blue-600` on a primary button is `--accent`; the same
-   class on an "in progress" chip is a status colour. Read what it means before replacing it.
-3. Do not restructure layout, spacing or components. Colour only.
-4. `pnpm lint && pnpm typecheck` green before reporting.
+### What the sweep found that the palette had not accounted for
 
-## Phase 3 — verification (me)
+Three agents independently hit the same hole, which is why it was real and not one agent guessing:
 
-- [ ] lint, typecheck, `pnpm test`, `pnpm e2e:smoke`
-- [ ] Screenshots of every major surface in **both** themes — a token that only works in one is the
-      classic failure and does not show up in any test
-- [ ] `grep` for survivors: any `-(zinc|blue|gray|slate)-[0-9]` left in `packages/web/src`
-- [ ] Kill the dev server afterwards
+- **`--on-*` vs `--*-text`.** `--danger-text` is text *in* red; there was nothing for text sitting *on*
+  a red fill. That gap produced `bg-(--warning) text-white` at **2.53:1**. Added `--on-accent`,
+  `--on-danger`, `--on-success`, `--on-warning` — brass and ember both take ink, as the icon does.
+- **No hover partners.** Every agent correctly *dropped* `hover:bg-red-700` rather than fake it from a
+  text token. Added `--danger-hover`, `--success-hover`, `--warning-hover`.
+- **`--bg-hover` never existed** — not in the new file and not in the old one. Nine references across
+  five files had been painting nothing. Pointed at `--bg-card-hover`.
+- **`--bg-terminal-hover`**, because the log dock's bar is fixed and an alpha hover would composite the
+  page behind it and flash cream in light mode.
 
-## Open question, deliberately not decided alone
+### The categorical question, decided
 
-The four pipeline states (extracting, synthesizing, normalizing, assembling) currently use four
-unrelated hues — yellow, blue, purple, indigo. In a warm palette they all fight the accent, and
-four arbitrary hues for four *sequential* stages is decoration rather than information. A heat ramp
-(brass → ember, hotter the further along) would encode the progression. That is a UX change, not a
-palette change, so it is proposed rather than done.
+Four systems used colour as a category. Only one of them was carrying information:
+
+| System | Decision |
+| --- | --- |
+| Step labels 1·Input / 2·Work / 3·Output | **a ramp** — brass → ember → green. It is a sequence, so colour can encode it. |
+| Book kinds (digest, api, reader) | neutral — the label already says which |
+| Activity pills (translating, AI note, digesting) | one "busy" look — the label carries the difference |
+| Action buttons (5 lanes, 5 hues) | one accent primary per lane, neutral outline for peers |
+
+Notes left the colour system entirely: it is a section, not a pipeline step. Six filled colours in a
+row was the actual design problem; the blue palette had only hidden it better.
+
+## Phase 3 — verification — DONE
+
+- 541 unit tests, `pnpm lint` 0 errors, typecheck clean, `pnpm -r build` clean
+- e2e smoke 17/19 — the two `uc9` failures are environmental (the packaged app holds port 3034, so
+  Vite proxies to *its* server, which reads `.models-missing` from another path). Same pair as
+  earlier today; they pass when the port is free.
+- Screenshots of library, book detail and chat in **both** themes. They caught one thing no test
+  could: two accent-filled digest buttons side by side. HN digest is now the secondary it always was.
+- Dev server shut down afterwards.

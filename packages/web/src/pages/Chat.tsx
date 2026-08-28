@@ -164,12 +164,12 @@ export function Chat() {
           ))}
           {busy && (
             <div className="flex items-center gap-2 text-sm text-(--text-muted)" data-testid="chat-busy">
-              <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-(--accent) animate-pulse" />
               {status === "submitted" ? "Searching the library…" : "Answering…"}
               <button onClick={() => stop()} className="text-xs underline text-(--text-faint) hover:text-(--text-secondary)">Stop</button>
             </div>
           )}
-          {error && <div className="text-sm text-red-600">{error.message}</div>}
+          {error && <div className="text-sm text-(--danger-text)">{error.message}</div>}
           <div ref={bottomRef} />
         </div>
 
@@ -186,13 +186,13 @@ export function Chat() {
               }}
               rows={2}
               placeholder="Ask your library… (Enter to send, Shift+Enter for newline)"
-              className="flex-1 resize-none rounded-lg border border-(--border) bg-(--bg-card) text-(--text-primary) text-sm px-3 py-2 outline-none focus:border-blue-500"
+              className="flex-1 resize-none rounded-lg border border-(--border) bg-(--bg-card) text-(--text-primary) text-sm px-3 py-2 outline-none focus:border-(--accent)"
               data-testid="chat-input"
             />
             <button
               onClick={send}
               disabled={busy || !input.trim()}
-              className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium disabled:opacity-50"
+              className="px-4 py-2 rounded-lg bg-(--accent) text-(--on-accent) text-sm font-medium disabled:opacity-50"
               data-testid="chat-send"
             >
               Ask

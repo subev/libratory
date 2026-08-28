@@ -75,12 +75,12 @@ export function ProfileSwitcher() {
 
   return (
     <div className="ml-auto flex items-center gap-2">
-      {error && <span className="text-sm text-red-600">{error}</span>}
+      {error && <span className="text-sm text-(--danger-text)">{error}</span>}
       <span title="Profile" className="text-sm">👤</span>
       <select
         value={active.id}
         onChange={(e) => activate(e.target.value)}
-        className="px-2 py-1.5 text-xs rounded-md border border-(--border) bg-(--bg-card) text-(--text-primary) outline-none focus:border-blue-500"
+        className="px-2 py-1.5 text-xs rounded-md border border-(--border) bg-(--bg-card) text-(--text-primary) outline-none focus:border-(--accent)"
         data-testid="profile-select"
       >
         {profiles.map((p) => (
@@ -107,7 +107,7 @@ export function ProfileSwitcher() {
         onClick={deleteProfile}
         disabled={active.isDefault || deleteMutation.isPending}
         title={active.isDefault ? "The default profile cannot be deleted" : "Delete this profile (must be empty)"}
-        className="text-(--text-faint) hover:text-red-600 text-xs disabled:opacity-50"
+        className="text-(--text-faint) hover:text-(--danger-text) text-xs disabled:opacity-50"
         data-testid="delete-profile"
       >
         🗑

@@ -224,7 +224,7 @@ export function HnDigestModal({ onClose }: { onClose: () => void }) {
                 const estimate = count * (Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86_400_000) + 1);
                 return (
                   <span
-                    className={estimate > 60 ? "text-amber-600 font-medium" : "text-(--text-faint)"}
+                    className={estimate > 60 ? "text-(--warning-text) font-medium" : "text-(--text-faint)"}
                     title={estimate > 60 ? "Each chapter is one AI summary plus TTS — a build this size runs for hours" : undefined}
                   >
                     (~{estimate} chapters{estimate > 60 ? " — hours of build time" : ""})
@@ -235,7 +235,7 @@ export function HnDigestModal({ onClose }: { onClose: () => void }) {
             {from === to && <span className="text-(--text-faint) self-center">— pick a range to unlock modes</span>}
           </fieldset>
 
-          {previewError && <p className="text-xs text-red-600">{previewError}</p>}
+          {previewError && <p className="text-xs text-(--danger-text)">{previewError}</p>}
           {preview && (
             <div className="rounded-md border border-(--border) divide-y divide-(--border) max-h-72 overflow-y-auto" data-testid="hn-digest-preview">
               {preview.map((story) => (
@@ -266,7 +266,7 @@ export function HnDigestModal({ onClose }: { onClose: () => void }) {
                     href={story.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`flex-1 truncate hover:underline ${excluded.has(story.id) ? "text-(--text-faint) line-through" : "text-blue-600"}`}
+                    className={`flex-1 truncate hover:underline ${excluded.has(story.id) ? "text-(--text-faint) line-through" : "text-(--accent)"}`}
                     title={story.url}
                   >
                     {story.title}
@@ -311,7 +311,7 @@ export function HnDigestModal({ onClose }: { onClose: () => void }) {
             onClick={run}
             disabled={state === "running" || includedCount === 0}
             title={includedCount === 0 ? "Every story is unchecked" : undefined}
-            className="px-3 py-1.5 bg-orange-600 text-white rounded-md text-xs font-medium hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 bg-(--accent) text-(--on-accent) rounded-md text-xs font-medium hover:bg-(--accent-hover) disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="hn-digest-run"
           >
             {state === "running"
@@ -326,13 +326,13 @@ export function HnDigestModal({ onClose }: { onClose: () => void }) {
           {state === "done" && bookId && (
             <Link
               to={`/books/${bookId}`}
-              className="text-xs font-medium text-blue-600 hover:text-blue-800"
+              className="text-xs font-medium text-(--accent) hover:text-(--accent-hover)"
               data-testid="hn-digest-open"
             >
               Open the book →
             </Link>
           )}
-          {state === "failed" && <span className="text-xs text-red-600">Failed — see the log above</span>}
+          {state === "failed" && <span className="text-xs text-(--danger-text)">Failed — see the log above</span>}
         </div>
       </div>
     </div>

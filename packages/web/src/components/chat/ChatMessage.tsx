@@ -55,7 +55,7 @@ export function ChatMessage({
   if (message.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-blue-600 text-white text-sm px-4 py-2 whitespace-pre-wrap">
+        <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-(--accent) text-(--on-accent) text-sm px-4 py-2 whitespace-pre-wrap">
           {messageText(message)}
         </div>
       </div>
@@ -85,7 +85,7 @@ export function ChatMessage({
           <SourceChips sources={sources} onOpenPdf={onOpenPdf} />
           <div className="flex items-center gap-2 mt-2">
             {savedNoteId ? (
-              <span className="text-xs text-green-600">Saved to notes ✓</span>
+              <span className="text-xs text-(--success-text)">Saved to notes ✓</span>
             ) : (
               <button
                 onClick={() => saveNote.mutate({ question: question || "Library chat", markdown: text, model, folderId })}
@@ -95,7 +95,7 @@ export function ChatMessage({
                 {saveNote.isPending ? "Saving…" : "Save as note"}
               </button>
             )}
-            {saveNote.error && <span className="text-xs text-red-600">{saveNote.error.message}</span>}
+            {saveNote.error && <span className="text-xs text-(--danger-text)">{saveNote.error.message}</span>}
           </div>
         </div>
       )}

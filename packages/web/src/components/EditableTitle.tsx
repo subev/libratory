@@ -40,7 +40,7 @@ export function EditableTitle({
           if (e.key === "Escape") setEditing(false);
         }}
         placeholder={placeholder}
-        className={`${className} bg-transparent border-b-2 border-blue-500 outline-none w-full`}
+        className={`${className} bg-transparent border-b-2 border-(--accent) outline-none w-full`}
       />
     );
   }
@@ -49,7 +49,7 @@ export function EditableTitle({
   return (
     <Tag
       onClick={() => { setValue(title); setEditing(true); }}
-      className={`${title ? className : "text-(--text-faint)"} cursor-pointer hover:text-blue-700`}
+      className={`${title ? className : "text-(--text-faint)"} cursor-pointer hover:text-(--accent)`}
       title={hint}
     >
       {title || placeholder}

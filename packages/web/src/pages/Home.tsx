@@ -44,7 +44,7 @@ export function Home() {
           <ProfileSwitcher />
           <Link
             to={folderId ? `/chat?folderId=${folderId}` : "/chat"}
-            className="ml-auto text-sm px-3 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-hover)"
+            className="ml-auto text-sm px-3 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
             data-testid="library-chat-link"
           >
             💬 Chat with library
@@ -52,7 +52,7 @@ export function Home() {
           <Link
             to="/open"
             title="Open a synced EPUB and read along on its own pages — nothing is uploaded"
-            className="ml-2 text-sm px-3 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-hover)"
+            className="ml-2 text-sm px-3 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
             data-testid="open-container-link"
           >
             📖 Open a read-along EPUB
@@ -61,7 +61,7 @@ export function Home() {
             onClick={() => setShowSettings(true)}
             title="AI model settings"
             data-testid="settings-gear"
-            className="text-sm px-2.5 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-hover)"
+            className="text-sm px-2.5 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
           >
             ⚙️
           </button>
@@ -98,7 +98,7 @@ export function Home() {
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Escape") setSearch(""); }}
                 placeholder="Search all books…"
-                className="w-72 pl-3 pr-8 py-1.5 text-sm rounded-md border border-(--border) bg-(--bg-card) text-(--text-primary) outline-none focus:border-blue-500"
+                className="w-72 pl-3 pr-8 py-1.5 text-sm rounded-md border border-(--border) bg-(--bg-card) text-(--text-primary) outline-none focus:border-(--accent)"
                 data-testid="book-search"
               />
               {search && (

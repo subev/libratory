@@ -17,7 +17,7 @@ export function AfterExtractChoice({
     <fieldset className="space-y-2">
       <legend className="text-xs font-medium text-(--text-secondary) mb-1">When extraction finishes</legend>
 
-      <label className={`flex gap-2 rounded-md border p-2 cursor-pointer ${autoSynthesize ? "border-blue-500 bg-(--bg-selected)" : "border-(--border) hover:bg-(--bg-subtle)"}`}>
+      <label className={`flex gap-2 rounded-md border p-2 cursor-pointer ${autoSynthesize ? "border-(--accent) bg-(--bg-selected)" : "border-(--border) hover:bg-(--bg-subtle)"}`}>
         <input
           type="checkbox"
           checked={autoSynthesize}

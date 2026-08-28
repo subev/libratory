@@ -96,7 +96,7 @@ export function FolderPickerModal({
       style={{ paddingLeft: `${12 + depth * 16}px` }}
       data-testid="folder-picker-row"
     >
-      <span className={`w-3 h-3 rounded-full border shrink-0 ${targetId === id ? "bg-blue-600 border-blue-600" : "border-(--border)"}`} />
+      <span className={`w-3 h-3 rounded-full border shrink-0 ${targetId === id ? "bg-(--accent) border-(--accent)" : "border-(--border)"}`} />
       <span className="truncate">{label}</span>
     </button>
   );
@@ -137,26 +137,26 @@ export function FolderPickerModal({
                 if (e.key === "Escape") setNewName(null);
               }}
               placeholder="New folder name — created inside the selection, Enter to create"
-              className="w-full px-2 py-1.5 text-sm rounded-md border border-(--border-input) bg-(--bg-input) text-(--text-primary) outline-none focus:border-blue-500"
+              className="w-full px-2 py-1.5 text-sm rounded-md border border-(--border-input) bg-(--bg-input) text-(--text-primary) outline-none focus:border-(--focus-ring)"
               data-testid="folder-picker-new-name"
             />
           ) : (
             <button
               onClick={() => setNewName("")}
-              className="text-sm text-blue-600 hover:text-blue-800"
+              className="text-sm text-(--accent) hover:text-(--accent-hover)"
               data-testid="folder-picker-new"
             >
               + New folder…
             </button>
           )}
           {(moveError || createMutation.error) && (
-            <p className="text-sm text-red-600">{moveError ?? createMutation.error!.message}</p>
+            <p className="text-sm text-(--danger-text)">{moveError ?? createMutation.error!.message}</p>
           )}
           <div className="flex justify-end">
             <button
               onClick={move}
               disabled={moving || itemCount === 0}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-(--accent) text-(--on-accent) rounded-md text-sm font-medium hover:bg-(--accent-hover) disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="folder-picker-move"
             >
               {moving ? "Moving..." : `Move ${itemLabel}`}

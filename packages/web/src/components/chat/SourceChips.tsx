@@ -33,9 +33,9 @@ export function SourceChips({
       {sources.map((source, i) => {
         const label = sourceLabel(source);
         const chipClass =
-          "inline-flex items-center gap-1 max-w-72 text-xs px-2 py-1 rounded-full bg-(--bg-subtle) text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) border border-(--border) cursor-pointer";
+          "inline-flex items-center gap-1 max-w-72 text-xs px-2 py-1 rounded-full bg-(--bg-subtle) text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-card-hover) border border-(--border) cursor-pointer";
         const badge = source.kind === "translation" && source.language ? (
-          <span className="uppercase text-[10px] font-semibold text-sky-600 shrink-0">{source.language}</span>
+          <span className="uppercase text-[10px] font-semibold text-(--text-muted) shrink-0">{source.language}</span>
         ) : null;
         const inner = (
           <>

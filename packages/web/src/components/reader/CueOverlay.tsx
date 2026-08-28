@@ -34,12 +34,12 @@ export function CueOverlay({
   // Softest first: the chunk under the pointer, the sentence a click would seek to, the sentence
   // being spoken, the word inside it. The element for each persists, so moving one is a transition
   const layers = [
-    { rects: linked, className: "bg-yellow-300/35 mix-blend-multiply", testId: "cue-linked-rect" },
-    { rects: ring, className: "outline-2 outline-offset-1 outline-amber-500/80", testId: "cue-ring-rect" },
-    { rects: cue?.r ?? [], className: "bg-amber-300/50 mix-blend-multiply", testId: "cue-rect" },
+    { rects: linked, className: "bg-(--accent-subtle) mix-blend-multiply", testId: "cue-linked-rect" },
+    { rects: ring, className: "outline-2 outline-offset-1 outline-(--accent)/80", testId: "cue-ring-rect" },
+    { rects: cue?.r ?? [], className: "bg-(--accent)/35 mix-blend-multiply", testId: "cue-rect" },
     {
       rects: word ?? [],
-      className: "bg-amber-400/80 mix-blend-multiply transition-all duration-150 ease-out motion-reduce:transition-none",
+      className: "bg-(--accent)/60 mix-blend-multiply transition-all duration-150 ease-out motion-reduce:transition-none",
       testId: "cue-word-rect",
     },
   ];

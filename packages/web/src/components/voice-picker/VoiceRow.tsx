@@ -38,20 +38,20 @@ export const VoiceRow = memo(function VoiceRow({ voice, action }: { voice: Voice
         onClick={() => actions.play(voice.id)}
         aria-busy={isPending}
         disabled={unavailable}
-        className={`shrink-0 h-8 w-8 rounded-full flex items-center justify-center border border-(--border) transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
-          isPending ? "cursor-progress" : "hover:border-blue-400 hover:bg-(--bg-selected)"
+        className={`shrink-0 h-8 w-8 rounded-full flex items-center justify-center border border-(--border) transition-colors focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none ${
+          isPending ? "cursor-progress" : "hover:border-(--accent) hover:bg-(--bg-selected)"
         }`}
         title={status ?? (isPlaying ? "Stop preview" : `Preview ${voice.label}`)}
         aria-label={isPending ? `Generating preview of ${voice.label}` : isPlaying ? `Stop preview of ${voice.label}` : `Preview ${voice.label}`}
         data-testid={`voice-preview-${voice.id}`}
       >
         {isPending ? (
-          <svg className="h-3.5 w-3.5 animate-spin text-blue-600" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <svg className="h-3.5 w-3.5 animate-spin text-(--accent)" viewBox="0 0 20 20" fill="none" aria-hidden="true">
             <circle cx="10" cy="10" r="7.5" stroke="currentColor" strokeWidth="2.5" className="opacity-25" />
             <path d="M17.5 10a7.5 7.5 0 00-7.5-7.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
           </svg>
         ) : isPlaying ? (
-          <svg className="h-3.5 w-3.5 text-blue-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <svg className="h-3.5 w-3.5 text-(--accent)" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path d="M5.75 3a.75.75 0 00-.75.75v12.5a.75.75 0 001.5 0V3.75A.75.75 0 005.75 3zM14.25 3a.75.75 0 00-.75.75v12.5a.75.75 0 001.5 0V3.75a.75.75 0 00-.75-.75z" />
           </svg>
         ) : (
@@ -67,11 +67,11 @@ export const VoiceRow = memo(function VoiceRow({ voice, action }: { voice: Voice
         aria-pressed={isSelected}
         disabled={unavailable}
         title={unavailable ? "This narrator needs Apple's MLX, which only runs on Apple Silicon" : undefined}
-        className="flex-1 min-w-0 text-left focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none rounded disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex-1 min-w-0 text-left focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none rounded disabled:opacity-50 disabled:cursor-not-allowed"
         data-testid={`voice-option-${voice.id}`}
       >
         <div className="text-sm text-(--text-primary) truncate">{voice.label}</div>
-        <div className={`text-xs truncate ${hasFailed ? "text-red-600 dark:text-red-400" : isPending ? "text-blue-600 dark:text-blue-400" : "text-(--text-faint)"}`}>
+        <div className={`text-xs truncate ${hasFailed ? "text-(--danger-text)" : isPending ? "text-(--accent)" : "text-(--text-faint)"}`}>
           {status ?? describe(voice)}
         </div>
       </button>
@@ -81,7 +81,7 @@ export const VoiceRow = memo(function VoiceRow({ voice, action }: { voice: Voice
       {action}
 
       {isSelected && (
-        <svg className="h-4 w-4 text-blue-600 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <svg className="h-4 w-4 text-(--accent) shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
         </svg>
       )}

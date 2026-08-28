@@ -37,7 +37,7 @@ export function ReaderOpen() {
         <ReaderFor source={source} />
         <p className="mx-auto max-w-5xl px-4 pb-6 text-xs text-(--text-faint)" data-testid="reader-opened-file">
           Reading {name} from this device.{" "}
-          <button onClick={() => setSource(null)} className="text-blue-600 hover:text-blue-800">
+          <button onClick={() => setSource(null)} className="text-(--accent) hover:text-(--accent-hover)">
             Open another
           </button>
         </p>
@@ -49,7 +49,7 @@ export function ReaderOpen() {
     <div className="min-h-screen bg-(--bg-page) px-4 py-3">
       <div className="mx-auto max-w-2xl">
         <p className="mb-4 text-sm">
-          <Link to="/" className="text-blue-600 hover:text-blue-800">← Library</Link>
+          <Link to="/" className="text-(--accent) hover:text-(--accent-hover)">← Library</Link>
         </p>
         <div
           onDragOver={(e) => { e.preventDefault(); setOver(true); }}
@@ -61,7 +61,7 @@ export function ReaderOpen() {
             if (file) void open(file);
           }}
           className={`rounded-lg border-2 border-dashed p-10 text-center ${
-            over ? "border-blue-500 bg-blue-50/50" : "border-(--border)"
+            over ? "border-(--accent) bg-(--bg-drag)" : "border-(--border)"
           }`}
           data-testid="reader-open-drop"
         >
@@ -73,7 +73,7 @@ export function ReaderOpen() {
           <button
             onClick={() => input.current?.click()}
             disabled={busy}
-            className="mt-5 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="mt-5 rounded bg-(--accent) px-4 py-2 text-sm font-medium text-(--on-accent) hover:bg-(--accent-hover) disabled:opacity-50"
             data-testid="reader-open-pick"
           >
             {busy ? "Opening…" : "Choose a file"}
@@ -86,7 +86,7 @@ export function ReaderOpen() {
             onChange={(e) => { const file = e.target.files?.[0]; if (file) void open(file); }}
           />
           {error ? (
-            <p className="mt-4 text-sm text-red-600" data-testid="reader-open-error">{error}</p>
+            <p className="mt-4 text-sm text-(--danger-text)" data-testid="reader-open-error">{error}</p>
           ) : null}
         </div>
         <p className="mt-4 text-xs text-(--text-faint)">

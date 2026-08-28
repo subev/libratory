@@ -32,7 +32,7 @@ function KeyCard({ slug, label, note, configured, keyHint, draft, onDraft, onSav
         <Dot on={configured} />
         <span className="font-medium text-(--text-primary)">{label}</span>
         <span className="text-xs text-(--text-faint)">{note}</span>
-        <span className={`ml-auto text-xs ${configured ? "text-green-600" : "text-(--text-muted)"}`}>
+        <span className={`ml-auto text-xs ${configured ? "text-(--success-text)" : "text-(--text-muted)"}`}>
           {configured ? `key set (${keyHint})` : "no key"}
         </span>
       </div>
@@ -43,13 +43,13 @@ function KeyCard({ slug, label, note, configured, keyHint, draft, onDraft, onSav
           onChange={(e) => onDraft(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && onSave()}
           placeholder={configured ? "Paste a new key to replace it" : "Paste API key"}
-          className="flex-1 text-xs rounded-md border border-(--border-input) bg-(--bg-input) px-2 py-1.5 text-(--text-primary) focus:outline-none focus:border-blue-500"
+          className="flex-1 text-xs rounded-md border border-(--border-input) bg-(--bg-input) px-2 py-1.5 text-(--text-primary) focus:outline-none focus:border-(--focus-ring)"
           data-testid={`settings-key-input-${slug}`}
         />
         <button
           onClick={onSave}
           disabled={!draft.trim() || busy}
-          className="text-xs px-2.5 py-1.5 rounded-md bg-blue-600 text-white font-medium disabled:opacity-50"
+          className="text-xs px-2.5 py-1.5 rounded-md bg-(--accent) text-(--on-accent) font-medium disabled:opacity-50"
           data-testid={`settings-key-save-${slug}`}
         >
           Save
@@ -64,13 +64,13 @@ function KeyCard({ slug, label, note, configured, keyHint, draft, onDraft, onSav
           Remove
         </button>
       </div>
-      {error && <p className="mt-2 text-xs text-red-600" data-testid={`settings-key-error-${slug}`}>{error}</p>}
+      {error && <p className="mt-2 text-xs text-(--danger-text)" data-testid={`settings-key-error-${slug}`}>{error}</p>}
     </div>
   );
 }
 
 function Dot({ on }: { on: boolean }) {
-  return <span className={`inline-block w-2 h-2 rounded-full ${on ? "bg-green-500" : "bg-(--text-faint)"}`} />;
+  return <span className={`inline-block w-2 h-2 rounded-full ${on ? "bg-(--success)" : "bg-(--text-faint)"}`} />;
 }
 
 export function SettingsModal({ onClose }: { onClose: () => void }) {
@@ -176,12 +176,12 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                 Preselected wherever a model is picked — cleanup, Ask AI, translations, digests, chat, chapter detection.
               </p>
               {chosenMissing && (
-                <p className="mt-1 text-xs text-amber-600" data-testid="settings-default-model-warning">
+                <p className="mt-1 text-xs text-(--warning-text)" data-testid="settings-default-model-warning">
                   Not available right now — requests fall back to the automatic choice until it is.
                 </p>
               )}
               {setDefaultMutation.error && (
-                <p className="mt-1 text-xs text-red-600">{setDefaultMutation.error.message}</p>
+                <p className="mt-1 text-xs text-(--danger-text)">{setDefaultMutation.error.message}</p>
               )}
             </div>
           </section>
@@ -205,7 +205,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                     <Dot on={server.running} />
                     <span className="font-medium text-(--text-primary)">{server.name}</span>
                     <span className="text-(--text-faint) text-xs">{server.url}</span>
-                    <span className={`ml-auto text-xs ${server.running ? "text-green-600" : "text-(--text-muted)"}`}>
+                    <span className={`ml-auto text-xs ${server.running ? "text-(--success-text)" : "text-(--text-muted)"}`}>
                       {server.running ? `running — ${server.models.length} model${server.models.length === 1 ? "" : "s"}` : "not detected"}
                     </span>
                   </div>
@@ -224,7 +224,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                             ) : (
                               <span className="text-(--text-faint)">· no chat tools</span>
                             )}
-                            {m.contextNote && <span className="text-amber-600">· {m.contextNote}</span>}
+                            {m.contextNote && <span className="text-(--warning-text)">· {m.contextNote}</span>}
                           </li>
                         ))}
                       </ul>
@@ -236,7 +236,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                       <button
                         onClick={() => startServerMutation.mutate({ name: server.name })}
                         disabled={startServerMutation.isPending}
-                        className="text-xs px-2.5 py-1 rounded-md bg-blue-600 text-white font-medium disabled:opacity-50"
+                        className="text-xs px-2.5 py-1 rounded-md bg-(--accent) text-(--on-accent) font-medium disabled:opacity-50"
                         data-testid={`settings-start-${server.name.replace(" ", "-").toLowerCase()}`}
                       >
                         {startServerMutation.isPending ? "Starting…" : "Start server"}
@@ -262,13 +262,13 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
           <section>
             <h3 className="text-sm font-semibold text-(--text-primary) mb-2">Cloud providers — need an API key</h3>
             <div className="space-y-3">{keysOfKind("llm").map(keyCard)}</div>
-            {startServerMutation.error && <p className="mt-2 text-xs text-red-600">{startServerMutation.error.message}</p>}
+            {startServerMutation.error && <p className="mt-2 text-xs text-(--danger-text)">{startServerMutation.error.message}</p>}
           </section>
 
           <section>
             <h3 className="text-sm font-semibold text-(--text-primary) mb-2">Cloud voices — need an API key</h3>
             {secretsError ? (
-              <p className="text-xs text-red-600">Could not read the saved keys: {secretsError.message}</p>
+              <p className="text-xs text-(--danger-text)">Could not read the saved keys: {secretsError.message}</p>
             ) : (
               <div className="space-y-3">{keysOfKind("voice").map(keyCard)}</div>
             )}

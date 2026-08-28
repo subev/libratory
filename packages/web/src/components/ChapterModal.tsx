@@ -433,20 +433,20 @@ function ChapterModalBody({
                 type="checkbox"
                 checked={chapter.selected}
                 onChange={() => onSetSelected(chapter.id, !chapter.selected)}
-                className="rounded border-(--border-input) text-indigo-600 focus:ring-indigo-500"
+                className="rounded border-(--border-input) text-(--accent) focus:ring-(--focus-ring)"
               />
               <span className="text-sm font-mono text-(--text-faint)">#{chapter.index + 1}</span>
               <h2 className="text-lg font-semibold text-(--text-primary) truncate">{chapter.title}</h2>
               <StatusBadge status={chapter.status} error={chapter.error} />
               {!isVariant && chapter.cleanup?.status === "done" ? (
                 <span
-                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-700"
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-(--success-bg) text-(--success-text)"
                   title="Cleaned by AI — the custom text holds the result"
                 >
                   cleaned
                 </span>
               ) : chapter.hasCustomText ? (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-(--warning-bg) text-(--warning-text)">
                   edited
                 </span>
               ) : null}
@@ -460,7 +460,7 @@ function ChapterModalBody({
                 sourceFile ? (
                   <button
                     onClick={() => setPdfPage(chapter.pageStart!)}
-                    className="tabular-nums text-blue-600 hover:text-blue-800"
+                    className="tabular-nums text-(--accent) hover:text-(--accent-hover)"
                     title="Open the source PDF at this chapter's first page"
                   >
                     p.{chapter.pageStart}{chapter.pageEnd && chapter.pageEnd !== chapter.pageStart ? `–${chapter.pageEnd}` : ""}
@@ -475,7 +475,7 @@ function ChapterModalBody({
                 canMark ? (
                   <Link
                     to={`/books/${bookId}/read?chapter=${chapter.index}`}
-                    className="text-blue-600 hover:text-blue-800"
+                    className="text-(--accent) hover:text-(--accent-hover)"
                     title="Follow the narration on the page itself, at full size"
                     data-testid="chapter-read-along"
                   >
@@ -488,7 +488,7 @@ function ChapterModalBody({
                 )
               ) : null}
               {chapter.progress && chapter.status === "synthesizing" ? (
-                <span className="text-blue-600 font-medium">Chunk {chapter.progress}</span>
+                <span className="text-(--accent) font-medium">Chunk {chapter.progress}</span>
               ) : null}
               {chapter.progress && chapter.status === "suspended" ? (
                 <span className="text-(--text-muted) font-medium">{chapter.progress} synthesized</span>
@@ -553,7 +553,7 @@ function ChapterModalBody({
             <button
               onClick={() => onQueue(chapter.id, true)}
               title="Continue synthesis from where it stopped — keeps the chunks already synthesized"
-              className="text-xs px-2.5 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 font-medium"
+              className="text-xs px-2.5 py-1 rounded bg-(--accent) text-(--on-accent) hover:bg-(--accent-hover) font-medium"
             >
               Continue{chapter.progress ? ` (${chapter.progress})` : ""}
             </button>
@@ -612,16 +612,16 @@ function ChapterModalBody({
                 Stop cleanup
               </button>
               {cleanupRunning ? (
-                <span className="text-xs text-purple-600" data-testid="chapter-cleanup-progress">
+                <span className="text-xs text-(--badge-normalizing-text)" data-testid="chapter-cleanup-progress">
                   Cleaning{chapter.cleanup?.progress ? ` · ${chapter.cleanup.progress} chunks` : ""}...
                 </span>
               ) : cleanupStatus === "failed" && chapter.cleanup?.error ? (
-                <span className="text-xs text-red-600 truncate" title={chapter.cleanup.error}>
+                <span className="text-xs text-(--danger-text) truncate" title={chapter.cleanup.error}>
                   Cleanup failed: {chapter.cleanup.error}
                 </span>
               ) : null}
               {queueCleanupMutation.error || stopCleanupMutation.error ? (
-                <span className="text-xs text-red-600 truncate">
+                <span className="text-xs text-(--danger-text) truncate">
                   {(queueCleanupMutation.error ?? stopCleanupMutation.error)?.message}
                 </span>
               ) : null}
@@ -639,7 +639,7 @@ function ChapterModalBody({
                   variantStatus === "done" ? `Discard this ${variantName} text and generate it again` :
                   isTranslationKind ? `Translate this chapter to ${variantName}` : `Rewrite this chapter as ${variantName}`
                 }
-                className="text-xs px-2.5 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="text-xs px-2.5 py-1 rounded bg-(--accent) text-(--on-accent) hover:bg-(--accent-hover) font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="chapter-translate"
               >
                 {runLabel}
@@ -662,16 +662,16 @@ function ChapterModalBody({
                 Compare
               </button>
               {variantRunning ? (
-                <span className="text-xs text-blue-600" data-testid="chapter-translation-progress">
+                <span className="text-xs text-(--accent)" data-testid="chapter-translation-progress">
                   {isTranslationKind ? "Translating" : "Rewriting"}{variantDetail?.progress ? ` · ${variantDetail.progress} chunks` : ""}...
                 </span>
               ) : variantStatus === "failed" && variantDetail?.error ? (
-                <span className="text-xs text-red-600 truncate" title={variantDetail.error}>
+                <span className="text-xs text-(--danger-text) truncate" title={variantDetail.error}>
                   Failed: {variantDetail.error}
                 </span>
               ) : null}
               {startVariantMutation.error || stopVariantMutation.error ? (
-                <span className="text-xs text-red-600 truncate">
+                <span className="text-xs text-(--danger-text) truncate">
                   {(startVariantMutation.error ?? stopVariantMutation.error)?.message}
                 </span>
               ) : null}
@@ -684,7 +684,7 @@ function ChapterModalBody({
                 onClick={() => onSwitchVariant(null)}
                 className={`text-xs px-2.5 py-1 rounded-full border font-medium ${
                   !variant
-                    ? "bg-blue-600 border-blue-600 text-white"
+                    ? "bg-(--accent) border-(--accent) text-(--on-accent)"
                     : "border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)"
                 }`}
               >
@@ -696,7 +696,7 @@ function ChapterModalBody({
                   onClick={() => onSwitchVariant(v.key)}
                   className={`text-xs px-2.5 py-1 rounded-full border font-medium ${
                     variant?.key === v.key
-                      ? "bg-blue-600 border-blue-600 text-white"
+                      ? "bg-(--accent) border-(--accent) text-(--on-accent)"
                       : "border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)"
                   }`}
                 >
@@ -710,7 +710,7 @@ function ChapterModalBody({
               <button
                 onClick={handleSave}
                 disabled={updateTextMutation.isPending}
-                className="text-xs px-2.5 py-1 rounded bg-green-600 text-white hover:bg-green-700 font-medium disabled:opacity-50"
+                className="text-xs px-2.5 py-1 rounded bg-(--success) text-(--on-success) hover:bg-(--success-hover) font-medium disabled:opacity-50"
                 data-testid="chapter-edit-save"
               >
                 {updateTextMutation.isPending ? "Saving..." : "Save"}
@@ -728,7 +728,7 @@ function ChapterModalBody({
                 <button
                   onClick={handleReset}
                   disabled={resetTextMutation.isPending}
-                  className="text-xs px-2.5 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100 font-medium disabled:opacity-50"
+                  className="text-xs px-2.5 py-1 rounded bg-(--danger-bg) text-(--danger-text) font-medium disabled:opacity-50"
                 >
                   Reset
                 </button>
@@ -736,7 +736,7 @@ function ChapterModalBody({
               {fullChapter && !isVariant ? (
                 <button
                   onClick={startEditing}
-                  className="text-xs px-2.5 py-1 rounded bg-amber-50 text-amber-700 hover:bg-amber-100 font-medium"
+                  className="text-xs px-2.5 py-1 rounded bg-(--warning-bg) text-(--warning-text) font-medium"
                   data-testid="chapter-edit"
                 >
                   Edit
@@ -788,7 +788,7 @@ function ChapterModalBody({
                 value={editText}
                 onChange={(e) => setEditText(e.target.value)}
                 data-testid="chapter-edit-text"
-                className="flex-1 min-h-0 w-full max-w-4xl mx-auto rounded bg-(--bg-card) border border-amber-300 px-6 py-5 text-[15px] text-(--text-primary) whitespace-pre-wrap leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-amber-400"
+                className="flex-1 min-h-0 w-full max-w-4xl mx-auto rounded bg-(--bg-card) border border-(--border-custom-text) px-6 py-5 font-reading text-[15px] text-(--text-primary) whitespace-pre-wrap leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-(--warning)"
               />
             ) : viewMode === "pages" && manifest && readerChapter ? (
               <div className="mx-auto flex w-full max-w-3xl flex-1 min-h-0 flex-col gap-4 overflow-y-auto">
@@ -818,7 +818,7 @@ function ChapterModalBody({
                 onSeek={(at) => playerRef.current?.seek(at)}
                 hoverChunk={hoverChunk}
                 onHoverCue={hoverCue}
-                className="mx-auto w-full max-w-4xl flex-1 min-h-0 overflow-y-auto rounded bg-(--bg-subtle) border border-(--border) px-6 py-5 text-[15px] leading-relaxed text-(--text-primary)"
+                className="mx-auto w-full max-w-4xl flex-1 min-h-0 overflow-y-auto rounded bg-(--bg-subtle) border border-(--border) px-6 py-5 font-reading text-[15px] leading-relaxed text-(--text-primary)"
               />
             ) : viewMode === "blocks" && fullChapter.sourceBlocks ? (
               <BlocksPreview
@@ -848,7 +848,7 @@ function ChapterModalBody({
               <button
                 onClick={handleRunVariant}
                 disabled={startVariantMutation.isPending}
-                className="text-xs px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700 font-medium disabled:opacity-50"
+                className="text-xs px-3 py-1.5 rounded bg-(--accent) text-(--on-accent) hover:bg-(--accent-hover) font-medium disabled:opacity-50"
                 data-testid="chapter-translate-empty"
               >
                 {startVariantMutation.isPending ? "Starting..." : isTranslationKind ? `Translate to ${variantName}` : `Generate ${variantName}`}
@@ -1064,7 +1064,7 @@ function ChunkPreviewPanel({
             <button
               onClick={togglePlay}
               title={isPlaying ? "Pause (space)" : "Play (space) — auto-advances through chunks"}
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white hover:bg-blue-700"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-(--accent) text-(--on-accent) hover:bg-(--accent-hover)"
             >
               {isPlaying ? (
                 <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -1108,7 +1108,7 @@ function ChunkPreviewPanel({
                   ? "No page info for this chunk"
                   : "Open the source PDF at this chunk's page"
             }
-            className="text-xs text-blue-600 hover:text-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="text-xs text-(--accent) hover:text-(--accent-hover) disabled:opacity-40 disabled:cursor-not-allowed"
           >
             PDF{sourcePage !== null ? ` p.${sourcePage}` : ""}
           </button>
@@ -1116,7 +1116,7 @@ function ChunkPreviewPanel({
             href={chunkPreviews.at(-1)?.url}
             target="_blank"
             rel="noreferrer"
-            className="text-xs text-blue-600 hover:text-blue-700"
+            className="text-xs text-(--accent) hover:text-(--accent-hover)"
           >
             Open latest file
           </a>
@@ -1137,9 +1137,9 @@ function ChunkPreviewPanel({
               title={preview.page !== undefined ? `PDF page ${preview.page}` : undefined}
               className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
                 active
-                  ? "bg-blue-600 text-white"
+                  ? "bg-(--accent) text-(--on-accent)"
                   : linked
-                    ? "bg-yellow-300/40 text-(--text-primary)"
+                    ? "bg-(--accent-subtle) text-(--text-primary)"
                     : "bg-(--bg-subtle) text-(--text-tertiary) hover:bg-(--border)"
               }`}
             >
@@ -1220,7 +1220,7 @@ function ViewModeTabs({
           data-testid={`view-tab-${mode}`}
           className={`px-2.5 py-1 capitalize ${
             viewMode === mode
-              ? "bg-zinc-800 text-white"
+              ? "bg-(--accent) text-(--on-accent)"
               : "bg-(--bg-card) text-(--text-tertiary) hover:bg-(--bg-card-hover)"
           }`}
         >
@@ -1272,7 +1272,7 @@ function TextPreview({
     requestAnimationFrame(() => { syncing.current = false; });
   }
 
-  const textClass = "flex-1 min-h-0 overflow-y-auto rounded bg-(--bg-subtle) border border-(--border) px-6 py-5 text-[15px] text-(--text-primary) whitespace-pre-wrap leading-relaxed";
+  const textClass = "flex-1 min-h-0 overflow-y-auto rounded bg-(--bg-subtle) border border-(--border) px-6 py-5 font-reading text-[15px] text-(--text-primary) whitespace-pre-wrap leading-relaxed";
   const readingColumn = " w-full max-w-4xl mx-auto";
 
   if (viewMode === "split" && cleanText) {
@@ -1377,9 +1377,9 @@ function ChunkedText({
         onMouseLeave={() => onHoverChunk(null)}
         className={`cursor-pointer rounded-sm transition-colors ${
           isSelected
-            ? "bg-yellow-300/70 text-(--text-primary)"
+            ? "bg-(--bg-selected) text-(--text-primary)"
             : isHovered
-              ? "bg-yellow-300/40 text-(--text-primary)"
+              ? "bg-(--bg-card-hover) text-(--text-primary)"
               : ""
         }`}
       >
@@ -1407,7 +1407,7 @@ function BlocksPreview({ sourceBlocks, onOpenPdf }: { sourceBlocks: SourceBlock[
               {onOpenPdf ? (
                 <button
                   onClick={() => onOpenPdf(block.page)}
-                  className="text-blue-600 hover:text-blue-800 tabular-nums shrink-0 w-8 text-right"
+                  className="text-(--accent) hover:text-(--accent-hover) tabular-nums shrink-0 w-8 text-right"
                   title="Open the source PDF at this page"
                 >
                   {block.page}

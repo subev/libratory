@@ -40,12 +40,12 @@ export function Breadcrumbs({
               },
             }
           : {};
-        const highlight = dragOverIndex === i ? "outline outline-2 outline-blue-500 rounded" : "";
+        const highlight = dragOverIndex === i ? "outline outline-2 outline-(--accent) rounded" : "";
         return (
           <span key={i} className="flex items-center gap-1.5 min-w-0">
             {i > 0 && <span className="text-(--text-faint)">›</span>}
             {item.to ? (
-              <Link to={item.to} className={`text-blue-600 hover:text-blue-800 truncate px-0.5 ${highlight}`} {...dropProps}>
+              <Link to={item.to} className={`text-(--accent) hover:text-(--accent-hover) truncate px-0.5 ${highlight}`} {...dropProps}>
                 {item.label}
               </Link>
             ) : (

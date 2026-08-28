@@ -32,12 +32,12 @@ export function DownloadNotice({
       data-testid={`${testIdPrefix}-notice`}
     >
       {children}
-      {error && <p className="text-red-600" data-testid={`${testIdPrefix}-error`}>{error}</p>}
+      {error && <p className="text-(--danger-text)" data-testid={`${testIdPrefix}-error`}>{error}</p>}
       <button
         type="button"
         onClick={onDownload}
         disabled={downloading || disabled}
-        className="px-2 py-1 rounded bg-blue-600 text-white disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+        className="px-2 py-1 rounded bg-(--accent) text-(--on-accent) disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none"
         data-testid={`${testIdPrefix}-download`}
       >
         {downloading ? `Downloading ${settledLabel}… ${progress ?? ""}`.trimEnd() : buttonLabel}

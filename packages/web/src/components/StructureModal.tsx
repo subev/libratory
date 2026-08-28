@@ -235,7 +235,7 @@ export function StructureModal({
         {chapterProposal && chapterProposal.status !== "running" ? (
           <div
             className={`px-5 py-2 border-b border-(--border) text-sm flex items-center gap-3 ${
-              chapterProposal.status === "failed" ? "bg-red-50 text-red-700" : "bg-(--bg-subtle) text-(--text-secondary)"
+              chapterProposal.status === "failed" ? "bg-(--danger-bg) text-(--danger-text)" : "bg-(--bg-subtle) text-(--text-secondary)"
             }`}
             data-testid="proposal-banner"
           >
@@ -247,7 +247,7 @@ export function StructureModal({
                 </span>
                 <button
                   onClick={useProposal}
-                  className="px-2 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700"
+                  className="px-2 py-1 bg-(--accent) text-(--on-accent) rounded text-xs font-medium hover:bg-(--accent-hover)"
                   data-testid="use-proposal"
                 >
                   Use proposal
@@ -293,7 +293,7 @@ export function StructureModal({
                       <label
                         key={key}
                         className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer text-sm hover:bg-(--bg-subtle) select-none ${
-                          selected.has(key) ? "bg-blue-50 dark:bg-blue-950/40" : ""
+                          selected.has(key) ? "bg-(--bg-selected)" : ""
                         }`}
                       >
                         <input
@@ -327,7 +327,7 @@ export function StructureModal({
                               e.preventDefault();
                               setPdfPreview({ fileId: pdfFile.id, page: h.page, filename: pdfFile.filename });
                             }}
-                            className="shrink-0 text-xs text-blue-600 hover:text-blue-800 tabular-nums"
+                            className="shrink-0 text-xs text-(--accent) hover:text-(--accent-hover) tabular-nums"
                             title="Open the source PDF at this page"
                           >
                             p.{h.page}
@@ -375,7 +375,7 @@ export function StructureModal({
                         {pdfFile ? (
                           <button
                             onClick={() => setPdfPreview({ fileId: pdfFile.id, page: ch.pageStart, filename: pdfFile.filename })}
-                            className="text-blue-600 hover:text-blue-800 tabular-nums"
+                            className="text-(--accent) hover:text-(--accent-hover) tabular-nums"
                             title="Open the source PDF at this chapter's first page"
                           >
                             p.{ch.pageStart}–{ch.pageEnd}
@@ -412,13 +412,13 @@ export function StructureModal({
           </button>
           <ModelPicker value={model} onChange={setModel} testId="structure-chapter-model" />
           {proposalRunning ? (
-            <span className="text-sm text-blue-600 truncate" data-testid="proposal-running" title={proposalProgress}>
+            <span className="text-sm text-(--accent) truncate" data-testid="proposal-running" title={proposalProgress}>
               {proposalProgress?.replace(/^\[AI\]\s*/, "") ??
                 `Proposal running${chapterProposal?.method === "llm" ? " (asking the model)" : ""}...`}
             </span>
           ) : null}
           {applyMutation.error || proposeMutation.error ? (
-            <span className="text-sm text-red-600 truncate">
+            <span className="text-sm text-(--danger-text) truncate">
               {(applyMutation.error ?? proposeMutation.error)?.message}
             </span>
           ) : null}
@@ -432,7 +432,7 @@ export function StructureModal({
               isProcessing ? "Wait for processing to finish" :
               "Delete existing chapters and re-slice at the checked boundaries"
             }
-            className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-(--accent) text-(--on-accent) rounded-md text-sm font-medium hover:bg-(--accent-hover) disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="apply-boundaries"
           >
             Apply boundaries

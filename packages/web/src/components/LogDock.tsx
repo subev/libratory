@@ -44,22 +44,22 @@ export function LogDock({ bookId, isProcessing, files }: { bookId: string; isPro
       <button
         onClick={() => setOpen(true)}
         data-testid="log-dock"
-        className="fixed bottom-0 inset-x-0 z-[60] flex items-center gap-3 px-4 h-9 bg-(--bg-terminal) text-left font-mono text-xs text-zinc-200 border-t border-zinc-700/60 hover:bg-zinc-800 cursor-pointer"
+        className="fixed bottom-0 inset-x-0 z-[60] flex items-center gap-3 px-4 h-9 bg-(--bg-terminal) text-left font-mono text-xs text-(--brand-page) border-t border-(--brand-page)/15 hover:bg-(--bg-terminal-hover) cursor-pointer"
         title="Open logs"
       >
-        <span className="flex items-center gap-1.5 shrink-0 text-zinc-400 font-sans font-medium">
-          <span className={`w-2 h-2 rounded-full ${isProcessing ? "bg-green-400 animate-pulse" : "bg-zinc-500"}`} />
+        <span className="flex items-center gap-1.5 shrink-0 text-(--brand-page)/70 font-sans font-medium">
+          <span className={`w-2 h-2 rounded-full ${isProcessing ? "bg-(--success) animate-pulse" : "bg-(--brand-page)/40"}`} />
           Logs ({logs.length})
         </span>
         {lastEntry ? (
           <span className="truncate min-w-0 flex-1">
-            <span className="text-zinc-500 mr-2 select-none">{formatLogTime(String(lastEntry.createdAt))}</span>
+            <span className="text-(--brand-page)/50 mr-2 select-none">{formatLogTime(String(lastEntry.createdAt))}</span>
             {lastEntry.message}
           </span>
         ) : (
-          <span className="text-zinc-500 flex-1">Waiting for logs...</span>
+          <span className="text-(--brand-page)/50 flex-1">Waiting for logs...</span>
         )}
-        <span className="shrink-0 text-zinc-500">&#9650;</span>
+        <span className="shrink-0 text-(--brand-page)/50">&#9650;</span>
       </button>
 
       {open && (
@@ -72,16 +72,16 @@ export function LogDock({ bookId, isProcessing, files }: { bookId: string; isPro
             className="bg-(--bg-terminal) rounded-lg shadow-xl w-full max-w-3xl h-[70vh] mx-4 flex flex-col overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-3 px-4 py-2.5 border-b border-zinc-700/60 shrink-0">
-              <span className="flex items-center gap-1.5 text-sm font-medium text-zinc-200">
-                <span className={`w-2 h-2 rounded-full ${isProcessing ? "bg-green-400 animate-pulse" : "bg-zinc-500"}`} />
+            <div className="flex items-center gap-3 px-4 py-2.5 border-b border-(--brand-page)/15 shrink-0">
+              <span className="flex items-center gap-1.5 text-sm font-medium text-(--brand-page)">
+                <span className={`w-2 h-2 rounded-full ${isProcessing ? "bg-(--success) animate-pulse" : "bg-(--brand-page)/40"}`} />
                 Logs ({filteredLogs.length}{fileFilter ? ` / ${logs.length}` : ""})
               </span>
               {isMultiFile && (
                 <select
                   value={fileFilter}
                   onChange={(e) => setFileFilter(e.target.value)}
-                  className="text-xs px-2 py-0.5 border border-zinc-600 rounded bg-zinc-800 text-zinc-200"
+                  className="text-xs px-2 py-0.5 border border-(--brand-page)/25 rounded bg-(--brand-page)/10 text-(--brand-page)"
                 >
                   <option value="">All files</option>
                   {files!.map((f) => (
@@ -95,14 +95,14 @@ export function LogDock({ bookId, isProcessing, files }: { bookId: string; isPro
               {logs.length > 0 && (
                 <button
                   onClick={() => clearLogs.mutate({ bookId })}
-                  className="text-xs text-zinc-500 hover:text-red-400"
+                  className="text-xs text-(--brand-page)/50 hover:text-(--brand-page)"
                 >
                   Clear
                 </button>
               )}
               <button
                 onClick={() => setOpen(false)}
-                className="text-zinc-400 hover:text-zinc-100 text-lg leading-none px-1"
+                className="text-(--brand-page)/70 hover:text-(--brand-page) text-lg leading-none px-1"
                 title="Close (Esc)"
               >
                 &times;
@@ -139,14 +139,14 @@ function LogScroller({ logs }: { logs: { id: string; message: string; createdAt:
       className="flex-1 overflow-y-auto p-3 font-mono text-xs leading-5"
     >
       {logs.length === 0 ? (
-        <p className="text-zinc-500">Waiting for logs...</p>
+        <p className="text-(--brand-page)/50">Waiting for logs...</p>
       ) : (
         logs.map((entry) => (
           <div key={entry.id} className="flex gap-3">
-            <span className="text-zinc-500 shrink-0 select-none">
+            <span className="text-(--brand-page)/50 shrink-0 select-none">
               {formatLogTime(String(entry.createdAt))}
             </span>
-            <span className="text-zinc-200 whitespace-pre-wrap break-all">
+            <span className="text-(--brand-page) whitespace-pre-wrap break-all">
               <LogMessageText message={entry.message} />
             </span>
           </div>
@@ -170,7 +170,7 @@ function LogMessageText({ message }: { message: string }) {
         href={part}
         target="_blank"
         rel="noreferrer"
-        className="text-blue-400 underline decoration-blue-400/40 underline-offset-2 hover:text-blue-300"
+        className="text-(--accent) underline decoration-(--accent)/40 underline-offset-2 hover:text-(--accent-hover)"
       >
         {part}
       </a>

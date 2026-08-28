@@ -10,7 +10,7 @@ export function CueTranscript({
   onSeek,
   hoverChunk = null,
   onHoverCue,
-  className = "rounded-lg bg-(--bg-card) p-6 text-lg leading-relaxed text-(--text-primary)",
+  className = "rounded-lg bg-(--bg-card) p-6 font-reading text-lg leading-relaxed text-(--text-primary)",
   empty = "No narration to read along with yet.",
 }: {
   cues: ReaderCues | null;
@@ -39,11 +39,11 @@ export function CueTranscript({
           onMouseLeave={() => { setHoverCue(-1); onHoverCue?.(null); }}
           className={`cursor-pointer ${
             i === activeIndex
-              ? "bg-amber-200/60 dark:bg-amber-500/30"
+              ? "bg-(--accent)/35"
               : i === hoverCue
-                ? "bg-yellow-300/60 dark:bg-yellow-400/35"
+                ? "bg-(--accent)/22"
                 : cue.c === hoverChunk
-                  ? "bg-yellow-300/30 dark:bg-yellow-400/15"
+                  ? "bg-(--accent-subtle)"
                   : "hover:bg-(--bg-subtle)"
           }`}
           data-testid={i === activeIndex ? "text-cue-active" : "text-cue"}
@@ -74,7 +74,7 @@ export function CueText({ cue, word }: { cue: ReaderCue; word: number }) {
   return (
     <>
       {cue.s.slice(0, start)}
-      <mark className="bg-amber-300 dark:bg-amber-500/50" data-testid="reader-word">{spoken}</mark>
+      <mark className="bg-(--accent)/60" data-testid="reader-word">{spoken}</mark>
       {cue.s.slice(start + spoken.length)}
     </>
   );

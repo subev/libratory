@@ -57,9 +57,31 @@
      was drawn that way round already. */
   --accent: var(--brand-tangerine);
   --accent-hover: oklch(0.5900 0.1620 45);
-  --accent-text: var(--brand-ink);
+  --on-accent: var(--brand-ink);
   --accent-subtle: --alpha(var(--brand-tangerine) / 12%);
   --focus-ring: var(--brand-tangerine);
+
+  /* --*-text is text IN that colour; --on-* is text sitting ON that colour as a fill. White on
+     brass measures 2.53:1 and fails, which is why the warning fill takes ink. */
+  --on-accent: var(--brand-ink);
+  --on-danger: #ffffff;
+  --on-success: #ffffff;
+  --on-warning: var(--brand-ink);
+  --danger-hover: oklch(0.3800 0.1500 27);
+  --success-hover: oklch(0.4500 0.1050 150);
+  --warning-hover: oklch(0.5900 0.1150 68);
+
+  /* The read-along and chunk-link highlights, which need a strong/weak pair that reads over a
+     white PDF page. */
+  --highlight: --alpha(var(--brand-tangerine) / 32%);
+  --highlight-soft: --alpha(var(--brand-tangerine) / 14%);
+
+  /* Input -> Work -> Output is a real sequence, so it gets a real ramp: cool brass, then the
+     accent while it is being worked, then settled green. Kinds and activities do NOT get hues —
+     their labels already say what they are. */
+  --step-input: var(--brand-brass);
+  --step-work: var(--accent);
+  --step-output: var(--success);
 
   --danger: oklch(0.4437 0.1613 26.8994);
   --danger-bg: oklch(0.4437 0.1613 26.8994 / 0.10);
@@ -77,6 +99,7 @@
   --border-custom-text: --alpha(var(--brand-brass) / 40%);
 
   --bg-terminal: #16140f;
+  --bg-terminal-hover: #23201a;
 
   /* Categorical, so they come from Solar Dusk's own chart ramp rather than four unrelated hues
      picked one at a time. */
@@ -126,9 +149,24 @@
        text on it — 6.12:1. */
     --accent: var(--brand-ember);
     --accent-hover: oklch(0.7600 0.1600 50);
-    --accent-text: var(--brand-ink);
+    --on-accent: var(--brand-ink);
     --accent-subtle: --alpha(var(--brand-ember) / 16%);
     --focus-ring: var(--brand-ember);
+
+    --on-accent: var(--brand-ink);
+    --on-danger: #ffffff;
+    --on-success: var(--brand-ink);
+    --on-warning: var(--brand-ink);
+    --danger-hover: oklch(0.6500 0.2100 27);
+    --success-hover: oklch(0.7800 0.1400 150);
+    --warning-hover: oklch(0.7800 0.1200 78);
+
+    --highlight: --alpha(var(--brand-ember) / 38%);
+    --highlight-soft: --alpha(var(--brand-ember) / 16%);
+
+    --step-input: var(--brand-brass);
+    --step-work: var(--accent);
+    --step-output: var(--success);
 
     --danger: oklch(0.5771 0.2152 27.3250);
     --danger-bg: oklch(0.5771 0.2152 27.3250 / 0.20);
@@ -146,6 +184,7 @@
     --border-custom-text: --alpha(var(--brand-brass) / 35%);
 
     --bg-terminal: #100e0a;
+    --bg-terminal-hover: #1b1813;
 
     --badge-pending-bg: --alpha(var(--brand-page) / 8%);
     --badge-pending-text: --alpha(var(--brand-page) / 72%);

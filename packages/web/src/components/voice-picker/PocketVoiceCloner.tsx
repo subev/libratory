@@ -136,7 +136,7 @@ export function PocketVoiceCloner({ onAdded }: Props) {
             onClick={() => setMode(id)}
             className={`px-2 py-1 text-xs rounded border ${
               mode === id
-                ? "border-blue-500 text-blue-600 bg-(--bg-selected)"
+                ? "border-(--accent) text-(--accent) bg-(--bg-selected)"
                 : "border-(--border) text-(--text-muted) hover:bg-(--bg-subtle)"
             }`}
           >
@@ -156,14 +156,14 @@ export function PocketVoiceCloner({ onAdded }: Props) {
               onClick={recording ? stopRecording : startRecording}
               disabled={busy}
               className={`px-3 py-1.5 text-sm rounded ${
-                recording ? "bg-red-600 text-white" : "bg-(--bg-subtle) text-(--text-secondary) border border-(--border)"
+                recording ? "bg-(--danger) text-(--on-danger)" : "bg-(--bg-subtle) text-(--text-secondary) border border-(--border)"
               } disabled:opacity-50`}
               data-testid="pocket-clone-record"
             >
               {recording ? "Stop" : recorded ? "Record again" : "Start recording"}
             </button>
             <span
-              className={`text-sm tabular-nums ${elapsed >= MIN_SECONDS ? "text-green-600" : "text-(--text-muted)"}`}
+              className={`text-sm tabular-nums ${elapsed >= MIN_SECONDS ? "text-(--success-text)" : "text-(--text-muted)"}`}
               data-testid="pocket-clone-timer"
             >
               {elapsed.toFixed(1)}s
@@ -173,7 +173,7 @@ export function PocketVoiceCloner({ onAdded }: Props) {
             )}
           </div>
           {tooShort && (
-            <p className="text-xs text-amber-600">Too short — record at least {MIN_SECONDS} seconds.</p>
+            <p className="text-xs text-(--warning-text)">Too short — record at least {MIN_SECONDS} seconds.</p>
           )}
         </div>
       ) : (
@@ -209,7 +209,7 @@ export function PocketVoiceCloner({ onAdded }: Props) {
         </span>
       </label>
 
-      {error && <p className="text-xs text-red-600" data-testid="pocket-clone-error">{error}</p>}
+      {error && <p className="text-xs text-(--danger-text)" data-testid="pocket-clone-error">{error}</p>}
 
       <div className="flex gap-2">
         <button
@@ -222,7 +222,7 @@ export function PocketVoiceCloner({ onAdded }: Props) {
               : tooShort ? `Recording must be at least ${MIN_SECONDS} seconds`
               : undefined
           }
-          className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white disabled:opacity-50"
+          className="px-3 py-1.5 text-sm rounded bg-(--accent) text-(--on-accent) disabled:opacity-50"
           data-testid="pocket-clone-submit"
         >
           {busy ? "Encoding..." : "Add voice"}

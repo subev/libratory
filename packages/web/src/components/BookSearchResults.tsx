@@ -30,11 +30,11 @@ export function BookSearchResults({ query }: { query: string }) {
         {results.map((book) => (
           <div key={book.id} className="px-4 py-3 flex items-center gap-3">
             <div className="min-w-0">
-              <Link to={`/books/${book.id}`} className="text-blue-600 hover:text-blue-800 font-medium">
+              <Link to={`/books/${book.id}`} className="text-(--accent) hover:text-(--accent-hover) font-medium">
                 {book.title}
               </Link>
               {book.kind === "digest" && (
-                <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300 align-middle" title="Digest — AI summary chapters from other books">
+                <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-(--bg-subtle) text-(--text-secondary) align-middle" title="Digest — AI summary chapters from other books">
                   digest
                 </span>
               )}

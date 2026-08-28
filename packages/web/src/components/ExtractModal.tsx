@@ -92,7 +92,7 @@ export function ExtractModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-(--text-faint) hover:text-(--text-tertiary) p-1 rounded focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+            className="text-(--text-faint) hover:text-(--text-tertiary) p-1 rounded focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none"
             title="Close"
             aria-label="Close"
           >
@@ -114,7 +114,7 @@ export function ExtractModal({
                     key={entry.id}
                     title={reason ?? undefined}
                     className={`flex gap-2 rounded-md border p-2 ${
-                      scope === entry.id ? "border-blue-500 bg-(--bg-selected)" : "border-(--border)"
+                      scope === entry.id ? "border-(--accent) bg-(--bg-selected)" : "border-(--border)"
                     } ${reason ? "opacity-50" : "cursor-pointer hover:bg-(--bg-subtle)"}`}
                   >
                     <input
@@ -217,7 +217,7 @@ export function ExtractModal({
         </div>
 
         {losing > 0 && (
-          <label className="mx-4 mb-3 flex gap-2 rounded-md border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-2.5 text-xs text-amber-900 dark:text-amber-200 cursor-pointer">
+          <label className="mx-4 mb-3 flex gap-2 rounded-md border border-(--warning) bg-(--warning-bg) p-2.5 text-xs text-(--warning-text) cursor-pointer">
             <input
               type="checkbox"
               checked={confirmed}
@@ -236,7 +236,7 @@ export function ExtractModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-md text-sm font-medium border border-(--border-input) text-(--text-secondary) hover:bg-(--bg-subtle) focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+            className="px-4 py-2 rounded-md text-sm font-medium border border-(--border-input) text-(--text-secondary) hover:bg-(--bg-subtle) focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none"
           >
             Close
           </button>
@@ -245,7 +245,7 @@ export function ExtractModal({
             onClick={() => onStart(scope, autoSynthesize)}
             disabled={!!blocked}
             title={blocked ?? undefined}
-            className="px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+            className="px-4 py-2 rounded-md text-sm font-medium bg-(--accent) text-(--on-accent) disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none"
             data-testid="extract-start"
           >
             {scope === "chapters" ? "Re-detect chapters" : scope === "book" ? "Extract whole book" : `Extract ${selectedCount} file${selectedCount === 1 ? "" : "s"}`}
