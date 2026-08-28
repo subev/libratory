@@ -10,14 +10,16 @@ const path = require("node:path");
 // Never require()d by relative path: that resolves inside app.asar, which holds packages/desktop
 // and not the repo's scripts/. Packaged, scripts/ sits beside the app (extraResources) and is
 // copied into HOME by stageRuntime; in a checkout it is three levels up.
+/** @type {Record<string, any> | null} */
 let pinCache = null;
 function pins(dir) {
   if (pinCache) return pinCache;
   const candidates = [path.join(dir, "scripts", "pins.json"), path.resolve(__dirname, "../../../scripts/pins.json")];
   const found = candidates.find(existsSync);
   if (!found) throw new Error(`Could not find pins.json (looked in ${candidates.join(", ")})`);
-  pinCache = JSON.parse(readFileSync(found, "utf8"));
-  return pinCache;
+  const parsed = JSON.parse(readFileSync(found, "utf8"));
+  pinCache = parsed;
+  return parsed;
 }
 
 // The tools the workers shell out to ship inside the bundle — copied out of Homebrew at build time

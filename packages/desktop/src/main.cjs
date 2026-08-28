@@ -30,15 +30,18 @@ function readConfig(home) {
   }
 }
 
-// Empty until boot() resolves it, which is falsy exactly like the null it replaces — the
+// Empty until boot() resolves them, which is falsy exactly like the null they replace — the
 // `HOME || defaultHome()` guards around this file still behave the same.
 /** @type {string} */
 let HOME = "";
-let RESOURCES = null;
+/** @type {string} */
+let RESOURCES = "";
 let CONFIG = {};
 const DEFAULT_DATABASE_URL = "postgres://libratory:libratory@localhost:5433/libratory";
 
+/** @type {import("electron").BrowserWindow | null} */
 let win = null;
+/** @type {import("node:child_process").ChildProcess | null} */
 let server = null;
 
 // First run pulls a 644 MB Postgres image, which took longer than the two-minute timeout this used
@@ -265,9 +268,10 @@ const STEPS = [
     id: "server",
     label: "Starting Libratory",
     async run(ctx) {
+      /** @type {string | null} */
       let died = null;
       startServer((reason) => { died = reason; });
-      const ready = await waitFor(`${ctx.url}/health`, 120000, () => died);
+      const ready = await waitFor(`${ctx.url}/health`, 120000, () => Boolean(died));
       if (died) throw new Error(died);
       if (!ready) throw new Error("The server did not start — check Console.app for Libratory.");
     },
@@ -277,6 +281,7 @@ const STEPS = [
 // The "Check again" button stays on screen while a blocked step is still blocked, which includes
 // the whole of the multi-gigabyte Python step. Two of these at once means two `uv sync` runs
 // against one environment and two servers racing to kill each other.
+/** @type {ReturnType<typeof crash.record> | null} */
 let lastFailure = null;
 
 async function runBoot() {
