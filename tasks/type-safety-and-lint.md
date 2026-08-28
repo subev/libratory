@@ -28,11 +28,11 @@ Not done — this is the work:
 
 | # | What | Size | Touches |
 | --- | --- | --- | --- |
-| 1 | oxlint errors | 42 errors, 51 warnings | `packages/web/src` (34), `e2e` (7), `scripts` (1), `packages/server/src/lib/cue-rects.ts` (1) |
-| 2 | `noUncheckedIndexedAccess` — server | 558 | `packages/server/src` |
-| 3 | `noUncheckedIndexedAccess` — web | 255 | `packages/web/src` |
-| 4 | desktop `checkJs` | 29 | `packages/desktop/src/*.cjs` |
-| 5 | CI enforcement | — | `.github/workflows/test.yml` |
+| 1 | oxlint errors | ~~42~~ **done** | 51 warnings remain, deliberately |
+| 2 | `noUncheckedIndexedAccess` — server | ~~558~~ **done** | flag lives in `packages/server/tsconfig.json` for now |
+| 3 | `noUncheckedIndexedAccess` — web | **255 — next** | `packages/web/src`; move the flag to `tsconfig.base.json` when it lands |
+| 4 | desktop `checkJs` | ~~29~~ **done** | |
+| 5 | CI enforcement | **after 3** | `.github/workflows/test.yml` — add `pnpm lint` |
 
 ## Order, and why
 
