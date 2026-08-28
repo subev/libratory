@@ -405,12 +405,25 @@ button, which tells someone who did not write the app nothing and tells us nothi
 it appends to `crash.log` beside the rest of the app's data and offers **Report this**, which opens
 a GitHub issue with the version, the OS, and the last of the stack already filled in; the person
 only has to say what they were doing. A blocked setup step is recorded the same way, so "it did not
-start" arrives with the reason attached.
+start" arrives with the reason attached. A crash in the *page* takes the same route: the error
+boundary hands its report to `report` on the preload, so it lands in `crash.log` and gets the same
+dialog rather than leaving a white window.
+
+Three files, all under **Help**, and all in the app's home beside the data:
+
+| | what it holds |
+| --- | --- |
+| `crash.log` | anything that killed the shell, a blocked setup step, and page crashes |
+| `server.log` | everything the server and its workers printed — marker's traceback, an engine's stderr. Rotated once at 8 MB |
+| the issue body | the same detail minus absolute home paths, which are only true on the machine that wrote them |
+
+`server.log` is the one to reach for when a book fails. The failure itself is already on the row —
+`books.error`, `bookFiles.error`, `chapters.error` — but that is a message, and the reason it
+carries (`marker_single exited with code 1`) is a summary of a traceback that is in the log.
 
 ## What is not here yet
 
-Signing and notarising — the DMG builds, and Gatekeeper refuses it until right-click → Open. Model
-revisions in the runtime manifest (see `tasks/desktop-updates.md`), so a model that changes upstream
+Model revisions in the runtime manifest (see `tasks/desktop-updates.md`), so a model that changes upstream
 is not invisible. And two features that still assume a checkout: PDF/EPUB export
 shells out to the Vivliostyle CLI through `node_modules`, and the Hacker News feed spawns a `.mjs`
 script with `process.execPath` — both resolve to nothing inside a compiled binary, so they work in

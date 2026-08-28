@@ -1,0 +1,62 @@
+name: Something went wrong
+description: A crash, a book that failed, or anything that behaved unexpectedly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Crashes reported from inside the app arrive with the details already filled in — this form is
+        for everything else. The two logs below are usually the difference between a guess and an answer.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+      placeholder: |
+        I clicked Extract… on a book with no chapters and the page went white.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "**Libratory → About Libratory**, or the title of the release you installed."
+      placeholder: 26.828.3
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: How it is installed
+      options:
+        - The DMG from Releases
+        - Built locally with pnpm app
+        - Running from a checkout with pnpm dev
+    validations:
+      required: true
+
+  - type: textarea
+    id: server-log
+    attributes:
+      label: server.log
+      description: |
+        **Help → Open the server log.** Paste the end of it — the part written when this happened.
+        This is where a worker's real reason lives: a book whose status is `failed` shows a one-line
+        message in the app, and the traceback behind it is only here.
+      render: text
+
+  - type: textarea
+    id: crash-log
+    attributes:
+      label: crash.log
+      description: "**Help → Open the crash log.** Only if the app quit or the page went white."
+      render: text
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots, the book it happened with, whether it happens every time.
