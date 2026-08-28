@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as pdfjs from "pdfjs-dist";
+// eslint-disable-next-line import/default -- Vite's ?url suffix makes the module's URL the default export; the resolver only sees the .mjs behind it
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { preparePdfWorker } from "../../lib/map-get-or-insert.ts";

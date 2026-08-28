@@ -79,18 +79,20 @@ export function ChapterTable({
   synthVoice?: string;
   onChangeSynthVoice?: (voice: string) => void;
 }) {
-  const [modalChapterIndex, setModalChapterIndex] = useState<number | null>(null);
+  const [pickedChapterIndex, setPickedChapterIndex] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Deep link (?chapter=<id>, e.g. from chat citations) opens the chapter modal
-  useEffect(() => {
-    const target = searchParams.get("chapter");
-    if (!target || chapters.length === 0) return;
-    const idx = chapters.findIndex((c) => c.id === target);
-    if (idx >= 0) setModalChapterIndex(idx);
+  // A deep link (?chapter=<id>, e.g. from a chat citation) opens the modal on its own; the first
+  // move away from it — another chapter, or closing — is what takes it back out of the URL.
+  const deepLinked = searchParams.get("chapter");
+  const deepLinkedIndex = deepLinked ? chapters.findIndex((c) => c.id === deepLinked) : -1;
+  const modalChapterIndex = pickedChapterIndex ?? (deepLinkedIndex >= 0 ? deepLinkedIndex : null);
+  const openChapterModal = (index: number | null) => {
+    setPickedChapterIndex(index);
+    if (!searchParams.has("chapter")) return;
     searchParams.delete("chapter");
     setSearchParams(searchParams, { replace: true });
-  }, [chapters, searchParams, setSearchParams]);
+  };
 
   const [aiChapter, setAiChapter] = useState<{ id: string; title: string } | null>(null);
   const [pdfPreview, setPdfPreview] = useState<{ fileId: string; page: number; filename?: string } | null>(null);
@@ -456,7 +458,7 @@ export function ChapterTable({
                       <EditableChapterTitle
                         title={chapter.title}
                         onRename={onRename ? (title) => onRename(chapter.id, title) : undefined}
-                        onClickTitle={() => setModalChapterIndex(chapters.indexOf(chapter))}
+                        onClickTitle={() => openChapterModal(chapters.indexOf(chapter))}
                       />
                       {!variant && chapter.cleanup?.status === "done" ? (
                         <span
@@ -540,7 +542,7 @@ export function ChapterTable({
                         </button>
                       ) : null}
                       <button
-                        onClick={() => setModalChapterIndex(chapters.indexOf(chapter))}
+                        onClick={() => openChapterModal(chapters.indexOf(chapter))}
                         title="Open this chapter — text, audio, editing"
                         className={ACTION_PILL}
                         data-testid="chapter-open"
@@ -676,8 +678,8 @@ export function ChapterTable({
           variant={variant}
           variants={variants}
           onSwitchVariant={onSwitchVariant}
-          onClose={() => setModalChapterIndex(null)}
-          onNavigate={setModalChapterIndex}
+          onClose={() => openChapterModal(null)}
+          onNavigate={openChapterModal}
           onQueue={onQueue}
           onSetSelected={onSetSelected}
           synthVoice={synthVoice}
@@ -782,16 +784,11 @@ function EditableChapterTitle({
   const [value, setValue] = useState(title);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setValue(title); }, [title]);
   useEffect(() => { if (editing) inputRef.current?.select(); }, [editing]);
 
   function save() {
     const trimmed = value.trim();
-    if (trimmed && trimmed !== title && onRename) {
-      onRename(trimmed);
-    } else {
-      setValue(title);
-    }
+    if (trimmed && trimmed !== title && onRename) onRename(trimmed);
     setEditing(false);
   }
 
@@ -804,7 +801,7 @@ function EditableChapterTitle({
         onBlur={save}
         onKeyDown={(e) => {
           if (e.key === "Enter") save();
-          if (e.key === "Escape") { setValue(title); setEditing(false); }
+          if (e.key === "Escape") setEditing(false);
         }}
         className="text-sm font-medium text-(--text-primary) bg-transparent border-b border-blue-500 outline-none w-full"
       />
@@ -825,7 +822,7 @@ function EditableChapterTitle({
       )}
       {onRename && (
         <button
-          onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+          onClick={(e) => { e.stopPropagation(); setValue(title); setEditing(true); }}
           className="text-(--text-faint) hover:text-(--text-tertiary) opacity-0 group-hover:opacity-100 transition-opacity"
           title="Rename chapter"
         >

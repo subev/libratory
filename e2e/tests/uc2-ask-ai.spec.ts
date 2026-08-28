@@ -1,6 +1,6 @@
 import { test, expect, uploadFixtureBook, FAKE_REPLY, FAKE_MODEL_KEY, FAKE_TINY_KEY } from "./fixtures.ts";
 
-test("UC2: Ask AI streams the answer, saves a note, and the note becomes a chapter", async ({ page, fakeLlm }) => {
+test("UC2: Ask AI streams the answer, saves a note, and the note becomes a chapter", async ({ page, fakeLlm: _fakeLlm }) => {
   await uploadFixtureBook(page);
 
   await page.getByRole("button", { name: "Ask AI (whole book)" }).click();
@@ -23,7 +23,7 @@ test("UC2: Ask AI streams the answer, saves a note, and the note becomes a chapt
   await expect(page.getByTestId("chapter-row")).toHaveCount(1);
 });
 
-test("UC2: the context meter blocks a scope that exceeds the model's context", async ({ page, fakeLlm }) => {
+test("UC2: the context meter blocks a scope that exceeds the model's context", async ({ page, fakeLlm: _fakeLlm }) => {
   await uploadFixtureBook(page);
 
   await page.getByRole("button", { name: "Ask AI (whole book)" }).click();

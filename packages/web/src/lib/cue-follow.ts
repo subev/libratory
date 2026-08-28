@@ -110,5 +110,5 @@ export function useFollowCue(cues: ReaderCues | null, ms: number, band: FollowBa
 
   useEffect(() => {
     if (followCue(band, { jump: settled.current !== anchor })) settled.current = anchor;
-  }, [cue, word, anchor]);
+  }, [cue, word, anchor, band]);
 }

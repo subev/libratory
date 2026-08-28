@@ -5,7 +5,7 @@ function sourceBook(title: string) {
   return { title, chapters: [{ title: "Only chapter", text: `The complete text of ${title}, short but digestible.` }] };
 }
 
-test("UC5: a digest writes one suspended AI chapter per source book, with a note on each source", async ({ page, request, profileId, fakeLlm }) => {
+test("UC5: a digest writes one suspended AI chapter per source book, with a note on each source", async ({ page, request, profileId, fakeLlm: _fakeLlm }) => {
   const { id: alphaId } = await createApiBook(request, profileId, sourceBook("Source Alpha"));
   await createApiBook(request, profileId, sourceBook("Source Beta"));
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { trpc } from "../trpc.ts";
 import { TRANSLATION_LANGUAGES } from "../lib/languages.ts";
 import { useBodyScrollLock } from "../lib/use-body-scroll-lock.ts";
@@ -75,11 +75,11 @@ export function VariantModal({
     },
   );
 
-  const refresh = () => {
+  const refresh = useCallback(() => {
     utils.variants.get.invalidate();
     utils.variants.listForBook.invalidate();
     utils.variants.list.invalidate();
-  };
+  }, [utils]);
   const startMutation = trpc.variants.start.useMutation({ onSuccess: refresh });
   const createMutation = trpc.variants.createTransform.useMutation({
     onSuccess: (row) => {
@@ -131,7 +131,6 @@ export function VariantModal({
 
   useEffect(() => {
     if (!variantId) return;
-    setLive(null);
     const source = new EventSource(`/translations/${variantId}/stream`);
     source.onmessage = (e) => {
       const event = JSON.parse(e.data) as
@@ -158,8 +157,12 @@ export function VariantModal({
         refresh();
       }
     };
-    return () => source.close();
-  }, [variantId]);
+    // A re-run keeps the row's id, so the previous run's text is dropped as this one is torn down
+    return () => {
+      source.close();
+      setLive(null);
+    };
+  }, [variantId, refresh]);
 
   const liveState = running && live && live.id === variant?.id ? live : null;
   const displayText = liveState?.text ?? variant?.text;

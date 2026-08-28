@@ -3,7 +3,7 @@ import { trpcQuery } from "./helpers/trpc.ts";
 
 const CHAPTER_TEXT = "The original chapter text that must survive the transform untouched.";
 
-test("UC4: a rewrite variant streams in and keeps its params; the original stays untouched", async ({ page, request, profileId, fakeLlm }) => {
+test("UC4: a rewrite variant streams in and keeps its params; the original stays untouched", async ({ page, request, profileId, fakeLlm: _fakeLlm }) => {
   const created = await createApiBook(request, profileId, {
     title: "Variant Factory",
     chapters: [{ title: "The only chapter", text: CHAPTER_TEXT }],
