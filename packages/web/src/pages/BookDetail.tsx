@@ -505,7 +505,7 @@ export function BookDetail() {
         {/* Starting an extraction can be refused before any job exists — no files selected, or
             chapters mid-synthesis — and none of these mutations renders its own error. */}
         {(() => {
-          const refusal = reExtractSelectedMutation.error ?? retryMutation.error ?? redetectMutation.error;
+          const refusal = setAutoSynthesizeMutation.error ?? reExtractSelectedMutation.error ?? retryMutation.error ?? redetectMutation.error;
           return refusal ? (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4" data-testid="extract-start-error">
               <p className="text-sm text-red-700">Could not start: {refusal.message}</p>
@@ -543,7 +543,14 @@ export function BookDetail() {
           extractOpen={extractOpen}
           onExtractOpenChange={setExtractOpen}
           onStartExtraction={async (scope, autoSynthesize) => {
-            await setAutoSynthesizeMutation.mutateAsync({ id: book.id, autoSynthesize });
+            for (const m of [setAutoSynthesizeMutation, reExtractSelectedMutation, retryMutation, redetectMutation]) m.reset();
+            try {
+              // Starting with the previous follow-on setting is worse than not starting: it decides
+              // whether hours of synthesis begin on their own when this finishes.
+              await setAutoSynthesizeMutation.mutateAsync({ id: book.id, autoSynthesize });
+            } catch {
+              return; // The banner is already showing it
+            }
             if (scope === "selected") reExtractSelectedMutation.mutate({ bookId: book.id });
             else if (scope === "book") retryMutation.mutate({ id: book.id });
             else redetectMutation.mutate({ id: book.id });

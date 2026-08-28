@@ -350,6 +350,10 @@ app.whenReady().then(() => {
   // The UI links out to Hacker News, publisher pages and whatever a digest cites. Electron's
   // default would open those in a chrome-less window that inherits this preload — an arbitrary
   // site with no address bar and `window.setup.recheck` on it. Send them to the real browser.
+  // Without this `win` stays a destroyed BrowserWindow rather than null, so every `win?.` guard in
+  // this file passes and then throws — from inside runBoot, which lands in unhandledRejection and
+  // writes a crash record for an ordinary quit.
+  win.on("closed", () => { win = null; });
   win.webContents.setWindowOpenHandler(({ url: target }) => {
     void shell.openExternal(target);
     return { action: "deny" };

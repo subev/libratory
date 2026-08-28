@@ -67,7 +67,7 @@ function show(r) {
     : { response: 2 };
 
   if (response === 0) void shell.openExternal(issueUrl(r));
-  if (response === 1) clipboard.writeText(asText(r));
+  if (response === 1) clipboard.writeText(scrub(asText(r)));
 }
 
 function record(err, home, context) {

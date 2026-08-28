@@ -178,14 +178,18 @@ export const bookFilesRouter = router({
 
       if (selectedFiles.length === 0) throw new Error("No files selected");
 
+      // Every file is checked before any is touched. Guarding inside the loop below meant that
+      // selecting two files where only the second was mid-synthesis deleted the first one's
+      // chapters, audio and edits, then threw — losing work to a request that did nothing.
       for (const file of selectedFiles) {
         const fileChapters = await db
           .select({ status: chapters.status })
           .from(chapters)
           .where(and(eq(chapters.bookId, input.bookId), eq(chapters.sourceFileIndex, file.index)));
-
         guardActiveChapters(fileChapters);
+      }
 
+      for (const file of selectedFiles) {
         await deleteChaptersForFile(input.bookId, file.index);
         await rm(path.join(bookTmpDir(input.bookId), `file_${file.index}`), { recursive: true, force: true }).catch(() => {});
 

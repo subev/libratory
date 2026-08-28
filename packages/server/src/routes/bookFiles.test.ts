@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getDb, resetDb } from "../../test/setup.ts";
-import { bookFiles, books } from "../schema.ts";
+import { bookFiles, books, chapters } from "../schema.ts";
 import { eq } from "drizzle-orm";
 
 vi.mock("../db.ts", async () => {
@@ -67,5 +67,42 @@ describe("removing a file keeps books.pdfPath describing a file that is still th
     await caller.remove({ id: rows[1].id });
 
     expect(await bookRow(book.id)).toMatchObject({ pdfPath: "/uploads/00_one.pdf", filename: "one.pdf" });
+  });
+});
+
+// Re-extraction deletes a file's chapters, its audio and any text edited by hand. The guard that
+// refuses while chapters are synthesizing ran inside the same loop that deletes, so selecting two
+// files where only the second was busy destroyed the first one's work and then threw — a request
+// that queued nothing and still cost you a chapter.
+describe("refusing to re-extract does not consume the files it got to first", () => {
+  async function selectedBookWithChapters(secondFileStatus: "done" | "synthesizing") {
+    const db = getDb();
+    const { book, rows } = await twoFileBook();
+    await db.update(bookFiles).set({ selected: true }).where(eq(bookFiles.bookId, book.id));
+    await db.insert(chapters).values([
+      { bookId: book.id, sourceFileIndex: 0, index: 0, title: "Kept", rawText: "one", status: "done" as const },
+      { bookId: book.id, sourceFileIndex: 1, index: 1, title: "Busy", rawText: "two", status: secondFileStatus },
+    ]);
+    return { book, rows };
+  }
+
+  it("keeps the first file's chapters when a later one is mid-synthesis", async () => {
+    const { book } = await selectedBookWithChapters("synthesizing");
+
+    await expect(caller.reExtractSelected({ bookId: book.id })).rejects.toThrow(/actively processing/);
+
+    const left = await getDb().select().from(chapters).where(eq(chapters.bookId, book.id));
+    expect(left).toHaveLength(2);
+    // And nothing was half-started either
+    const files = await getDb().select().from(bookFiles).where(eq(bookFiles.bookId, book.id));
+    expect(files.every((f) => f.status === "done")).toBe(true);
+  });
+
+  it("still clears everything when no file is busy", async () => {
+    const { book } = await selectedBookWithChapters("done");
+
+    await caller.reExtractSelected({ bookId: book.id });
+
+    expect(await getDb().select().from(chapters).where(eq(chapters.bookId, book.id))).toEqual([]);
   });
 });
