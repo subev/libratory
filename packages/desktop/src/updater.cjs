@@ -61,7 +61,12 @@ function install({ onStatus, getWindow } = {}) {
 
   // Decimal, because that is what Finder and the GitHub release page both say.
   const mb = (bytes) => `${Math.round(bytes / 1e6)} MB`;
-  const progress = (fraction) => getWindow?.()?.setProgressBar(fraction);
+  // getWindow returns main.cjs's `win`, which is not cleared when the window closes — calling
+  // setProgressBar on a destroyed one throws from inside an event handler and crashes on quit.
+  const progress = (fraction) => {
+    const win = getWindow?.();
+    if (win && !win.isDestroyed()) win.setProgressBar(fraction);
+  };
 
   autoUpdater.on("update-available", async (info) => {
     if (declined.has(info.version)) return;

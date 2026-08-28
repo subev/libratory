@@ -502,10 +502,22 @@ export function BookDetail() {
           </div>
         </div>
 
+        {/* Starting an extraction can be refused before any job exists — no files selected, or
+            chapters mid-synthesis — and none of these mutations renders its own error. */}
+        {(() => {
+          const refusal = reExtractSelectedMutation.error ?? retryMutation.error ?? redetectMutation.error;
+          return refusal ? (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4" data-testid="extract-start-error">
+              <p className="text-sm text-red-700">Could not start: {refusal.message}</p>
+            </div>
+          ) : null;
+        })()}
+
         {/* "All 1 file(s) failed extraction" only counts what the rows below already say, and says
-            it louder than the reason. Assembly, re-detection and export have no row of their own,
-            so those keep the banner. */}
-        {book.error && !(book.files ?? []).some((f) => f.status === "failed") && (
+            it louder than the reason. Matching that one sentence rather than "some file failed":
+            "No chapters detected in any file" is also set by the extract worker, and assembly,
+            re-detection and export write here too — none of them has a row to appear in. */}
+        {book.error && !/^All \d+ file\(s\) failed extraction$/.test(book.error) && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
             <p className="text-sm text-red-700 font-mono">{book.error}</p>
           </div>

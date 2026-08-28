@@ -33,8 +33,11 @@ function asText(r) {
   ].join("\n");
 }
 
+// The log keeps the real paths; an issue is public and a path is only true on this machine.
+const scrub = (text) => text.replace(/\/(?:Users|home)\/[^/\s"')]+/g, "~");
+
 function issueUrl(r) {
-  const title = `Crash: ${r.message.split("\n")[0].slice(0, 90)}`;
+  const title = `Crash: ${scrub(r.message.split("\n")[0]).slice(0, 90)}`;
   const body = [
     "<!-- What were you doing when this happened? -->",
     "",
@@ -44,9 +47,7 @@ function issueUrl(r) {
     asText(r).slice(-MAX_BODY),
     "```",
   ].join("\n");
-  // The log keeps the real paths; an issue is public and a path is only true on this machine.
-  const redacted = body.replace(/\/(?:Users|home)\/[^/\s"')]+/g, "~");
-  return `${REPO}/issues/new?labels=crash&title=${encodeURIComponent(title)}&body=${encodeURIComponent(redacted)}`;
+  return `${REPO}/issues/new?labels=crash&title=${encodeURIComponent(title)}&body=${encodeURIComponent(scrub(body))}`;
 }
 
 // Electron's own dialog prints a stack trace and offers OK, which tells someone who did not write

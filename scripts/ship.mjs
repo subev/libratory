@@ -78,9 +78,14 @@ function main() {
   // The workflow opens every draft with this, so anything else is notes someone wrote on purpose.
   const placeholder = !release.body?.trim() || release.body.trim() === "Build in progress…";
   const previous = tags.filter((t) => newer(tag, t)).sort((a, b) => (newer(a, b) ? -1 : 1))[0];
-  const notes = placeholder
+  // No previous tag on a first release, or in a clone fetched without them — the range would be
+  // "undefined..v1" and die with a raw stack after every check had passed.
+  const subjects = placeholder && previous
     ? git("log", `${previous}..${tag}`, "--format=%s").split("\n")
-        .filter((s) => s && !/^Release\b/.test(s)).map((s) => `- ${s}`).join("\n")
+        .filter((s) => s && !/^Release\b/.test(s)).map((s) => `- ${s}`)
+    : [];
+  const notes = placeholder
+    ? (subjects.join("\n") || `Released ${tag}.`)
     : release.body.trim();
 
   console.log(`\n  draft     ${tag}`);

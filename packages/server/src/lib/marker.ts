@@ -441,7 +441,7 @@ function runMarkerSingle(pdfPath: string, outDir: string, device: "mps" | "cuda"
         // 126/127 are the shell refusing to run it at all, which is an environment fault rather
         // than anything about the PDF, and says so — the message otherwise sends you to the book.
         const cannotRun = code === 126 || code === 127;
-        const detail = stderrTail.at(-1) ?? "";
+        const detail = (stderrTail.at(-1) ?? "").slice(-300);
         if (stderrTail.length) void log(`marker_single stderr:\n${stderrTail.join("\n")}`);
         reject(new Error(cannotRun
           ? `marker_single could not be run (exit ${code}) — the Python environment looks broken${detail ? `: ${detail}` : ""}`

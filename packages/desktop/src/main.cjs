@@ -106,7 +106,12 @@ function openServerLog() {
     // No log yet, or a home we cannot stat — either way the append below decides
   }
   try {
-    return createWriteStream(file, { flags: "a" });
+    const stream = createWriteStream(file, { flags: "a" });
+    // A full disk or a read-only home fails asynchronously, and an unhandled "error" on a stream
+    // reaches crash.install's uncaughtException — taking the app down over a log line, which is
+    // the opposite of what the catch below is for. Give up on the log instead.
+    stream.on("error", () => { logStream = null; });
+    return stream;
   } catch {
     return null; // Logging that breaks the app is worse than no logging
   }

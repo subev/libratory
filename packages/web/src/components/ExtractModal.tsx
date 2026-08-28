@@ -135,8 +135,9 @@ export function ExtractModal({
             </fieldset>
           ) : (
             <p className="text-sm text-(--text-secondary)" data-testid="extract-first-run">
-              Marker reads {selectedCount === 1 ? "the selected file" : `the ${selectedCount} selected files`} and
-              finds the chapter boundaries — minutes per book. Nothing is replaced: this book has no chapters yet.
+              {selectedCount === 0
+                ? "No files are selected, so there is nothing to read. Close this and tick the files you want in the list above."
+                : `Marker reads ${selectedCount === 1 ? "the selected file" : `the ${selectedCount} selected files`} and finds the chapter boundaries — minutes per book. Nothing is replaced: this book has no chapters yet.`}
             </p>
           )}
 
