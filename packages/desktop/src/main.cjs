@@ -227,7 +227,9 @@ const STEPS = [
     async run(ctx, detail) {
       ctx.pending = runtime.pending(RESOURCES, HOME);
       ctx.python = setup.pythonBin(HOME);
-      if (!ctx.pending.python) return "up to date";
+      const repaired = setup.repairVenvPaths(HOME);
+      if (repaired) detail(`Repaired ${repaired} script(s) left pointing at the old app folder`);
+      if (!ctx.pending.python) return repaired ? `repaired ${repaired} script(s)` : "up to date";
       detail(ctx.pending.fresh ? "Installing Python and PyTorch — about 2.4 GB, once" : "Updating Python packages for this release");
       await setup.syncPython(HOME, (line) => detail(line.trim().split("\n").at(-1)));
       runtime.writeState(HOME, { pythonLock: ctx.pending.want.pythonLock });

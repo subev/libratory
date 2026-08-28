@@ -393,8 +393,15 @@ function runMarkerSingle(pdfPath: string, outDir: string, device: "mps" | "cuda"
     let lastStage = "";
     let lastLoggedPercent = -1;
     let lastLogTime = Date.now();
+    // Only lines naming a warning or a traceback were ever logged, so a failure that says none of
+    // those words — "…/python: No such file or directory" — reached the caller as a bare exit code.
+    const stderrTail: string[] = [];
     const rl = createInterface({ input: proc.stderr });
     rl.on("line", (line) => {
+      if (line.trim()) {
+        stderrTail.push(line.trim());
+        if (stderrTail.length > 20) stderrTail.shift();
+      }
       const progressMatch = line.match(/(\d+)\/(\d+)/);
       if (progressMatch) {
         const [, currentStr, totalStr] = progressMatch;
@@ -431,7 +438,14 @@ function runMarkerSingle(pdfPath: string, outDir: string, device: "mps" | "cuda"
       if (signal?.aborted) {
         reject(new ExtractAbortedError());
       } else if (code !== 0) {
-        reject(new Error(`marker_single exited with code ${code}`));
+        // 126/127 are the shell refusing to run it at all, which is an environment fault rather
+        // than anything about the PDF, and says so — the message otherwise sends you to the book.
+        const cannotRun = code === 126 || code === 127;
+        const detail = stderrTail.at(-1) ?? "";
+        if (stderrTail.length) void log(`marker_single stderr:\n${stderrTail.join("\n")}`);
+        reject(new Error(cannotRun
+          ? `marker_single could not be run (exit ${code}) — the Python environment looks broken${detail ? `: ${detail}` : ""}`
+          : `marker_single exited with code ${code}${detail ? `: ${detail}` : ""}`));
       } else {
         resolve();
       }
@@ -555,9 +569,9 @@ export async function extractPdf(pdfPath: string, outDir: string, log: LogFn = n
     // Only a non-CPU failure gets a second chance: the MPS bug is real, and a CUDA install can be
     // broken in ways a book upload should not have to care about. A CPU failure is the real thing.
     if (firstDevice === "cpu") throw deviceError;
-    await log(firstDevice === "mps"
-      ? `MPS extraction failed — known PyTorch MPS bug with certain PDFs. Retrying with CPU...`
-      : `CUDA extraction failed. Retrying with CPU...`);
+    // Asserting the known MPS bug for any first-device failure is how "cannot execute this file"
+    // was reported as a PyTorch problem three times in a row.
+    await log(`${firstDevice.toUpperCase()} extraction failed: ${(deviceError as Error).message}. Retrying with CPU...`);
     await runMarkerSingle(pdfPath, outDir, "cpu", log, forceOcr, options.signal);
   }
 

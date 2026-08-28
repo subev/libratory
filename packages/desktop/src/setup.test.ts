@@ -1,10 +1,10 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile, readFile, chmod, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { missingTools, stageRuntime, toolPath } from "./setup.cjs";
+import { missingTools, repairVenvPaths, stageRuntime, toolPath } from "./setup.cjs";
 import pins from "../../../scripts/pins.json" with { type: "json" };
 
 const dirs: string[] = [];
@@ -91,5 +91,64 @@ describe("what a first run has to put in place before any step reads it", () => 
   it("creates the home directory when there is not one yet", async () => {
     const { home } = await stagedInto();
     expect(existsSync(home)).toBe(true);
+  });
+});
+
+// pdf2audio became Libratory, the home moved with it, and 109 of the venv's 114 console scripts
+// went on exec'ing a python that no longer existed. Everything that used one reported "exited with
+// code 126" and nothing said why, because the lock hash still matched and the python step never
+// looked past it.
+describe("a venv whose scripts still name the folder the app used to live in", () => {
+  async function venv(root: string, stale: string) {
+    const bin = path.join(root, "python", "bin");
+    await mkdir(bin, { recursive: true });
+    // The wrapper pip generates: a /bin/sh header that re-execs the file with the venv's python.
+    await writeFile(path.join(bin, "marker_single"), `#!/bin/sh\n'''exec' '${stale}/bin/python' "$0" "$@"\n`);
+    await chmod(path.join(bin, "marker_single"), 0o755);
+    await writeFile(path.join(bin, "activate"), `VIRTUAL_ENV="${stale}"\nexport VIRTUAL_ENV\n`);
+    await writeFile(path.join(bin, "compiled"), Buffer.from([0x7f, 0x45, 0x4c, 0x00, 0x01]));
+    return bin;
+  }
+
+  // The space in "Application Support" is the whole difficulty: matching without the quotes around
+  // the path captures from the space onwards and rewrites it into nonsense.
+  const STALE = "/Users/x/Library/Application Support/pdf2audio/python";
+
+  it("repoints them at the home it is running from, and says how many", async () => {
+    const home = await mkdtemp(path.join(tmpdir(), "libratory-venv-"));
+    dirs.push(home);
+    const bin = await venv(home, STALE);
+
+    expect(repairVenvPaths(home)).toBe(2);
+
+    const expected = path.join(home, "python");
+    expect(await readFile(path.join(bin, "marker_single"), "utf8")).toContain(`'${expected}/bin/python'`);
+    expect(await readFile(path.join(bin, "activate"), "utf8")).toContain(`VIRTUAL_ENV="${expected}"`);
+  });
+
+  it("leaves the executable bit and any compiled file alone", async () => {
+    const home = await mkdtemp(path.join(tmpdir(), "libratory-venv-"));
+    dirs.push(home);
+    const bin = await venv(home, STALE);
+
+    repairVenvPaths(home);
+
+    expect((await stat(path.join(bin, "marker_single"))).mode & 0o777).toBe(0o755);
+    expect((await readFile(path.join(bin, "compiled"))).length).toBe(5);
+  });
+
+  it("does nothing when they already point here, however often it runs", async () => {
+    const home = await mkdtemp(path.join(tmpdir(), "libratory-venv-"));
+    dirs.push(home);
+    await venv(home, path.join(home, "python"));
+
+    expect(repairVenvPaths(home)).toBe(0);
+    expect(repairVenvPaths(home)).toBe(0);
+  });
+
+  it("does not mind a home with no venv in it yet", async () => {
+    const home = await mkdtemp(path.join(tmpdir(), "libratory-venv-"));
+    dirs.push(home);
+    expect(repairVenvPaths(home)).toBe(0);
   });
 });
