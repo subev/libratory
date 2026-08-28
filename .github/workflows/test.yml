@@ -42,6 +42,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # First because it is the fastest thing here — under a second for 45k lines — so a rule
+      # violation fails in seconds rather than after the build and the suites. The React effect
+      # rules in particular exist because a dependency array with an inline arrow in it produced a
+      # render loop that reached a release.
+      - run: pnpm lint
+
       # Server tsc is noEmit type-checking; the web build type-checks and bundles.
       - run: pnpm -r build
 

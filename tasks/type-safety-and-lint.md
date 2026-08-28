@@ -32,7 +32,7 @@ Not done — this is the work:
 | 2 | `noUncheckedIndexedAccess` — server | ~~558~~ **done** | flag lives in `packages/server/tsconfig.json` for now |
 | 3 | `noUncheckedIndexedAccess` — web | **255 — next** | `packages/web/src`; move the flag to `tsconfig.base.json` when it lands |
 | 4 | desktop `checkJs` | ~~29~~ **done** | |
-| 5 | CI enforcement | **after 3** | `.github/workflows/test.yml` — add `pnpm lint` |
+| 5 | CI enforcement | ~~—~~ **done** | `pnpm lint` runs first in `test.yml`, before the build |
 
 ## Order, and why
 
@@ -83,9 +83,9 @@ raising the floor rather than as bug-hunting.
 
 ### 5. CI enforcement
 
-`.github/workflows/test.yml` runs `pnpm -r build` (which typechecks) and `pnpm test`. Add
-`pnpm lint`. It is deliberately **not** wired up yet — with 42 errors it would be red on arrival,
-which teaches everyone to ignore it.
+Done. `pnpm lint` runs first in `test.yml` — ahead of the build, because at under a second for 45k
+lines it should fail fast rather than after two suites. It went in only once the 42 errors were
+cleared: wiring it up red would have taught everyone to ignore it.
 
 ## Deliberately deferred
 
