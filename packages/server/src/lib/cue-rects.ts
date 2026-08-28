@@ -119,7 +119,7 @@ const RESYNC_WINDOW = 64;
 const MIN_ALIGNMENT = 0.6;
 
 function alignProjections(block: string, lines: string): number[] {
-  const map = new Array<number>(block.length).fill(-1);
+  const map: number[] = Array.from({ length: block.length }, () => -1);
   let i = 0;
   let j = 0;
 
