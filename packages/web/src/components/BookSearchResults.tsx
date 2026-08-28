@@ -30,7 +30,7 @@ export function BookSearchResults({ query }: { query: string }) {
         {results.map((book) => (
           <div key={book.id} className="px-4 py-3 flex items-center gap-3">
             <div className="min-w-0">
-              <Link to={`/books/${book.id}`} className="text-(--accent) hover:text-(--accent-hover) font-medium">
+              <Link to={`/books/${book.id}`} className="text-(--accent-text) hover:text-(--accent-text-hover) font-medium">
                 {book.title}
               </Link>
               {book.kind === "digest" && (

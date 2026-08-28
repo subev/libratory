@@ -107,7 +107,7 @@ function FolderTableRow({
               className="text-sm font-medium bg-transparent border-b border-(--accent) outline-none text-(--text-primary)"
             />
           ) : (
-            <Link to={`/folders/${folder.id}`} className="text-(--text-primary) hover:text-(--accent) font-medium">
+            <Link to={`/folders/${folder.id}`} className="text-(--text-primary) hover:text-(--accent-text-hover) font-medium">
               📁 {folder.name}
             </Link>
           )}
@@ -484,7 +484,7 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
                   />
                 </td>
                 <td className="px-4 py-3 max-w-md">
-                  <Link to={`/books/${book.id}`} className="text-(--accent) hover:text-(--accent-hover) font-medium">
+                  <Link to={`/books/${book.id}`} className="text-(--accent-text) hover:text-(--accent-text-hover) font-medium">
                     {book.title}
                   </Link>
                   {book.kind === "digest" && (

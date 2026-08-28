@@ -18,6 +18,7 @@ import { NotesSection } from "../components/NotesSection.tsx";
 import { loadBookSort, sortBooks } from "../lib/book-sort.ts";
 import { formatBytes, pendingExportLabel, pendingExportSummary } from "../lib/format.ts";
 import { getVoiceLabel, languageLabel } from "../lib/voices.ts";
+import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "../lib/button-classes.ts";
 
 // A worker killed mid-run (restart, network drop) leaves digestJob stuck on "running"; treat a
 // stale heartbeat as interrupted, mirroring the server's resumeDigest guard.
@@ -424,7 +425,7 @@ export function BookDetail() {
               onClick={() => prevBook && navigate(`/books/${prevBook.id}`)}
               disabled={!prevBook}
               title={prevBook ? `Previous book: "${prevBook.title}" — press [` : "This is the first book in the list"}
-              className="px-2.5 py-1 rounded-md text-sm text-(--accent) hover:bg-(--bg-subtle) disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-2.5 py-1 rounded-md text-sm text-(--accent-text) hover:bg-(--bg-subtle) disabled:opacity-40 disabled:cursor-not-allowed"
               data-testid="prev-book"
             >
               &larr; Prev
@@ -438,7 +439,7 @@ export function BookDetail() {
               onClick={() => nextBook && navigate(`/books/${nextBook.id}`)}
               disabled={!nextBook}
               title={nextBook ? `Next book: "${nextBook.title}" — press ]` : "This is the last book in the list"}
-              className="px-2.5 py-1 rounded-md text-sm text-(--accent) hover:bg-(--bg-subtle) disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-2.5 py-1 rounded-md text-sm text-(--accent-text) hover:bg-(--bg-subtle) disabled:opacity-40 disabled:cursor-not-allowed"
               data-testid="next-book"
             >
               Next &rarr;
@@ -574,7 +575,7 @@ export function BookDetail() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold text-(--text-secondary)">
-                <span className="text-xs font-medium text-(--step-work) uppercase tracking-wider mr-2">2 · Work</span>
+                <span className="text-xs font-medium text-(--accent-text) uppercase tracking-wider mr-2">2 · Work</span>
                 Chapters
               </h2>
               {book.chapterDetection && (
@@ -613,7 +614,7 @@ export function BookDetail() {
               title={book.kind !== "pdf" ? "Synthetic book — no PDF structure to edit" : "Review every detected heading and edit chapter boundaries by hand"}
               data-testid="open-structure"
             >
-              <svg className="w-4 h-4 text-(--accent)" viewBox="0 0 16 16" fill="currentColor">
+              <svg className="w-4 h-4 text-(--accent-text)" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M1.75 2.5a.75.75 0 000 1.5h12.5a.75.75 0 000-1.5H1.75zM4.75 6.5a.75.75 0 000 1.5h9.5a.75.75 0 000-1.5h-9.5zM4 11.25a.75.75 0 01.75-.75h9.5a.75.75 0 010 1.5h-9.5a.75.75 0 01-.75-.75zM1.75 14a.75.75 0 000 1.5h12.5a.75.75 0 000-1.5H1.75z" transform="translate(0 -1)"/>
               </svg>
               Structure
@@ -625,7 +626,7 @@ export function BookDetail() {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-(--border-input) bg-(--bg-card) text-sm font-medium text-(--text-primary) shadow-sm hover:bg-(--bg-subtle) disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="open-translation"
             >
-              <svg className="w-4 h-4 text-(--accent)" viewBox="0 0 16 16" fill="currentColor">
+              <svg className="w-4 h-4 text-(--accent-text)" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M8 1a7 7 0 100 14A7 7 0 008 1zM2.5 8c0-.53.075-1.042.215-1.527.777.212 1.685.375 2.687.478a17.6 17.6 0 000 2.098c-1.002.103-1.91.266-2.687.478A5.48 5.48 0 012.5 8zm4.41-.94a16.1 16.1 0 000 1.88c.36.02.724.031 1.09.031s.73-.011 1.09-.031a16.1 16.1 0 000-1.88C8.73 7.04 8.366 7.03 8 7.03s-.73.011-1.09.031zm4.688.42c.014.171.021.345.021.52s-.007.349-.021.52c1.002-.103 1.91-.266 2.687-.478a5.512 5.512 0 000-.084c-.777-.212-1.685-.375-2.687-.478zM8 2.5c.474 0 1.056.607 1.474 1.885.09.276.17.575.238.892A18.7 18.7 0 008 5.25c-.585 0-1.158-.024-1.712.027.068-.317.148-.616.238-.892C6.944 3.107 7.526 2.5 8 2.5zm-2.86.79a7.28 7.28 0 00-.395 1.05 12.9 12.9 0 00-1.573.34A5.53 5.53 0 015.14 3.29zm5.72 0a5.53 5.53 0 012.368 2.39c-.485-.135-1.013-.25-1.573-.34a7.28 7.28 0 00-.394-1.05h-.001zM8 13.5c-.474 0-1.056-.607-1.474-1.885a9.05 9.05 0 01-.238-.892c.554.051 1.127.077 1.712.077s1.158-.026 1.712-.077a9.05 9.05 0 01-.238.892C9.056 12.893 8.474 13.5 8 13.5zm-3.255-2.13c.112.365.244.717.395 1.05a5.53 5.53 0 01-2.368-2.39c.485.135 1.013.25 1.573.34h.4zm6.51 0c.56-.09 1.088-.205 1.573-.34a5.53 5.53 0 01-2.368 2.39c.151-.333.283-.685.395-1.05h.4z"/>
               </svg>
               Translate / Transform
@@ -688,7 +689,7 @@ export function BookDetail() {
                   onClick={() => translateTitlesMutation.mutate({ bookId: book.id, key: activeVariant })}
                   disabled={translateTitlesMutation.isPending || titlesRequested}
                   title={`Translate the ${missingTitleCount} chapter title${missingTitleCount === 1 ? "" : "s"} still shown in the original language`}
-                  className="text-xs font-medium text-(--accent) hover:underline shrink-0 disabled:opacity-50 disabled:no-underline"
+                  className="text-xs font-medium text-(--accent-text) hover:underline shrink-0 disabled:opacity-50 disabled:no-underline"
                   data-testid="translate-titles"
                 >
                   {titlesRequested ? `Translating titles (${missingTitleCount} left)...` : `Translate titles (${missingTitleCount})`}
@@ -696,7 +697,7 @@ export function BookDetail() {
               ) : null}
               <button
                 onClick={() => setActiveVariant(null)}
-                className="text-xs font-medium text-(--accent) hover:underline shrink-0"
+                className="text-xs font-medium text-(--accent-text) hover:underline shrink-0"
               >
                 Back to original
               </button>
@@ -714,7 +715,7 @@ export function BookDetail() {
                     ? (activeVariant ? `No selected chapters have ${activeLabel} text ready or underway` : "No selected chapters are ready for synthesis")
                     : "Pick voice and speed, then synthesize the selected chapters"
                 }
-                className="px-4 py-2 bg-(--accent) text-(--on-accent) rounded-md text-sm font-medium hover:bg-(--accent-hover) disabled:opacity-50 disabled:cursor-not-allowed"
+                className={PRIMARY_BUTTON}
                 data-testid="open-synthesize"
               >
                 Synthesize selected ({selectedSynthesizable}){langSuffix}...
@@ -727,7 +728,7 @@ export function BookDetail() {
                 }
                 disabled={!(hasActiveChapters || translationAudioQueued) || cancelMutation.isPending || stopAudioMutation.isPending}
                 title={!(hasActiveChapters || translationAudioQueued) ? "No chapters are actively processing" : "Stop the running synthesis — finished chapters keep their audio, the rest resume later"}
-                className="px-4 py-2 rounded-md border border-(--border-input) bg-(--bg-card) text-(--text-secondary) text-sm font-medium hover:text-(--text-primary) hover:bg-(--bg-card-hover) disabled:opacity-50 disabled:cursor-not-allowed"
+                className={SECONDARY_BUTTON}
                 data-testid="cancel-processing"
               >
                 Cancel processing
@@ -742,7 +743,7 @@ export function BookDetail() {
                     ? `Translate the selected chapters to ${activeLabel} (finished ones are skipped, stopped ones resume)`
                     : `Rewrite the selected chapters as ${activeLabel} (finished ones are skipped, stopped ones resume)`
                 }
-                className="px-4 py-2 rounded-md border border-(--border-input) bg-(--bg-card) text-(--text-secondary) text-sm font-medium hover:text-(--text-primary) hover:bg-(--bg-card-hover) disabled:opacity-50 disabled:cursor-not-allowed"
+                className={SECONDARY_BUTTON}
                 data-testid="translate-selected"
               >
                 {activeKind === "translation" ? "Translate" : "Rewrite"} selected ({selectedTranslatable}){langSuffix}
@@ -755,7 +756,7 @@ export function BookDetail() {
                   selectedCleanable === 0 ? "No selected chapters need cleanup — already-cleaned and running ones are skipped" :
                   "Ask AI to strip OCR artifacts from the selected chapters without altering the prose (cleaned ones are skipped)"
                 }
-                className="px-4 py-2 rounded-md border border-(--border-input) bg-(--bg-card) text-(--text-secondary) text-sm font-medium hover:text-(--text-primary) hover:bg-(--bg-card-hover) disabled:opacity-50 disabled:cursor-not-allowed"
+                className={SECONDARY_BUTTON}
                 data-testid="cleanup-selected"
               >
                 Cleanup selected ({selectedCleanable})
@@ -775,7 +776,7 @@ export function BookDetail() {
                     ? "No raw text or chapters to ask about"
                     : "Summarize, question, or run any prompt — switch between selected chapters and the whole book inside"
                 }
-                className="px-4 py-2 rounded-md border border-(--border-input) bg-(--bg-card) text-(--text-secondary) text-sm font-medium hover:text-(--text-primary) hover:bg-(--bg-card-hover) disabled:opacity-50 disabled:cursor-not-allowed"
+                className={SECONDARY_BUTTON}
                 data-testid="ask-ai-selected"
               >
                 Ask AI
@@ -793,7 +794,7 @@ export function BookDetail() {
                   hasActiveChapters ? "Wait for active chapters to finish" :
                   "Delete selected chapters and their audio"
                 }
-                className="px-4 py-2 bg-(--danger) text-(--on-danger) rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-(--danger) text-(--on-danger) hover:bg-(--danger-hover) rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Delete selected ({selectedCount})
               </button>
@@ -819,7 +820,7 @@ export function BookDetail() {
                       onClick={() => resumeDigestMutation.mutate({ id: book.id })}
                       disabled={resumeDigestMutation.isPending}
                       title="Re-run the digest — books that already have a summary chapter are skipped"
-                      className="px-4 py-2 rounded-md border border-(--border-input) bg-(--bg-card) text-(--text-secondary) text-sm font-medium hover:text-(--text-primary) hover:bg-(--bg-card-hover) disabled:opacity-50 disabled:cursor-not-allowed"
+                      className={SECONDARY_BUTTON}
                       data-testid="resume-digest"
                     >
                       {resumeDigestMutation.isPending ? "Queuing..." : "Resume digest"}
@@ -846,7 +847,7 @@ export function BookDetail() {
                     title={extractionReady
                       ? "Choose what to read and with which settings, then start — Marker takes minutes per book"
                       : "Full extraction needs the Marker models — download them below"}
-                    className="px-4 py-2 bg-(--accent) text-(--on-accent) rounded-md text-sm font-medium hover:bg-(--accent-hover) disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={PRIMARY_BUTTON}
                     data-testid="extract-chapters"
                   >
                     Extract chapters...
@@ -859,7 +860,7 @@ export function BookDetail() {
                         ? "Summarize, question, or run any prompt against the whole book's raw text"
                         : "No raw text — the PDF may be scanned; run Extract chapters with Force OCR instead"
                     }
-                    className="px-4 py-2 rounded-md border border-(--border-input) bg-(--bg-card) text-(--text-secondary) text-sm font-medium hover:text-(--text-primary) hover:bg-(--bg-card-hover) disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={SECONDARY_BUTTON}
                     data-testid="ask-ai-book"
                   >
                     Ask AI (whole book)
@@ -887,7 +888,7 @@ export function BookDetail() {
                   onClick={() => resumeDigestMutation.mutate({ id: book.id })}
                   disabled={resumeDigestMutation.isPending}
                   title="Re-run the digest — books that already have a summary chapter are skipped"
-                  className="text-(--accent) hover:underline font-medium disabled:opacity-50"
+                  className="text-(--accent-text) hover:underline font-medium disabled:opacity-50"
                 >
                   Resume
                 </button>
@@ -928,7 +929,7 @@ export function BookDetail() {
                   onClick={() => setCreateTab("audio")}
                   className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                     createTab === "audio"
-                      ? "bg-(--bg-card) shadow-sm text-(--accent)"
+                      ? "bg-(--bg-card) shadow-sm text-(--accent-text)"
                       : "text-(--text-muted) hover:text-(--text-secondary)"
                   }`}
                   data-testid="create-tab-audio"
@@ -945,7 +946,7 @@ export function BookDetail() {
                   onClick={() => setCreateTab("document")}
                   className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                     createTab === "document"
-                      ? "bg-(--bg-card) shadow-sm text-(--accent)"
+                      ? "bg-(--bg-card) shadow-sm text-(--accent-text)"
                       : "text-(--text-muted) hover:text-(--text-secondary)"
                   }`}
                   data-testid="create-tab-document"
@@ -1005,7 +1006,7 @@ export function BookDetail() {
                     isAssembling ? "Assembly already in progress" :
                     undefined
                   }
-                  className="px-4 py-2 bg-(--accent) text-(--on-accent) rounded-md text-sm font-medium hover:bg-(--accent-hover) disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={PRIMARY_BUTTON}
                   data-testid="assemble-button"
                 >
                   {book.outputPath ? "Re-assemble" : "Assemble"}{deferOutputs ? " when ready" : " selected"} ({deferOutputs ? selectedCount : selectedWithAudio}){langSuffix}
@@ -1039,7 +1040,7 @@ export function BookDetail() {
                     onClick={() => exportDocumentMutation.mutate({ id: book.id, language: activeVariant ?? undefined, format: "pdf" })}
                     disabled={!canExportDocument || !!pendingExportFor("pdf")?.running}
                     title={exportTooltip("pdf")}
-                    className="px-4 py-2 rounded-md border border-(--border-input) bg-(--bg-card) text-(--text-secondary) text-sm font-medium hover:text-(--text-primary) hover:bg-(--bg-card-hover) disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={SECONDARY_BUTTON}
                     data-testid="export-pdf"
                   >
                     Export PDF ({selectedExportable}){langSuffix}
@@ -1048,7 +1049,7 @@ export function BookDetail() {
                     onClick={() => exportDocumentMutation.mutate({ id: book.id, language: activeVariant ?? undefined, format: "epub" })}
                     disabled={!canExportDocument || !!pendingExportFor("epub")?.running}
                     title={exportTooltip("epub")}
-                    className="px-4 py-2 rounded-md border border-(--border-input) bg-(--bg-card) text-(--text-secondary) text-sm font-medium hover:text-(--text-primary) hover:bg-(--bg-card-hover) disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={SECONDARY_BUTTON}
                     data-testid="export-epub"
                   >
                     Export EPUB ({selectedExportable}){langSuffix}
@@ -1075,7 +1076,7 @@ export function BookDetail() {
                       })}
                       disabled={!canExportSync || !!pendingExportFor("epub-sync")?.running}
                       title={syncExportTooltip}
-                      className="px-4 py-2 rounded-md border border-(--border-input) bg-(--bg-card) text-(--text-secondary) text-sm font-medium hover:text-(--text-primary) hover:bg-(--bg-card-hover) disabled:opacity-50 disabled:cursor-not-allowed"
+                      className={SECONDARY_BUTTON}
                       data-testid="export-epub-sync"
                     >
                       Export synced EPUB{deferOutputs ? " when ready" : ""} ({deferOutputs ? selectedCount : selectedSyncExportable}){langSuffix}
@@ -1136,7 +1137,7 @@ export function BookDetail() {
               }
             }}
             disabled={deleteMutation.isPending}
-            className="px-4 py-2 bg-(--danger) text-(--on-danger) rounded-md text-sm font-medium disabled:opacity-50"
+            className="px-4 py-2 bg-(--danger) text-(--on-danger) hover:bg-(--danger-hover) rounded-md text-sm font-medium disabled:opacity-50"
           >
             Delete book
           </button>

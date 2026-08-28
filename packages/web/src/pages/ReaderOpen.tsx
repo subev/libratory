@@ -37,7 +37,7 @@ export function ReaderOpen() {
         <ReaderFor source={source} />
         <p className="mx-auto max-w-5xl px-4 pb-6 text-xs text-(--text-faint)" data-testid="reader-opened-file">
           Reading {name} from this device.{" "}
-          <button onClick={() => setSource(null)} className="text-(--accent) hover:text-(--accent-hover)">
+          <button onClick={() => setSource(null)} className="text-(--accent-text) hover:text-(--accent-text-hover)">
             Open another
           </button>
         </p>
@@ -49,7 +49,7 @@ export function ReaderOpen() {
     <div className="min-h-screen bg-(--bg-page) px-4 py-3">
       <div className="mx-auto max-w-2xl">
         <p className="mb-4 text-sm">
-          <Link to="/" className="text-(--accent) hover:text-(--accent-hover)">← Library</Link>
+          <Link to="/" className="text-(--accent-text) hover:text-(--accent-text-hover)">← Library</Link>
         </p>
         <div
           onDragOver={(e) => { e.preventDefault(); setOver(true); }}

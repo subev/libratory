@@ -124,7 +124,7 @@ export class ErrorBoundary extends Component<Props, State> {
           {help && (
             <p className="mt-2 text-xs text-(--text-muted)">
               React shortens its messages in a release build.{" "}
-              <a href={help} target="_blank" rel="noreferrer" className="text-(--accent) hover:text-(--accent-hover)">
+              <a href={help} target="_blank" rel="noreferrer" className="text-(--accent-text) hover:text-(--accent-text-hover)">
                 What this one means
               </a>
             </p>

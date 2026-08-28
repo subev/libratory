@@ -38,19 +38,16 @@ The subject is a reading app, so the split carries meaning rather than decoratin
 Fonts are copied from `~/repos/libratory-site/public/fonts` (all OFL). Self-hosted, never a CDN —
 the desktop app runs offline.
 
-## Phase 1 — the system (do this alone, first, and completely)
+## Phase 1 — the system — DONE
 
-Nothing else can start until the vocabulary exists, or every agent invents its own name for
-"the orange one".
-
-- [ ] Bump Tailwind 4.1 → 4.3.3 in `packages/web` (and the site, so they cannot drift)
-- [ ] `styles.css`: rewrite every existing token to Solar Dusk / site values, light **and** dark
-- [ ] Add the tokens the 512 hardcoded utilities need somewhere to land:
-      `--accent`, `--accent-hover`, `--accent-text`, `--accent-subtle`, `--focus-ring`,
-      `--danger`, `--danger-bg`, `--danger-text`, `--success`, `--warning`
-- [ ] `@theme` block so components can write `bg-accent` / `text-ink` as real utilities
-- [ ] Copy the three woff2 files + `@font-face` + font stacks
-- [ ] Dark theme grounds on the site's own `#16140f` / `#1e1b14` — the strongest continuity signal
+- Tailwind 4.1 → 4.3.3; every token rewritten to Solar Dusk / site values, both themes
+- The tokens the sweep needed: `--accent`, `--danger`, `--success`, `--warning`, plus `--on-*`
+  (text sitting ON a fill) and the `-hover` partners the agents refused to invent
+- `@theme inline` carries the **fonts only** — colours stayed as `bg-(--accent)`, the form the
+  codebase already used. See "What linting can and cannot see" below; this is the one decision
+  from the original plan that was reversed
+- The site's two woff2 faces, self-hosted (mono is a system stack, so two files not three)
+- Dark grounds on the site's own `#16140f` / `#1e1b14`
 
 ## Phase 2 — the sweep — DONE
 
@@ -97,3 +94,32 @@ row was the actual design problem; the blue palette had only hidden it better.
 - Screenshots of library, book detail and chat in **both** themes. They caught one thing no test
   could: two accent-filled digest buttons side by side. HN digest is now the secondary it always was.
 - Dev server shut down afterwards.
+
+## What the review passes then found
+
+`/simplify` (4 agents) and `/code-review` ran over the finished diff. The quality agents converged
+on structure; the correctness pass found the palette failing the standard the work set for itself.
+
+**The contrast bug.** The commit measured ink *on* tangerine (4.93:1, passes) and never measured
+tangerine *as* text. As text on cream it is **3.23:1**, and the sweep put `text-(--accent)` in ~55
+places that had been `text-blue-600` at ≈5.2:1 — every book title, breadcrumb, prev/next link.
+Brass as the "1 · Input" label was **2.45:1**, failing even the large-text threshold.
+
+The fix separates fill from text, which the `--on-*` work had already half-established:
+
+| token | role | light |
+| --- | --- | --- |
+| `--accent` | fill under ink | `#e2601f`, ink 4.93:1 |
+| `--accent-text` | accent AS text | `oklch(0.52 0.155 45)`, 5.36:1 on page |
+| `--accent-hover` | fill on hover | **brightens** — darkening drops ink to 3.98:1 |
+| `--accent-text-hover` | link on hover | darkens, 7.54:1 |
+
+Step labels are text, so they take `--warning-text` / `--accent-text` / `--success-text`; the
+`--step-*` ramp stays on the decorative stripe it was made for.
+
+**What linting can and cannot see.** `bg-(--typo)` compiles to `background-color: var(--typo)` —
+valid CSS that paints nothing, which is how `--bg-hover` survived. Measured: `oxlint-tailwindcss`
+(a native oxlint plugin, v4-only) catches unknown classes, hardcoded colours, duplicates and
+deprecated v4 spellings in 0.42s, but **not** an undefined custom property. Registering colours in
+`@theme` and writing `bg-accent` makes them lintable with typo suggestions, and `oxlint --fix`
+performs the conversion. That is the open decision; the plugin is installed but not yet enabled.

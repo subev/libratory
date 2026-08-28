@@ -90,7 +90,7 @@ export function VoicePicker({ value, onChange, title }: VoicePickerProps) {
         data-testid="voice-picker-trigger"
       >
         <span className="truncate">{label}</span>
-        <span className="shrink-0 text-xs font-medium text-(--accent)">Change</span>
+        <span className="shrink-0 text-xs font-medium text-(--accent-text)">Change</span>
       </button>
       {library}
     </div>

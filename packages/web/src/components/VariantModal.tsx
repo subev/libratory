@@ -292,7 +292,7 @@ export function VariantModal({
           </button>
 
           {running ? (
-            <span className="text-sm text-(--accent)" data-testid="translation-progress">
+            <span className="text-sm text-(--accent-text)" data-testid="translation-progress">
               {thinking ? "Thinking" : isTranslationTarget ? "Translating" : "Rewriting"}{variant?.progress ? ` · ${variant.progress} chunks` : ""}...
             </span>
           ) : variant?.status === "suspended" ? (

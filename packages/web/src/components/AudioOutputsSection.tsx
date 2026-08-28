@@ -25,7 +25,7 @@ export function AudioOutputsSection({
   return (
     <section className="rounded-xl border border-(--border) border-t-2 border-t-(--step-output)/80 bg-(--bg-card) p-4 flex flex-col">
       <h2 className="text-lg font-semibold text-(--text-secondary) mb-3">
-        <span className="text-xs font-medium text-(--step-output) uppercase tracking-wider mr-2">3 · Output</span>
+        <span className="text-xs font-medium text-(--success-text) uppercase tracking-wider mr-2">3 · Output</span>
         Assemblies
       </h2>
       {(

@@ -46,12 +46,12 @@ export const VoiceRow = memo(function VoiceRow({ voice, action }: { voice: Voice
         data-testid={`voice-preview-${voice.id}`}
       >
         {isPending ? (
-          <svg className="h-3.5 w-3.5 animate-spin text-(--accent)" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <svg className="h-3.5 w-3.5 animate-spin text-(--accent-text)" viewBox="0 0 20 20" fill="none" aria-hidden="true">
             <circle cx="10" cy="10" r="7.5" stroke="currentColor" strokeWidth="2.5" className="opacity-25" />
             <path d="M17.5 10a7.5 7.5 0 00-7.5-7.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
           </svg>
         ) : isPlaying ? (
-          <svg className="h-3.5 w-3.5 text-(--accent)" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <svg className="h-3.5 w-3.5 text-(--accent-text)" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path d="M5.75 3a.75.75 0 00-.75.75v12.5a.75.75 0 001.5 0V3.75A.75.75 0 005.75 3zM14.25 3a.75.75 0 00-.75.75v12.5a.75.75 0 001.5 0V3.75a.75.75 0 00-.75-.75z" />
           </svg>
         ) : (
@@ -71,7 +71,7 @@ export const VoiceRow = memo(function VoiceRow({ voice, action }: { voice: Voice
         data-testid={`voice-option-${voice.id}`}
       >
         <div className="text-sm text-(--text-primary) truncate">{voice.label}</div>
-        <div className={`text-xs truncate ${hasFailed ? "text-(--danger-text)" : isPending ? "text-(--accent)" : "text-(--text-faint)"}`}>
+        <div className={`text-xs truncate ${hasFailed ? "text-(--danger-text)" : isPending ? "text-(--accent-text)" : "text-(--text-faint)"}`}>
           {status ?? describe(voice)}
         </div>
       </button>
@@ -81,7 +81,7 @@ export const VoiceRow = memo(function VoiceRow({ voice, action }: { voice: Voice
       {action}
 
       {isSelected && (
-        <svg className="h-4 w-4 text-(--accent) shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <svg className="h-4 w-4 text-(--accent-text) shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
         </svg>
       )}

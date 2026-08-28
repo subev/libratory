@@ -4,6 +4,7 @@ import { trpc } from "../trpc.ts";
 import { useBodyScrollLock } from "../lib/use-body-scroll-lock.ts";
 import { DIGEST_LISTENING_PROMPT, DIGEST_PRESETS } from "../lib/ai-presets.ts";
 import { ModelPicker } from "./ModelPicker.tsx";
+import { PRIMARY_BUTTON } from "../lib/button-classes.ts";
 
 export function DigestModal({
   sourceBooks,
@@ -169,7 +170,7 @@ export function DigestModal({
             onClick={create}
             disabled={!title.trim() || !prompt.trim() || included.length < 2 || createMutation.isPending}
             title={included.length < 2 ? "A digest needs at least 2 books with text" : undefined}
-            className="px-4 py-2 bg-(--accent) text-(--on-accent) rounded-md text-sm font-medium hover:bg-(--accent-hover) disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            className={`${PRIMARY_BUTTON} shrink-0`}
             data-testid="digest-create"
           >
             {createMutation.isPending ? "Creating..." : "Create digest"}

@@ -49,7 +49,7 @@ export function EditableTitle({
   return (
     <Tag
       onClick={() => { setValue(title); setEditing(true); }}
-      className={`${title ? className : "text-(--text-faint)"} cursor-pointer hover:text-(--accent)`}
+      className={`${title ? className : "text-(--text-faint)"} cursor-pointer hover:text-(--accent-text-hover)`}
       title={hint}
     >
       {title || placeholder}

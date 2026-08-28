@@ -3,6 +3,7 @@ import { trpc } from "../trpc.ts";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
 import { useBodyScrollLock } from "../lib/use-body-scroll-lock.ts";
 import { ModelPicker } from "./ModelPicker.tsx";
+import { PRIMARY_BUTTON } from "../lib/button-classes.ts";
 
 type ChapterProposal = {
   status: "running" | "done" | "failed";
@@ -327,7 +328,7 @@ export function StructureModal({
                               e.preventDefault();
                               setPdfPreview({ fileId: pdfFile.id, page: h.page, filename: pdfFile.filename });
                             }}
-                            className="shrink-0 text-xs text-(--accent) hover:text-(--accent-hover) tabular-nums"
+                            className="shrink-0 text-xs text-(--accent-text) hover:text-(--accent-text-hover) tabular-nums"
                             title="Open the source PDF at this page"
                           >
                             p.{h.page}
@@ -375,7 +376,7 @@ export function StructureModal({
                         {pdfFile ? (
                           <button
                             onClick={() => setPdfPreview({ fileId: pdfFile.id, page: ch.pageStart, filename: pdfFile.filename })}
-                            className="text-(--accent) hover:text-(--accent-hover) tabular-nums"
+                            className="text-(--accent-text) hover:text-(--accent-text-hover) tabular-nums"
                             title="Open the source PDF at this chapter's first page"
                           >
                             p.{ch.pageStart}–{ch.pageEnd}
@@ -412,7 +413,7 @@ export function StructureModal({
           </button>
           <ModelPicker value={model} onChange={setModel} testId="structure-chapter-model" />
           {proposalRunning ? (
-            <span className="text-sm text-(--accent) truncate" data-testid="proposal-running" title={proposalProgress}>
+            <span className="text-sm text-(--accent-text) truncate" data-testid="proposal-running" title={proposalProgress}>
               {proposalProgress?.replace(/^\[AI\]\s*/, "") ??
                 `Proposal running${chapterProposal?.method === "llm" ? " (asking the model)" : ""}...`}
             </span>
@@ -432,7 +433,7 @@ export function StructureModal({
               isProcessing ? "Wait for processing to finish" :
               "Delete existing chapters and re-slice at the checked boundaries"
             }
-            className="px-4 py-2 bg-(--accent) text-(--on-accent) rounded-md text-sm font-medium hover:bg-(--accent-hover) disabled:opacity-50 disabled:cursor-not-allowed"
+            className={PRIMARY_BUTTON}
             data-testid="apply-boundaries"
           >
             Apply boundaries

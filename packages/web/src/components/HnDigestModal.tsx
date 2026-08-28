@@ -266,7 +266,7 @@ export function HnDigestModal({ onClose }: { onClose: () => void }) {
                     href={story.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`flex-1 truncate hover:underline ${excluded.has(story.id) ? "text-(--text-faint) line-through" : "text-(--accent)"}`}
+                    className={`flex-1 truncate hover:underline ${excluded.has(story.id) ? "text-(--text-faint) line-through" : "text-(--accent-text)"}`}
                     title={story.url}
                   >
                     {story.title}
@@ -326,7 +326,7 @@ export function HnDigestModal({ onClose }: { onClose: () => void }) {
           {state === "done" && bookId && (
             <Link
               to={`/books/${bookId}`}
-              className="text-xs font-medium text-(--accent) hover:text-(--accent-hover)"
+              className="text-xs font-medium text-(--accent-text) hover:text-(--accent-text-hover)"
               data-testid="hn-digest-open"
             >
               Open the book →

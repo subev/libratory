@@ -45,7 +45,7 @@ export function Breadcrumbs({
           <span key={i} className="flex items-center gap-1.5 min-w-0">
             {i > 0 && <span className="text-(--text-faint)">›</span>}
             {item.to ? (
-              <Link to={item.to} className={`text-(--accent) hover:text-(--accent-hover) truncate px-0.5 ${highlight}`} {...dropProps}>
+              <Link to={item.to} className={`text-(--accent-text) hover:text-(--accent-text-hover) truncate px-0.5 ${highlight}`} {...dropProps}>
                 {item.label}
               </Link>
             ) : (

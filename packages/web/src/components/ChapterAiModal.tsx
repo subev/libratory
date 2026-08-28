@@ -8,6 +8,7 @@ import { useBodyScrollLock } from "../lib/use-body-scroll-lock.ts";
 import { AI_PRESETS, estimateTokens, estimateTokensFromCounts, formatTokens } from "../lib/ai-presets.ts";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { useActiveLlmModel } from "../lib/use-llm-models.ts";
+import { PRIMARY_BUTTON } from "../lib/button-classes.ts";
 
 export type AiScope =
   | { kind: "chapters"; bookId: string; chapters: { id: string; title: string }[] }
@@ -221,7 +222,7 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
                 onClick={run}
                 disabled={!prompt.trim() || pending || overContext}
                 title={overContext ? `The ${subject === "book" ? "book's raw text" : "selected chapters"} exceed this model's context window` : "Cmd+Enter"}
-                className="flex-1 px-4 py-2 bg-(--accent) text-(--on-accent) rounded-md text-sm font-medium hover:bg-(--accent-hover) disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`flex-1 ${PRIMARY_BUTTON}`}
                 data-testid="ai-run"
               >
                 {pending ? "Answering..." : "Ask"}

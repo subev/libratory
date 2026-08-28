@@ -268,7 +268,7 @@ export function VoiceLibraryModal({
               <button
                 type="button"
                 onClick={() => setShowAllLanguages(true)}
-                className="w-full text-left px-3 py-2 rounded-md text-xs text-(--accent) hover:bg-(--bg-subtle) focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none"
+                className="w-full text-left px-3 py-2 rounded-md text-xs text-(--accent-text) hover:bg-(--bg-subtle) focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none"
                 data-testid="voice-show-all-languages"
               >
                 Show all {languages.length} languages
@@ -365,7 +365,7 @@ export function VoiceLibraryModal({
                               <button
                                 type="button"
                                 onClick={() => expand(name)}
-                                className="w-full text-left px-3 py-1.5 text-xs text-(--accent) hover:underline focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none rounded"
+                                className="w-full text-left px-3 py-1.5 text-xs text-(--accent-text) hover:underline focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none rounded"
                                 data-testid={`voice-show-all-${name}`}
                               >
                                 Show all {voices.length} {name} voices
@@ -444,7 +444,7 @@ function ProviderChip({
       aria-pressed={active}
       className={`px-2 py-1 text-xs rounded-full border focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none ${
         active
-          ? "border-(--accent) text-(--accent) bg-(--bg-selected)"
+          ? "border-(--accent) text-(--accent-text) bg-(--bg-selected)"
           : "border-(--border) text-(--text-muted) hover:bg-(--bg-subtle)"
       }`}
       data-testid={`voice-provider-${label}`}

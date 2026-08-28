@@ -214,7 +214,7 @@ export function ChapterTable({
             <span className={`text-xs transition-transform ${filtersOpen ? "rotate-90" : ""}`}>&#9654;</span>
             Filter
             {activeFilterCount > 0 && !filtersOpen ? (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-(--accent-subtle) text-(--accent)">
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-(--accent-subtle) text-(--accent-text)">
                 {activeFilterCount}
               </span>
             ) : null}
@@ -347,7 +347,7 @@ export function ChapterTable({
             <div className="flex items-center gap-3">
               <button
                 onClick={() => onSetSelectedBatch(filteredChapters.map((c) => c.id), true)}
-                className="text-(--accent) hover:text-(--accent-hover) font-medium"
+                className="text-(--accent-text) hover:text-(--accent-text-hover) font-medium"
               >
                 Select filtered
               </button>
@@ -374,7 +374,7 @@ export function ChapterTable({
                   type="checkbox"
                   checked={allVisibleSelected}
                   onChange={handleToggleAll}
-                  className="rounded border-(--border-input) text-(--accent) focus:ring-(--focus-ring)"
+                  className="rounded border-(--border-input) text-(--accent-text) focus:ring-(--focus-ring)"
                 />
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">#</th>
@@ -451,7 +451,7 @@ export function ChapterTable({
                         }
                         lastClickedFilteredIndex.current = filteredIdx;
                       }}
-                      className="rounded border-(--border-input) text-(--accent) focus:ring-(--focus-ring)"
+                      className="rounded border-(--border-input) text-(--accent-text) focus:ring-(--focus-ring)"
                     />
                   </td>
                   <td className="px-4 py-3 text-sm text-(--text-tertiary)">{chapter.index + 1}</td>
@@ -477,7 +477,7 @@ export function ChapterTable({
                       {chapter.source?.kind === "book" ? (
                         <Link
                           to={`/books/${chapter.source.bookId}`}
-                          className="text-xs text-(--accent) hover:text-(--accent-hover)"
+                          className="text-xs text-(--accent-text) hover:text-(--accent-text-hover)"
                           title={`Open the source book: "${chapter.source.title}"`}
                           data-testid="chapter-source-link"
                         >
@@ -488,7 +488,7 @@ export function ChapterTable({
                           href={chapter.source.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-(--accent) hover:text-(--accent-hover)"
+                          className="text-xs text-(--accent-text) hover:text-(--accent-text-hover)"
                           title={chapter.source.title ?? chapter.source.url}
                         >
                           source ↗
@@ -500,7 +500,7 @@ export function ChapterTable({
                             onClick={() =>
                               setPdfPreview({ fileId: sourceFile.id, page: chapter.pageStart!, filename: sourceFile.filename })
                             }
-                            className="text-xs text-(--accent) hover:text-(--accent-hover) tabular-nums"
+                            className="text-xs text-(--accent-text) hover:text-(--accent-text-hover) tabular-nums"
                             title="Open the source PDF at this chapter's first page"
                           >
                             p.{chapter.pageStart}{chapter.pageEnd && chapter.pageEnd !== chapter.pageStart ? `–${chapter.pageEnd}` : ""}
@@ -534,7 +534,7 @@ export function ChapterTable({
                           onClick={() => handlePlay(chapter.id)}
                           className={`w-6 h-6 flex items-center justify-center rounded text-sm ${
                             playingChapterId === chapter.id
-                              ? "text-(--accent) hover:text-(--accent-hover)"
+                              ? "text-(--accent-text) hover:text-(--accent-text-hover)"
                               : "text-(--text-faint) hover:text-(--text-secondary)"
                           }`}
                           title={playingChapterId === chapter.id && isAudioPlaying ? "Pause" : "Play"}
@@ -636,7 +636,7 @@ export function ChapterTable({
         <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-50 w-[min(72rem,calc(100vw-2rem))] bg-(--bg-card) border border-(--border) rounded-lg px-4 py-3 flex items-center gap-4 shadow-lg">
           <button
             onClick={() => handlePlay(playingChapter.id)}
-            className="text-lg text-(--accent) hover:text-(--accent-hover) w-8 h-8 flex items-center justify-center shrink-0"
+            className="text-lg text-(--accent-text) hover:text-(--accent-text-hover) w-8 h-8 flex items-center justify-center shrink-0"
           >
             {isAudioPlaying ? "\u23F8" : "\u25B6"}
           </button>
@@ -713,7 +713,7 @@ function ChapterStatusCell({ chapter, cleanup }: { chapter: ChapterRow; cleanup:
         </div>
         <div className="w-full bg-(--bg-page) rounded-full h-1">
           <div
-            className="bg-(--badge-synthesizing-text) h-1 rounded-full transition-all duration-500"
+            className="bg-(--step-work) h-1 rounded-full transition-all duration-500"
             style={{ width: `${percent}%` }}
           />
         </div>
@@ -748,7 +748,7 @@ function ChapterStatusCell({ chapter, cleanup }: { chapter: ChapterRow; cleanup:
           </div>
           <div className="w-full bg-(--bg-page) rounded-full h-1">
             <div
-              className="bg-(--badge-normalizing-text) h-1 rounded-full transition-all duration-500"
+              className="bg-(--badge-normalizing-bg) h-1 rounded-full transition-all duration-500"
               style={{ width: `${percent}%` }}
             />
           </div>
@@ -815,7 +815,7 @@ function EditableChapterTitle({
       {onClickTitle ? (
         <button
           onClick={onClickTitle}
-          className="text-sm font-medium text-(--text-primary) hover:text-(--accent) text-left"
+          className="text-sm font-medium text-(--text-primary) hover:text-(--accent-text-hover) text-left"
         >
           {title}
         </button>

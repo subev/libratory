@@ -110,11 +110,11 @@ export function BookFilesSection({
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold text-(--text-secondary)">
-            <span className="text-xs font-medium text-(--step-input) uppercase tracking-wider mr-2">1 · Input</span>
+            <span className="text-xs font-medium text-(--warning-text) uppercase tracking-wider mr-2">1 · Input</span>
             Source files
           </h2>
           {extractingCount > 0 && (
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-(--accent)" data-testid="extracting-indicator">
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-(--accent-text)" data-testid="extracting-indicator">
               <span className="w-2 h-2 rounded-full bg-(--accent) animate-pulse" />
               Extracting {extractingCount} file{extractingCount === 1 ? "" : "s"}...
             </span>
@@ -201,7 +201,7 @@ export function BookFilesSection({
                     file.status === "done" ? "text-(--success-text)" :
                     file.status === "failed" ? "text-(--danger-text)" :
                     file.status === "suspended" ? "text-(--warning-text)" :
-                    file.status === "extracting" ? "text-(--accent)" :
+                    file.status === "extracting" ? "text-(--accent-text)" :
                     "text-(--text-muted)"
                   }`}>
                     {file.status === "raw" ? "raw text" : file.status === "suspended" ? "cancelled" : file.status}
@@ -248,7 +248,7 @@ export function BookFilesSection({
                         file.status === "raw" ? "Extract chapters from this file" :
                         "Re-extract this file"
                       }
-                      className="p-1 rounded text-(--accent) hover:bg-(--bg-selected) disabled:opacity-20 disabled:cursor-not-allowed"
+                      className="p-1 rounded text-(--accent-text) hover:bg-(--bg-selected) disabled:opacity-20 disabled:cursor-not-allowed"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
                         <path d="M11.534 7h3.932a.25.25 0 01.192.41l-1.966 2.36a.25.25 0 01-.384 0l-1.966-2.36A.25.25 0 0111.534 7zM.534 9h3.932a.25.25 0 00.192-.41L2.692 6.23a.25.25 0 00-.384 0L.342 8.59A.25.25 0 00.534 9z"/>

@@ -136,7 +136,7 @@ export function PocketVoiceCloner({ onAdded }: Props) {
             onClick={() => setMode(id)}
             className={`px-2 py-1 text-xs rounded border ${
               mode === id
-                ? "border-(--accent) text-(--accent) bg-(--bg-selected)"
+                ? "border-(--accent) text-(--accent-text) bg-(--bg-selected)"
                 : "border-(--border) text-(--text-muted) hover:bg-(--bg-subtle)"
             }`}
           >

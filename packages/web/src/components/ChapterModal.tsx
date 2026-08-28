@@ -433,7 +433,7 @@ function ChapterModalBody({
                 type="checkbox"
                 checked={chapter.selected}
                 onChange={() => onSetSelected(chapter.id, !chapter.selected)}
-                className="rounded border-(--border-input) text-(--accent) focus:ring-(--focus-ring)"
+                className="rounded border-(--border-input) text-(--accent-text) focus:ring-(--focus-ring)"
               />
               <span className="text-sm font-mono text-(--text-faint)">#{chapter.index + 1}</span>
               <h2 className="text-lg font-semibold text-(--text-primary) truncate">{chapter.title}</h2>
@@ -446,7 +446,7 @@ function ChapterModalBody({
                   cleaned
                 </span>
               ) : chapter.hasCustomText ? (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-(--warning-bg) text-(--warning-text)">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-(--warning-bg) text-(--warning-text) hover:bg-(--warning)/25">
                   edited
                 </span>
               ) : null}
@@ -460,7 +460,7 @@ function ChapterModalBody({
                 sourceFile ? (
                   <button
                     onClick={() => setPdfPage(chapter.pageStart!)}
-                    className="tabular-nums text-(--accent) hover:text-(--accent-hover)"
+                    className="tabular-nums text-(--accent-text) hover:text-(--accent-text-hover)"
                     title="Open the source PDF at this chapter's first page"
                   >
                     p.{chapter.pageStart}{chapter.pageEnd && chapter.pageEnd !== chapter.pageStart ? `–${chapter.pageEnd}` : ""}
@@ -475,7 +475,7 @@ function ChapterModalBody({
                 canMark ? (
                   <Link
                     to={`/books/${bookId}/read?chapter=${chapter.index}`}
-                    className="text-(--accent) hover:text-(--accent-hover)"
+                    className="text-(--accent-text) hover:text-(--accent-text-hover)"
                     title="Follow the narration on the page itself, at full size"
                     data-testid="chapter-read-along"
                   >
@@ -488,7 +488,7 @@ function ChapterModalBody({
                 )
               ) : null}
               {chapter.progress && chapter.status === "synthesizing" ? (
-                <span className="text-(--accent) font-medium">Chunk {chapter.progress}</span>
+                <span className="text-(--accent-text) font-medium">Chunk {chapter.progress}</span>
               ) : null}
               {chapter.progress && chapter.status === "suspended" ? (
                 <span className="text-(--text-muted) font-medium">{chapter.progress} synthesized</span>
@@ -662,7 +662,7 @@ function ChapterModalBody({
                 Compare
               </button>
               {variantRunning ? (
-                <span className="text-xs text-(--accent)" data-testid="chapter-translation-progress">
+                <span className="text-xs text-(--accent-text)" data-testid="chapter-translation-progress">
                   {isTranslationKind ? "Translating" : "Rewriting"}{variantDetail?.progress ? ` · ${variantDetail.progress} chunks` : ""}...
                 </span>
               ) : variantStatus === "failed" && variantDetail?.error ? (
@@ -728,7 +728,7 @@ function ChapterModalBody({
                 <button
                   onClick={handleReset}
                   disabled={resetTextMutation.isPending}
-                  className="text-xs px-2.5 py-1 rounded bg-(--danger-bg) text-(--danger-text) font-medium disabled:opacity-50"
+                  className="text-xs px-2.5 py-1 rounded bg-(--danger-bg) text-(--danger-text) hover:bg-(--danger)/20 font-medium disabled:opacity-50"
                 >
                   Reset
                 </button>
@@ -1108,7 +1108,7 @@ function ChunkPreviewPanel({
                   ? "No page info for this chunk"
                   : "Open the source PDF at this chunk's page"
             }
-            className="text-xs text-(--accent) hover:text-(--accent-hover) disabled:opacity-40 disabled:cursor-not-allowed"
+            className="text-xs text-(--accent-text) hover:text-(--accent-text-hover) disabled:opacity-40 disabled:cursor-not-allowed"
           >
             PDF{sourcePage !== null ? ` p.${sourcePage}` : ""}
           </button>
@@ -1116,7 +1116,7 @@ function ChunkPreviewPanel({
             href={chunkPreviews.at(-1)?.url}
             target="_blank"
             rel="noreferrer"
-            className="text-xs text-(--accent) hover:text-(--accent-hover)"
+            className="text-xs text-(--accent-text) hover:text-(--accent-text-hover)"
           >
             Open latest file
           </a>
@@ -1379,7 +1379,7 @@ function ChunkedText({
           isSelected
             ? "bg-(--bg-selected) text-(--text-primary)"
             : isHovered
-              ? "bg-(--bg-card-hover) text-(--text-primary)"
+              ? "bg-(--accent-subtle) text-(--text-primary)"
               : ""
         }`}
       >
@@ -1407,7 +1407,7 @@ function BlocksPreview({ sourceBlocks, onOpenPdf }: { sourceBlocks: SourceBlock[
               {onOpenPdf ? (
                 <button
                   onClick={() => onOpenPdf(block.page)}
-                  className="text-(--accent) hover:text-(--accent-hover) tabular-nums shrink-0 w-8 text-right"
+                  className="text-(--accent-text) hover:text-(--accent-text-hover) tabular-nums shrink-0 w-8 text-right"
                   title="Open the source PDF at this page"
                 >
                   {block.page}

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { trpc } from "../trpc.ts";
 import { useBodyScrollLock } from "../lib/use-body-scroll-lock.ts";
+import { PRIMARY_BUTTON } from "../lib/button-classes.ts";
 
 type FolderNode = { id: string; name: string; depth: number };
 
@@ -143,7 +144,7 @@ export function FolderPickerModal({
           ) : (
             <button
               onClick={() => setNewName("")}
-              className="text-sm text-(--accent) hover:text-(--accent-hover)"
+              className="text-sm text-(--accent-text) hover:text-(--accent-text-hover)"
               data-testid="folder-picker-new"
             >
               + New folder…
@@ -156,7 +157,7 @@ export function FolderPickerModal({
             <button
               onClick={move}
               disabled={moving || itemCount === 0}
-              className="px-4 py-2 bg-(--accent) text-(--on-accent) rounded-md text-sm font-medium hover:bg-(--accent-hover) disabled:opacity-50 disabled:cursor-not-allowed"
+              className={PRIMARY_BUTTON}
               data-testid="folder-picker-move"
             >
               {moving ? "Moving..." : `Move ${itemLabel}`}

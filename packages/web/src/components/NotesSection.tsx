@@ -103,7 +103,7 @@ export function NotesSection({ bookId, noteJob }: { bookId: string; noteJob: Not
                 {note.scope.kind === "book-raw" && note.scope.digestBookId && (
                   <Link
                     to={`/books/${note.scope.digestBookId}`}
-                    className="text-xs text-(--accent) hover:text-(--accent-hover) shrink-0"
+                    className="text-xs text-(--accent-text) hover:text-(--accent-text-hover) shrink-0"
                     title="This summary is a chapter of a digest book — open it"
                   >
                     digest ↗
@@ -118,7 +118,7 @@ export function NotesSection({ bookId, noteJob }: { bookId: string; noteJob: Not
                       onClick={() => toChapterMutation.mutate({ id: note.id })}
                       disabled={toChapterMutation.isPending}
                       title="Append this note as a new suspended chapter at the end of the book — drag it into place in the chapter table, then synthesize"
-                      className="text-xs text-(--accent) hover:text-(--accent-hover) font-medium disabled:opacity-50"
+                      className="text-xs text-(--accent-text) hover:text-(--accent-text-hover) font-medium disabled:opacity-50"
                       data-testid="note-to-chapter"
                     >
                       Add as chapter

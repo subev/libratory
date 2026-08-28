@@ -399,7 +399,7 @@ function ReaderShell({ bookId, chapterId, title, children }: { bookId?: string; 
     <div className="min-h-screen bg-(--bg-page) px-4 py-3">
       <div className="mx-auto max-w-5xl">
         <nav className="mb-2 flex items-center gap-2 text-sm text-(--text-muted)">
-          <Link to={back} className="text-(--accent) hover:text-(--accent-hover)" data-testid="reader-back">
+          <Link to={back} className="text-(--accent-text) hover:text-(--accent-text-hover)" data-testid="reader-back">
             ← Back
           </Link>
           {title && <span className="truncate text-(--text-secondary)">{title}</span>}

@@ -18,6 +18,9 @@ importers:
       oxlint:
         specifier: ^1.80.0
         version: 1.80.0
+      oxlint-tailwindcss:
+        specifier: ^1.10.0
+        version: 1.10.0
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -3850,6 +3853,10 @@ packages:
 
   os-locale@8.0.0:
     resolution: {integrity: sha512-0hdyXRn0wSKMTHCo2CkPJdTKzIhg1Wb7DxJtkeD8M8rRXSwP2ZFRu4UiWBnkjPdRbL5X+AnUVXBE2SZOmkm3dg==}
+    engines: {node: '>=20'}
+
+  oxlint-tailwindcss@1.10.0:
+    resolution: {integrity: sha512-6N1wI7zk1d978xhg+YS6Difg2eOKdK5QRYORLq3q3U8CLUoiZ75FyyVN1eAb2RWHIeKXjRCFkGVegsQmV6HXTg==}
     engines: {node: '>=20'}
 
   oxlint@1.80.0:
@@ -9027,6 +9034,11 @@ snapshots:
       mimic-fn: 2.1.0
 
   os-locale@8.0.0: {}
+
+  oxlint-tailwindcss@1.10.0:
+    dependencies:
+      '@tailwindcss/node': 4.3.3
+      tailwindcss: 4.3.3
 
   oxlint@1.80.0:
     optionalDependencies:
