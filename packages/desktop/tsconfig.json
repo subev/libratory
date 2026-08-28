@@ -5,7 +5,7 @@
     "types": ["node"],
     "noEmit": true,
     "allowJs": true,
-    "checkJs": false,
+    "checkJs": true,
     "noImplicitAny": false,
     "allowImportingTsExtensions": true,
     "declaration": false,
