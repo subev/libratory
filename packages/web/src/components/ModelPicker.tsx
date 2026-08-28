@@ -1,4 +1,4 @@
-import { memo, useEffect } from "react";
+import { memo, useEffect, useRef } from "react";
 import { useDefaultModelKey, useLlmModels } from "../lib/use-llm-models.ts";
 import { formatTokens } from "../lib/ai-presets.ts";
 
@@ -22,14 +22,24 @@ export const ModelPicker = memo(function ModelPicker({
   };
 
   // Callers mount with value "" (unresolved): land on the default model, or the first usable one
-  // when the default is missing or can't do what this picker needs (e.g. chat tools). Waiting for
-  // the default to arrive is the whole point — picking first and correcting later cannot happen,
-  // because by then `value` is usable and this returns early.
+  // when the default is missing or can't do what this picker needs (e.g. chat tools).
+  //
+  // `onChange` is deliberately not a dependency, and the emitted key is remembered. Callers pass an
+  // inline arrow, so its identity changes every render; when the change is persisted through the
+  // server, `value` stays unusable for the whole round-trip, and an effect that re-runs on every
+  // render fires the mutation again on each one. That is a render loop that ends in React #185 and
+  // a white page, which is exactly how it was found.
+  const latest = useRef(onChange);
+  latest.current = onChange;
+  const emitted = useRef<string | null>(null);
+
   useEffect(() => {
     if (models.length === 0 || defaultPending || usable(value)) return;
     const fallback = defaultKey && usable(defaultKey) ? defaultKey : models.find((m) => !requireTools || m.supportsTools)?.key;
-    if (fallback) onChange(fallback);
-  }, [models, value, requireTools, onChange, defaultKey, defaultPending]);
+    if (!fallback || emitted.current === fallback) return;
+    emitted.current = fallback;
+    latest.current(fallback);
+  }, [models, value, requireTools, defaultKey, defaultPending]);
 
   const active = models.find((m) => m.key === value);
   return (
