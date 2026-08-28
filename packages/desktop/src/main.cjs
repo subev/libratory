@@ -312,7 +312,7 @@ async function runBoot() {
       return;
     }
   }
-  win.loadURL(ctx.url);
+  win?.loadURL(ctx.url);
   // Only once the app is actually usable — a version check has no business delaying a launch
   updater.install({ onStatus: (text) => appLog(`[updater] ${text}`), getWindow: () => win });
 }
@@ -375,7 +375,7 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(menu(`http://localhost:${PORT}`));
   win.loadFile(path.join(__dirname, "first-run.html"));
   win.webContents.once("did-finish-load", () => {
-    win.webContents.send("steps", STEPS.map(({ id, label }) => ({ id, label })));
+    win?.webContents.send("steps", STEPS.map(({ id, label }) => ({ id, label })));
     void boot();
   });
   ipcMain.on("recheck", boot);
