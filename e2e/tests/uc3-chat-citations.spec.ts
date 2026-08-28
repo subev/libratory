@@ -2,7 +2,7 @@ import { test, expect, uploadFixtureBook, FAKE_CITED_REPLY, FAKE_MODEL_KEY } fro
 
 // Indexing runs BGE-M3 embeddings locally — first load can take a while, so full tier
 test.describe("chat with citations", { tag: "@slow" }, () => {
-  test("UC3: a scoped chat answers with a verified citation that opens the PDF at the page", async ({ page, fakeLlm }) => {
+  test("UC3: a scoped chat answers with a verified citation that opens the PDF at the page", async ({ page, fakeLlm: _fakeLlm }) => {
     test.setTimeout(5 * 60_000);
 
     await uploadFixtureBook(page, { waitForIndex: true });

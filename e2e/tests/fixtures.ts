@@ -24,7 +24,10 @@ export const test = base.extend<{ profileId: string }, { fakeLlm: void }>({
     await page.addInitScript((id: string) => localStorage.setItem("profile.id", id), profileId);
     await use(page);
   },
+  // Worker-scoped and requested by name only: tests that need the stub destructure it as
+  // `fakeLlm: _fakeLlm`, which Playwright still reads as a request for `fakeLlm`.
   fakeLlm: [
+    // eslint-disable-next-line no-empty-pattern -- Playwright requires a destructuring pattern here; this fixture depends on nothing
     async ({}, use) => {
       const stub = await startFakeLlm(0);
       const restore = await registerFakeLlm(`http://localhost:${stub.port}`);

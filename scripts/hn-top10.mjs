@@ -273,7 +273,7 @@ async function summarize(key, story, article, comments) {
 }
 
 async function mapLimit(items, limit, fn) {
-  const results = new Array(items.length);
+  const results = Array.from({ length: items.length });
   let next = 0;
   await Promise.all(
     Array.from({ length: Math.min(limit, items.length) }, async () => {
