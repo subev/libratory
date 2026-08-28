@@ -18,7 +18,7 @@ export type SynthesizePayload = {
   resume?: boolean;
 };
 
-export async function synthesize(payload: SynthesizePayload, { addJob }: { addJob: WorkerUtils["addJob"] }) {
+export async function synthesize(payload: SynthesizePayload, { addJob: _addJob }: { addJob: WorkerUtils["addJob"] }) {
   const { chapterId, bookId, resume = false } = payload;
   const log = (msg: string) => appendLog(bookId, msg);
 

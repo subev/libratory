@@ -61,13 +61,13 @@ function decoded(error: Error) {
 }
 
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { error: null, componentStack: null };
+  override state: State = { error: null, componentStack: null };
 
   static getDerivedStateFromError(error: Error) {
     return { error };
   }
 
-  componentDidCatch(error: Error, info: { componentStack?: string | null }) {
+  override componentDidCatch(error: Error, info: { componentStack?: string | null }) {
     this.setState({ componentStack: info.componentStack ?? null });
     console.error("Page crashed:", error, info.componentStack);
   }
@@ -80,7 +80,7 @@ export class ErrorBoundary extends Component<Props, State> {
     else window.open(issueUrl(text, this.state.error!.message), "_blank", "noreferrer");
   };
 
-  render() {
+  override render() {
     const { error, componentStack } = this.state;
     if (!error) return this.props.children;
     const help = decoded(error);

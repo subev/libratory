@@ -29,7 +29,7 @@ export function translationChunkPreviewDir(bookId: string, language: string, cha
 
 export async function synthesizeTranslation(
   payload: SynthesizeTranslationPayload,
-  { addJob }: { addJob: WorkerUtils["addJob"] },
+  { addJob: _addJob }: { addJob: WorkerUtils["addJob"] },
 ) {
   const { translationId, bookId, resume = false } = payload;
   const log = (msg: string) => appendLog(bookId, msg);
@@ -206,7 +206,11 @@ export async function synthesizeTranslation(
     const remaining = rows.filter((r) => r.audioStatus !== "done" && r.audioStatus !== "suspended");
     const suspended = rows.filter((r) => r.audioStatus === "suspended");
     if (rows.length > 0 && remaining.length === 0) {
-      await log(`All queued ${label} chapters synthesized`);
+      // remaining excludes suspended, so "all synthesized" was also what a restart that suspended
+      // every chapter reported — the one case where someone needs to know to resume.
+      await log(suspended.length > 0
+        ? `${rows.length - suspended.length} ${label} chapters synthesized, ${suspended.length} suspended — resume to finish`
+        : `All queued ${label} chapters synthesized`);
     }
   } catch (err) {
     if (cancelPoll) {

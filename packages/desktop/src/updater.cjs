@@ -35,6 +35,9 @@ function updatesConfigured() {
 
 let installed = false;
 
+/**
+ * @param {{ onStatus?: (text: string) => void, getWindow?: () => import("electron").BrowserWindow | null }} [opts]
+ */
 function install({ onStatus, getWindow } = {}) {
   // boot() runs again on "recheck", and every listener below would be registered a second time —
   // two dialogs for one update, and an interval nothing clears.
@@ -192,4 +195,6 @@ function install({ onStatus, getWindow } = {}) {
 
 }
 
-module.exports = { install, updatesConfigured, checkNow: (...a) => checkNow(...a) };
+// checkNow is reassigned by install(), so the export has to read it at call time rather than
+// capture the placeholder defined above.
+module.exports = { install, updatesConfigured, checkNow: () => checkNow() };

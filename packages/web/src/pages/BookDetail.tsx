@@ -263,7 +263,6 @@ export function BookDetail() {
   const cleanupSelectedMutation = trpc.chapters.cleanupSelected.useMutation({ onSuccess: invalidate });
   const renameChapterMutation = trpc.chapters.rename.useMutation({ onSuccess: invalidate });
   const reorderChaptersMutation = trpc.chapters.reorder.useMutation({ onSuccess: invalidate });
-  const setSkipSynthesisMutation = trpc.bookFiles.setSkipSynthesis.useMutation({ onSuccess: invalidate });
 
   if (isLoading || !book) {
     return (

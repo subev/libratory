@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ensureGraphileTables, getDb, insertJob, resetDb } from "../../test/setup.ts";
-import { books, bookFiles, chapters, notes, folders, profiles } from "../schema.ts";
+import { books, bookFiles, chapters, folders, profiles } from "../schema.ts";
 
 const { mockQuickAddJob, mockDeepseekChat } = vi.hoisted(() => ({
   mockQuickAddJob: vi.fn(async () => {}),

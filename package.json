@@ -24,7 +24,8 @@
     "app": "bash scripts/desktop-build.sh --fast --install",
     "app:dmg": "bash scripts/desktop-build.sh",
     "release": "node scripts/release.mjs",
-    "ship": "node scripts/ship.mjs"
+    "ship": "node scripts/ship.mjs",
+    "typecheck": "pnpm -r --filter \"./packages/*\" exec tsc --noEmit"
   },
   "devDependencies": {
     "typescript": "^5.7.3"
