@@ -65,10 +65,10 @@ export function ReaderOpen() {
           }`}
           data-testid="reader-open-drop"
         >
-          <h1 className="text-lg font-semibold text-(--text-primary)">Open a read-along book</h1>
+          <h1 className="text-lg font-semibold text-(--text-primary)">Open a read-along EPUB</h1>
           <p className="mx-auto mt-2 max-w-md text-sm text-(--text-muted)">
-            Drop a book someone sent you and read along on its own pages — the narration, the print
-            it was set in, and nothing uploaded anywhere.
+            Drop a synced EPUB and read along on its own pages — the narration, the print it was
+            set in, and nothing uploaded anywhere.
           </p>
           <button
             onClick={() => input.current?.click()}
@@ -81,7 +81,7 @@ export function ReaderOpen() {
           <input
             ref={input}
             type="file"
-            accept=".p2af,.epub,application/epub+zip"
+            accept=".epub,application/epub+zip"
             className="hidden"
             onChange={(e) => { const file = e.target.files?.[0]; if (file) void open(file); }}
           />
@@ -90,8 +90,9 @@ export function ReaderOpen() {
           ) : null}
         </div>
         <p className="mt-4 text-xs text-(--text-faint)">
-          Books exported from this library as a synced EPUB carry their pages with them. An EPUB
-          from anywhere else opens in any reader, but has no print to follow.
+          It has to be a synced EPUB — the “Export synced EPUB” button on a book’s page, which puts
+          the original pages and the narration timing inside the file. A plain “Export EPUB”, an M4B
+          audiobook or a PDF has no pages to follow and will not open here.
         </p>
       </div>
     </div>
