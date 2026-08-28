@@ -23,7 +23,8 @@
     "jobs:clear": "source .env 2>/dev/null; psql \"$DATABASE_URL\" -c 'DELETE FROM graphile_worker._private_jobs; SELECT count(*) AS remaining FROM graphile_worker._private_jobs;'",
     "app": "bash scripts/desktop-build.sh --fast --install",
     "app:dmg": "bash scripts/desktop-build.sh",
-    "release": "node scripts/release.mjs"
+    "release": "node scripts/release.mjs",
+    "ship": "node scripts/ship.mjs"
   },
   "devDependencies": {
     "typescript": "^5.7.3"

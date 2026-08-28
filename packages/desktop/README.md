@@ -121,7 +121,15 @@ Two ways to cut one, and neither involves editing a version by hand.
 ```bash
 pnpm release          # says what it would do, changes nothing
 pnpm release --yes    # version, commit, tag, push — the push starts the build
+pnpm ship             # publish the draft that build produced
 ```
+
+`release` and `ship` are separate on purpose: cutting a release is reversible, publishing one is
+not, because `electron-updater` starts offering it to everyone the moment it stops being a draft.
+`scripts/ship.mjs` refuses a build that is still running, one that failed, one missing an artefact,
+and warns loudly about one the notary did not accept — all four look like a perfectly normal draft
+in the GitHub UI. If the notes are still the workflow's placeholder it writes them from the commit
+subjects since the previous tag.
 
 **From GitHub:** Actions → **Release** → *Run workflow*. Same script, run on the runner, so a
 release needs no checkout at all.

@@ -85,7 +85,9 @@ function main() {
   git("tag", `v${version}`);
   git("push", "origin", "main", `v${version}`);
 
-  console.log(`\n  Pushed v${version}. Watch it:  gh run watch\n`);
+  console.log(`\n  Pushed v${version} — a DRAFT. Nobody is offered it until it is published.`);
+  console.log(`  Watch the build:  gh run watch`);
+  console.log(`  Then publish it:  pnpm ship\n`);
 }
 
 main();
