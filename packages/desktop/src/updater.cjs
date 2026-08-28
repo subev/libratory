@@ -36,9 +36,12 @@ function updatesConfigured() {
 let installed = false;
 
 /**
- * @param {{ onStatus?: (text: string) => void, getWindow?: () => import("electron").BrowserWindow | null }} [opts]
+ * @param {{
+ *   onStatus?: (text: string) => void,
+ *   onProgress?: (progress: { percent: number, transferred: number, total: number } | null) => void,
+ * }} [opts]
  */
-function install({ onStatus, getWindow } = {}) {
+function install({ onStatus, onProgress } = {}) {
   // boot() runs again on "recheck", and every listener below would be registered a second time —
   // two dialogs for one update, and an interval nothing clears.
   if (installed) return;
@@ -64,12 +67,6 @@ function install({ onStatus, getWindow } = {}) {
 
   // Decimal, because that is what Finder and the GitHub release page both say.
   const mb = (bytes) => `${Math.round(bytes / 1e6)} MB`;
-  // getWindow returns main.cjs's `win`, which is not cleared when the window closes — calling
-  // setProgressBar on a destroyed one throws from inside an event handler and crashes on quit.
-  const progress = (fraction) => {
-    const win = getWindow?.();
-    if (win && !win.isDestroyed()) win.setProgressBar(fraction);
-  };
 
   autoUpdater.on("update-available", async (info) => {
     if (declined.has(info.version)) return;
@@ -89,15 +86,19 @@ function install({ onStatus, getWindow } = {}) {
     else declined.add(info.version);
   });
 
-  // The Dock icon rather than a dialog: Electron dialogs cannot be updated once shown, and a
-  // modal would block the app for the length of a 190 MB download.
+  // A dialog cannot be updated once shown, so progress goes to the page and the Dock tile instead.
+  // Logged every tenth only — per tick it would be hundreds of lines in a log kept for diagnosis.
+  let logged = -1;
   autoUpdater.on("download-progress", ({ percent, transferred, total }) => {
-    progress(percent / 100);
+    onProgress?.({ percent, transferred, total });
+    const tenth = Math.floor(percent / 10);
+    if (tenth === logged) return;
+    logged = tenth;
     onStatus?.(`Downloading ${Math.round(percent)}% — ${mb(transferred)} of ${mb(total)}`);
   });
 
   autoUpdater.on("update-downloaded", async (info) => {
-    progress(-1);
+    onProgress?.(null);
     downloaded = info.version;
     onStatus?.(`Update ${info.version} downloaded`);
     const { response } = await dialog.showMessageBox({
@@ -117,7 +118,7 @@ function install({ onStatus, getWindow } = {}) {
   });
 
   autoUpdater.on("error", (err) => {
-    progress(-1);
+    onProgress?.(null);
     onStatus?.(`Updater error: ${err.message}`);
     // A failed *check* must never reach the user: they did not ask, and there is nothing to do
     // about it. A failed *install* is different — they clicked twice and are waiting for a restart

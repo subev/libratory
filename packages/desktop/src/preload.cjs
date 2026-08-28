@@ -10,4 +10,6 @@ contextBridge.exposeInMainWorld("setup", {
   // A payload means a crash in the page can use the same reporter as one in the shell: written
   // to crash.log, then the dialog with Report and Copy. Without one only the shell could report.
   report: (details) => ipcRenderer.send("report", details),
+  // Progress for an update the user asked for. null ends it — downloaded, cancelled or failed.
+  onUpdateProgress: (fn) => ipcRenderer.on("update-progress", (_e, progress) => fn(progress)),
 });

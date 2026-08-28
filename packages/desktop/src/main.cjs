@@ -309,12 +309,28 @@ async function runBoot() {
       win?.webContents.send("failed", { step: step.label });
       // Saying "skipped" beats leaving them at ○, which reads as "still to come"
       for (const later of STEPS.slice(i + 1)) send(later.id, "skipped");
+      installUpdater();
       return;
     }
   }
   win?.loadURL(ctx.url);
-  // Only once the app is actually usable — a version check has no business delaying a launch
-  updater.install({ onStatus: (text) => appLog(`[updater] ${text}`), getWindow: () => win });
+  installUpdater();
+}
+
+// After the steps so a check never competes with the Python download for bandwidth — but after a
+// failed one too, or a machine blocked on Docker gets no updater at all. install() is idempotent.
+function installUpdater() {
+  updater.install({
+    onStatus: (text) => appLog(`[updater] ${text}`),
+    // `win` is not cleared when its window closes, and either call on a destroyed one throws from
+    // inside an event handler — which on quit takes the app down with it.
+
+    onProgress: (progress) => {
+      if (!win || win.isDestroyed()) return;
+      win.setProgressBar(progress ? progress.percent / 100 : -1);
+      win.webContents.send("update-progress", progress);
+    },
+  });
 }
 
 function menu(url) {

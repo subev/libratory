@@ -9,6 +9,7 @@ import { profileHeaders } from "./lib/profile.ts";
 import { installExclusiveAudio } from "./lib/exclusive-audio.ts";
 import { installBreadcrumbs } from "./lib/breadcrumbs.ts";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
+import { UpdateProgress } from "./components/UpdateProgress.tsx";
 import { Home } from "./pages/Home.tsx";
 import { BookDetail } from "./pages/BookDetail.tsx";
 import { Chat } from "./pages/Chat.tsx";
@@ -42,6 +43,7 @@ createRoot(document.getElementById("root")!).render(
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <ErrorBoundary>
+            <UpdateProgress />
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/folders/:folderId" element={<Home />} />

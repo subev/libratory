@@ -11,12 +11,6 @@ import { breadcrumbs } from "../lib/breadcrumbs.ts";
 const REPO = "https://github.com/subev/libratory";
 const MAX_BODY = 4000;
 
-declare global {
-  interface Window {
-    setup?: { report?: (details: string) => void };
-  }
-}
-
 type Props = { children: ReactNode };
 type State = { error: Error | null; componentStack: string | null };
 
