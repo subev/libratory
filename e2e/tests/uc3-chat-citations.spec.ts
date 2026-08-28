@@ -13,7 +13,7 @@ test.describe("chat with citations", { tag: "@slow" }, () => {
     await page.getByTestId("chat-send").click();
 
     const answer = page.getByTestId("chat-assistant-message").last();
-    await expect(answer).toContainText(FAKE_CITED_REPLY.split(" [")[0], { timeout: 60_000 });
+    await expect(answer).toContainText(FAKE_CITED_REPLY.split(" [")[0] ?? FAKE_CITED_REPLY, { timeout: 60_000 });
 
     const chip = answer.getByTestId("chat-sources").getByRole("button").first();
     await expect(chip).toContainText(/tiny.book/i);

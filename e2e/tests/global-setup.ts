@@ -6,7 +6,7 @@ import { LLM_MODELS_PATH } from "./helpers/env.ts";
 // Interrupted runs (e.g. a test stopped from the Playwright UI) can skip fixture
 // teardown — sweep the state they left behind before this run starts.
 export default async function globalSetup(config: FullConfig) {
-  const baseURL = config.projects[0].use.baseURL!;
+  const baseURL = config.projects[0]?.use.baseURL;
   const ctx = await request.newContext({ baseURL });
 
   let profiles: { id: string; name: string }[];
