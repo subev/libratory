@@ -42,6 +42,61 @@ Postgres runs in Docker (`docker-compose.yml` at root), mapped to host port **54
 
 Environment variables are managed via `.env` at the repo root (gitignored), with `.env.example` as template. The server loads env via `dotenv` in `packages/server/src/env.ts`, validated through a Zod schema. All server code imports the typed `env` object — never reads `process.env` directly. Vars: `DATABASE_URL`, `DATA_DIR`, `PORT`, `CONDA_ENV_PATH` (Python env bin dir; default `<repo>/.venv/bin`, created by `scripts/setup.sh`), `POCKET_ENV_PATH` (Pocket TTS Python env bin dir; default `<repo>/.venv-pocket/bin`), `HF_TOKEN` is read by `scripts/setup.sh` directly (setup-time only, for the gated Pocket TTS cloning weights) and is deliberately not in the Zod schema — no server code reads it, optional AI provider keys — `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` — plus optional `LOCAL_LLM_URL`/`LOCAL_LLM_MODEL` (and `LOCAL_LLM_LABEL`/`LOCAL_LLM_CONTEXT_TOKENS`/`LOCAL_LLM_TOOLS`) for a *custom* OpenAI-compatible server — local Ollama and LM Studio servers are auto-discovered with no configuration (cached 30s, per-model tools capability and context length read from the server); each available model is pickable (registry in `lib/llm.ts`, extra entries via `DATA_DIR/llm-models.json`); `DEFAULT_LLM_MODEL` is the Settings choice every no-explicit-pick request resolves to, written by `setDefaultModelKey` and honoured by `defaultModelKey` only while that model is actually available; the home page ⚙️ opens `SettingsModal` (`llmModels.status` + `secrets.list`/`secrets.set` tRPC) which shows detected local servers/models and edits every user-settable key — written to `.env` via `lib/env-file.ts` and applied to the in-memory `env` without restart, never echoed back to the client (only `configured` and the last four characters). `lib/secrets.ts` holds the one table of those keys, LLM providers and the two cloud TTS providers alike; anything missing from it is unreachable in the desktop app, which has no checkout and no file to edit. Which file gets written is `envFilePath` — `LIBRATORY_ENV_FILE` if set (the desktop app passes `config.json`'s `envFile`), else `<repoRoot>/.env`; `updateEnvFile` writes 0600 and renames into place, because in the packaged app that call is what *creates* the file. `HOST` (default `127.0.0.1`) is what the server binds — 0.0.0.0 was a dev-box default that shipped an unauthenticated library to every network the app is opened on, and CORS is gated for the same reason: `lib/cors.ts` reflects loopback origins, plus an Origin matching the request's own `Host` when that Host is an IP literal (the phone-on-the-LAN case; a rebinding page cannot produce a literal, because to make a browser send `Host: attacker.com` the page must come from attacker.com). Names that legitimately front the server — a reverse proxy, an mDNS or tailnet name — are listed in `TRUSTED_HOSTS`. The file-path columns (`books.pdf_path`/`output_path`, `book_files.pdf_path`, `chapters.audio_path`, `chapter_translations.audio_path`, `assemblies`/`documents.output_path`) store paths **relative to `DATA_DIR`** through the `dataPath` custom column type in `schema.ts` — code on either side still sees absolute paths, and a path outside `DATA_DIR` stays absolute and resolves to itself. They were absolute until 0034, which is why renaming this checkout left 2547 rows pointing at a directory that no longer existed and made the container's `/data` unreachable by construction. `MIGRATIONS_DIR` (default `<repo>/packages/server/drizzle`) is where `main.ts` applies pending migrations at boot: a packaged app has no drizzle-kit and nobody to run `pnpm db:migrate`, so without it a fresh install comes up against an empty database. Also optional: `READALOUD_DROP_DIR` (synced-EPUB drop folder for Storyteller auto-import).
 
+## Type safety — read this before writing code
+
+The compiler and the linter are the cheapest reviewers in this repo, and they are configured to be
+strict on purpose. On 2026-08-28 a single day of enabling them found **eleven real bugs** that no
+test covered. Every rule below is written because something broke.
+
+**Statuses and kinds are unions, never `string`.** Drizzle's `enum` option already gives you
+`"pending" | "extracting" | "synthesizing" | "done" | "failed" | "suspended"` and friends — never
+widen one to `string`, and never accept a bare `string` where a union is available. A union is what
+makes an unhandled case a compile error instead of a branch nobody wrote.
+
+**Handle unions exhaustively.** In a `switch`, end with a `default` that assigns the value to
+`never`, so adding a status to the schema fails the build at every place that has to care:
+
+```ts
+default: {
+  const unhandled: never = status;
+  throw new Error(`unhandled status ${unhandled}`);
+}
+```
+
+`noFallthroughCasesInSwitch` is on. Ternary chains over a union get no such check — prefer a
+`switch` when the branches matter.
+
+**`noUncheckedIndexedAccess` is on: `arr[0]` is `T | undefined`.** Do not reach for `!` to silence
+it — that is the flag switched off one site at a time. Use a guard, a default, or hoist the element
+into a checked local. Two whole days of this repo's index accesses were audited with **zero** `!`
+added, and four pre-existing ones were removed as standing in for real checks. What it caught:
+a chapter dereferenced by an index held in state across list changes (99 use sites, a white page
+every time), two drag handlers splicing `undefined` back into a list, an unchecked index returned
+by an LLM, and an embedding loop that could spin forever writing nothing.
+
+**An empty array is truthy.** `if (!line.xs)` does not mean "has entries". That guard let `xs[-1]`
+through and drew a read-along highlight out of `NaN`s.
+
+**Effect dependency arrays are linted and the rules are not decoration.** `exhaustive-deps`,
+`set-state-in-effect` and `exhaustive-effect-dependencies` exist here because a dependency array
+containing an inline arrow produced a render loop, React error #185 and a white page — and reached
+a release. If a rule genuinely does not apply, disable it at that line **with a one-line reason**;
+never blanket-disable, and never silence one to make a number go down.
+
+**`unknown` over `any`, type guards over assertions.** `useUnknownInCatchVariables` is on via
+`strict`, so narrow errors with `err instanceof Error` rather than casting.
+
+**Three checks must be green before every commit** — CI runs all of them, lint first:
+
+```bash
+pnpm lint        # oxlint, under a second for 45k lines
+pnpm typecheck   # tsc --noEmit across every package
+pnpm test        # 538 unit + integration tests
+```
+
+Open work and the reasoning behind the current settings live in
+[`tasks/type-safety-and-lint.md`](tasks/type-safety-and-lint.md).
+
 ## The Pipeline
 
 ```
@@ -513,6 +568,9 @@ The UI has a LogViewer component that polls `books.logs` every second during pro
 ## Development Commands
 
 ```bash
+pnpm lint             # oxlint over packages, scripts, e2e (also runs first in CI)
+pnpm lint:fix         # ...and apply what it can fix itself
+pnpm typecheck        # tsc --noEmit across every package
 pnpm dev              # Start server (port 3034) + web (port 3033) in parallel
 pnpm dev:server       # Server only
 pnpm dev:web          # Web only
