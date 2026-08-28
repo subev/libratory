@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getDb, resetDb } from "../../test/setup.ts";
+import { getDb, resetDb, row } from "../../test/setup.ts";
 import { books, bookFiles } from "../schema.ts";
 import { eq, asc } from "drizzle-orm";
 
@@ -56,10 +56,10 @@ describe("rawExtract worker", () => {
     await rawExtract({ bookId }, { addJob: vi.fn() } as any);
 
     const files = await db.select().from(bookFiles).where(eq(bookFiles.bookId, bookId)).orderBy(asc(bookFiles.index));
-    expect(files[0].rawText).toBe("one two three");
-    expect(files[0].rawWords).toBe(3);
-    expect(files[1].rawText).toBe("четири пет");
-    expect(files[1].rawWords).toBe(2);
+    expect(files[0]?.rawText).toBe("one two three");
+    expect(files[0]?.rawWords).toBe(3);
+    expect(files[1]?.rawText).toBe("четири пет");
+    expect(files[1]?.rawWords).toBe(2);
   });
 
   it("skips files that already have raw text", async () => {
@@ -73,7 +73,7 @@ describe("rawExtract worker", () => {
     expect(mockExtract).toHaveBeenCalledTimes(1);
     expect(mockExtract).toHaveBeenCalledWith("/tmp/raw_1.pdf");
     const files = await db.select().from(bookFiles).where(eq(bookFiles.bookId, bookId)).orderBy(asc(bookFiles.index));
-    expect(files[0].rawText).toBe("existing");
+    expect(files[0]?.rawText).toBe("existing");
   });
 
   it("leaves rawText null when extraction yields nothing", async () => {
@@ -83,7 +83,7 @@ describe("rawExtract worker", () => {
 
     await rawExtract({ bookId }, { addJob: vi.fn() } as any);
 
-    const [file] = await db.select().from(bookFiles).where(eq(bookFiles.bookId, bookId));
+    const file = row(await db.select().from(bookFiles).where(eq(bookFiles.bookId, bookId)));
     expect(file.rawText).toBeNull();
     expect(file.rawWords).toBeNull();
   });
@@ -117,7 +117,7 @@ describe("rawExtract worker", () => {
     await rawExtract({ bookId, note: { prompt: "Summarize", model: "flash" } }, { addJob } as any);
 
     expect(addJob).not.toHaveBeenCalled();
-    const [book] = await db.select().from(books).where(eq(books.id, bookId));
+    const book = row(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.noteJob?.status).toBe("failed");
     expect(book.noteJob?.error).toMatch(/no raw text/i);
   });

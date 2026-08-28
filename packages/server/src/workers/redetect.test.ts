@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getDb, resetDb } from "../../test/setup.ts";
+import { getDb, resetDb, row } from "../../test/setup.ts";
 import { books, bookFiles, chapters, assemblies } from "../schema.ts";
 import { eq, asc } from "drizzle-orm";
 
@@ -74,7 +74,7 @@ describe("redetect worker", () => {
     const remaining = await db.select().from(assemblies).where(eq(assemblies.bookId, bookId));
     expect(remaining).toHaveLength(0);
 
-    const [book] = await db.select().from(books).where(eq(books.id, bookId));
+    const book = row(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.status).toBe("pending");
     expect(book.totalChapters).toBe(3);
     expect(book.chapterDetection).toBe("numbered-headings");
@@ -123,7 +123,7 @@ describe("redetect worker", () => {
 
     await expect(redetect({ bookId })).rejects.toThrow("No chapters detected");
 
-    const [book] = await db.select().from(books).where(eq(books.id, bookId));
+    const book = row(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.status).toBe("failed");
     expect(book.error).toContain("No chapters detected");
   });

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { mkdir, writeFile, readdir, rm } from "node:fs/promises";
 
-import { getDb, resetDb } from "../../test/setup.ts";
+import { getDb, resetDb, row } from "../../test/setup.ts";
 import { books, chapters } from "../schema.ts";
 
 vi.mock("../lib/tts.ts", () => {
@@ -89,7 +89,7 @@ describe("synthesize worker", () => {
       chunkPreviewUrlBase: `/files/${bookId}/chunks/ch000`,
     }));
 
-    const [chapter] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
+    const chapter = row(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
     expect(chapter.status).toBe("done");
     expect(chapter.progress).toBeNull();
     expect(chapter.audioPath).toContain("ch000.m4a");
@@ -117,7 +117,7 @@ describe("synthesize worker", () => {
 
     await synthesizeWorker({ bookId, chapterId }, { addJob } as never);
 
-    const [chapter] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
+    const chapter = row(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
     expect(chapter.status).toBe("done");
     expect(addJob).not.toHaveBeenCalled();
   });
@@ -191,7 +191,7 @@ describe("synthesize worker", () => {
 
     await synthesizeWorker({ bookId, chapterId }, { addJob: vi.fn() } as never);
 
-    const [chapter] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
+    const chapter = row(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
     expect(chapter.status).toBe("suspended");
     expect(chapter.progress).toBe("313/322");
   });
@@ -222,7 +222,7 @@ describe("synthesize worker", () => {
 
     await synthesizeWorker({ bookId, chapterId }, { addJob: vi.fn() } as never);
 
-    const [chapter] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
+    const chapter = row(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
     expect(chapter.status).toBe("suspended");
     expect(chapter.error).toBeNull();
   });
@@ -261,7 +261,7 @@ describe("synthesize worker", () => {
       chunkPreviewUrlBase: `/files/${bookId}/chunks/ch000`,
     }));
 
-    const [chapter] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
+    const chapter = row(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
     expect(chapter.synthesizedWith).toEqual({ voice: "bg-mms:bul", speed: null });
   });
 });

@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import multipart from "@fastify/multipart";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getDb, resetDb } from "../test/setup.ts";
+import { getDb, resetDb, row } from "../test/setup.ts";
 import { books, bookFiles, folders } from "./schema.ts";
 import { eq, asc } from "drizzle-orm";
 
@@ -78,7 +78,7 @@ describe("POST /upload", () => {
     const db = getDb();
     const files = await db.select().from(bookFiles).where(eq(bookFiles.bookId, book.id));
     expect(files).toHaveLength(1);
-    expect(files[0].status).toBe("raw");
+    expect(files[0]?.status).toBe("raw");
 
     expect(mockQuickAddJob).toHaveBeenCalledTimes(1);
     expect(mockQuickAddJob).toHaveBeenCalledWith(
@@ -91,7 +91,7 @@ describe("POST /upload", () => {
 
   it("assigns the book to the given folder", async () => {
     const db = getDb();
-    const [folder] = await db.insert(folders).values({ name: "History" }).returning();
+    const folder = row(await db.insert(folders).values({ name: "History" }).returning());
     const app = await createApp();
     const { payload, headers } = multipartBody([
       { name: "file", value: "%PDF-fake", filename: "my_book.pdf" },
@@ -101,7 +101,7 @@ describe("POST /upload", () => {
     const res = await app.inject({ method: "POST", url: "/upload", payload, headers });
 
     expect(res.statusCode).toBe(200);
-    const [book] = await db.select().from(books);
+    const book = row(await db.select().from(books));
     expect(book.folderId).toBe(folder.id);
   });
 
@@ -134,7 +134,7 @@ describe("POST /upload", () => {
 
     const db = getDb();
     const files = await db.select().from(bookFiles).where(eq(bookFiles.bookId, book.id));
-    expect(files[0].status).toBe("pending");
+    expect(files[0]?.status).toBe("pending");
 
     const jobNames = mockQuickAddJob.mock.calls.map((c: any[]) => c[1]);
     expect(jobNames).toEqual(["rawExtract", "extract"]);

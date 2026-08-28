@@ -199,18 +199,18 @@ function formatTimestamp(date: Date): string {
 
 // Build a compact summary like "Ch 1-3, 5, 7-10" from 0-based indices
 function buildChapterSummary(indices: number[]): string {
-  if (indices.length === 0) return "";
-  const nums = indices.map((i) => i + 1).sort((a, b) => a - b);
+  const [head, ...rest] = indices.map((i) => i + 1).sort((a, b) => a - b);
+  if (head === undefined) return "";
   const ranges: string[] = [];
-  let start = nums[0];
-  let end = nums[0];
-  for (let i = 1; i < nums.length; i++) {
-    if (nums[i] === end + 1) {
-      end = nums[i];
+  let start = head;
+  let end = head;
+  for (const num of rest) {
+    if (num === end + 1) {
+      end = num;
     } else {
       ranges.push(start === end ? String(start) : `${start}-${end}`);
-      start = nums[i];
-      end = nums[i];
+      start = num;
+      end = num;
     }
   }
   ranges.push(start === end ? String(start) : `${start}-${end}`);

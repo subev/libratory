@@ -133,8 +133,8 @@ export async function indexBook({ bookId }: IndexBookPayload, { addJob }: { addJ
     }
 
     let changed = 0;
-    for (let i = 0; i < units.length; i++) {
-      if (await reindexUnit(book, units[i])) changed++;
+    for (const [i, unit] of units.entries()) {
+      if (await reindexUnit(book, unit)) changed++;
       if ((i + 1) % 5 === 0 || i === units.length - 1) {
         job = await setJob(bookId, job, { progress: `chunked ${i + 1}/${units.length} units` });
       }

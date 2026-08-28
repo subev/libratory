@@ -60,8 +60,8 @@ export async function cleanup(payload: CleanupPayload) {
     // Cleaned chunks accumulate in memory and land in customText in one final
     // write — an interrupted run must never leave a truncated chapter behind.
     const cleaned: string[] = [];
-    for (let i = 0; i < chunks.length; i++) {
-      cleaned.push(await cleanupChunk({ text: chunks[i] }));
+    for (const [i, chunk] of chunks.entries()) {
+      cleaned.push(await cleanupChunk({ text: chunk }));
 
       const updated = await db
         .update(chapters)

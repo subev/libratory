@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getDb, resetDb } from "../../test/setup.ts";
+import { getDb, resetDb, row } from "../../test/setup.ts";
 import { books, bookFiles, chapters, notes } from "../schema.ts";
 import { eq, asc } from "drizzle-orm";
 
@@ -47,7 +47,7 @@ async function insertSourceBook(opts: { title: string; rawText?: string | null; 
 async function insertDigestBook(sourceBookIds: string[], prompt = "Narrate a summary") {
   const db = getDb();
   const now = new Date().toISOString();
-  const [book] = await db
+  const book = row(await db
     .insert(books)
     .values({
       title: "My Digest",
@@ -56,7 +56,7 @@ async function insertDigestBook(sourceBookIds: string[], prompt = "Narrate a sum
       origin: { type: "digest", sourceBookIds, prompt, model: "flash" },
       digestJob: { status: "running", createdAt: now, updatedAt: now },
     })
-    .returning();
+    .returning());
   return book.id;
 }
 
@@ -79,13 +79,13 @@ describe("digest worker", () => {
     const chs = await db.select().from(chapters).where(eq(chapters.bookId, digestId)).orderBy(asc(chapters.index));
     expect(chs.map((c) => c.title)).toEqual(["Book A", "Book B"]);
     expect(chs.every((c) => c.status === "suspended" && c.rawText === "Spoken summary.")).toBe(true);
-    expect(chs[0].source).toEqual({ kind: "book", bookId: a, title: "Book A" });
+    expect(chs[0]?.source).toEqual({ kind: "book", bookId: a, title: "Book A" });
 
     const noteRows = await db.select().from(notes);
     expect(noteRows.map((n) => n.bookId).sort()).toEqual([a, b].sort());
-    expect(noteRows[0].scope).toMatchObject({ kind: "book-raw", digestBookId: digestId });
+    expect(noteRows[0]?.scope).toMatchObject({ kind: "book-raw", digestBookId: digestId });
 
-    const [book] = await db.select().from(books).where(eq(books.id, digestId));
+    const book = row(await db.select().from(books).where(eq(books.id, digestId)));
     expect(book.digestJob?.status).toBe("done");
     expect(book.totalChapters).toBe(2);
     expect(book.status).toBe("pending");
@@ -98,8 +98,8 @@ describe("digest worker", () => {
 
     await digest({ bookId: digestId });
 
-    const firstCall = mockDeepseekChat.mock.calls[0][1] as string;
-    const secondCall = mockDeepseekChat.mock.calls[1][1] as string;
+    const firstCall = mockDeepseekChat.mock.calls[0]?.[1] as string;
+    const secondCall = mockDeepseekChat.mock.calls[1]?.[1] as string;
     expect(firstCall).toContain("cleaned chapter text");
     expect(firstCall).not.toContain("raw layer");
     expect(secondCall).toContain("raw only text");
@@ -124,7 +124,7 @@ describe("digest worker", () => {
     expect(mockDeepseekChat).toHaveBeenCalledTimes(1);
     const chs = await db.select().from(chapters).where(eq(chapters.bookId, digestId)).orderBy(asc(chapters.index));
     expect(chs.map((c) => c.title)).toEqual(["Book A", "Book B"]);
-    expect(chs[0].rawText).toBe("existing summary");
+    expect(chs[0]?.rawText).toBe("existing summary");
   });
 
   it("skips textless sources and reports partial failure", async () => {
@@ -137,7 +137,7 @@ describe("digest worker", () => {
 
     const chs = await db.select().from(chapters).where(eq(chapters.bookId, digestId));
     expect(chs).toHaveLength(1);
-    const [book] = await db.select().from(books).where(eq(books.id, digestId));
+    const book = row(await db.select().from(books).where(eq(books.id, digestId)));
     expect(book.digestJob?.status).toBe("failed");
     expect(book.digestJob?.error).toMatch(/1 of 2/);
   });
@@ -151,7 +151,7 @@ describe("digest worker", () => {
     await expect(digest({ bookId: digestId })).rejects.toThrow(/DEEPSEEK_API_KEY/);
 
     const db = getDb();
-    const [book] = await db.select().from(books).where(eq(books.id, digestId));
+    const book = row(await db.select().from(books).where(eq(books.id, digestId)));
     expect(book.digestJob?.status).toBe("failed");
     expect(mockDeepseekChat).not.toHaveBeenCalled();
   });
@@ -167,7 +167,7 @@ describe("digest worker", () => {
 
     const chs = await db.select().from(chapters).where(eq(chapters.bookId, digestId));
     expect(chs.map((c) => c.title)).toEqual(["Works"]);
-    const [book] = await db.select().from(books).where(eq(books.id, digestId));
+    const book = row(await db.select().from(books).where(eq(books.id, digestId)));
     expect(book.digestJob?.status).toBe("failed");
   });
 });

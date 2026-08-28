@@ -80,10 +80,11 @@ export async function translate(
 
     live = beginTranslationLive(translationId, translated);
 
-    for (let i = done; i < chunks.length; i++) {
+    for (const [i, chunk] of chunks.entries()) {
+      if (i < done) continue;
       if (translated) live.append("\n\n");
       const result = await runChunk({
-        text: chunks[i],
+        text: chunk,
         previousOutput: translated ? translated.slice(-1500) : undefined,
         onDelta: live.append,
         onThinking: live.think,

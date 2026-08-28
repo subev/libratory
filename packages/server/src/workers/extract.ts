@@ -46,11 +46,11 @@ export async function extract(payload: ExtractPayload, { addJob }: { addJob: Wor
     }
 
     // Count total chapters
-    const [{ count }] = await db
+    const [highest] = await db
       .select({ count: max(chapters.index) })
       .from(chapters)
       .where(eq(chapters.bookId, bookId));
-    const totalChapters = count != null ? count + 1 : 0;
+    const totalChapters = highest?.count != null ? highest.count + 1 : 0;
 
     await db
       .update(books)
@@ -104,8 +104,7 @@ async function extractSinglePdf(
   await log(`Detected ${extractedChapters.length} chapters (${method})`);
   await db.update(books).set({ chapterDetection: method, updatedAt: new Date() }).where(eq(books.id, book.id));
 
-  for (let i = 0; i < extractedChapters.length; i++) {
-    const ch = extractedChapters[i];
+  for (const [i, ch] of extractedChapters.entries()) {
     const globalIndex = chapterOffset + i;
     const wordCount = ch.text.split(/\s+/).filter(Boolean).length;
     await log(`Chapter ${globalIndex + 1}: "${ch.title}" (${wordCount.toLocaleString()} words)`);
@@ -125,6 +124,7 @@ async function extractSinglePdf(
       })
       .returning();
 
+    if (!inserted) throw new Error("Failed to insert the extracted chapter");
     if (!skipSynthesis) {
       await addJob("normalize", { chapterId: inserted.id, bookId: book.id }, { maxAttempts: 1 });
     }

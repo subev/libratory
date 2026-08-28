@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { getDb, resetDb, ensureGraphileTables, insertJob, listJobs } from "../../test/setup.ts";
+import { getDb, resetDb, ensureGraphileTables, insertJob, listJobs, row as firstRow } from "../../test/setup.ts";
 import { books, chapters, chapterVariants } from "../schema.ts";
 import { eq } from "drizzle-orm";
 
@@ -50,7 +50,7 @@ describe("startup sweep", () => {
 
     await sweepStrandedWork();
 
-    const [row] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
+    const row = firstRow(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
     expect(row.status).toBe("pending");
     expect(row.progress).toBe("5/10");
     expect(mockQuickAddJob).toHaveBeenCalledWith(
@@ -96,7 +96,7 @@ describe("startup sweep", () => {
 
     await sweepStrandedWork();
 
-    const [row] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
+    const row = firstRow(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
     expect(row.status).toBe("suspended");
     expect(mockQuickAddJob).not.toHaveBeenCalled();
   });
@@ -106,21 +106,21 @@ describe("startup sweep", () => {
     const { bookId, chapterId } = await insertFixture(db);
     const otherChapterId = crypto.randomUUID();
     await db.insert(chapters).values({ id: otherChapterId, bookId, index: 1, title: "Ch2", rawText: "More." });
-    const [translating] = await db
+    const translating = firstRow(await db
       .insert(chapterVariants)
       .values({ chapterId, key: "Bulgarian", status: "translating", text: "partial", progress: "1/3" })
-      .returning();
-    const [audioStuck] = await db
+      .returning());
+    const audioStuck = firstRow(await db
       .insert(chapterVariants)
       .values({ chapterId: otherChapterId, key: "Bulgarian", status: "done", text: "bg", audioStatus: "synthesizing" })
-      .returning();
+      .returning());
 
     await sweepStrandedWork();
 
-    const [t] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, translating.id));
+    const t = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.id, translating.id)));
     expect(t.status).toBe("pending");
     expect(t.text).toBe("partial");
-    const [a] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, audioStuck.id));
+    const a = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.id, audioStuck.id)));
     expect(a.audioStatus).toBe("pending");
     expect(mockQuickAddJob).toHaveBeenCalledWith(
       expect.anything(),
@@ -139,14 +139,14 @@ describe("startup sweep", () => {
   it("leaves deferred audio markers to the translate worker", async () => {
     const db = getDb();
     const { chapterId } = await insertFixture(db);
-    const [row] = await db
+    const row = firstRow(await db
       .insert(chapterVariants)
       .values({ chapterId, key: "Bulgarian", status: "translating", text: "", audioStatus: "pending" })
-      .returning();
+      .returning());
 
     await sweepStrandedWork();
 
-    const [t] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, row.id));
+    const t = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.id, row.id)));
     expect(t.audioStatus).toBe("pending");
     expect(mockQuickAddJob).toHaveBeenCalledWith(expect.anything(), "translate", expect.anything(), expect.anything());
     expect(mockQuickAddJob).not.toHaveBeenCalledWith(expect.anything(), "synthesizeTranslation", expect.anything(), expect.anything());
@@ -164,7 +164,7 @@ describe("startup sweep", () => {
 
     await sweepStrandedWork();
 
-    const [row] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
+    const row = firstRow(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
     expect(row.cleanup?.status).toBe("pending");
     expect(row.cleanup?.error).toBeUndefined();
     expect(mockQuickAddJob).toHaveBeenCalledWith(
@@ -195,7 +195,7 @@ describe("startup sweep", () => {
     await sweepStrandedWork();
 
     expect(mockQuickAddJob).not.toHaveBeenCalledWith(expect.anything(), "cleanup", expect.anything(), expect.anything());
-    const [done] = await db.select().from(chapters).where(eq(chapters.id, doneChapterId));
+    const done = firstRow(await db.select().from(chapters).where(eq(chapters.id, doneChapterId)));
     expect(done.cleanup?.status).toBe("done");
   });
 
@@ -209,7 +209,7 @@ describe("startup sweep", () => {
 
     await sweepStrandedWork();
 
-    const [row] = await db.select().from(books).where(eq(books.id, bookId));
+    const row = firstRow(await db.select().from(books).where(eq(books.id, bookId)));
     expect(row.chapterProposal?.status).toBe("failed");
     expect(row.chapterProposal?.error).toContain("server restart");
     expect(mockQuickAddJob).not.toHaveBeenCalledWith(expect.anything(), "propose", expect.anything(), expect.anything());
@@ -226,7 +226,7 @@ describe("startup sweep", () => {
 
     await sweepStrandedWork();
 
-    const [row] = await db.select().from(books).where(eq(books.id, bookId));
+    const row = firstRow(await db.select().from(books).where(eq(books.id, bookId)));
     expect(row.noteJob?.status).toBe("failed");
     expect(row.noteJob?.error).toContain("server restart");
   });
@@ -248,9 +248,9 @@ describe("startup sweep", () => {
       { bookId, language: "Bulgarian" },
       { maxAttempts: 1 },
     );
-    const [replayed] = await db.select().from(books).where(eq(books.id, bookId));
+    const replayed = firstRow(await db.select().from(books).where(eq(books.id, bookId)));
     expect(replayed.status).toBe("assembling");
-    const [unstuck] = await db.select().from(books).where(eq(books.id, stuckBookId));
+    const unstuck = firstRow(await db.select().from(books).where(eq(books.id, stuckBookId)));
     expect(unstuck.status).toBe("done");
   });
 });

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import path from "node:path";
 import { sql } from "drizzle-orm";
-import { getDb, resetDb } from "../test/setup.ts";
+import { getDb, resetDb, row } from "../test/setup.ts";
 import { books, bookFiles, chapters } from "./schema.ts";
 import { outputDir, uploadsDir } from "./lib/paths.ts";
 
@@ -26,10 +26,10 @@ describe("the data-path columns", () => {
     const bookId = await insertBook(pdfPath, audioPath);
 
     const raw = await db.execute(sql`select pdf_path from ${bookFiles} where book_id = ${bookId}`);
-    expect((raw as unknown as { pdf_path: string }[])[0].pdf_path).toBe(path.join("uploads", "b-1", "book.pdf"));
+    expect((raw as unknown as { pdf_path: string }[])[0]?.pdf_path).toBe(path.join("uploads", "b-1", "book.pdf"));
 
-    const [file] = await db.select().from(bookFiles);
-    const [chapter] = await db.select().from(chapters);
+    const file = row(await db.select().from(bookFiles));
+    const chapter = row(await db.select().from(chapters));
     expect(file.pdfPath).toBe(pdfPath);
     expect(chapter.audioPath).toBe(audioPath);
   });
@@ -41,9 +41,9 @@ describe("the data-path columns", () => {
     const bookId = await insertBook(outside, outside);
 
     const raw = await db.execute(sql`select pdf_path from ${bookFiles} where book_id = ${bookId}`);
-    expect((raw as unknown as { pdf_path: string }[])[0].pdf_path).toBe(outside);
+    expect((raw as unknown as { pdf_path: string }[])[0]?.pdf_path).toBe(outside);
 
-    const [file] = await db.select().from(bookFiles);
+    const file = row(await db.select().from(bookFiles));
     expect(file.pdfPath).toBe(outside);
   });
 
@@ -53,7 +53,7 @@ describe("the data-path columns", () => {
     await db.insert(books).values({ id: bookId, title: "Book", filename: "b.pdf" });
     await db.insert(chapters).values({ bookId, index: 0, title: "One", rawText: "t" });
 
-    const [chapter] = await db.select().from(chapters);
+    const chapter = row(await db.select().from(chapters));
     expect(chapter.audioPath).toBeNull();
   });
 });

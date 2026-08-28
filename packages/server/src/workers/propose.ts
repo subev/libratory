@@ -43,6 +43,7 @@ export async function propose(payload: ProposePayload) {
         for (const { fileIndex, blocks } of files) {
           for (const s of selected.get(fileIndex) ?? []) {
             const block = blocks[s.blockIndex];
+            if (!block) continue;
             boundaries.push({
               fileIndex,
               blockIndex: s.blockIndex,
@@ -62,7 +63,9 @@ export async function propose(payload: ProposePayload) {
         if (detected) {
           detection = detected.method;
           for (const i of detected.indices) {
-            boundaries.push({ fileIndex: source.fileIndex, blockIndex: i, title: allBlocks[i].text, page: allBlocks[i].page });
+            const block = allBlocks[i];
+            if (!block) continue;
+            boundaries.push({ fileIndex: source.fileIndex, blockIndex: i, title: block.text, page: block.page });
           }
         } else {
           await log(`No chapter headings detected for "${source.filename}"`);
