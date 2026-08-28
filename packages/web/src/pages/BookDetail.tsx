@@ -19,6 +19,13 @@ import { loadBookSort, sortBooks } from "../lib/book-sort.ts";
 import { formatBytes, pendingExportLabel, pendingExportSummary } from "../lib/format.ts";
 import { getVoiceLabel, languageLabel } from "../lib/voices.ts";
 
+// A worker killed mid-run (restart, network drop) leaves digestJob stuck on "running"; treat a
+// stale heartbeat as interrupted, mirroring the server's resumeDigest guard.
+function digestJobLive(digestJob: { status: string; updatedAt: string } | null | undefined): boolean {
+  if (digestJob?.status !== "running") return false;
+  return Date.now() - new Date(digestJob.updatedAt).getTime() < 15 * 60_000;
+}
+
 export function BookDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -85,7 +92,7 @@ export function BookDetail() {
       utils.books.diskUsage.invalidate({ bookId: id! });
     }
     prevAssemblyActive.current = assemblyActive;
-  }, [assemblyActive]);
+  }, [assemblyActive, id, utils]);
 
   const { data: originalAudioSize } = trpc.chapters.selectedAudioSize.useQuery(
     { bookId: id! },
@@ -113,7 +120,7 @@ export function BookDetail() {
       utils.books.diskUsage.invalidate({ bookId: id! });
     }
     prevPendingCount.current = pendingExports.length;
-  }, [pendingExports.length]);
+  }, [pendingExports.length, id, utils]);
 
   // Book mutations
   const cancelMutation = trpc.books.cancel.useMutation({ onSuccess: invalidate });
@@ -167,8 +174,9 @@ export function BookDetail() {
       return next;
     }, { replace: true });
   };
-  const [titlesRequested, setTitlesRequested] = useState(false);
-  useEffect(() => setTitlesRequested(false), [activeVariant]);
+  // The request belongs to the lane it was made in, so switching lanes withdraws it
+  const [titlesRequestedFor, setTitlesRequestedFor] = useState<string | null | undefined>(undefined);
+  const titlesRequested = titlesRequestedFor === activeVariant;
 
   const { data: variantLanes = [] } = trpc.variants.list.useQuery(
     { bookId: id! },
@@ -188,6 +196,8 @@ export function BookDetail() {
   const bookIndex = orderedBooks.findIndex((b) => b.id === id);
   const prevBook = bookIndex > 0 ? orderedBooks[bookIndex - 1] : null;
   const nextBook = bookIndex >= 0 && bookIndex < orderedBooks.length - 1 ? orderedBooks[bookIndex + 1] : null;
+  const prevBookId = prevBook?.id ?? null;
+  const nextBookId = nextBook?.id ?? null;
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -196,12 +206,12 @@ export function BookDetail() {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
       if (askScope || showStructure || showTranslation || showSynthesize) return;
-      const target = e.key === "[" ? prevBook : nextBook;
-      if (target) navigate(`/books/${target.id}`);
+      const target = e.key === "[" ? prevBookId : nextBookId;
+      if (target) navigate(`/books/${target}`);
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [prevBook?.id, nextBook?.id, askScope, showStructure, showTranslation, showSynthesize]);
+  }, [prevBookId, nextBookId, navigate, askScope, showStructure, showTranslation, showSynthesize]);
 
   const { data: translationRows = [] } = trpc.variants.listForBook.useQuery(
     { bookId: id!, key: activeVariant! },
@@ -232,7 +242,7 @@ export function BookDetail() {
   const stopAudioMutation = trpc.variants.stopAudio.useMutation({ onSuccess: invalidateVariants });
   const translateTitlesMutation = trpc.variants.translateMissingTitles.useMutation({
     onSuccess: () => {
-      setTitlesRequested(true);
+      setTitlesRequestedFor(activeVariant);
       invalidateVariants();
     },
   });
@@ -279,11 +289,7 @@ export function BookDetail() {
   const hasRawText = book.files?.some((f) => f.hasRawText) ?? false;
   const isAssembling = book.status === "assembling";
   const isSynthetic = book.kind !== "pdf";
-  // A worker killed mid-run (restart, network drop) leaves digestJob stuck on "running";
-  // treat a stale heartbeat as interrupted, mirroring the server's resumeDigest guard
-  const digestRunning = book.digestJob?.status === "running";
-  const digestLive =
-    digestRunning && Date.now() - new Date(book.digestJob!.updatedAt).getTime() < 15 * 60_000;
+  const digestLive = digestJobLive(book.digestJob);
   const digestFailed = book.digestJob?.status === "failed";
   const digestTotal = book.origin?.type === "digest" ? book.origin.sourceBookIds.length : 0;
   const digestIncomplete = digestTotal > 0 && book.chapters.length < digestTotal && !digestLive;
