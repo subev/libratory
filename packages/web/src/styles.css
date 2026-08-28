@@ -1,98 +1,197 @@
 @import "tailwindcss";
 
+/* The marketing site's own faces, self-hosted — the desktop app runs offline and can never reach
+   a font CDN. Fraunces for headings and Source Serif for anything you actually read; the chrome
+   you operate stays sans. */
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/fraunces-var-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+  src: url("/fonts/source-serif-4-var-latin.woff2") format("woff2");
+}
+
 :root {
   color-scheme: light dark;
 
-  --bg-page: var(--color-zinc-100);
-  --bg-card: var(--color-white);
-  --bg-card-hover: var(--color-zinc-50);
-  --bg-subtle: var(--color-zinc-50);
-  --bg-input: var(--color-white);
-  --bg-drag: var(--color-blue-50);
-  --bg-selected: var(--color-blue-50);
+  --stack-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --stack-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --stack-reading: "Source Serif 4", Georgia, serif;
+  --stack-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 
-  --border: var(--color-zinc-200);
-  --border-input: var(--color-zinc-300);
-  --divide: var(--color-zinc-200);
+  /* The brand pair, from the app icon: tangerine tile, ink figure, cream pages. Every accent in
+     the app is one of these three. */
+  --brand-tangerine: #e2601f;
+  --brand-ember: #ef7734;
+  --brand-brass: #e0913d;
+  --brand-ink: #2a1408;
+  --brand-page: #fdf1e4;
 
-  --text-primary: var(--color-zinc-900);
-  --text-secondary: var(--color-zinc-700);
-  --text-tertiary: var(--color-zinc-600);
-  --text-muted: var(--color-zinc-500);
-  --text-faint: var(--color-zinc-400);
+  --bg-page: oklch(0.9686 0.0091 78.2818);
+  --bg-card: oklch(0.9885 0.0057 84.5659);
+  --bg-card-hover: oklch(0.9600 0.0150 82);
+  --bg-subtle: oklch(0.9363 0.0218 83.2637);
+  --bg-input: oklch(0.9885 0.0057 84.5659);
+  --bg-drag: --alpha(var(--brand-tangerine) / 10%);
+  --bg-selected: --alpha(var(--brand-tangerine) / 10%);
 
-  --bg-custom-text: oklch(0.987 0.013 85 / 0.3);
-  --border-custom-text: var(--color-amber-200);
+  --border: oklch(0.8866 0.0404 89.6994);
+  --border-input: oklch(0.8200 0.0420 85);
+  --divide: oklch(0.8866 0.0404 89.6994);
 
-  --bg-terminal: var(--color-zinc-900);
+  --text-primary: oklch(0.3660 0.0251 49.6085);
+  --text-secondary: oklch(0.4444 0.0096 73.6390);
+  --text-tertiary: oklch(0.5000 0.0110 60);
+  --text-muted: oklch(0.5534 0.0116 58.0708);
+  --text-faint: oklch(0.6400 0.0100 58);
 
-  --badge-pending-bg: var(--color-zinc-100);
-  --badge-pending-text: var(--color-zinc-700);
-  --badge-extracting-bg: var(--color-yellow-100);
-  --badge-extracting-text: var(--color-yellow-800);
-  --badge-synthesizing-bg: var(--color-blue-100);
-  --badge-synthesizing-text: var(--color-blue-800);
-  --badge-normalizing-bg: var(--color-purple-100);
-  --badge-normalizing-text: var(--color-purple-800);
-  --badge-assembling-bg: var(--color-indigo-100);
-  --badge-assembling-text: var(--color-indigo-800);
-  --badge-done-bg: var(--color-green-100);
-  --badge-done-text: var(--color-green-800);
-  --badge-failed-bg: var(--color-red-100);
-  --badge-failed-text: var(--color-red-800);
-  --badge-suspended-bg: var(--color-amber-100);
-  --badge-suspended-text: var(--color-amber-800);
-  --badge-cancelled-bg: var(--color-zinc-200);
-  --badge-cancelled-text: var(--color-zinc-600);
+  /* Ink on tangerine measures 4.93:1 and passes AA; white on it is 3.54:1 and does not. The icon
+     was drawn that way round already. */
+  --accent: var(--brand-tangerine);
+  --accent-hover: oklch(0.5900 0.1620 45);
+  --accent-text: var(--brand-ink);
+  --accent-subtle: --alpha(var(--brand-tangerine) / 12%);
+  --focus-ring: var(--brand-tangerine);
+
+  --danger: oklch(0.4437 0.1613 26.8994);
+  --danger-bg: oklch(0.4437 0.1613 26.8994 / 0.10);
+  --danger-text: oklch(0.4437 0.1613 26.8994);
+
+  --success: oklch(0.5200 0.1150 150);
+  --success-bg: oklch(0.5200 0.1150 150 / 0.12);
+  --success-text: oklch(0.4300 0.1050 150);
+
+  --warning: var(--brand-brass);
+  --warning-bg: --alpha(var(--brand-brass) / 15%);
+  --warning-text: oklch(0.4800 0.0900 70);
+
+  --bg-custom-text: --alpha(var(--brand-brass) / 8%);
+  --border-custom-text: --alpha(var(--brand-brass) / 40%);
+
+  --bg-terminal: #16140f;
+
+  /* Categorical, so they come from Solar Dusk's own chart ramp rather than four unrelated hues
+     picked one at a time. */
+  --badge-pending-bg: oklch(0.9363 0.0218 83.2637);
+  --badge-pending-text: oklch(0.4444 0.0096 73.6390);
+  --badge-extracting-bg: oklch(0.7952 0.1617 86.0468 / 0.22);
+  --badge-extracting-text: oklch(0.4600 0.0950 75);
+  --badge-synthesizing-bg: --alpha(var(--brand-tangerine) / 15%);
+  --badge-synthesizing-text: oklch(0.4900 0.1400 45);
+  --badge-normalizing-bg: oklch(0.6847 0.1479 237.3225 / 0.18);
+  --badge-normalizing-text: oklch(0.4500 0.1100 237);
+  --badge-assembling-bg: oklch(0.5538 0.1207 66.4416 / 0.18);
+  --badge-assembling-text: oklch(0.4300 0.1000 66);
+  --badge-done-bg: oklch(0.5200 0.1150 150 / 0.15);
+  --badge-done-text: oklch(0.4300 0.1050 150);
+  --badge-failed-bg: oklch(0.4437 0.1613 26.8994 / 0.12);
+  --badge-failed-text: oklch(0.4437 0.1613 26.8994);
+  --badge-suspended-bg: --alpha(var(--brand-brass) / 18%);
+  --badge-suspended-text: oklch(0.4800 0.0900 70);
+  --badge-cancelled-bg: oklch(0.9000 0.0100 70);
+  --badge-cancelled-text: oklch(0.5534 0.0116 58.0708);
+}
+
+/* Grounded on the marketing site's own two darks rather than a neutral charcoal — it is the
+   strongest signal that these are one product. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-page: #16140f;
+    --bg-card: #1e1b14;
+    --bg-card-hover: --alpha(var(--brand-page) / 6%);
+    --bg-subtle: --alpha(var(--brand-page) / 4%);
+    --bg-input: #1e1b14;
+    --bg-drag: --alpha(var(--brand-ember) / 14%);
+    --bg-selected: --alpha(var(--brand-ember) / 14%);
+
+    --border: --alpha(var(--brand-page) / 12%);
+    --border-input: --alpha(var(--brand-page) / 26%);
+    --divide: --alpha(var(--brand-page) / 12%);
+
+    --text-primary: var(--brand-page);
+    --text-secondary: --alpha(var(--brand-page) / 82%);
+    --text-tertiary: --alpha(var(--brand-page) / 72%);
+    --text-muted: --alpha(var(--brand-page) / 62%);
+    --text-faint: --alpha(var(--brand-page) / 42%);
+
+    /* The brighter ember, because the tangerine loses its heat against charcoal. Ink stays the
+       text on it — 6.12:1. */
+    --accent: var(--brand-ember);
+    --accent-hover: oklch(0.7600 0.1600 50);
+    --accent-text: var(--brand-ink);
+    --accent-subtle: --alpha(var(--brand-ember) / 16%);
+    --focus-ring: var(--brand-ember);
+
+    --danger: oklch(0.5771 0.2152 27.3250);
+    --danger-bg: oklch(0.5771 0.2152 27.3250 / 0.20);
+    --danger-text: oklch(0.7400 0.1500 27);
+
+    --success: oklch(0.7200 0.1400 150);
+    --success-bg: oklch(0.7200 0.1400 150 / 0.18);
+    --success-text: oklch(0.8000 0.1300 150);
+
+    --warning: var(--brand-brass);
+    --warning-bg: --alpha(var(--brand-brass) / 18%);
+    --warning-text: oklch(0.8200 0.1100 78);
+
+    --bg-custom-text: --alpha(var(--brand-brass) / 10%);
+    --border-custom-text: --alpha(var(--brand-brass) / 35%);
+
+    --bg-terminal: #100e0a;
+
+    --badge-pending-bg: --alpha(var(--brand-page) / 8%);
+    --badge-pending-text: --alpha(var(--brand-page) / 72%);
+    --badge-extracting-bg: oklch(0.7952 0.1617 86.0468 / 0.20);
+    --badge-extracting-text: oklch(0.8600 0.1400 86);
+    --badge-synthesizing-bg: --alpha(var(--brand-ember) / 20%);
+    --badge-synthesizing-text: oklch(0.8000 0.1500 50);
+    --badge-normalizing-bg: oklch(0.6847 0.1479 237.3225 / 0.20);
+    --badge-normalizing-text: oklch(0.7800 0.1200 237);
+    --badge-assembling-bg: oklch(0.5538 0.1207 66.4416 / 0.24);
+    --badge-assembling-text: oklch(0.8000 0.1100 66);
+    --badge-done-bg: oklch(0.7200 0.1400 150 / 0.18);
+    --badge-done-text: oklch(0.8000 0.1300 150);
+    --badge-failed-bg: oklch(0.5771 0.2152 27.3250 / 0.22);
+    --badge-failed-text: oklch(0.7800 0.1500 27);
+    --badge-suspended-bg: --alpha(var(--brand-brass) / 20%);
+    --badge-suspended-text: oklch(0.8200 0.1100 78);
+    --badge-cancelled-bg: --alpha(var(--brand-page) / 8%);
+    --badge-cancelled-text: --alpha(var(--brand-page) / 50%);
+  }
+}
+
+/* Only the fonts need names — colours are written as bg-(--accent), the form the whole codebase
+   already uses. */
+@theme inline {
+  --font-sans: var(--stack-sans);
+  --font-display: var(--stack-display);
+  --font-reading: var(--stack-reading);
+  --font-mono: var(--stack-mono);
+}
+
+body {
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--stack-sans);
+}
+
+/* The one place the site's voice comes through: what you read is set like a book, what you
+   operate is not. */
+h1, h2 {
+  font-family: var(--stack-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 @keyframes slide-indeterminate {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(400%); }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-page: var(--color-zinc-900);
-    --bg-card: var(--color-zinc-800);
-    --bg-card-hover: oklch(0.37 0.013 286 / 0.5);
-    --bg-subtle: oklch(0.274 0.006 286 / 0.5);
-    --bg-input: var(--color-zinc-800);
-    --bg-drag: var(--color-blue-950);
-    --bg-selected: var(--color-blue-950);
-
-    --border: var(--color-zinc-700);
-    --border-input: var(--color-zinc-600);
-    --divide: var(--color-zinc-700);
-
-    --text-primary: var(--color-zinc-100);
-    --text-secondary: var(--color-zinc-300);
-    --text-tertiary: var(--color-zinc-400);
-    --text-muted: var(--color-zinc-400);
-    --text-faint: var(--color-zinc-500);
-
-    --bg-custom-text: oklch(0.279 0.077 75 / 0.3);
-    --border-custom-text: var(--color-amber-800);
-
-    --bg-terminal: var(--color-zinc-950);
-
-    --badge-pending-bg: var(--color-zinc-700);
-    --badge-pending-text: var(--color-zinc-300);
-    --badge-extracting-bg: oklch(0.55 0.163 49 / 0.3);
-    --badge-extracting-text: var(--color-yellow-300);
-    --badge-synthesizing-bg: oklch(0.546 0.245 263 / 0.3);
-    --badge-synthesizing-text: var(--color-blue-300);
-    --badge-normalizing-bg: oklch(0.496 0.265 302 / 0.3);
-    --badge-normalizing-text: var(--color-purple-300);
-    --badge-assembling-bg: oklch(0.511 0.262 277 / 0.3);
-    --badge-assembling-text: var(--color-indigo-300);
-    --badge-done-bg: oklch(0.527 0.154 150 / 0.3);
-    --badge-done-text: var(--color-green-300);
-    --badge-failed-bg: oklch(0.577 0.245 27 / 0.3);
-    --badge-failed-text: var(--color-red-300);
-    --badge-suspended-bg: oklch(0.555 0.163 49 / 0.3);
-    --badge-suspended-text: var(--color-amber-300);
-    --badge-cancelled-bg: var(--color-zinc-700);
-    --badge-cancelled-text: var(--color-zinc-400);
-  }
 }
