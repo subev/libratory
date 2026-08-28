@@ -57,11 +57,11 @@ export const notesRouter = router({
       const bookId = note.bookId;
       if (!bookId) throw new Error("Library-wide notes are not attached to a book");
 
-      const [{ maxIndex }] = await db
+      const [tail] = await db
         .select({ maxIndex: max(chapters.index) })
         .from(chapters)
         .where(eq(chapters.bookId, bookId));
-      const index = maxIndex != null ? maxIndex + 1 : 0;
+      const index = tail?.maxIndex != null ? tail.maxIndex + 1 : 0;
       const title = note.prompt.length > 100 ? `${note.prompt.slice(0, 100).trimEnd()}…` : note.prompt;
 
       const [chapter] = await db
@@ -76,6 +76,7 @@ export const notesRouter = router({
         })
         .returning({ id: chapters.id });
 
+      if (!chapter) throw new Error("Failed to create the chapter");
       await db.update(books).set({ totalChapters: index + 1, updatedAt: new Date() }).where(eq(books.id, bookId));
       await appendLog(bookId, `Added note "${title}" as chapter ${index + 1}`);
       await queueIndexBook(bookId);

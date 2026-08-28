@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getDb, resetDb } from "../../test/setup.ts";
+import { getDb, resetDb, row } from "../../test/setup.ts";
 import { books, folders, profiles, DEFAULT_PROFILE_ID } from "../schema.ts";
 import { eq } from "drizzle-orm";
 
@@ -24,8 +24,7 @@ beforeEach(async () => {
 
 async function makeProfile(name: string) {
   const db = getDb();
-  const [profile] = await db.insert(profiles).values({ name }).returning();
-  return profile;
+  return row(await db.insert(profiles).values({ name }).returning());
 }
 
 describe("profilesRouter CRUD", () => {
@@ -69,8 +68,8 @@ describe("profile scoping", () => {
   it("scopes folders.list and books.list to the caller's profile", async () => {
     const db = getDb();
     const other = await makeProfile("Wife");
-    const [mine] = await db.insert(folders).values({ name: "Mine" }).returning();
-    const [hers] = await db.insert(folders).values({ name: "Hers", profileId: other.id }).returning();
+    const mine = row(await db.insert(folders).values({ name: "Mine" }).returning());
+    const hers = row(await db.insert(folders).values({ name: "Hers", profileId: other.id }).returning());
     await db.insert(books).values({ title: "My book" });
     await db.insert(books).values({ title: "Her book", profileId: other.id });
 
@@ -85,7 +84,7 @@ describe("profile scoping", () => {
   it("hides another profile's folder from path/rename/move/delete", async () => {
     const db = getDb();
     const other = await makeProfile("Wife");
-    const [hers] = await db.insert(folders).values({ name: "Hers", profileId: other.id }).returning();
+    const hers = row(await db.insert(folders).values({ name: "Hers", profileId: other.id }).returning());
 
     const defaultCaller = foldersRouter.createCaller({});
     await expect(defaultCaller.path({ id: hers.id })).rejects.toThrow("Folder not found");
@@ -96,16 +95,16 @@ describe("profile scoping", () => {
     ).rejects.toThrow("Parent folder not found");
 
     await defaultCaller.rename({ id: hers.id, name: "Stolen" });
-    const [unchanged] = await db.select().from(folders).where(eq(folders.id, hers.id));
+    const unchanged = row(await db.select().from(folders).where(eq(folders.id, hers.id)));
     expect(unchanged.name).toBe("Hers");
   });
 
   it("refuses to move books into another profile's folder and skips foreign books", async () => {
     const db = getDb();
     const other = await makeProfile("Wife");
-    const [hers] = await db.insert(folders).values({ name: "Hers", profileId: other.id }).returning();
-    const [herBook] = await db.insert(books).values({ title: "Her book", profileId: other.id }).returning();
-    const [myFolder] = await db.insert(folders).values({ name: "Mine" }).returning();
+    const hers = row(await db.insert(folders).values({ name: "Hers", profileId: other.id }).returning());
+    const herBook = row(await db.insert(books).values({ title: "Her book", profileId: other.id }).returning());
+    const myFolder = row(await db.insert(folders).values({ name: "Mine" }).returning());
 
     const defaultCaller = booksRouter.createCaller({});
     await expect(
@@ -113,7 +112,7 @@ describe("profile scoping", () => {
     ).rejects.toThrow("Folder not found");
 
     await defaultCaller.moveToFolder({ ids: [herBook.id], folderId: myFolder.id });
-    const [after] = await db.select().from(books).where(eq(books.id, herBook.id));
+    const after = row(await db.select().from(books).where(eq(books.id, herBook.id)));
     expect(after.folderId).toBeNull();
   });
 });

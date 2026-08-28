@@ -41,6 +41,7 @@ export const foldersRouter = router({
         .insert(folders)
         .values({ name: input.name, parentId: input.parentId, profileId })
         .returning();
+      if (!folder) throw new Error("Failed to create the folder");
       return folder;
     }),
 

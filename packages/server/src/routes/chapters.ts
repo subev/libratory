@@ -71,8 +71,8 @@ export const chaptersRouter = router({
       // Without a map, offsets into clean/custom text are scaled onto rawText for an
       // approximate page, bounded by the chapter's own page range either way.
       const pageForRange = (range: { start: number; end: number }): number | null => {
-        const exact = textMap ? blocksAtRange(textMap, range.start, range.end) : [];
-        if (exact.length > 0) return blocks[exact[0]]?.page ?? null;
+        const [exactBlock] = textMap ? blocksAtRange(textMap, range.start, range.end) : [];
+        if (exactBlock !== undefined) return blocks[exactBlock]?.page ?? null;
         const rawOffset =
           chunkTextSource === "raw"
             ? range.start
@@ -277,11 +277,11 @@ export const chaptersRouter = router({
     }))
     .mutation(async ({ input }) => {
       // chapterIds is the new order — index 0 gets index=0, index 1 gets index=1, etc.
-      for (let i = 0; i < input.chapterIds.length; i++) {
+      for (const [i, chapterId] of input.chapterIds.entries()) {
         await db
           .update(chapters)
           .set({ index: i })
-          .where(and(eq(chapters.id, input.chapterIds[i]), eq(chapters.bookId, input.bookId)));
+          .where(and(eq(chapters.id, chapterId), eq(chapters.bookId, input.bookId)));
       }
       return { success: true };
     }),

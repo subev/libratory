@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getDb, resetDb } from "../../test/setup.ts";
+import { getDb, resetDb, row } from "../../test/setup.ts";
 import { books, chapters, notes } from "../schema.ts";
 import { eq } from "drizzle-orm";
 
@@ -41,10 +41,10 @@ describe("notesRouter", () => {
   it("deletes a note", async () => {
     const db = getDb();
     const bookId = await insertBook();
-    const [note] = await db
+    const note = row(await db
       .insert(notes)
       .values({ bookId, prompt: "p", model: "flash", result: "r", scope: { kind: "book-raw", files: 1 } })
-      .returning();
+      .returning());
 
     const caller = notesRouter.createCaller({});
     await caller.delete({ id: note.id });
@@ -59,10 +59,10 @@ describe("notesRouter", () => {
       { bookId, index: 0, title: "Ch 1", rawText: "one", status: "done" },
       { bookId, index: 1, title: "Ch 2", rawText: "two", status: "done" },
     ]);
-    const [note] = await db
+    const note = row(await db
       .insert(notes)
       .values({ bookId, prompt: "Summarize the ending", model: "flash", result: "The ending...", scope: { kind: "book-raw", files: 1 } })
-      .returning();
+      .returning());
 
     const caller = notesRouter.createCaller({});
     const { chapterId, index } = await caller.toChapter({ id: note.id });
@@ -75,17 +75,17 @@ describe("notesRouter", () => {
       status: "suspended",
       source: { kind: "note", noteId: note.id },
     });
-    const [book] = await db.select().from(books).where(eq(books.id, bookId));
+    const book = row(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.totalChapters).toBe(3);
   });
 
   it("creates the first chapter of a chapterless book at index 0", async () => {
     const db = getDb();
     const bookId = await insertBook();
-    const [note] = await db
+    const note = row(await db
       .insert(notes)
       .values({ bookId, prompt: "p", model: "flash", result: "r", scope: { kind: "book-raw", files: 1 } })
-      .returning();
+      .returning());
 
     const caller = notesRouter.createCaller({});
     const { index } = await caller.toChapter({ id: note.id });

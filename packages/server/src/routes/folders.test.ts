@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getDb, resetDb } from "../../test/setup.ts";
+import { getDb, resetDb, row } from "../../test/setup.ts";
 import { books, folders } from "../schema.ts";
 import { eq } from "drizzle-orm";
 
@@ -27,9 +27,9 @@ const booksCaller = booksRouter.createCaller({});
 
 async function makeTree() {
   const db = getDb();
-  const [a] = await db.insert(folders).values({ name: "A" }).returning();
-  const [b] = await db.insert(folders).values({ name: "B", parentId: a.id }).returning();
-  const [c] = await db.insert(folders).values({ name: "C", parentId: b.id }).returning();
+  const a = row(await db.insert(folders).values({ name: "A" }).returning());
+  const b = row(await db.insert(folders).values({ name: "B", parentId: a.id }).returning());
+  const c = row(await db.insert(folders).values({ name: "C", parentId: b.id }).returning());
   return { a, b, c };
 }
 
@@ -66,7 +66,7 @@ describe("foldersRouter CRUD", () => {
     const { a, c } = await makeTree();
     const path = await caller.path({ id: c.id });
     expect(path.map((p) => p.name)).toEqual(["A", "B", "C"]);
-    expect(path[0].id).toBe(a.id);
+    expect(path[0]?.id).toBe(a.id);
   });
 });
 
@@ -116,7 +116,7 @@ describe("foldersRouter.delete", () => {
   it("deletes every descendant book through deleteBook and sweeps the folder tree", async () => {
     const db = getDb();
     const { a, c } = await makeTree();
-    const [other] = await db.insert(folders).values({ name: "Other" }).returning();
+    const other = row(await db.insert(folders).values({ name: "Other" }).returning());
     const inA = crypto.randomUUID();
     const inC = crypto.randomUUID();
     const rootBook = crypto.randomUUID();
@@ -157,14 +157,14 @@ describe("booksRouter.list folder scoping", () => {
     const root = await booksCaller.list({ folderId: null });
     expect(root.books.map((bk) => bk.title)).toEqual(["Root book"]);
     expect(root.folders.map((f) => f.name)).toEqual(["A"]);
-    expect(root.folders[0].bookCount).toBe(2);
-    expect(typeof root.folders[0].sizeBytes).toBe("number");
-    expect(root.folders[0].lastActivityAt).not.toBeNull();
+    expect(root.folders[0]?.bookCount).toBe(2);
+    expect(typeof root.folders[0]?.sizeBytes).toBe("number");
+    expect(root.folders[0]?.lastActivityAt).not.toBeNull();
 
     const insideA = await booksCaller.list({ folderId: a.id });
     expect(insideA.books.map((bk) => bk.title)).toEqual(["In A"]);
     expect(insideA.folders.map((f) => f.name)).toEqual(["B"]);
-    expect(insideA.folders[0].bookCount).toBe(1);
+    expect(insideA.folders[0]?.bookCount).toBe(1);
 
     const legacy = await booksCaller.list();
     expect(legacy.books.map((bk) => bk.title)).toEqual(["Root book"]);
@@ -172,7 +172,7 @@ describe("booksRouter.list folder scoping", () => {
 
   it("counts book-level failures but not cancellations, and flags book rows", async () => {
     const db = getDb();
-    const [folder] = await db.insert(folders).values({ name: "F" }).returning();
+    const folder = row(await db.insert(folders).values({ name: "F" }).returning());
     await db.insert(books).values([
       { title: "Broken", folderId: folder.id, status: "failed", error: "All 1 file(s) failed extraction" },
       { title: "Cancelled", folderId: folder.id, status: "failed", error: "Cancelled by user" },
@@ -180,7 +180,7 @@ describe("booksRouter.list folder scoping", () => {
     ]);
 
     const root = await booksCaller.list({ folderId: null });
-    expect(root.folders[0].failedBookCount).toBe(1);
+    expect(root.folders[0]?.failedBookCount).toBe(1);
 
     const inside = await booksCaller.list({ folderId: folder.id });
     const byTitle = Object.fromEntries(inside.books.map((bk) => [bk.title, bk.failed]));
@@ -205,7 +205,7 @@ describe("booksRouter.moveToFolder", () => {
 
     await booksCaller.moveToFolder({ ids: [id1], folderId: null });
     rows = await db.select().from(books).where(eq(books.id, id1));
-    expect(rows[0].folderId).toBeNull();
+    expect(rows[0]?.folderId).toBeNull();
   });
 
   it("rejects a nonexistent target folder", async () => {
