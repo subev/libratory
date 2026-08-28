@@ -7,6 +7,7 @@ import { httpBatchStreamLink } from "@trpc/client";
 import { trpc } from "./trpc.ts";
 import { profileHeaders } from "./lib/profile.ts";
 import { installExclusiveAudio } from "./lib/exclusive-audio.ts";
+import { installBreadcrumbs } from "./lib/breadcrumbs.ts";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
 import { Home } from "./pages/Home.tsx";
 import { BookDetail } from "./pages/BookDetail.tsx";
@@ -32,6 +33,7 @@ const trpcClient = trpc.createClient({
   ],
 });
 
+installBreadcrumbs();
 installExclusiveAudio();
 
 createRoot(document.getElementById("root")!).render(

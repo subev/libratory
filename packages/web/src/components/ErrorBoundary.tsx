@@ -1,40 +1,56 @@
 import { Component, type ReactNode } from "react";
+import { breadcrumbs } from "../lib/breadcrumbs.ts";
 
 // A render error unmounts the whole tree, and what is left is a white page that says nothing —
 // in the browser you can at least open the console, but in the desktop app there is no hint that
 // a console exists. This keeps the failure on screen and makes it reportable.
 //
-// The issue it opens matches packages/desktop/src/crash.cjs, so a crash reported from the page and
-// one reported from the shell arrive with the same label and the same shape.
+// Inside the app it hands the report to the shell's own crash reporter, so a crash in the page is
+// written to crash.log and offered the same dialog as a crash in the shell. In a browser there is
+// no shell, so it falls back to opening the issue itself.
 const REPO = "https://github.com/subev/libratory";
 const MAX_BODY = 4000;
 
-type Props = { children: ReactNode };
-type State = { error: Error | null };
+declare global {
+  interface Window {
+    setup?: { report?: (details: string) => void };
+  }
+}
 
-function details(error: Error) {
+type Props = { children: ReactNode };
+type State = { error: Error | null; componentStack: string | null };
+
+// A path is only true on the machine that wrote it, and an issue is public.
+function redact(text: string) {
+  return text.replace(/\/(?:Users|home)\/[^/\s"')]+/g, "~");
+}
+
+function details(error: Error, componentStack: string | null) {
+  const recent = breadcrumbs();
   return [
-    `Libratory — page crash`,
+    "Libratory — page crash",
     `${location.pathname}${location.search}`,
     new Date().toISOString(),
     navigator.userAgent,
     "",
     error.stack || error.message,
+    componentStack ? `\ncomponent stack:${componentStack}` : "",
+    recent ? `\nbefore it:\n${recent}` : "",
   ].join("\n");
 }
 
-function issueUrl(error: Error) {
-  const title = `Crash: ${(error.message || "render error").split("\n")[0].slice(0, 90)}`;
-  const body = [
+function issueUrl(body: string, message: string) {
+  const title = `Crash: ${(message || "render error").split("\n")[0].slice(0, 90)}`;
+  const filled = [
     "<!-- What were you doing when this happened? -->",
     "",
     "",
     "---",
     "```",
-    details(error).slice(-MAX_BODY),
+    redact(body).slice(-MAX_BODY),
     "```",
   ].join("\n");
-  return `${REPO}/issues/new?labels=crash&title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+  return `${REPO}/issues/new?labels=crash&title=${encodeURIComponent(title)}&body=${encodeURIComponent(filled)}`;
 }
 
 // Production React replaces messages with a number, which is unreadable on its own but does have a
@@ -45,20 +61,30 @@ function decoded(error: Error) {
 }
 
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { error: null };
+  state: State = { error: null, componentStack: null };
 
   static getDerivedStateFromError(error: Error) {
     return { error };
   }
 
   componentDidCatch(error: Error, info: { componentStack?: string | null }) {
+    this.setState({ componentStack: info.componentStack ?? null });
     console.error("Page crashed:", error, info.componentStack);
   }
 
+  report = () => {
+    const text = details(this.state.error!, this.state.componentStack);
+    // The shell writes it to crash.log before offering the issue, so the evidence survives even if
+    // the report is never sent. A browser has nowhere to write, so it goes straight to GitHub.
+    if (window.setup?.report) window.setup.report(text);
+    else window.open(issueUrl(text, this.state.error!.message), "_blank", "noreferrer");
+  };
+
   render() {
-    const { error } = this.state;
+    const { error, componentStack } = this.state;
     if (!error) return this.props.children;
     const help = decoded(error);
+    const text = details(error, componentStack);
 
     return (
       <div className="min-h-screen bg-(--bg-page) px-4 py-16" data-testid="page-crash">
@@ -85,16 +111,15 @@ export class ErrorBoundary extends Component<Props, State> {
             >
               Reload this page
             </button>
-            <a
-              href={issueUrl(error)}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              onClick={this.report}
               className="rounded border border-(--border) px-4 py-2 text-sm text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-hover)"
+              data-testid="crash-report"
             >
               Report it
-            </a>
+            </button>
             <button
-              onClick={() => void navigator.clipboard.writeText(details(error))}
+              onClick={() => void navigator.clipboard.writeText(text)}
               className="rounded border border-(--border) px-4 py-2 text-sm text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-hover)"
             >
               Copy details
@@ -112,9 +137,11 @@ export class ErrorBoundary extends Component<Props, State> {
           )}
 
           <details className="mt-4">
-            <summary className="cursor-pointer text-xs text-(--text-faint)">Technical details</summary>
-            <pre className="mt-2 overflow-x-auto rounded bg-(--bg-subtle) p-3 text-[11px] leading-relaxed text-(--text-muted)">
-              {details(error)}
+            <summary className="cursor-pointer text-xs text-(--text-faint)">
+              Technical details — the error, the component tree, and what was logged before it
+            </summary>
+            <pre className="mt-2 max-h-96 overflow-auto rounded bg-(--bg-subtle) p-3 text-[11px] leading-relaxed text-(--text-muted)">
+              {text}
             </pre>
           </details>
         </div>

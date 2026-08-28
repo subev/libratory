@@ -7,5 +7,7 @@ contextBridge.exposeInMainWorld("setup", {
   onFailed: (fn) => ipcRenderer.on("failed", (_e, info) => fn(info)),
   onHelp: (fn) => ipcRenderer.on("help", (_e, help) => fn(help)),
   open: (url) => ipcRenderer.send("open", url),
-  report: () => ipcRenderer.send("report"),
+  // A payload means a crash in the page can use the same reporter as one in the shell: written
+  // to crash.log, then the dialog with Report and Copy. Without one only the shell could report.
+  report: (details) => ipcRenderer.send("report", details),
 });

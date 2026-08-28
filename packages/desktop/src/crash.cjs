@@ -44,7 +44,9 @@ function issueUrl(r) {
     asText(r).slice(-MAX_BODY),
     "```",
   ].join("\n");
-  return `${REPO}/issues/new?labels=crash&title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+  // The log keeps the real paths; an issue is public and a path is only true on this machine.
+  const redacted = body.replace(/\/(?:Users|home)\/[^/\s"')]+/g, "~");
+  return `${REPO}/issues/new?labels=crash&title=${encodeURIComponent(title)}&body=${encodeURIComponent(redacted)}`;
 }
 
 // Electron's own dialog prints a stack trace and offers OK, which tells someone who did not write
