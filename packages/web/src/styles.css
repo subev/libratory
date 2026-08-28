@@ -71,10 +71,6 @@
   --success-hover: oklch(0.4500 0.1050 150);
   --warning-hover: oklch(0.5900 0.1150 68);
 
-  /* The read-along and chunk-link highlights, which need a strong/weak pair that reads over a
-     white PDF page. */
-  --highlight: --alpha(var(--brand-tangerine) / 32%);
-  --highlight-soft: --alpha(var(--brand-tangerine) / 14%);
 
   /* Input -> Work -> Output is a real sequence, so it gets a real ramp: cool brass, then the
      accent while it is being worked, then settled green. Kinds and activities do NOT get hues —
@@ -161,8 +157,6 @@
     --success-hover: oklch(0.7800 0.1400 150);
     --warning-hover: oklch(0.7800 0.1200 78);
 
-    --highlight: --alpha(var(--brand-ember) / 38%);
-    --highlight-soft: --alpha(var(--brand-ember) / 16%);
 
     --step-input: var(--brand-brass);
     --step-work: var(--accent);
