@@ -33,7 +33,13 @@ function updatesConfigured() {
   return app.isPackaged && existsSync(path.join(process.resourcesPath, "app-update.yml"));
 }
 
+let installed = false;
+
 function install({ onStatus, getWindow } = {}) {
+  // boot() runs again on "recheck", and every listener below would be registered a second time —
+  // two dialogs for one update, and an interval nothing clears.
+  if (installed) return;
+  installed = true;
   let autoUpdater;
   try {
     ({ autoUpdater } = require("electron-updater"));
@@ -130,10 +136,29 @@ function install({ onStatus, getWindow } = {}) {
     onStatus?.("No app-update.yml — this build cannot check for updates");
     return;
   }
-  const check = () => void autoUpdater.checkForUpdates().catch(() => {});
+  // The launch check used to throw its failure away and not try again for six hours, so a network
+  // that was not ready yet — while Docker, Postgres and Python are still coming up — meant no
+  // update was offered across restart after restart, until the Help menu asked and it worked.
+  const RETRY_AFTER_MS = [15_000, 60_000, 300_000];
+  const pendingRetries = new Set();
+  const check = (attempt = 0) => {
+    autoUpdater.checkForUpdates().catch((err) => {
+      const again = RETRY_AFTER_MS[attempt];
+      onStatus?.(`Update check failed: ${err.message}${again ? ` — trying again in ${again / 1000}s` : " — waiting for the next scheduled check"}`);
+      if (!again) return;
+      const retry = setTimeout(() => {
+        pendingRetries.delete(retry);
+        check(attempt + 1);
+      }, again);
+      pendingRetries.add(retry);
+    });
+  };
   check();
-  const timer = setInterval(check, CHECK_EVERY_MS);
-  app.on("before-quit", () => clearInterval(timer));
+  const timer = setInterval(() => check(), CHECK_EVERY_MS);
+  app.on("before-quit", () => {
+    clearInterval(timer);
+    for (const retry of pendingRetries) clearTimeout(retry);
+  });
 
   // Asked for from the Help menu. The automatic check is deliberately quiet about finding nothing,
   // which leaves no way to tell "already current" from "never looked" — this answers both.

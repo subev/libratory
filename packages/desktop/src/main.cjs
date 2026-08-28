@@ -112,18 +112,29 @@ function openServerLog() {
   }
 }
 
+// One file for everything the app has to say, the shell included — an updater that quietly gave up
+// wrote its reason to a stdout a packaged app does not have.
+let logStream;
+function logRaw(text) {
+  if (logStream === undefined) logStream = openServerLog();
+  logStream?.write(text);
+  process.stdout.write(text);
+}
+
+function appLog(line) {
+  logRaw(`${line}\n`);
+}
+
 function startServer(onDied) {
   killOrphanedServers();
   const bundled = path.join(RESOURCES, "libratory-server");
   server = spawn(bundled, [], { env: serverEnv(), stdio: ["ignore", "pipe", "pipe"] });
   let tail = "";
-  const log = openServerLog();
-  log?.write(`\n=== ${new Date().toISOString()}  Libratory ${app.getVersion()} starting the server\n`);
+  appLog(`\n=== ${new Date().toISOString()}  Libratory ${app.getVersion()} starting the server`);
   const keep = (b) => {
     const text = String(b);
     tail = (tail + text).slice(-2000);
-    log?.write(text);
-    process.stdout.write(text);
+    logRaw(text);
   };
   server.stdout?.on("data", keep);
   server.stderr?.on("data", keep);
@@ -132,7 +143,6 @@ function startServer(onDied) {
   // 'error' kill the main process with no window and no message.
   server.on("error", (err) => onDied(err.message));
   server.on("exit", (code, signal) => {
-    log?.end();
     if (server?.killed || signal === "SIGTERM") return;
     onDied(tail.trim().split("\n").at(-1) || `the server exited with code ${code}`);
   });
@@ -293,7 +303,7 @@ async function runBoot() {
   }
   win.loadURL(ctx.url);
   // Only once the app is actually usable — a version check has no business delaying a launch
-  updater.install({ onStatus: (text) => console.log(`[updater] ${text}`), getWindow: () => win });
+  updater.install({ onStatus: (text) => appLog(`[updater] ${text}`), getWindow: () => win });
 }
 
 function menu(url) {
