@@ -185,7 +185,7 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
   useEffect(() => {
     const host = pagesRef.current;
     if (!host) return;
-    const observer = new ResizeObserver(([entry]) => setPagesWidth(entry.contentRect.width));
+    const observer = new ResizeObserver(([entry]) => { if (entry) setPagesWidth(entry.contentRect.width); });
     observer.observe(host);
     return () => observer.disconnect();
   }, [hasManifest]);

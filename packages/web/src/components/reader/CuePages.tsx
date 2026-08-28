@@ -62,7 +62,7 @@ export function CuePages({
   }
 
   const activeIndex = cues ? cueIndexAt(cues.cues, ms) : -1;
-  const activeCue = activeIndex >= 0 ? cues!.cues[activeIndex] : null;
+  const activeCue = (activeIndex >= 0 ? cues?.cues[activeIndex] : null) ?? null;
   const activeWord = activeCue ? wordIndexAt(activeCue, ms) : -1;
 
   const linked = cuesOfChunk(cues?.cues ?? [], hoverChunk).flatMap((cue) => cue.r ?? []);
@@ -88,7 +88,8 @@ export function CuePages({
             onPointer={(x, y) => {
               if (!cues) return;
               const at = cueAtPoint(cues.cues, spread.page.i, x, y);
-              if (at >= 0) onSeek(cues.cues[at].t[0]);
+              const cue = at >= 0 ? cues.cues[at] : undefined;
+              if (cue) onSeek(cue.t[0]);
             }}
           >
             <CueOverlay

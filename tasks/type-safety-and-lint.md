@@ -16,9 +16,10 @@ that the classes of bug found on 2026-08-28 cannot be reintroduced silently.
 Done:
 
 - TypeScript **7.0.2** (the Go port) across the workspace. server and web typecheck clean on it.
-- Four strict flags on in `tsconfig.base.json`: `noUnusedLocals`, `noUnusedParameters`,
-  `noFallthroughCasesInSwitch`, `noImplicitOverride`. Cost ten fixes, one of which was a real bug
-  (a completion message that claimed success when every chapter had been suspended).
+- Five strict flags on in `tsconfig.base.json`: `noUnusedLocals`, `noUnusedParameters`,
+  `noFallthroughCasesInSwitch`, `noImplicitOverride` and `noUncheckedIndexedAccess`. The first four
+  cost ten fixes, one of which was a real bug (a completion message that claimed success when every
+  chapter had been suspended).
 - **oxlint 1.80** installed and configured (`.oxlintrc.json`), `pnpm lint` / `pnpm lint:fix`.
   0.93s over 45k lines.
 - `pnpm typecheck` added; `packages/desktop` has a `build` script at last, so `pnpm -r build`
@@ -26,13 +27,15 @@ Done:
 
 Not done — this is the work:
 
-| # | What | Size | Touches |
-| --- | --- | --- | --- |
-| 1 | oxlint errors | ~~42~~ **done** | 51 warnings remain, deliberately |
-| 2 | `noUncheckedIndexedAccess` — server | ~~558~~ **done** | flag lives in `packages/server/tsconfig.json` for now |
-| 3 | `noUncheckedIndexedAccess` — web | **255 — next** | `packages/web/src`; move the flag to `tsconfig.base.json` when it lands |
-| 4 | desktop `checkJs` | ~~29~~ **done** | |
-| 5 | CI enforcement | ~~—~~ **done** | `pnpm lint` runs first in `test.yml`, before the build |
+| # | What | Result |
+| --- | --- | --- |
+| 1 | oxlint errors | **done** — 42 cleared, 33 warnings left deliberately |
+| 2 | `noUncheckedIndexedAccess` — server | **done** — 558 cleared, 3 real bugs |
+| 3 | `noUncheckedIndexedAccess` — web + e2e | **done** — 157 cleared, 3 real bugs; flag now in `tsconfig.base.json` and covers all four tsconfigs |
+| 4 | desktop `checkJs` | **done** — 29 cleared, 1 real bug |
+| 5 | CI enforcement | **done** — `pnpm lint` runs first in `test.yml` |
+
+**All five are complete.** What remains is the deferred item below: type-aware linting.
 
 ## Order, and why
 

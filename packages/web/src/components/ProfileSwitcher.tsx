@@ -24,9 +24,8 @@ export function ProfileSwitcher() {
     }
   }, [staleStored, queryClient]);
 
-  if (!profiles || profiles.length === 0) return null;
-
-  const active = profiles.find((p) => p.id === stored) ?? profiles[0];
+  const active = profiles?.find((p) => p.id === stored) ?? profiles?.[0];
+  if (!profiles || !active) return null;
 
   function activate(id: string) {
     setStoredProfileId(id);
@@ -49,7 +48,7 @@ export function ProfileSwitcher() {
     }
   }
 
-  async function renameProfile() {
+  const renameProfile = async () => {
     const name = window.prompt("Rename profile", active.name)?.trim();
     if (!name || name === active.name) return;
     setError(null);
@@ -59,9 +58,9 @@ export function ProfileSwitcher() {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }
+  };
 
-  async function deleteProfile() {
+  const deleteProfile = async () => {
     if (!confirm(`Delete profile "${active.name}"? Its books and folders must be deleted or moved first.`)) return;
     setError(null);
     try {
@@ -72,7 +71,7 @@ export function ProfileSwitcher() {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }
+  };
 
   return (
     <div className="ml-auto flex items-center gap-2">

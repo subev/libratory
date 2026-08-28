@@ -15,7 +15,8 @@ export type AiScope =
 
 function lastAssistant(messages: UIMessage[]): UIMessage | null {
   for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === "assistant") return messages[i];
+    const message = messages[i];
+    if (message?.role === "assistant") return message;
   }
   return null;
 }
@@ -50,7 +51,8 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
   const bookTitle = scope.kind === "book-raw" ? scope.bookTitle : (book?.title ?? "this book");
   const hasRawText = (book?.rawTextTotalWords ?? 0) > 0;
 
-  const subject = kind === "book-raw" ? "book" : chapterSelection.length === 1 ? "chapter" : "chapters";
+  const onlyChapter = chapterSelection.length === 1 ? chapterSelection[0] : undefined;
+  const subject = kind === "book-raw" ? "book" : onlyChapter ? "chapter" : "chapters";
   const [activePreset, setActivePreset] = useState<string>("summarize");
   const [prompt, setPrompt] = useState<string>(AI_PRESETS[0].prompt(subject));
   const [model, setModel] = useState<string>("");
@@ -98,7 +100,7 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
     },
     {
       key: "chapters" as const,
-      label: chapterSelection.length === 1 ? `Chapter: ${chapterSelection[0].title}` : `Selected chapters (${chapterSelection.length})`,
+      label: onlyChapter ? `Chapter: ${onlyChapter.title}` : `Selected chapters (${chapterSelection.length})`,
       disabled: chapterSelection.length === 0,
       title: chapterSelection.length === 0 ? "No chapters selected — select chapters in the table first" : chapterSelection.map((c) => c.title).join("\n"),
     },

@@ -81,8 +81,16 @@ const UNTOUCHED_UI: ModalUi = {
 
 type ViewMode = "pages" | "text" | "custom" | "clean" | "raw" | "split" | "blocks";
 
-export function ChapterModal({
+// The open index is held across list changes — a filter or a delete can leave it past the end
+export function ChapterModal(props: ChapterModalProps) {
+  const chapter = props.chapters[props.chapterIndex];
+  if (!chapter) return null;
+  return <ChapterModalBody {...props} chapter={chapter} />;
+}
+
+function ChapterModalBody({
   bookId,
+  chapter,
   chapters,
   files,
   chapterIndex,
@@ -95,9 +103,8 @@ export function ChapterModal({
   onSetSelected,
   synthVoice,
   onChangeSynthVoice,
-}: ChapterModalProps) {
+}: ChapterModalProps & { chapter: ChapterRow }) {
   useBodyScrollLock();
-  const chapter = chapters[chapterIndex];
   const hasPrev = chapterIndex > 0;
   const hasNext = chapterIndex < chapters.length - 1;
 
@@ -262,7 +269,7 @@ export function ChapterModal({
     if (previews.length === 0 && selectedChunkPreviewUrl === null) return;
     // While synthesizing, follow the latest chunk; otherwise default to the first so playback
     // (and the play button) starts from the beginning of the chapter.
-    const fallback = previews.length === 0 ? null : chapter.status === "synthesizing" ? previews.at(-1)!.url : previews[0].url;
+    const fallback = (chapter.status === "synthesizing" ? previews.at(-1) : previews[0])?.url ?? null;
     // eslint-disable-next-line react/set-state-in-effect -- sticky from the moment the chunks appear, so it is not a function of this render's props
     setSelectedChunkPreviewUrl(fallback);
   }, [fullChapter?.chunkPreviews, chapter.status, selectedChunkPreviewUrl, setSelectedChunkPreviewUrl]);
@@ -1390,7 +1397,7 @@ function BlocksPreview({ sourceBlocks, onOpenPdf }: { sourceBlocks: SourceBlock[
   return (
     <div className="flex-1 min-h-0 overflow-y-auto rounded bg-(--bg-subtle) border border-(--border) p-2 font-mono text-xs leading-relaxed">
       {sourceBlocks.map((block, i) => {
-        const showPageDivider = i > 0 && block.page !== sourceBlocks[i - 1].page;
+        const showPageDivider = i > 0 && block.page !== sourceBlocks[i - 1]?.page;
         return (
           <div key={i}>
             {showPageDivider ? (

@@ -10,8 +10,9 @@ function printPainted(page: Page) {
     const context = canvas.getContext("2d");
     if (!context || canvas.width === 0) return false;
     const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i + 3] > 0 && data[i] < 200 && data[i + 1] < 200 && data[i + 2] < 200) return true;
+    for (let i = 0; i + 3 < data.length; i += 4) {
+      const r = data[i] ?? 0, g = data[i + 1] ?? 0, b = data[i + 2] ?? 0, alpha = data[i + 3] ?? 0;
+      if (alpha > 0 && r < 200 && g < 200 && b < 200) return true;
     }
     return false;
   });
@@ -153,13 +154,13 @@ test.describe("read along on the page", { tag: "@slow" }, () => {
       const chapter = manifest.chapters.find((entry: { audio: string | null }) => entry.audio);
       const doc = await (await fetch(chapter.cues)).json();
       const cue = doc.cues.find(
-        (entry: { t: number[]; r?: number[][]; wr?: number[][][] }) =>
+        (entry: { t: [number, number]; r?: number[][]; wr?: number[][][] }) =>
           entry.t[0] > 0 && entry.r?.length && entry.wr?.some((rects) => rects.length),
       );
       if (!cue) return null;
 
       const word = cue.w[cue.wr.findIndex((rects: number[][]) => rects.length)];
-      return { startMs: cue.t[0] as number, rect: cue.r[0] as number[], wordMs: (word[0] + word[1]) / 2 };
+      return { startMs: cue.t[0] as number, rect: cue.r[0] as [number, number, number, number, number], wordMs: (word[0] + word[1]) / 2 };
     });
     expect(target).not.toBeNull();
 
@@ -223,7 +224,7 @@ test.describe("read along on the page", { tag: "@slow" }, () => {
 
     // Back lands on the chapter being read, not at the top of the table
     const rolled = await chapterPicker.evaluate((el: HTMLSelectElement) =>
-      el.selectedOptions[0].text.replace(/^\d+\.\s*/, ""),
+      el.selectedOptions[0]?.text.replace(/^\d+\.\s*/, "") ?? "",
     );
     await page.getByTestId("reader-back").click();
     await expect(page.getByTestId("chapter-modal")).toContainText(rolled);

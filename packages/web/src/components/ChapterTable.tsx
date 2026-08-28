@@ -416,8 +416,10 @@ export function ChapterTable({
                     if (fromIdx === -1 || toIdx === -1) return;
                     const reordered = [...chapters];
                     const [moved] = reordered.splice(fromIdx, 1);
-                    reordered.splice(toIdx, 0, moved);
-                    onReorder!(reordered.map((c) => c.id));
+                    if (moved) {
+                      reordered.splice(toIdx, 0, moved);
+                      onReorder!(reordered.map((c) => c.id));
+                    }
                     setDragChapterId(null);
                     setDragOverChapterId(null);
                   }}
@@ -700,7 +702,7 @@ export function ChapterTable({
 function ChapterStatusCell({ chapter, cleanup }: { chapter: ChapterRow; cleanup: ChapterRow["cleanup"] }) {
   let main;
   if ((chapter.status === "synthesizing" || chapter.status === "translating") && chapter.progress) {
-    const [current, total] = chapter.progress.split("/").map(Number);
+    const [current = 0, total = 0] = chapter.progress.split("/").map(Number);
     const percent = total > 0 ? (current / total) * 100 : 0;
 
     main = (
@@ -731,7 +733,7 @@ function ChapterStatusCell({ chapter, cleanup }: { chapter: ChapterRow; cleanup:
   const cleaningActive = cleanup?.status === "cleaning" || cleanup?.status === "pending";
   if (!cleaningActive && cleanup?.status !== "failed") return main;
 
-  const [current, total] = (cleanup?.progress ?? "").split("/").map(Number);
+  const [current = 0, total = 0] = (cleanup?.progress ?? "").split("/").map(Number);
   const percent = total > 0 ? (current / total) * 100 : 0;
   return (
     <div className="space-y-1" data-testid="chapter-cleanup-status">

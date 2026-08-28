@@ -75,7 +75,7 @@ export function Chat() {
   const lastQuestionBefore = (index: number): string => {
     for (let i = index - 1; i >= 0; i--) {
       const m = messages[i];
-      if (m.role === "user") {
+      if (m?.role === "user") {
         return (m.parts ?? [])
           .filter((p): p is { type: "text"; text: string } => p.type === "text")
           .map((p) => p.text)

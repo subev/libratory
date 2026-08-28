@@ -13,7 +13,7 @@ const subjectPhrase: Record<AiPresetSubject, string> = {
 };
 
 // The Summarize default mirrors Brave Leo's page-summary prompt
-export const AI_PRESETS: AiPreset[] = [
+export const AI_PRESETS: [AiPreset, ...AiPreset[]] = [
   {
     key: "summarize",
     label: "Summarize",
