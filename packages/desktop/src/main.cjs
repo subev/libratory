@@ -30,7 +30,10 @@ function readConfig(home) {
   }
 }
 
-let HOME = null;
+// Empty until boot() resolves it, which is falsy exactly like the null it replaces — the
+// `HOME || defaultHome()` guards around this file still behave the same.
+/** @type {string} */
+let HOME = "";
 let RESOURCES = null;
 let CONFIG = {};
 const DEFAULT_DATABASE_URL = "postgres://libratory:libratory@localhost:5433/libratory";

@@ -41,7 +41,7 @@ function toolPath(resources) {
 
 function sh(cmd, args, opts = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { ...opts, env: { ...process.env, PATH: toolPath(opts.resources), ...(opts.env || {}) } });
+    const child = spawn(cmd, args, { ...opts, env: { ...process.env, PATH: toolPath(opts.resources), ...opts.env } });
     let tail = "";
     const keep = (b) => { tail = (tail + String(b)).slice(-4000); opts.onOutput?.(String(b)); };
     child.stdout?.on("data", keep);

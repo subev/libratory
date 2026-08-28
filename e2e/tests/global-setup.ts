@@ -14,7 +14,7 @@ export default async function globalSetup(config: FullConfig) {
     profiles = await trpcQuery(ctx, "profiles.list");
   } catch (err) {
     throw new Error(
-      `Dev server not reachable at ${baseURL} — start it with \`pnpm dev\` from the repo root first.\n(${err})`,
+      `Dev server not reachable at ${baseURL} — start it with \`pnpm dev\` from the repo root first.\n(${err})`, { cause: err },
     );
   }
 

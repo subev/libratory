@@ -25,10 +25,13 @@
     "app:dmg": "bash scripts/desktop-build.sh",
     "release": "node scripts/release.mjs",
     "ship": "node scripts/ship.mjs",
-    "typecheck": "pnpm -r --filter \"./packages/*\" exec tsc --noEmit"
+    "typecheck": "pnpm -r --filter \"./packages/*\" exec tsc --noEmit",
+    "lint": "oxlint packages scripts e2e",
+    "lint:fix": "oxlint packages scripts e2e --fix"
   },
   "devDependencies": {
-    "typescript": "^5.7.3"
+    "oxlint": "^1.80.0",
+    "typescript": "^7.0.2"
   },
   "engines": {
     "node": ">=20"

@@ -61,8 +61,8 @@ function main() {
   if (build.conclusion !== "success") fail(`The build for ${tag} ended as ${build.conclusion}.`, `gh run view ${build.databaseId} --log-failed`);
 
   const release = JSON.parse(gh("release", "view", tag, "--json", "body,assets"));
-  const names = release.assets.map((a) => a.name);
-  const missing = ["Libratory-arm64.dmg", "Libratory-arm64.zip", "latest-mac.yml"].filter((n) => !names.includes(n));
+  const names = new Set(release.assets.map((a) => a.name));
+  const missing = ["Libratory-arm64.dmg", "Libratory-arm64.zip", "latest-mac.yml"].filter((n) => !names.has(n));
   if (missing.length) fail(`${tag} is missing ${missing.join(", ")}.`, "A published release without these cannot be installed or updated to.");
 
   // The one thing worth reading the log for: an un-notarised build downloads and opens for nobody,

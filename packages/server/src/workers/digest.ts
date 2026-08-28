@@ -46,7 +46,7 @@ export async function digest(payload: DigestPayload) {
     const error = describeError(err);
     await setJob({ status: "failed", error });
     await log(`Digest failed: ${error}`);
-    throw new Error(error);
+    throw new Error(error, { cause: err });
   }
 
   await setJob({ status: "running" });

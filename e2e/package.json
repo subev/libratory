@@ -13,6 +13,7 @@
   "devDependencies": {
     "@playwright/test": "^1.55.0",
     "@types/node": "^22.10.0",
-    "pdfkit": "^0.17.1"
+    "pdfkit": "^0.17.1",
+    "typescript": "^7.0.2"
   }
 }
