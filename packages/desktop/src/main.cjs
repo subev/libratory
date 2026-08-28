@@ -258,7 +258,7 @@ async function runBoot() {
   }
   win.loadURL(ctx.url);
   // Only once the app is actually usable — a version check has no business delaying a launch
-  updater.install({ onStatus: (text) => console.log(`[updater] ${text}`) });
+  updater.install({ onStatus: (text) => console.log(`[updater] ${text}`), getWindow: () => win });
 }
 
 function menu(url) {

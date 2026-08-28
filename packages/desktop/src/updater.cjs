@@ -33,7 +33,7 @@ function updatesConfigured() {
   return app.isPackaged && existsSync(path.join(process.resourcesPath, "app-update.yml"));
 }
 
-function install({ onStatus } = {}) {
+function install({ onStatus, getWindow } = {}) {
   let autoUpdater;
   try {
     ({ autoUpdater } = require("electron-updater"));
@@ -53,14 +53,19 @@ function install({ onStatus } = {}) {
   let downloaded = null;
   const declined = new Set();
 
+  // Decimal, because that is what Finder and the GitHub release page both say.
+  const mb = (bytes) => `${Math.round(bytes / 1e6)} MB`;
+  const progress = (fraction) => getWindow?.()?.setProgressBar(fraction);
+
   autoUpdater.on("update-available", async (info) => {
     if (declined.has(info.version)) return;
-    onStatus?.(`Update available: ${info.version}`);
+    const size = info.files?.[0]?.size ? mb(info.files[0].size) : null;
+    onStatus?.(`Update available: ${info.version}${size ? ` (${size})` : ""}`);
     const { response } = await dialog.showMessageBox({
       type: "info",
       title: "A new Libratory is available",
       message: `Version ${info.version} is ready to download.`,
-      detail: "It installs when you quit, and the next launch brings the Python environment and models up to date with it. Nothing in your library changes.",
+      detail: `${size ? `About ${size} to download. ` : ""}It installs when you quit, and the next launch brings the Python environment and models up to date with it. Nothing in your library changes.`,
       buttons: ["Download it", "Not now"],
       defaultId: 0,
       cancelId: 1,
@@ -70,7 +75,15 @@ function install({ onStatus } = {}) {
     else declined.add(info.version);
   });
 
+  // The Dock icon rather than a dialog: Electron dialogs cannot be updated once shown, and a
+  // modal would block the app for the length of a 190 MB download.
+  autoUpdater.on("download-progress", ({ percent, transferred, total }) => {
+    progress(percent / 100);
+    onStatus?.(`Downloading ${Math.round(percent)}% — ${mb(transferred)} of ${mb(total)}`);
+  });
+
   autoUpdater.on("update-downloaded", async (info) => {
+    progress(-1);
     downloaded = info.version;
     onStatus?.(`Update ${info.version} downloaded`);
     const { response } = await dialog.showMessageBox({
@@ -90,6 +103,7 @@ function install({ onStatus } = {}) {
   });
 
   autoUpdater.on("error", (err) => {
+    progress(-1);
     onStatus?.(`Updater error: ${err.message}`);
     // A failed *check* must never reach the user: they did not ask, and there is nothing to do
     // about it. A failed *install* is different — they clicked twice and are waiting for a restart
