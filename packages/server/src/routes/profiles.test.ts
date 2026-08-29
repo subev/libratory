@@ -31,7 +31,7 @@ describe("profilesRouter CRUD", () => {
   it("lists the default profile first and marks it", async () => {
     await makeProfile("Wife");
     const list = await caller.list();
-    expect(list[0]).toEqual({ id: DEFAULT_PROFILE_ID, name: "Default", isDefault: true });
+    expect(list[0]).toEqual({ id: DEFAULT_PROFILE_ID, name: "Default", isDefault: true, books: 0, folders: 0 });
     expect(list[1]).toMatchObject({ name: "Wife", isDefault: false });
   });
 
@@ -54,6 +54,21 @@ describe("profilesRouter CRUD", () => {
     await expect(caller.delete({ id: profile.id })).rejects.toThrow(
       "Profile still has books or folders",
     );
+  });
+
+  it("counts the books and folders each profile holds", async () => {
+    const db = getDb();
+    const profile = await makeProfile("Wife");
+    await db.insert(books).values({ title: "Hers", profileId: profile.id });
+    await db.insert(books).values({ title: "Also hers", profileId: profile.id });
+    await db.insert(folders).values({ name: "Hers", profileId: profile.id });
+    await db.insert(books).values({ title: "Mine" });
+
+    const list = await caller.list();
+    expect(list).toMatchObject([
+      { name: "Default", books: 1, folders: 0 },
+      { name: "Wife", books: 2, folders: 1 },
+    ]);
   });
 
   it("deletes an empty profile", async () => {

@@ -2,15 +2,34 @@ import { z } from "zod";
 import { router, publicProcedure } from "../trpc.ts";
 import { db } from "../db.ts";
 import { profiles, folders, books, DEFAULT_PROFILE_ID } from "../schema.ts";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, count } from "drizzle-orm";
+import { bookTotalSizeCached } from "../lib/disk-usage.ts";
 
 export const profilesRouter = router({
   list: publicProcedure.query(async () => {
-    const rows = await db
-      .select({ id: profiles.id, name: profiles.name })
-      .from(profiles)
-      .orderBy(asc(profiles.createdAt));
-    return rows.map((r) => ({ ...r, isDefault: r.id === DEFAULT_PROFILE_ID }));
+    const [rows, bookCounts, folderCounts] = await Promise.all([
+      db.select({ id: profiles.id, name: profiles.name }).from(profiles).orderBy(asc(profiles.createdAt)),
+      db.select({ profileId: books.profileId, n: count() }).from(books).groupBy(books.profileId),
+      db.select({ profileId: folders.profileId, n: count() }).from(folders).groupBy(folders.profileId),
+    ]);
+    const bookCount = new Map(bookCounts.map((r) => [r.profileId, r.n]));
+    const folderCount = new Map(folderCounts.map((r) => [r.profileId, r.n]));
+    return rows.map((r) => ({
+      ...r,
+      isDefault: r.id === DEFAULT_PROFILE_ID,
+      books: bookCount.get(r.id) ?? 0,
+      folders: folderCount.get(r.id) ?? 0,
+    }));
+  }),
+
+  // Separate from list because it walks the library on disk; the switcher only asks once it opens.
+  usage: publicProcedure.query(async () => {
+    const rows = await db.select({ id: books.id, profileId: books.profileId }).from(books);
+    const bytes: Record<string, number> = {};
+    for (const book of rows) {
+      bytes[book.profileId] = (bytes[book.profileId] ?? 0) + (await bookTotalSizeCached(book.id));
+    }
+    return bytes;
   }),
 
   create: publicProcedure
