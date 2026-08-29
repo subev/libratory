@@ -97,6 +97,61 @@ pnpm test        # 538 unit + integration tests
 Open work and the reasoning behind the current settings live in
 [`tasks/type-safety-and-lint.md`](tasks/type-safety-and-lint.md).
 
+## Colour and reading surfaces — read this before touching a className
+
+### Two tiers, and the boundary is enforced
+
+`packages/web/src/styles.css` is a **palette** and a **mapping**.
+
+- **Palette** (`--pal-*`) is raw colour: literals only, steps rising as the colour darkens. Every
+  step carries a contrast contract — 600 is the brand fill because ink on it is 4.93:1, 700 is text
+  on cream because that is 5.36:1, 500 is what survives charcoal. Picking a colour is a lookup.
+- **Semantic** (`--accent`, `--danger`, `--text-muted`, …) is a pure `var()` mapping into it.
+
+**Components may only use semantic tokens.** `oxlint` fails the build on `bg-(--pal-…)`. If nothing
+in the semantic layer fits, add one there — do not reach past it, and never inline a hex.
+
+Two rules the palette exists to enforce, both learned the hard way:
+
+- **`--*-text` is text IN a colour; `--on-*` is text sitting ON it as a fill.** They are not
+  interchangeable. `bg-(--warning) text-white` measured 2.53:1.
+- **A brand colour is not automatically a text colour.** The tangerine passes at 4.93:1 under ink
+  and fails at 3.23:1 as text on cream. That is why `--accent` and `--accent-text` both exist.
+
+### Reading surfaces are not UI surfaces
+
+Chapter text, the read-along transcript and the reflowed text view are **read**, not operated, and
+they follow different rules from the rest of the app. The design line is *machinery in sans, library
+in serif*.
+
+| | reading | UI |
+| --- | --- | --- |
+| face | `font-reading` (Source Serif 4) | sans |
+| measure | `max-w-prose` (65ch) | whatever the layout needs |
+| size | 17px modal / `text-lg` reader | `text-sm` / `text-xs` |
+| ground | `--bg-reading` | `--bg-card` / `--bg-subtle` |
+
+**Do not widen the measure.** Before this was fixed the panes ran ~119 characters per line at 15px;
+Medium, Instapaper and Safari Reader all land between 65 and 71. A full-width reading pane is the
+single most common regression here, because it looks fine in a screenshot and is miserable to read.
+
+`--bg-reading` is a warm, slightly dimmed ground rather than paper white. Sepia measures roughly 25%
+lower effective radiance, and it is the one display-mode claim with real evidence behind it. Text
+lands at 8.9:1 — deliberately short of pure black on white, which is harsh over long passages.
+
+### Highlighting: read-along is not annotation
+
+The read-along highlight uses the **accent**, not the conventional highlighter yellow, and that is
+deliberate: a moving cue is a playhead, not a mark the reader made. Every immersion-reading product
+tracks the voice in its own brand colour. Yellow is the convention for *user-created* highlights —
+if this app ever grows those, they should be yellow and visibly distinct from the cue.
+
+The overlay ladder over a PDF page (`CueOverlay`) is one hue at four strengths — linked chunk, seek
+ring, active sentence, active word — painted with `mix-blend-multiply`, because pdf.js renders white
+paper in **both** themes. Anything drawn on that layer must read against white; theme-varying tokens
+do not belong there. The same applies to `LogDock`, which sits on `--bg-terminal` (dark in both
+themes) and therefore uses the `--terminal-*` tokens rather than the theme ramp.
+
 ## The Pipeline
 
 ```

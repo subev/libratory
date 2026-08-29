@@ -10,7 +10,7 @@ export function CueTranscript({
   onSeek,
   hoverChunk = null,
   onHoverCue,
-  className = "rounded-lg bg-(--bg-card) p-6 font-reading text-lg leading-relaxed text-(--text-primary)",
+  className = "mx-auto w-full max-w-prose rounded-lg bg-(--bg-reading) p-7 font-reading text-lg leading-relaxed text-(--text-primary)",
   empty = "No narration to read along with yet.",
 }: {
   cues: ReaderCues | null;

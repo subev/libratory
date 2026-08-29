@@ -788,7 +788,7 @@ function ChapterModalBody({
                 value={editText}
                 onChange={(e) => setEditText(e.target.value)}
                 data-testid="chapter-edit-text"
-                className="flex-1 min-h-0 w-full max-w-4xl mx-auto rounded bg-(--bg-card) border border-(--border-custom-text) px-6 py-5 font-reading text-[15px] text-(--text-primary) whitespace-pre-wrap leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-(--warning)"
+                className="flex-1 min-h-0 w-full max-w-prose mx-auto rounded bg-(--bg-reading) border border-(--border-custom-text) px-7 py-6 font-reading text-[17px] text-(--text-primary) whitespace-pre-wrap leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-(--warning)"
               />
             ) : viewMode === "pages" && manifest && readerChapter ? (
               <div className="mx-auto flex w-full max-w-3xl flex-1 min-h-0 flex-col gap-4 overflow-y-auto">
@@ -818,7 +818,7 @@ function ChapterModalBody({
                 onSeek={(at) => playerRef.current?.seek(at)}
                 hoverChunk={hoverChunk}
                 onHoverCue={hoverCue}
-                className="mx-auto w-full max-w-4xl flex-1 min-h-0 overflow-y-auto rounded bg-(--bg-subtle) border border-(--border) px-6 py-5 font-reading text-[15px] leading-relaxed text-(--text-primary)"
+                className="mx-auto w-full max-w-prose flex-1 min-h-0 overflow-y-auto rounded bg-(--bg-reading) border border-(--border-reading) px-7 py-6 font-reading text-[17px] leading-relaxed text-(--text-primary)"
               />
             ) : viewMode === "blocks" && fullChapter.sourceBlocks ? (
               <BlocksPreview
@@ -1272,7 +1272,7 @@ function TextPreview({
     requestAnimationFrame(() => { syncing.current = false; });
   }
 
-  const textClass = "flex-1 min-h-0 overflow-y-auto rounded bg-(--bg-subtle) border border-(--border) px-6 py-5 font-reading text-[15px] text-(--text-primary) whitespace-pre-wrap leading-relaxed";
+  const textClass = "mx-auto w-full max-w-prose flex-1 min-h-0 overflow-y-auto rounded bg-(--bg-reading) border border-(--border-reading) px-7 py-6 font-reading text-[17px] text-(--text-primary) whitespace-pre-wrap leading-relaxed";
   const readingColumn = " w-full max-w-4xl mx-auto";
 
   if (viewMode === "split" && cleanText) {

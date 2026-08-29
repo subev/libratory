@@ -190,6 +190,12 @@
   --bg-custom-text: var(--pal-brass-a08);
   --border-custom-text: var(--pal-brass-a40);
 
+  /* Reading surfaces. A warm, slightly dimmed ground rather than paper white: sepia measures
+     about 25% lower effective radiance and is the one display-mode finding with evidence behind
+     it. Contrast lands at 8.9:1 — comfortable, and deliberately short of pure black on white. */
+  --bg-reading: var(--pal-neutral-150);
+  --border-reading: var(--border);
+
   /* Dark in both themes, so its text and lines cannot come from the theme ramp. */
   --bg-terminal: var(--pal-neutral-950);
   --bg-terminal-hover: var(--pal-terminal-hover);
@@ -261,6 +267,8 @@
 
     --bg-custom-text: var(--pal-brass-a10);
     --border-custom-text: var(--pal-brass-a35);
+
+    --bg-reading: var(--pal-neutral-900);
 
     --bg-terminal: var(--pal-neutral-990);
     --bg-terminal-hover: var(--pal-neutral-975);
