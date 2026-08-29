@@ -1,7 +1,9 @@
-import type { ComponentPropsWithRef, ReactNode } from "react";
+import type { ComponentPropsWithRef } from "react";
 import { Link } from "react-router";
 
-type Variant = "primary" | "secondary" | "danger" | "warning" | "success" | "ghost" | "icon";
+export const VARIANTS = ["primary", "secondary", "danger", "warning", "success", "ghost", "icon"] as const;
+
+type Variant = (typeof VARIANTS)[number];
 type Size = "sm" | "md";
 
 const BASE = "inline-flex items-center justify-center gap-1.5 font-medium whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed";
@@ -16,33 +18,27 @@ const VARIANT: Record<Variant, string> = {
   icon: "border border-(--border) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-subtle) shrink-0",
 };
 
-const SIZE: Record<Variant, Record<Size, string>> = {
-  primary: { sm: "text-xs px-2.5 py-1 rounded", md: "text-sm px-4 py-2 rounded-md" },
-  secondary: { sm: "text-xs px-2.5 py-1 rounded", md: "text-sm px-4 py-2 rounded-md" },
-  danger: { sm: "text-xs px-2.5 py-1 rounded", md: "text-sm px-4 py-2 rounded-md" },
-  warning: { sm: "text-xs px-2.5 py-1 rounded", md: "text-sm px-4 py-2 rounded-md" },
-  success: { sm: "text-xs px-2.5 py-1 rounded", md: "text-sm px-4 py-2 rounded-md" },
+// Only two variants deviate on size; the filled ones were five identical rows.
+const PAD: Record<Size, string> = { sm: "text-xs px-2.5 py-1 rounded", md: "text-sm px-4 py-2 rounded-md" };
+const SIZE: Partial<Record<Variant, Record<Size, string>>> = {
   ghost: { sm: "text-xs px-2 py-1 rounded", md: "text-sm px-3 py-1.5 rounded-md" },
   icon: { sm: "w-7 h-7 rounded-md", md: "w-9 h-9 rounded-md" },
 };
 
 // The quiet register of a variant: colour without the weight of a fill, for a control that must warn
 // rather than shout. The type only admits `soft` on the variants listed here.
-type SoftVariant = "primary" | "danger" | "warning" | "success";
-
-const SOFT: Record<SoftVariant, string> = {
+const SOFT = {
   primary: "text-(--accent-text) hover:text-(--accent-text-hover) hover:bg-(--bg-subtle)",
   danger: "bg-(--danger-bg) text-(--danger-text) hover:bg-(--danger-bg-hover)",
   warning: "bg-(--warning-bg) text-(--warning-text) hover:bg-(--warning-bg-hover)",
   success: "bg-(--success-bg) text-(--success-text) hover:bg-(--success-bg-hover)",
-};
+} satisfies Partial<Record<Variant, string>>;
 
-type Common = {
-  variant?: Variant;
-  size?: Size;
-  className?: string;
-  children?: ReactNode;
-};
+type SoftVariant = keyof typeof SOFT;
+
+export const SOFT_VARIANTS = Object.keys(SOFT) as SoftVariant[];
+
+type Common = { variant?: Variant; size?: Size };
 
 // An icon-only button has no text to name it, so the label is not optional.
 type Labelled = { variant: "icon"; "aria-label": string } | { variant?: Exclude<Variant, "icon"> };
@@ -53,12 +49,12 @@ type AsButton = Common & ComponentPropsWithRef<"button"> & { href?: never; to?: 
 type AsLink = Common & Omit<ComponentPropsWithRef<"a">, "href"> & { href: string; to?: never; disabled?: boolean };
 type AsRoute = Common & Omit<ComponentPropsWithRef<"a">, "href"> & { to: string; href?: never; disabled?: boolean };
 
-export type ButtonProps = (AsButton | AsLink | AsRoute) & Labelled & Softness;
+type ButtonProps = (AsButton | AsLink | AsRoute) & Labelled & Softness;
 
 export function Button(props: ButtonProps) {
   const { variant = "secondary", soft = false, size = "md", className = "", children, ...rest } = props;
   const skin = soft ? SOFT[variant as SoftVariant] : VARIANT[variant];
-  const classes = `${BASE} ${skin} ${SIZE[variant][size]} ${className}`.trim();
+  const classes = `${BASE} ${skin} ${(SIZE[variant] ?? PAD)[size]} ${className}`.trim();
   const { href, to, disabled, download, target, rel, ...attrs } = rest as {
     href?: string;
     to?: string;
@@ -71,17 +67,18 @@ export function Button(props: ButtonProps) {
 
   // A disabled anchor still navigates, so an unavailable link becomes a real disabled button rather
   // than disappearing — the app shows actions it cannot do, it does not hide them.
-  if (to !== undefined && !disabled) {
-    return (
-      <Link {...(attrs as ComponentPropsWithRef<"a">)} {...anchorOnly} to={to} className={`${classes} no-underline`}>
+  if (!disabled && (to !== undefined || href !== undefined)) {
+    const shared = {
+      ...(attrs as ComponentPropsWithRef<"a">),
+      ...anchorOnly,
+      className: `${classes} no-underline`,
+    };
+    return to !== undefined ? (
+      <Link {...shared} to={to}>
         {children}
       </Link>
-    );
-  }
-
-  if (href !== undefined && !disabled) {
-    return (
-      <a {...(attrs as ComponentPropsWithRef<"a">)} {...anchorOnly} href={href} className={`${classes} no-underline`}>
+    ) : (
+      <a {...shared} href={href}>
         {children}
       </a>
     );

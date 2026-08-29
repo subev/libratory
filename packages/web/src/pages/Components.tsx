@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { Link } from "react-router";
 import css from "../styles.css?raw";
-import { Button } from "../components/Button.tsx";
+import { Button, VARIANTS, SOFT_VARIANTS } from "../components/Button.tsx";
 import { PillToggle } from "../components/PillToggle.tsx";
 import { StatusBadge, statusStyles } from "../components/StatusBadge.tsx";
 import * as Icons from "../components/icons.tsx";
@@ -184,7 +184,7 @@ function IconGallery() {
   );
 }
 
-function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+function GallerySection({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
     <section id={id} className="space-y-4">
       <h2 className="text-xl text-(--text-primary)">{title}</h2>
@@ -216,34 +216,32 @@ function TokenGroups({ groups }: { groups: Group[] }) {
   );
 }
 
-const VARIANTS = ["primary", "secondary", "danger", "warning", "success", "ghost", "icon"] as const;
-
 function ButtonRow({ variant }: { variant: (typeof VARIANTS)[number] }) {
-  const label = variant === "icon" ? undefined : "Action";
-  const icon = <IconRefresh className="h-4 w-4" />;
-  const common = variant === "icon" ? ({ variant, "aria-label": "Re-run" } as const) : ({ variant } as const);
+  const isIcon = variant === "icon";
+  const common = isIcon ? ({ variant, "aria-label": "Re-run" } as const) : ({ variant } as const);
+  const body = isIcon ? <IconRefresh className="h-4 w-4" /> : "Action";
   return (
     <div className="flex flex-wrap items-center gap-3">
       <span className="w-24 shrink-0 font-mono text-xs text-(--text-muted)">{variant}</span>
       <Button {...common} size="md">
-        {variant === "icon" ? icon : label}
+        {body}
       </Button>
       <Button {...common} size="sm">
-        {variant === "icon" ? icon : label}
+        {body}
       </Button>
       <Button {...common} size="sm" disabled title="Nothing to do">
-        {variant === "icon" ? icon : "Disabled"}
+        {isIcon ? body : "Disabled"}
       </Button>
-      {variant !== "icon" ? (
-        <Button variant={variant} size="sm" href="#buttons">
-          As a link
-        </Button>
-      ) : null}
-      {variant !== "icon" ? (
-        <Button variant={variant} size="sm" href="#buttons" disabled title="Nothing to download yet">
-          Disabled link
-        </Button>
-      ) : null}
+      {!isIcon && (
+        <>
+          <Button variant={variant} size="sm" href="#buttons">
+            As a link
+          </Button>
+          <Button variant={variant} size="sm" href="#buttons" disabled title="Nothing to download yet">
+            Disabled link
+          </Button>
+        </>
+      )}
     </div>
   );
 }
@@ -292,7 +290,7 @@ export function Components() {
           </p>
         </header>
 
-        <Section id="reading" title="Reading surface">
+        <GallerySection id="reading" title="Reading surface">
           <p className="text-sm text-(--text-secondary)">
             Measured line length:{" "}
             <span className="font-mono text-(--text-primary)">
@@ -310,9 +308,9 @@ export function Components() {
               </span>
             </span>
           </p>
-        </Section>
+        </GallerySection>
 
-        <Section id="buttons" title="Buttons">
+        <GallerySection id="buttons" title="Buttons">
           <p className="text-sm text-(--text-secondary)">
             Every variant at both sizes, resting and disabled, plus the link form. A disabled link renders as a
             real disabled button, because a disabled anchor still navigates.
@@ -323,15 +321,11 @@ export function Components() {
             ))}
             <div className="flex flex-wrap items-center gap-3 border-t border-(--border) pt-3">
               <span className="w-24 shrink-0 font-mono text-xs text-(--text-muted)">soft</span>
-              <Button variant="danger" soft size="sm">
-                Reset
-              </Button>
-              <Button variant="warning" soft size="sm">
-                Edit
-              </Button>
-              <Button variant="success" soft size="sm">
-                Saved
-              </Button>
+              {SOFT_VARIANTS.map((variant) => (
+                <Button key={variant} variant={variant} soft size="sm">
+                  {variant}
+                </Button>
+              ))}
               <span className="text-xs text-(--text-muted)">
                 status colour without the weight of a fill — for a control that must warn, not shout
               </span>
@@ -349,9 +343,9 @@ export function Components() {
               </PillToggle>
             </div>
           </div>
-        </Section>
+        </GallerySection>
 
-        <Section id="icons" title={`Icons (${ICONS.length})`}>
+        <GallerySection id="icons" title={`Icons (${ICONS.length})`}>
           <p className="text-sm text-(--text-secondary)">
             The whole set, read off components/icons.tsx. Nothing else in the app may draw an SVG or use an emoji —
             scripts/check-icons.mjs fails the build on either. Weight carries state: regular for idle, fill for active.
@@ -374,9 +368,9 @@ export function Components() {
             )}
           </div>
           <IconGallery />
-        </Section>
+        </GallerySection>
 
-        <Section id="badges" title="StatusBadge">
+        <GallerySection id="badges" title="StatusBadge">
           <div className={`flex flex-wrap gap-2 ${CARD}`}>
             {Object.keys(statusStyles).map((status) => (
               <StatusBadge key={status} status={status} />
@@ -384,9 +378,9 @@ export function Components() {
             <StatusBadge status="synthesizing" chaptersCompleted={3} totalChapters={12} />
             <StatusBadge status="failed" error="Cancelled by user" />
           </div>
-        </Section>
+        </GallerySection>
 
-        <Section id="typography" title="Typography">
+        <GallerySection id="typography" title="Typography">
           <div className={`space-y-4 ${CARD}`}>
             <Specimen label="h1 — Fraunces, display">
               <h1 className="text-3xl">The queen of the golden bird</h1>
@@ -408,20 +402,20 @@ export function Components() {
               <p className="font-mono text-xs">chapter_03.m4a — 00:14:22 — 3.1 MB</p>
             </Specimen>
           </div>
-        </Section>
+        </GallerySection>
 
-        <Section id="semantic" title={`Semantic tokens (${count(SEMANTIC)})`}>
+        <GallerySection id="semantic" title={`Semantic tokens (${count(SEMANTIC)})`}>
           <TokenGroups groups={SEMANTIC} />
-        </Section>
+        </GallerySection>
 
-        <Section id="palette" title={`Palette (${count(PALETTE)})`}>
+        <GallerySection id="palette" title={`Palette (${count(PALETTE)})`}>
           <p className="text-sm text-(--text-secondary)">
             Raw colour. Never legal in a className — the semantic layer above is what components use.
           </p>
           <TokenGroups groups={PALETTE} />
-        </Section>
+        </GallerySection>
 
-        <Section id="ungrouped" title={`Ungrouped (${UNGROUPED.length})`}>
+        <GallerySection id="ungrouped" title={`Ungrouped (${UNGROUPED.length})`}>
           <p className="text-sm text-(--text-secondary)">
             Declared in styles.css but claimed by no group above. A new token lands here rather than vanishing.
           </p>
@@ -430,7 +424,7 @@ export function Components() {
           ) : (
             <TokenGrid tokens={UNGROUPED} />
           )}
-        </Section>
+        </GallerySection>
       </div>
     </div>
   );

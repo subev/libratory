@@ -192,8 +192,8 @@ Four rules the sweep of 82 hand-rolled icons established:
 - **An emoji is not an icon.** It is full-colour OS artwork that ignores the palette and redraws
   itself differently on macOS and Windows — which matters now that the app ships on both. A `✓` is
   not an icon either: it inherits the text font and lands at whatever size and baseline that font
-  decides. If you need an arrow in genuine prose (`press ←`), spell it out; if you truly cannot,
-  mark the line `prose-glyph`.
+  decides. If you need an arrow in genuine prose (`press ←`), spell it out — comment lines are
+  skipped, and there is no per-line escape hatch: one existed, was documented, and was never used.
 
 ## Buttons — read this before styling a `<button>`
 
@@ -220,7 +220,7 @@ Four things it centralises that call sites kept getting wrong:
   component; focus comes from the base `:focus-visible` rule in `styles.css`.
 
 `soft` is the quiet register of a variant: `danger`/`warning`/`success` become a tint rather than a
-fill, `primary` becomes accent text with no fill, and `icon` loses its border and goes faint. Reach
+fill and `primary` becomes accent text with no fill. The type admits `soft` on those four only. Reach
 for it when a control must warn rather than shout — the chapter Edit button is `warning soft` because
 saving custom text drops the chapter to mode `"text"` and the read-along stops following the page.
 
@@ -236,9 +236,10 @@ and does that exist right now".
 behaviour rather than an override. If a call site needs something the variants cannot express, add a
 variant; do not fight the one you picked.
 
-`scripts/check-buttons.mjs` (in `pnpm lint`) fails on any `<button>` or `<a>` carrying a hand-written
+`scripts/check-buttons.mjs` (in `pnpm lint`) fails on any `<button>`, `<a>`, `<Link>` or `<NavLink>` carrying a hand-written
 skin — a radius, plus padding or a fixed box, plus a fill or a border. A control that is genuinely
-not an action opts out with a `button-ok` comment above it **and a reason**: `PillToggle` (a toggle),
+not an action opts out with a `button-ok` comment on one of the two lines directly above it. The gate
+cannot check that you wrote a reason, so writing one is on you: `PillToggle` (a toggle),
 `VoicePicker`'s trigger (a labelled form control skinned to match the input beside it), and selection
 rows. Inconvenience is not a reason.
 

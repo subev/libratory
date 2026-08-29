@@ -20,6 +20,9 @@ export function sourceLabel(source: ChatSource): string {
   return parts.join(" — ");
 }
 
+const chipClass =
+  "inline-flex items-center gap-1 max-w-72 text-xs px-2 py-1 rounded-full bg-(--bg-subtle) text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-card-hover) border border-(--border) cursor-pointer";
+
 export function SourceChips({
   sources,
   onOpenPdf,
@@ -32,8 +35,6 @@ export function SourceChips({
     <div className="flex flex-wrap gap-1.5 mt-2" data-testid="chat-sources">
       {sources.map((source, i) => {
         const label = sourceLabel(source);
-        const chipClass =
-          "inline-flex items-center gap-1 max-w-72 text-xs px-2 py-1 rounded-full bg-(--bg-subtle) text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-card-hover) border border-(--border) cursor-pointer";
         const badge = source.kind === "translation" && source.language ? (
           <span className="uppercase text-[10px] font-semibold text-(--text-muted) shrink-0">{source.language}</span>
         ) : null;
@@ -44,7 +45,6 @@ export function SourceChips({
             {badge}
           </>
         );
-        const chapterParam = source.chapterId ? `chapter=${source.chapterId}` : "";
         if (source.fileId) {
           return (
             // button-ok: a citation chip — numbered, truncating and pill-shaped; its own primitive
@@ -57,6 +57,7 @@ export function SourceChips({
             </button>
           );
         }
+        const chapterParam = source.chapterId ? `chapter=${source.chapterId}` : "";
         const variantParam =
           source.kind === "translation" && source.language
             ? `variant=${encodeURIComponent(source.language)}`
