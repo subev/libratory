@@ -7,7 +7,7 @@ import { ChapterAiModal } from "./ChapterAiModal.tsx";
 import { VariantModal } from "./VariantModal.tsx";
 import { VoicePickerChip } from "./VoicePicker.tsx";
 import { PillToggle } from "./PillToggle.tsx";
-import { TOOLBAR_BUTTON } from "../lib/button-classes.ts";
+import { Button } from "./Button.tsx";
 import { getVoiceLabel } from "../lib/voices.ts";
 import { useBodyScrollLock } from "../lib/use-body-scroll-lock.ts";
 import { CueTranscript } from "./reader/CueTranscript.tsx";
@@ -412,26 +412,28 @@ function ChapterModalBody({
     <div className="fixed inset-0 z-50 flex items-center justify-center" data-testid="chapter-modal">
       <div className="absolute inset-0 bg-(--scrim)" onClick={onClose} />
       {hasPrev ? (
-        <a
+        <Button
+          variant="icon"
           href="#prev"
           onClick={(e) => { e.preventDefault(); onNavigate(chapterIndex - 1); }}
-          className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-(--bg-card)/90 shadow-md border border-(--border) text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-card) transition-colors text-xl font-light select-none no-underline"
+          className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-(--bg-card)/90 shadow-md transition-colors select-none"
           title="Previous chapter (Left arrow)"
           aria-label="Previous chapter"
         >
           <IconChevronLeft className="h-5 w-5" />
-        </a>
+        </Button>
       ) : null}
       {hasNext ? (
-        <a
+        <Button
+          variant="icon"
           href="#next"
           onClick={(e) => { e.preventDefault(); onNavigate(chapterIndex + 1); }}
-          className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-(--bg-card)/90 shadow-md border border-(--border) text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-card) transition-colors text-xl font-light select-none no-underline"
+          className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-(--bg-card)/90 shadow-md transition-colors select-none"
           title="Next chapter (Right arrow)"
           aria-label="Next chapter"
         >
           <IconChevronRight className="h-5 w-5" />
-        </a>
+        </Button>
       ) : null}
       <div className="relative bg-(--bg-card) rounded-xl shadow-2xl w-[92vw] max-w-6xl h-[92vh] flex flex-col">
         <div className="flex items-start justify-between p-5 border-b border-(--border)">
@@ -519,24 +521,20 @@ function ChapterModalBody({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 px-5 py-2 border-b border-(--border) bg-(--bg-subtle)">
-          {chapter.status === "done" && chapter.audioPath ? (
-            <a
-              href={chapterAudioDownload(chapter, variant).href}
-              download={chapterAudioDownload(chapter, variant).filename}
-              title={`Download the ${variantName ?? "chapter"} audio`}
-              className={`${TOOLBAR_BUTTON} no-underline`}
-            >
-              Download
-            </a>
-          ) : (
-            <button
-              disabled
-              title={`No ${variantName ?? "chapter"} audio to download yet`}
-              className={TOOLBAR_BUTTON}
-            >
-              Download
-            </button>
-          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            href={chapterAudioDownload(chapter, variant).href}
+            download={chapterAudioDownload(chapter, variant).filename}
+            disabled={chapter.status !== "done" || !chapter.audioPath}
+            title={
+              chapter.status === "done" && chapter.audioPath
+                ? `Download the ${variantName ?? "chapter"} audio`
+                : `No ${variantName ?? "chapter"} audio to download yet`
+            }
+          >
+            Download
+          </Button>
 
           <Divider />
 
@@ -557,15 +555,18 @@ function ChapterModalBody({
             </span>
           ) : null}
           {canContinueSynthesis ? (
-            <button
+            <Button
+              variant="primary"
+              size="sm"
               onClick={() => onQueue(chapter.id, true)}
               title="Continue synthesis from where it stopped — keeps the chunks already synthesized"
-              className="text-xs px-2.5 py-1 rounded bg-(--accent) text-(--on-accent) hover:bg-(--accent-hover) font-medium"
             >
               Continue{chapter.progress ? ` (${chapter.progress})` : ""}
-            </button>
+            </Button>
           ) : null}
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => onQueue(chapter.id)}
             disabled={["pending", "normalizing", "synthesizing"].includes(chapter.status) || chapter.synthesizable === false}
             title={
@@ -577,25 +578,27 @@ function ChapterModalBody({
                     ? `Discard the ${chapter.progress ?? "already-synthesized"} chunks and synthesize the whole chapter again${withVoice}`
                     : `Re-synthesize this chapter's audio from text (from scratch)${withVoice}`
             }
-            className={TOOLBAR_BUTTON}
             data-testid="chapter-synthesize"
           >
             {canContinueSynthesis ? "Start over" : "Re-synthesize"}
-          </button>
+          </Button>
 
           <Divider />
 
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setShowAi(true)}
             title="Summarize, question, or run any prompt against this chapter's text"
-            className={TOOLBAR_BUTTON}
             data-testid="chapter-ask-ai"
           >
             Ask AI
-          </button>
+          </Button>
           {!isVariant ? (
             <>
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => queueCleanupMutation.mutate({ id: chapter.id })}
                 disabled={cleanupRunning || queueCleanupMutation.isPending}
                 title={
@@ -604,20 +607,20 @@ function ChapterModalBody({
                   cleanupStatus === "done" ? "Run the AI cleanup again on the current text" :
                   "Ask AI to strip OCR artifacts from this chapter without altering the prose"
                 }
-                className={TOOLBAR_BUTTON}
                 data-testid="chapter-cleanup"
               >
                 {cleanupLabel}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => stopCleanupMutation.mutate({ id: chapter.id })}
                 disabled={!cleanupRunning || stopCleanupMutation.isPending}
                 title={cleanupRunning ? "Stop the cleanup — the chapter text stays unchanged" : "Nothing is running"}
-                className={TOOLBAR_BUTTON}
                 data-testid="chapter-cleanup-stop"
               >
                 Stop cleanup
-              </button>
+              </Button>
               {cleanupRunning ? (
                 <span className="text-xs text-(--badge-normalizing-text)" data-testid="chapter-cleanup-progress">
                   Cleaning{chapter.cleanup?.progress ? ` · ${chapter.cleanup.progress} chunks` : ""}...
@@ -636,7 +639,9 @@ function ChapterModalBody({
           ) : null}
           {isVariant ? (
             <>
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={handleRunVariant}
                 disabled={variantRunning || startVariantMutation.isPending}
                 title={
@@ -646,28 +651,29 @@ function ChapterModalBody({
                   variantStatus === "done" ? `Discard this ${variantName} text and generate it again` :
                   isTranslationKind ? `Translate this chapter to ${variantName}` : `Rewrite this chapter as ${variantName}`
                 }
-                className="text-xs px-2.5 py-1 rounded bg-(--accent) text-(--on-accent) hover:bg-(--accent-hover) font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="chapter-translate"
               >
                 {runLabel}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => stopVariantMutation.mutate({ chapterId: chapter.id, key: variant!.key })}
                 disabled={!variantRunning || stopVariantMutation.isPending}
                 title={variantRunning ? "Stop and keep everything generated so far" : "Nothing is running"}
-                className={TOOLBAR_BUTTON}
                 data-testid="chapter-translate-stop"
               >
                 Stop {isTranslationKind ? "translation" : "rewrite"}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => setShowCompare(true)}
                 title="Review the original and this variant side by side"
-                className={TOOLBAR_BUTTON}
                 data-testid="chapter-compare"
               >
                 Compare
-              </button>
+              </Button>
               {variantRunning ? (
                 <span className="text-xs text-(--accent-text)" data-testid="chapter-translation-progress">
                   {isTranslationKind ? "Translating" : "Rewriting"}{variantDetail?.progress ? ` · ${variantDetail.progress} chunks` : ""}...
@@ -703,42 +709,48 @@ function ChapterModalBody({
           ) : null}
           {isEditing ? (
             <div className="flex items-center gap-2">
-              <button
+              <Button
+                variant="success"
+                size="sm"
                 onClick={handleSave}
                 disabled={updateTextMutation.isPending}
-                className="text-xs px-2.5 py-1 rounded bg-(--success) text-(--on-success) hover:bg-(--success-hover) font-medium disabled:opacity-50"
                 data-testid="chapter-edit-save"
               >
                 {updateTextMutation.isPending ? "Saving..." : "Save"}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => setIsEditing(false)}
-                className="text-xs px-2.5 py-1 rounded bg-(--bg-subtle) text-(--text-tertiary) hover:bg-(--border) font-medium"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
               {chapter.hasCustomText ? (
-                <button
+                <Button
+                  variant="danger"
+                  soft
+                  size="sm"
                   onClick={handleReset}
                   disabled={resetTextMutation.isPending}
-                  className="text-xs px-2.5 py-1 rounded bg-(--danger-bg) text-(--danger-text) hover:bg-(--danger)/20 font-medium disabled:opacity-50"
                 >
                   Reset
-                </button>
+                </Button>
               ) : null}
               {fullChapter && !isVariant ? (
-                <button
+                <Button
+                  variant="warning"
+                  soft
+                  size="sm"
                   onClick={startEditing}
                   // Warning tint on purpose: saving custom text drops the chapter to mode "text"
                   // (reader-doc.ts) and the read-along stops following the PDF page.
-                  className="text-xs px-2.5 py-1 rounded bg-(--warning-bg) text-(--warning-text) font-medium"
                   data-testid="chapter-edit"
                 >
                   Edit
-                </button>
+                </Button>
               ) : null}
               <ViewModeTabs
                 viewMode={viewMode}
@@ -844,14 +856,15 @@ function ChapterModalBody({
           ) : isVariant ? (
             <div className="flex flex-col items-center justify-center gap-3 flex-1 text-sm text-(--text-muted)">
               <span>No {variantName} text for this chapter yet.</span>
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={handleRunVariant}
                 disabled={startVariantMutation.isPending}
-                className="text-xs px-3 py-1.5 rounded bg-(--accent) text-(--on-accent) hover:bg-(--accent-hover) font-medium disabled:opacity-50"
                 data-testid="chapter-translate-empty"
               >
                 {startVariantMutation.isPending ? "Starting..." : isTranslationKind ? `Translate to ${variantName}` : `Generate ${variantName}`}
-              </button>
+              </Button>
             </div>
           ) : (
             <div className="flex items-center justify-center flex-1 text-sm text-(--text-muted)">
@@ -1060,17 +1073,19 @@ function ChunkPreviewPanel({
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {activeUrl ? (
-            <button
+            <Button
+              variant="icon"
+              size="sm"
               onClick={togglePlay}
               title={isPlaying ? "Pause (space)" : "Play (space) — auto-advances through chunks"}
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-(--accent) text-(--on-accent) hover:bg-(--accent-hover)"
+              aria-label={isPlaying ? "Pause" : "Play"}
             >
               {isPlaying ? (
                 <IconPause className="h-3.5 w-3.5" weight="fill" />
               ) : (
                 <IconPlay className="h-3.5 w-3.5 translate-x-px" />
               )}
-            </button>
+            </Button>
           ) : null}
           {activeUrl ? (
             <select
@@ -1122,6 +1137,7 @@ function ChunkPreviewPanel({
         {chunkPreviews.map((preview) => {
           const active = preview.url === activeUrl;
           const linked = !active && preview.url === hoveredUrl;
+          // button-ok: a chunk selector whose three states track the text pane's hover, not an action
           return (
             <button
               key={preview.fileName}

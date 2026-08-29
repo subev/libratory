@@ -8,6 +8,7 @@ import { PillToggle } from "./PillToggle.tsx";
 import { profileHeaders } from "../lib/profile.ts";
 import { AfterExtractChoice } from "./AfterExtractChoice.tsx";
 import { IconDragHandle, IconClose, IconAdd } from "./icons.tsx";
+import { Button } from "./Button.tsx";
 
 type UploadZoneProps = {
   onUploadComplete: () => void;
@@ -337,13 +338,14 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
                 </button>
               </div>
             ))}
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => fileInputRef.current?.click()}
-              className="w-full py-2 flex items-center justify-center gap-1 text-xs text-(--text-muted) hover:text-(--text-secondary) border border-dashed border-(--border-input) rounded-md transition-colors"
+              className="w-full border-dashed"
             >
               <IconAdd className="h-3 w-3" /> Add more files
-            </button>
+            </Button>
           </div>
         ) : (
           <div>
@@ -497,15 +499,14 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
           </div>
 
           <div className="p-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-            <button
-              type="button"
+            <Button
+              variant="primary"
               onClick={upload}
               disabled={isUploading}
-              className="px-5 py-2.5 bg-(--accent) text-(--on-accent) rounded-md text-sm font-medium hover:bg-(--accent-hover) disabled:opacity-50"
             >
               {isUploading ? "Uploading..." : !fullExtract ? "Upload" : autoSynthesize ? "Extract & synthesize" : "Extract"}
               {isMultiFile ? ` (${stagedFiles.length} ${separateBooks ? "books" : "files"})` : ""}
-            </button>
+            </Button>
             <p className="min-w-0 flex-1 text-xs text-(--text-muted)">{outcome}</p>
           </div>
         </div>

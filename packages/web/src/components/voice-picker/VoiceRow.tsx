@@ -1,6 +1,7 @@
 import { memo } from "react";
 
 import { voiceBlockedByMissingMlx, type Voice } from "../../lib/voices.ts";
+import { Button } from "../Button.tsx";
 import { IconCheck, IconPause, IconPlay, IconSpinner } from "../icons.tsx";
 import { trpc } from "../../trpc.ts";
 import { useVoicePicker } from "./context.tsx";
@@ -34,12 +35,13 @@ export const VoiceRow = memo(function VoiceRow({ voice, action }: { voice: Voice
     <div
       className={`flex items-center gap-3 px-3 py-2 rounded-md ${isSelected ? "bg-(--bg-selected)" : "hover:bg-(--bg-subtle)"}`}
     >
-      <button
-        type="button"
+      <Button
+        variant="icon"
+        size="sm"
         onClick={() => actions.play(voice.id)}
         aria-busy={isPending}
         disabled={unavailable}
-        className={`shrink-0 h-8 w-8 rounded-full flex items-center justify-center border border-(--border) transition-colors ${ isPending ? "cursor-progress" : "hover:border-(--accent) hover:bg-(--bg-selected)" }`}
+        className={isPending ? "cursor-progress" : ""}
         title={status ?? (isPlaying ? "Stop preview" : `Preview ${voice.label}`)}
         aria-label={isPending ? `Generating preview of ${voice.label}` : isPlaying ? `Stop preview of ${voice.label}` : `Preview ${voice.label}`}
         data-testid={`voice-preview-${voice.id}`}
@@ -51,7 +53,7 @@ export const VoiceRow = memo(function VoiceRow({ voice, action }: { voice: Voice
         ) : (
           <IconPlay className="h-3.5 w-3.5 text-(--text-muted)" />
         )}
-      </button>
+      </Button>
 
       <button
         type="button"

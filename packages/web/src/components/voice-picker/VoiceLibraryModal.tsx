@@ -22,6 +22,7 @@ import { ModelBundleNotice } from "../ModelBundleNotice.tsx";
 import { PocketVoiceCloner } from "./PocketVoiceCloner.tsx";
 import { VoiceRow } from "./VoiceRow.tsx";
 import { PillToggle } from "../PillToggle.tsx";
+import { Button } from "../Button.tsx";
 import { Empty, Section } from "./layout.tsx";
 import { useVoicePicker } from "./context.tsx";
 
@@ -233,6 +234,7 @@ export function VoiceLibraryModal({
 
         <div className="flex flex-1 min-h-0">
           <nav className="w-48 shrink-0 border-r border-(--border) p-2 overflow-y-auto" aria-label="Languages">
+            {/* button-ok: a nav item in the language rail, not an action — aria-current marks the open page */}
             {clonedVoices.length > 0 && (
               <button
                 type="button"
@@ -246,6 +248,7 @@ export function VoiceLibraryModal({
               </button>
             )}
 
+            {/* button-ok: nav items in the language rail, not actions — aria-current marks the open page */}
             {railLanguages.map((code) => (
               <button
                 key={code}
@@ -263,14 +266,16 @@ export function VoiceLibraryModal({
             ))}
 
             {!showAllLanguages && languages.length > railLanguages.length && (
-              <button
-                type="button"
+              <Button
+                variant="primary"
+                soft
+                size="sm"
                 onClick={() => setShowAllLanguages(true)}
-                className="w-full text-left px-3 py-2 rounded-md text-xs text-(--accent-text) hover:bg-(--bg-subtle)"
+                className="w-full"
                 data-testid="voice-show-all-languages"
               >
-                Show all {languages.length} languages
-              </button>
+                <span className="flex-1 text-left">Show all {languages.length} languages</span>
+              </Button>
             )}
           </nav>
 
@@ -397,14 +402,9 @@ export function VoiceLibraryModal({
         <div className="border-t border-(--border) shrink-0">
           {footer ?? (
             <div className="flex items-center justify-end gap-2 px-4 py-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 rounded-md text-sm font-medium border border-(--border-input) text-(--text-secondary) hover:bg-(--bg-subtle)"
-                data-testid="voice-library-done"
-              >
+              <Button onClick={onClose} data-testid="voice-library-done">
                 Done
-              </button>
+              </Button>
             </div>
           )}
         </div>

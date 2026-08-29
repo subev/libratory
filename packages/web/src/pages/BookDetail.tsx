@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useParams, useNavigate, useSearchParams } from "react-router";
+import { useParams, useNavigate, useSearchParams } from "react-router";
 import { trpc } from "../trpc.ts";
 import { ModelBundleNotice, useModelBundle } from "../components/ModelBundleNotice.tsx";
 import { ChapterTable } from "../components/ChapterTable.tsx";
@@ -16,10 +16,10 @@ import { DiskUsageButton } from "../components/DiskUsageButton.tsx";
 import { ChapterAiModal, type AiScope } from "../components/ChapterAiModal.tsx";
 import { NotesSection } from "../components/NotesSection.tsx";
 import { PillToggle } from "../components/PillToggle.tsx";
+import { Button } from "../components/Button.tsx";
 import { loadBookSort, sortBooks } from "../lib/book-sort.ts";
 import { formatBytes, pendingExportLabel, pendingExportSummary } from "../lib/format.ts";
 import { getVoiceLabel, languageLabel } from "../lib/voices.ts";
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "../lib/button-classes.ts";
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -432,31 +432,35 @@ export function BookDetail() {
             ]}
           />
           <div className="flex items-center gap-2" data-testid="book-nav">
-            <button
+            <Button
+              variant="primary"
+              soft
+              size="sm"
               onClick={() => prevBook && navigate(`/books/${prevBook.id}`)}
               disabled={!prevBook}
               title={prevBook ? `Previous book: "${prevBook.title}" — press [` : "This is the first book in the list"}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-sm text-(--accent-text) hover:bg-(--bg-subtle) disabled:opacity-40 disabled:cursor-not-allowed"
               data-testid="prev-book"
-            >
+              >
               <IconArrowLeft className="h-4 w-4" />
               Prev
-            </button>
+            </Button>
             {bookIndex >= 0 && (
               <span className="text-xs text-(--text-faint) tabular-nums" title={`Position in the home list's current sort (${bookSort.key})`}>
                 {bookIndex + 1} of {orderedBooks.length}
               </span>
             )}
-            <button
+            <Button
+              variant="primary"
+              soft
+              size="sm"
               onClick={() => nextBook && navigate(`/books/${nextBook.id}`)}
               disabled={!nextBook}
               title={nextBook ? `Next book: "${nextBook.title}" — press ]` : "This is the last book in the list"}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-sm text-(--accent-text) hover:bg-(--bg-subtle) disabled:opacity-40 disabled:cursor-not-allowed"
               data-testid="next-book"
-            >
+              >
               Next
               <IconArrowRight className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -489,37 +493,31 @@ export function BookDetail() {
              </p>
            </div>
           <div className="shrink-0 pt-1 flex items-center gap-2">
-            {hasChapterAudio || hasChapterPages ? (
-              <Link
-                to={`/books/${book.id}/read`}
-                title={hasChapterAudio
-                  ? "Follow the narration on the PDF page, and tap a sentence to jump there"
-                  : "Read the book's own pages — synthesize a chapter to follow the narration across them"}
-                className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
-                data-testid="book-read-link"
-              >
-                <IconBook className="h-4 w-4" />
-                Read along
-              </Link>
-            ) : (
-              <span
-                title="No chapter is on a page yet — extract chapters to read this book on its own print"
-                className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-faint) opacity-50 cursor-not-allowed"
-                data-testid="book-read-link"
-              >
-                <IconBook className="h-4 w-4" />
-                Read along
-              </span>
-            )}
-            <Link
+            <Button
+              variant="secondary"
+              to={`/books/${book.id}/read`}
+              disabled={!(hasChapterAudio || hasChapterPages)}
+              title={
+                !(hasChapterAudio || hasChapterPages)
+                  ? "No chapter is on a page yet — extract chapters to read this book on its own print"
+                  : hasChapterAudio
+                    ? "Follow the narration on the PDF page, and tap a sentence to jump there"
+                    : "Read the book's own pages — synthesize a chapter to follow the narration across them"
+              }
+              data-testid="book-read-link"
+            >
+              <IconBook className="h-4 w-4" />
+              Read along
+            </Button>
+            <Button
+              variant="secondary"
               to={`/chat?bookId=${book.id}`}
               title="Chat about this book — searches its text and translations, cites pages"
-              className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
               data-testid="book-chat-link"
             >
               <IconChat className="h-4 w-4" />
               Chat
-            </Link>
+            </Button>
             <DiskUsageButton bookId={book.id} />
           </div>
         </div>
@@ -623,26 +621,26 @@ export function BookDetail() {
           </div>
 
           <div className="flex items-center gap-2 mb-3 flex-wrap">
-            <button
+            <Button
+              variant="secondary"
               onClick={() => setShowStructure(true)}
               disabled={book.kind !== "pdf"}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-(--border-input) bg-(--bg-card) text-sm font-medium text-(--text-primary) shadow-sm hover:bg-(--bg-subtle) disabled:opacity-50 disabled:cursor-not-allowed"
               title={book.kind !== "pdf" ? "Synthetic book — no PDF structure to edit" : "Review every detected heading and edit chapter boundaries by hand"}
               data-testid="open-structure"
             >
               <IconStructure className="w-4 h-4 text-(--accent-text)" />
               Structure
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="secondary"
               onClick={() => setShowTranslation(true)}
               disabled={book.chapters.length === 0}
               title={book.chapters.length === 0 ? "Extract chapters first" : "Translate or rewrite chapters (ELI5, summary, custom prompts) and review side by side"}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-(--border-input) bg-(--bg-card) text-sm font-medium text-(--text-primary) shadow-sm hover:bg-(--bg-subtle) disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="open-translation"
             >
               <IconTranslate className="w-4 h-4 text-(--accent-text)" />
               Translate / Transform
-            </button>
+            </Button>
 
             {/* Variant view switcher */}
             {variantLanes.length > 0 && (
@@ -711,7 +709,8 @@ export function BookDetail() {
           {/* Chapter work toolbar — acts on the selected chapters */}
           {book.chapters.length > 0 && (
             <div className="flex gap-3 mb-3 flex-wrap">
-              <button
+              <Button
+                variant="primary"
                 onClick={() => setShowSynthesize(true)}
                 disabled={selectedSynthesizable === 0}
                 title={
@@ -719,12 +718,12 @@ export function BookDetail() {
                     ? (activeVariant ? `No selected chapters have ${activeLabel} text ready or underway` : "No selected chapters are ready for synthesis")
                     : "Pick voice and speed, then synthesize the selected chapters"
                 }
-                className={PRIMARY_BUTTON}
                 data-testid="open-synthesize"
               >
                 Synthesize selected ({selectedSynthesizable}){langSuffix}...
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={() =>
                   activeVariant
                     ? stopAudioMutation.mutate({ bookId: book.id, key: activeVariant })
@@ -732,12 +731,12 @@ export function BookDetail() {
                 }
                 disabled={!(hasActiveChapters || translationAudioQueued) || cancelMutation.isPending || stopAudioMutation.isPending}
                 title={!(hasActiveChapters || translationAudioQueued) ? "No chapters are actively processing" : "Stop the running synthesis — finished chapters keep their audio, the rest resume later"}
-                className={SECONDARY_BUTTON}
                 data-testid="cancel-processing"
               >
                 Cancel processing
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={() => processSelectedVariantsMutation.mutate({ bookId: book.id, key: activeVariant! })}
                 disabled={!activeVariant || selectedTranslatable === 0 || processSelectedVariantsMutation.isPending}
                 title={
@@ -747,12 +746,12 @@ export function BookDetail() {
                     ? `Translate the selected chapters to ${activeLabel} (finished ones are skipped, stopped ones resume)`
                     : `Rewrite the selected chapters as ${activeLabel} (finished ones are skipped, stopped ones resume)`
                 }
-                className={SECONDARY_BUTTON}
                 data-testid="translate-selected"
               >
                 {activeKind === "translation" ? "Translate" : "Rewrite"} selected ({selectedTranslatable}){langSuffix}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={() => cleanupSelectedMutation.mutate({ bookId: book.id })}
                 disabled={!!activeVariant || selectedCleanable === 0 || cleanupSelectedMutation.isPending}
                 title={
@@ -760,12 +759,12 @@ export function BookDetail() {
                   selectedCleanable === 0 ? "No selected chapters need cleanup — already-cleaned and running ones are skipped" :
                   "Ask AI to strip OCR artifacts from the selected chapters without altering the prose (cleaned ones are skipped)"
                 }
-                className={SECONDARY_BUTTON}
                 data-testid="cleanup-selected"
               >
                 Cleanup selected ({selectedCleanable})
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={() => {
                   const selected = book.chapters.filter((c) => c.selected).map((c) => ({ id: c.id, title: c.title }));
                   setAskScope(
@@ -780,12 +779,12 @@ export function BookDetail() {
                     ? "No raw text or chapters to ask about"
                     : "Summarize, question, or run any prompt — switch between selected chapters and the whole book inside"
                 }
-                className={SECONDARY_BUTTON}
                 data-testid="ask-ai-selected"
               >
                 Ask AI
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="danger"
                 onClick={() => {
                   if (confirm(`Delete ${selectedCount} selected chapter(s) and their audio?`)) {
                     deleteChaptersMutation.mutate({ bookId: book.id });
@@ -798,10 +797,9 @@ export function BookDetail() {
                   hasActiveChapters ? "Wait for active chapters to finish" :
                   "Delete selected chapters and their audio"
                 }
-                className="px-4 py-2 bg-(--danger) text-(--on-danger) hover:bg-(--danger-hover) rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Delete selected ({selectedCount})
-              </button>
+              </Button>
             </div>
           )}
 
@@ -820,15 +818,15 @@ export function BookDetail() {
                         ? `Digest failed: ${book.digestJob?.error ?? "unknown error"}`
                         : "No chapters were generated."}
                     </p>
-                    <button
+                    <Button
+                      variant="secondary"
                       onClick={() => resumeDigestMutation.mutate({ id: book.id })}
                       disabled={resumeDigestMutation.isPending}
                       title="Re-run the digest — books that already have a summary chapter are skipped"
-                      className={SECONDARY_BUTTON}
                       data-testid="resume-digest"
                     >
                       {resumeDigestMutation.isPending ? "Queuing..." : "Resume digest"}
-                    </button>
+                    </Button>
                     {resumeDigestMutation.error && (
                       <p className="text-(--danger-text) text-sm">{resumeDigestMutation.error.message}</p>
                     )}
@@ -845,18 +843,19 @@ export function BookDetail() {
                     : "No chapters extracted yet, and no raw text is available — the PDF may be scanned or encrypted."}
                 </p>
                 <div className="flex gap-3 flex-wrap">
-                  <button
+                  <Button
+                    variant="primary"
                     onClick={() => setExtractOpen(true)}
                     disabled={!extractionReady}
                     title={extractionReady
                       ? "Choose what to read and with which settings, then start — Marker takes minutes per book"
                       : "Full extraction needs the Marker models — download them below"}
-                    className={PRIMARY_BUTTON}
                     data-testid="extract-chapters"
                   >
                     Extract chapters...
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="secondary"
                     onClick={() => setAskScope({ kind: "book-raw", bookId: book.id, bookTitle: book.title })}
                     disabled={!hasRawText}
                     title={
@@ -864,11 +863,10 @@ export function BookDetail() {
                         ? "Summarize, question, or run any prompt against the whole book's raw text"
                         : "No raw text — the PDF may be scanned; run Extract chapters with Force OCR instead"
                     }
-                    className={SECONDARY_BUTTON}
                     data-testid="ask-ai-book"
                   >
                     Ask AI (whole book)
-                  </button>
+                  </Button>
                 </div>
                 <ModelBundleNotice id="extraction" verb="Extracting chapters" />
               </div>
@@ -930,6 +928,7 @@ export function BookDetail() {
           {book.chapters.length > 0 && (
             <div className="mt-4">
               <div className="inline-flex rounded-lg bg-(--bg-subtle) border border-(--border) p-1 gap-1">
+                {/* button-ok: a tab in a segmented control — picking which panel shows, not an action */}
                 <button
                   onClick={() => setCreateTab("audio")}
                   className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -945,6 +944,7 @@ export function BookDetail() {
                     <span className="w-1.5 h-1.5 rounded-full bg-(--accent) animate-pulse" title="Synthesis in progress" />
                   )}
                 </button>
+                {/* button-ok: a tab in a segmented control — picking which panel shows, not an action */}
                 <button
                   onClick={() => setCreateTab("document")}
                   className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -967,6 +967,7 @@ export function BookDetail() {
                     {selectedInFlight} of {selectedCount} selected chapter{selectedCount === 1 ? "" : "s"} still synthesizing —
                   </span>
                   <div className="inline-flex rounded-lg bg-(--bg-subtle) border border-(--border) p-0.5 gap-0.5">
+                    {/* button-ok: one side of a segmented choice, not an action — the build runs from the button below */}
                     <button
                       onClick={() => setWaitForAll(false)}
                       className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
@@ -977,6 +978,7 @@ export function BookDetail() {
                     >
                       Ready now ({selectedWithAudio})
                     </button>
+                    {/* button-ok: one side of a segmented choice, not an action — the build runs from the button below */}
                     <button
                       onClick={() => setWaitForAll(true)}
                       className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
@@ -992,7 +994,8 @@ export function BookDetail() {
               )}
               <div className={`pt-3 space-y-3 ${createTab === "audio" ? "" : "hidden"}`}>
                 <div className="flex items-center gap-2 flex-wrap">
-                <button
+                <Button
+                  variant="primary"
                   onClick={() =>
                     activeVariant
                       ? assembleVariantMutation.mutate({ bookId: book.id, key: activeVariant, waitForAll: deferOutputs })
@@ -1006,12 +1009,13 @@ export function BookDetail() {
                     isAssembling ? "Assembly already in progress" :
                     undefined
                   }
-                  className={PRIMARY_BUTTON}
                   data-testid="assemble-button"
                 >
                   {book.outputPath ? "Re-assemble" : "Assemble"}{deferOutputs ? " when ready" : " selected"} ({deferOutputs ? selectedCount : selectedWithAudio}){langSuffix}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="danger"
+                  soft
                   onClick={() => {
                     if (confirm(`Delete the synthesized${activeVariant ? ` ${activeLabel}` : ""} audio files and WAV chunks of ${audioDataCount} selected chapter(s), freeing ${audioDataSize}? ${activeVariant ? "Variant text" : "Chapters and text"} are kept — you can re-synthesize anytime.`)) {
                       if (activeVariant) {
@@ -1027,46 +1031,46 @@ export function BookDetail() {
                     hasActiveChapters ? "Wait for active chapters to finish" :
                     `Delete the synthesized${activeVariant ? ` ${activeLabel}` : ""} audio files and WAV chunks of the selected chapters (${audioDataSize}) — text is kept, re-synthesize anytime`
                   }
-                  className="px-4 py-2 border border-(--danger) text-(--danger-text) rounded-md text-sm font-medium hover:bg-(--danger-bg) disabled:opacity-50 disabled:cursor-not-allowed"
                   data-testid="delete-audio-selected"
                 >
                   Delete chapter audio ({audioDataCount}{selectedAudioSize && selectedAudioSize.bytes > 0 ? ` · ${audioDataSize}` : ""}){langSuffix}
-                </button>
+                </Button>
                 </div>
               </div>
               <div className={`pt-3 ${createTab === "document" ? "" : "hidden"}`}>
                 <div className="flex items-start gap-2 flex-wrap">
-                  <button
+                  <Button
+                    variant="secondary"
                     onClick={() => exportDocumentMutation.mutate({ id: book.id, language: activeVariant ?? undefined, format: "pdf" })}
                     disabled={!canExportDocument || !!pendingExportFor("pdf")?.running}
                     title={exportTooltip("pdf")}
-                    className={SECONDARY_BUTTON}
                     data-testid="export-pdf"
                   >
                     Export PDF ({selectedExportable}){langSuffix}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="secondary"
                     onClick={() => exportDocumentMutation.mutate({ id: book.id, language: activeVariant ?? undefined, format: "epub" })}
                     disabled={!canExportDocument || !!pendingExportFor("epub")?.running}
                     title={exportTooltip("epub")}
-                    className={SECONDARY_BUTTON}
                     data-testid="export-epub"
                   >
                     Export EPUB ({selectedExportable}){langSuffix}
-                  </button>
+                  </Button>
                   {!rendererReady && (
-                    <button
+                    <Button
+                      variant="secondary"
                       onClick={() => installRenderer.mutate()}
                       disabled={installRenderer.isPending}
                       title="Vivliostyle renders these two formats and brings its own browser, once"
-                      className="px-4 py-2 rounded-md text-sm font-medium border border-(--border-input) text-(--text-secondary) hover:bg-(--bg-subtle) disabled:opacity-50 disabled:cursor-not-allowed"
                       data-testid="install-renderer"
                     >
                       {installRenderer.isPending ? "Downloading renderer…" : "Download page renderer (345 MB)"}
-                    </button>
+                    </Button>
                   )}
                   <div className="ml-1 flex flex-col gap-1.5 border-l border-(--border) pl-3">
-                    <button
+                    <Button
+                      variant="secondary"
                       onClick={() => exportDocumentMutation.mutate({
                         id: book.id,
                         language: activeVariant ?? undefined,
@@ -1076,11 +1080,10 @@ export function BookDetail() {
                       })}
                       disabled={!canExportSync || !!pendingExportFor("epub-sync")?.running}
                       title={syncExportTooltip}
-                      className={SECONDARY_BUTTON}
                       data-testid="export-epub-sync"
                     >
                       Export synced EPUB{deferOutputs ? " when ready" : ""} ({deferOutputs ? selectedCount : selectedSyncExportable}){langSuffix}
-                    </button>
+                    </Button>
                     {exportConfig?.readaloudDropDir && (
                       <label
                         className="flex w-fit items-center gap-1.5 text-xs text-(--text-muted) cursor-pointer hover:text-(--text-secondary)"
@@ -1130,17 +1133,17 @@ export function BookDetail() {
         {/* Danger zone */}
         <section className="rounded-xl border border-(--border) border-t-2 border-t-(--danger)/70 bg-(--bg-card) p-4">
           <h3 className="text-sm font-medium text-(--text-muted) uppercase tracking-wider mb-3">Danger zone</h3>
-          <button
+          <Button
+            variant="danger"
             onClick={() => {
               if (confirm("Delete this book and all its audio?")) {
                 deleteMutation.mutate({ id: book.id });
               }
             }}
             disabled={deleteMutation.isPending}
-            className="px-4 py-2 bg-(--danger) text-(--on-danger) hover:bg-(--danger-hover) rounded-md text-sm font-medium disabled:opacity-50"
           >
             Delete book
-          </button>
+          </Button>
         </section>
 
         <LogDock

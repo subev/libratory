@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { trpc } from "../trpc.ts";
 import { Modal, ModalHeader } from "./Modal.tsx";
-import { PRIMARY_BUTTON } from "../lib/button-classes.ts";
+import { Button } from "./Button.tsx";
 import { IconFolder } from "./icons.tsx";
 
 type FolderNode = { id: string; name: string; depth: number };
@@ -87,6 +87,7 @@ export function FolderPickerModal({
     }
   }
 
+  // button-ok: a radio row picking the move destination, not an action — the move button below acts
   const row = (id: string | null, label: string, depth: number, folderIcon = false) => (
     <button
       key={id ?? "root"}
@@ -141,14 +142,14 @@ export function FolderPickerModal({
           <p className="text-sm text-(--danger-text)">{moveError ?? createMutation.error!.message}</p>
         )}
         <div className="flex justify-end">
-          <button
+          <Button
+            variant="primary"
             onClick={move}
             disabled={moving || itemCount === 0}
-            className={PRIMARY_BUTTON}
             data-testid="folder-picker-move"
           >
             {moving ? "Moving..." : `Move ${itemLabel}`}
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

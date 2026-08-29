@@ -3,6 +3,7 @@ import { trpc } from "../trpc.ts";
 import { TRANSLATION_LANGUAGES } from "../lib/languages.ts";
 import { Modal, ModalHeader } from "./Modal.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
+import { Button } from "./Button.tsx";
 
 type ChapterSummary = { id: string; index: number; title: string };
 
@@ -253,7 +254,8 @@ export function VariantModal({
 
         <ModelPicker value={model} onChange={setModel} testId="variant-model" />
 
-        <button
+        <Button
+          variant="primary"
           onClick={handleStart}
           disabled={!canStart}
           title={
@@ -264,20 +266,18 @@ export function VariantModal({
             variant?.status === "done" && !promptEdited ? "Discard this text and generate it again" :
             isTranslationTarget ? "Translate this chapter" : "Rewrite this chapter"
           }
-          className="px-3 py-1.5 bg-(--accent) text-(--on-accent) rounded-md text-sm font-medium hover:bg-(--accent-hover) disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="translation-start"
         >
           {startLabel}
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => selectedId && activeKey && stopMutation.mutate({ chapterId: selectedId, key: activeKey })}
           disabled={!selectedId || !running || stopMutation.isPending}
           title={running ? "Stop and keep everything generated so far" : "Nothing is running"}
-          className="px-3 py-1.5 bg-(--bg-subtle) text-(--text-secondary) rounded-md text-sm font-medium hover:bg-(--border) disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="translation-stop"
         >
           Stop
-        </button>
+        </Button>
 
         {running ? (
           <span className="text-sm text-(--accent-text)" data-testid="translation-progress">
@@ -323,6 +323,7 @@ export function VariantModal({
         <div className="w-64 shrink-0 overflow-y-auto border-r border-(--border) p-2">
           {chapters.map((ch) => {
             const t = statusByChapter.get(ch.id);
+            // button-ok: a chapter list row selecting what the pane shows, not an action
             return (
               <button
                 key={ch.id}

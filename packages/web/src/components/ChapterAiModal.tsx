@@ -9,7 +9,7 @@ import { AI_PRESETS, estimateTokens, estimateTokensFromCounts, formatTokens } fr
 import { ModelPicker } from "./ModelPicker.tsx";
 import { PillToggle } from "./PillToggle.tsx";
 import { useActiveLlmModel } from "../lib/use-llm-models.ts";
-import { PRIMARY_BUTTON } from "../lib/button-classes.ts";
+import { Button } from "./Button.tsx";
 
 export type AiScope =
   | { kind: "chapters"; bookId: string; chapters: { id: string; title: string }[] }
@@ -135,6 +135,7 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
     <Modal size="lg" onClose={onClose} testId="chapter-ai-modal">
       <ModalHeader title="Ask about" onClose={onClose}>
         <div className="inline-flex rounded-md border border-(--border) p-0.5 gap-0.5 min-w-0" data-testid="ai-scope-toggle">
+          {/* button-ok: segments of a scope toggle, not actions — the segment skin belongs to the group */}
           {scopeOptions.map((option) => (
             <button
               key={option.key}
@@ -195,15 +196,16 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
           )}
           <div className="flex items-center gap-2 shrink-0">
             <ModelPicker value={model} onChange={setModel} testId="ai-model-toggle" />
-            <button
+            <Button
+              variant="primary"
               onClick={run}
               disabled={!prompt.trim() || pending || overContext}
               title={overContext ? `The ${subject === "book" ? "book's raw text" : "selected chapters"} exceed this model's context window` : "Cmd+Enter"}
-              className={`flex-1 ${PRIMARY_BUTTON}`}
+              className="flex-1"
               data-testid="ai-run"
             >
               {pending ? "Answering..." : "Ask"}
-            </button>
+            </Button>
           </div>
         </div>
 

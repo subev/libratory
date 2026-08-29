@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { Link } from "react-router";
 import css from "../styles.css?raw";
-import { PRIMARY_BUTTON, SECONDARY_BUTTON, DANGER_BUTTON, TOOLBAR_BUTTON } from "../lib/button-classes.ts";
+import { Button } from "../components/Button.tsx";
 import { PillToggle } from "../components/PillToggle.tsx";
 import { StatusBadge, statusStyles } from "../components/StatusBadge.tsx";
 import * as Icons from "../components/icons.tsx";
+import { IconRefresh } from "../components/icons.tsx";
 
 type IconComponent = ComponentType<{ className?: string; weight?: "regular" | "fill" }>;
 
@@ -215,16 +216,34 @@ function TokenGroups({ groups }: { groups: Group[] }) {
   );
 }
 
-function ButtonRow({ name, className }: { name: string; className: string }) {
+const VARIANTS = ["primary", "secondary", "danger", "warning", "success", "ghost", "icon"] as const;
+
+function ButtonRow({ variant }: { variant: (typeof VARIANTS)[number] }) {
+  const label = variant === "icon" ? undefined : "Action";
+  const icon = <IconRefresh className="h-4 w-4" />;
+  const common = variant === "icon" ? ({ variant, "aria-label": "Re-run" } as const) : ({ variant } as const);
   return (
-    <div className="flex items-center gap-3">
-      <span className="w-40 shrink-0 font-mono text-xs text-(--text-muted)">{name}</span>
-      <button type="button" className={className}>
-        Resting
-      </button>
-      <button type="button" className={className} disabled>
-        Disabled
-      </button>
+    <div className="flex flex-wrap items-center gap-3">
+      <span className="w-24 shrink-0 font-mono text-xs text-(--text-muted)">{variant}</span>
+      <Button {...common} size="md">
+        {variant === "icon" ? icon : label}
+      </Button>
+      <Button {...common} size="sm">
+        {variant === "icon" ? icon : label}
+      </Button>
+      <Button {...common} size="sm" disabled title="Nothing to do">
+        {variant === "icon" ? icon : "Disabled"}
+      </Button>
+      {variant !== "icon" ? (
+        <Button variant={variant} size="sm" href="#buttons">
+          As a link
+        </Button>
+      ) : null}
+      {variant !== "icon" ? (
+        <Button variant={variant} size="sm" href="#buttons" disabled title="Nothing to download yet">
+          Disabled link
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -294,11 +313,29 @@ export function Components() {
         </Section>
 
         <Section id="buttons" title="Buttons">
+          <p className="text-sm text-(--text-secondary)">
+            Every variant at both sizes, resting and disabled, plus the link form. A disabled link renders as a
+            real disabled button, because a disabled anchor still navigates.
+          </p>
           <div className={`space-y-3 ${CARD}`}>
-            <ButtonRow name="PRIMARY_BUTTON" className={PRIMARY_BUTTON} />
-            <ButtonRow name="SECONDARY_BUTTON" className={SECONDARY_BUTTON} />
-            <ButtonRow name="DANGER_BUTTON" className={DANGER_BUTTON} />
-            <ButtonRow name="TOOLBAR_BUTTON" className={TOOLBAR_BUTTON} />
+            {VARIANTS.map((variant) => (
+              <ButtonRow key={variant} variant={variant} />
+            ))}
+            <div className="flex flex-wrap items-center gap-3 border-t border-(--border) pt-3">
+              <span className="w-24 shrink-0 font-mono text-xs text-(--text-muted)">soft</span>
+              <Button variant="danger" soft size="sm">
+                Reset
+              </Button>
+              <Button variant="warning" soft size="sm">
+                Edit
+              </Button>
+              <Button variant="success" soft size="sm">
+                Saved
+              </Button>
+              <span className="text-xs text-(--text-muted)">
+                status colour without the weight of a fill — for a control that must warn, not shout
+              </span>
+            </div>
             <div className="flex items-center gap-3">
               <span className="w-40 shrink-0 font-mono text-xs text-(--text-muted)">PillToggle</span>
               <PillToggle selected onClick={noop}>

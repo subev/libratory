@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Button } from "./Button.tsx";
 
 // The card that offers an optional download and then gets out of the way. Three features need it
 // — the model bundles, Pocket's per-language models, and the page renderer — and when each had its
@@ -33,15 +34,15 @@ export function DownloadNotice({
     >
       {children}
       {error && <p className="text-(--danger-text)" data-testid={`${testIdPrefix}-error`}>{error}</p>}
-      <button
-        type="button"
+      <Button
+        variant="primary"
+        size="sm"
         onClick={onDownload}
         disabled={downloading || disabled}
-        className="px-2 py-1 rounded bg-(--accent) text-(--on-accent) disabled:opacity-50"
         data-testid={`${testIdPrefix}-download`}
       >
         {downloading ? `Downloading ${settledLabel}… ${progress ?? ""}`.trimEnd() : buttonLabel}
-      </button>
+      </Button>
       {downloading && (
         <p className="text-(--text-muted)">Keep using the app — this unlocks itself when it lands, no restart.</p>
       )}

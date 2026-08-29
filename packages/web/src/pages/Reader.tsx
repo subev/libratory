@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 
 import { IconArrowLeft, IconPause, IconPlay } from "../components/icons.tsx";
+import { Button } from "../components/Button.tsx";
 import { CueTranscript } from "../components/reader/CueTranscript.tsx";
 import { CuePages } from "../components/reader/CuePages.tsx";
 import { bodyFit, chapterPages, UNMAPPED, type ReaderCues, type ReaderManifest } from "../lib/reader-doc.ts";
@@ -209,15 +210,17 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
     <ReaderShell bookId={id} chapterId={chapter.id} title={manifest.book.title}>
       <div className="sticky top-0 z-10 -mx-4 mb-4 border-b border-(--border) bg-(--bg-page)/95 px-4 py-2 backdrop-blur">
         <div className="flex flex-wrap items-center gap-3">
-          <button
+          <Button
+            variant="icon"
+            size="sm"
+            aria-label={playing ? "Pause" : "Play"}
             onClick={togglePlay}
             disabled={!chapter.audio}
             title={chapter.audio ? (playing ? "Pause (space)" : "Play the narration (space)") : "This chapter has no audio yet"}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-(--accent) text-(--on-accent) hover:bg-(--accent-hover) disabled:opacity-40"
             data-testid="reader-play"
           >
             {playing ? <IconPause weight="fill" className="h-4 w-4" /> : <IconPlay className="h-4 w-4" />}
-          </button>
+          </Button>
 
           <select
             value={chapter.i}
@@ -378,6 +381,7 @@ function Segmented({
   return (
     <div className="flex rounded border border-(--border) bg-(--bg-card) p-0.5" data-testid={testId}>
       {options.map((option) => (
+        // button-ok: a segmented selection — data-active marks the chosen option, it is not an action
         <button
           key={option.id}
           onClick={() => onChange(option.id)}

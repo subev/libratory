@@ -3,7 +3,7 @@ import { trpc } from "../trpc.ts";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
 import { Modal, ModalHeader } from "./Modal.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
-import { PRIMARY_BUTTON } from "../lib/button-classes.ts";
+import { Button } from "./Button.tsx";
 
 type ChapterProposal = {
   status: "running" | "done" | "failed";
@@ -228,13 +228,14 @@ export function StructureModal({
                   Proposal ready: {chapterProposal.boundaries?.length ?? 0} boundaries
                   {chapterProposal.detection ? ` (${chapterProposal.detection})` : ""}
                 </span>
-                <button
+                <Button
+                  variant="primary"
+                  size="sm"
                   onClick={useProposal}
-                  className="px-2 py-1 bg-(--accent) text-(--on-accent) rounded text-xs font-medium hover:bg-(--accent-hover)"
                   data-testid="use-proposal"
                 >
                   Use proposal
-                </button>
+                </Button>
               </>
             ) : (
               <span>Proposal failed: {chapterProposal.error}</span>
@@ -377,22 +378,20 @@ export function StructureModal({
         </div>
 
         <div className="flex items-center gap-3 p-4 border-t border-(--border)">
-          <button
+          <Button
             onClick={() => proposeMutation.mutate({ id: bookId, method: "deterministic" })}
             disabled={proposalRunning || proposeMutation.isPending}
-            className="px-3 py-1.5 bg-(--bg-subtle) text-(--text-secondary) rounded-md text-sm font-medium hover:bg-(--border) disabled:opacity-50"
             title="Re-run the heading heuristics and preview the result before committing"
           >
             Propose (heuristic)
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => proposeMutation.mutate({ id: bookId, method: "llm", model })}
             disabled={proposalRunning || proposeMutation.isPending}
-            className="px-3 py-1.5 bg-(--bg-subtle) text-(--text-secondary) rounded-md text-sm font-medium hover:bg-(--border) disabled:opacity-50"
             title="Ask the selected AI model to find the table of contents and propose chapter boundaries (takes a few minutes on big or multi-file books)"
           >
             Propose (LLM)
-          </button>
+          </Button>
           <ModelPicker value={model} onChange={setModel} testId="structure-chapter-model" />
           {proposalRunning ? (
             <span className="text-sm text-(--accent-text) truncate" data-testid="proposal-running" title={proposalProgress}>
@@ -407,7 +406,8 @@ export function StructureModal({
           ) : null}
           <div className="flex-1" />
           <span className="text-sm text-(--text-muted)">{selectedCount} boundaries</span>
-          <button
+          <Button
+            variant="primary"
             onClick={apply}
             disabled={selectedCount === 0 || isProcessing || applyMutation.isPending}
             title={
@@ -415,11 +415,10 @@ export function StructureModal({
               isProcessing ? "Wait for processing to finish" :
               "Delete existing chapters and re-slice at the checked boundaries"
             }
-            className={PRIMARY_BUTTON}
             data-testid="apply-boundaries"
           >
             Apply boundaries
-          </button>
+          </Button>
         </div>
       </Modal>
       {pdfPreview ? (

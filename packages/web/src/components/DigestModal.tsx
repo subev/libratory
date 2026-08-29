@@ -5,7 +5,7 @@ import { Modal, ModalHeader } from "./Modal.tsx";
 import { DIGEST_LISTENING_PROMPT, DIGEST_PRESETS } from "../lib/ai-presets.ts";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { PillToggle } from "./PillToggle.tsx";
-import { PRIMARY_BUTTON } from "../lib/button-classes.ts";
+import { Button } from "./Button.tsx";
 import { IconWarning } from "./icons.tsx";
 
 export function DigestModal({
@@ -106,13 +106,14 @@ export function DigestModal({
               {unusable.map((b) => `"${b.title}"`).join(", ")} — the digest would fail. Extract them first
               (with Force OCR if scanned), or leave them out.
             </p>
-            <button
+            <Button
+              variant="warning"
+              size="sm"
               onClick={excludeUnusable}
-              className="px-3 py-1.5 rounded-md text-xs font-medium bg-(--warning) text-(--on-warning) hover:bg-(--warning-hover)"
               data-testid="digest-exclude-unusable"
             >
               Exclude {unusable.length} book{unusable.length === 1 ? "" : "s"} without text
-            </button>
+            </Button>
           </div>
         )}
 
@@ -149,15 +150,16 @@ export function DigestModal({
         <p className="text-xs text-(--text-faint)">
           Summaries run in the background (~1-2 min per book). Chapters arrive suspended — review, pick a voice, then synthesize.
         </p>
-        <button
+        <Button
+          variant="primary"
+          className="shrink-0"
           onClick={create}
           disabled={!title.trim() || !prompt.trim() || included.length < 2 || createMutation.isPending}
           title={included.length < 2 ? "A digest needs at least 2 books with text" : undefined}
-          className={`${PRIMARY_BUTTON} shrink-0`}
           data-testid="digest-create"
         >
           {createMutation.isPending ? "Creating..." : "Create digest"}
-        </button>
+        </Button>
       </div>
     </Modal>
   );

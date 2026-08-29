@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 
+import { Button } from "../components/Button.tsx";
 import { IconArrowLeft } from "../components/icons.tsx";
 import { ReaderFor } from "./Reader.tsx";
 import { containerSource, type DocumentSource } from "../lib/reader-source.ts";
@@ -71,14 +72,15 @@ export function ReaderOpen() {
             Drop a synced EPUB and read along on its own pages — the narration, the print it was
             set in, and nothing uploaded anywhere.
           </p>
-          <button
+          <Button
+            variant="primary"
             onClick={() => input.current?.click()}
             disabled={busy}
-            className="mt-5 rounded bg-(--accent) px-4 py-2 text-sm font-medium text-(--on-accent) hover:bg-(--accent-hover) disabled:opacity-50"
+            className="mt-5"
             data-testid="reader-open-pick"
           >
             {busy ? "Opening…" : "Choose a file"}
-          </button>
+          </Button>
           <input
             ref={input}
             type="file"

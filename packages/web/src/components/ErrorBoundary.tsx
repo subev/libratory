@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from "react";
 import { breadcrumbs } from "../lib/breadcrumbs.ts";
+import { Button } from "./Button.tsx";
 
 // A render error unmounts the whole tree, and what is left is a white page that says nothing —
 // in the browser you can at least open the console, but in the desktop app there is no hint that
@@ -92,32 +93,18 @@ export class ErrorBoundary extends Component<Props, State> {
           {/* Reloading lands on the same crash when the page is what broke, which is the usual case
               and the first thing anyone tries. Leaving is the action that actually works. */}
           <div className="mt-5 flex flex-wrap gap-2">
-            <a
-              href="/"
-              className="rounded bg-(--accent) px-4 py-2 text-sm font-medium text-(--on-accent) hover:bg-(--accent-hover)"
-              data-testid="crash-home"
-            >
+            <Button variant="primary" href="/" data-testid="crash-home">
               Back to the library
-            </a>
-            <button
-              onClick={() => location.reload()}
-              className="rounded border border-(--border) px-4 py-2 text-sm text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
-            >
+            </Button>
+            <Button onClick={() => location.reload()}>
               Reload this page
-            </button>
-            <button
-              onClick={this.report}
-              className="rounded border border-(--border) px-4 py-2 text-sm text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
-              data-testid="crash-report"
-            >
+            </Button>
+            <Button onClick={this.report} data-testid="crash-report">
               Report it
-            </button>
-            <button
-              onClick={() => void navigator.clipboard.writeText(text)}
-              className="rounded border border-(--border) px-4 py-2 text-sm text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
-            >
+            </Button>
+            <Button onClick={() => void navigator.clipboard.writeText(text)}>
               Copy details
-            </button>
+            </Button>
           </div>
 
           <p className="mt-5 font-mono text-xs wrap-break-word text-(--danger-text)">{error.message}</p>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PillToggle } from "../PillToggle.tsx";
+import { Button } from "../Button.tsx";
 
 const READING_SCRIPT =
   "The morning light came in sideways through the tall windows, and for a moment nobody spoke. " +
@@ -143,17 +144,15 @@ export function PocketVoiceCloner({ onAdded }: Props) {
             {READING_SCRIPT}
           </p>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
+            <Button
+              variant={recording ? "danger" : "secondary"}
+              size="sm"
               onClick={recording ? stopRecording : startRecording}
               disabled={busy}
-              className={`px-3 py-1.5 text-sm rounded ${
-                recording ? "bg-(--danger) text-(--on-danger)" : "bg-(--bg-subtle) text-(--text-secondary) border border-(--border)"
-              } disabled:opacity-50`}
               data-testid="pocket-clone-record"
             >
               {recording ? "Stop" : recorded ? "Record again" : "Start recording"}
-            </button>
+            </Button>
             <span
               className={`text-sm tabular-nums ${elapsed >= MIN_SECONDS ? "text-(--success-text)" : "text-(--text-muted)"}`}
               data-testid="pocket-clone-timer"
@@ -204,8 +203,9 @@ export function PocketVoiceCloner({ onAdded }: Props) {
       {error && <p className="text-xs text-(--danger-text)" data-testid="pocket-clone-error">{error}</p>}
 
       <div className="flex gap-2">
-        <button
-          type="button"
+        <Button
+          variant="primary"
+          size="sm"
           onClick={submit}
           disabled={!canSubmit}
           title={
@@ -214,18 +214,13 @@ export function PocketVoiceCloner({ onAdded }: Props) {
               : tooShort ? `Recording must be at least ${MIN_SECONDS} seconds`
               : undefined
           }
-          className="px-3 py-1.5 text-sm rounded bg-(--accent) text-(--on-accent) disabled:opacity-50"
           data-testid="pocket-clone-submit"
         >
           {busy ? "Encoding..." : "Add voice"}
-        </button>
-        <button
-          type="button"
-          onClick={() => { reset(); setOpen(false); }}
-          className="px-3 py-1.5 text-sm rounded border border-(--border) text-(--text-secondary)"
-        >
+        </Button>
+        <Button size="sm" onClick={() => { reset(); setOpen(false); }}>
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );

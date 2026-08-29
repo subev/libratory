@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import { TOOLBAR_BUTTON } from "../lib/button-classes.ts";
+import { Button } from "./Button.tsx";
 import { IconMicrophone } from "./icons.tsx";
 import {
   cartesiaVoiceToEntry,
@@ -80,6 +80,7 @@ export function VoicePicker({ value, onChange, title }: VoicePickerProps) {
   return (
     <div className="relative flex-1">
       <label className="block text-sm font-medium text-(--text-secondary) mb-1" htmlFor="voice-picker-trigger">Voice</label>
+      {/* button-ok: a labelled form control, skinned to match the text input beside it, not an action */}
       <button
         id="voice-picker-trigger"
         ref={triggerRef}
@@ -103,21 +104,21 @@ export function VoicePickerChip({ value, onChange, title }: VoicePickerProps) {
 
   return (
     <div className="relative">
-      <button
+      <Button
+        variant="secondary"
+        size="sm"
         ref={triggerRef}
-        type="button"
         onClick={open}
         title={title}
         aria-haspopup="dialog"
         aria-label={`Voice: ${label}`}
-        className={`${TOOLBAR_BUTTON} flex items-center gap-1.5`}
         data-testid="voice-picker-trigger"
       >
         {/* A chevron promised a dropdown; this opens a modal, so it reads as a button instead. */}
         <IconMicrophone className="h-3.5 w-3.5 shrink-0 text-(--text-faint)" />
         <span className="text-(--text-faint)">Voice</span>
         <span className="truncate max-w-56">{label}</span>
-      </button>
+      </Button>
       {library}
     </div>
   );

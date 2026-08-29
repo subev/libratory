@@ -26,7 +26,7 @@
     "release": "node scripts/release.mjs",
     "ship": "node scripts/ship.mjs",
     "typecheck": "pnpm -r --filter \"./packages/*\" exec tsc --noEmit",
-    "lint": "node scripts/check-tokens.mjs && node scripts/check-icons.mjs && oxlint packages scripts e2e",
+    "lint": "node scripts/check-tokens.mjs && node scripts/check-icons.mjs && node scripts/check-buttons.mjs && oxlint packages scripts e2e",
     "lint:fix": "oxlint packages scripts e2e --fix"
   },
   "devDependencies": {

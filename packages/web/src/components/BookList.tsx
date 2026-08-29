@@ -8,7 +8,8 @@ import { HnDigestModal } from "./HnDigestModal.tsx";
 import { FolderPickerModal } from "./FolderPickerModal.tsx";
 import { setDragItems, getDragItems, hasDragItems, type DragItems } from "../lib/dnd.ts";
 import { statusStyles } from "./StatusBadge.tsx";
-import { IconCheck, IconChevronDown, IconChevronUp, IconDelete, IconFolder, IconRename } from "./icons.tsx";
+import { IconAdd, IconCheck, IconChevronDown, IconChevronUp, IconDelete, IconFolder, IconRename } from "./icons.tsx";
+import { Button } from "./Button.tsx";
 
 type SortKey = BookSortKey;
 type SortDir = BookSortDir;
@@ -334,41 +335,43 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
-        <button
+        <Button
+          variant="primary"
+          size="sm"
           onClick={() => setShowDigest(true)}
           disabled={selectedCount < 2}
           title={selectedCount < 2 ? "Select at least 2 books with the checkboxes" : "Create a digest book — one AI summary chapter per selected book, ready to listen to"}
-          className="px-3 py-1.5 bg-(--accent) text-(--on-accent) rounded-md text-xs font-medium hover:bg-(--accent-hover) disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="create-digest"
         >
           Create digest ({selectedCount})
-        </button>
-        <button
+        </Button>
+        <Button
+          size="sm"
           onClick={() => setShowHnDigest(true)}
           title="Build a podcast-style book from a day's top Hacker News stories"
-          className="px-3 py-1.5 rounded-md border border-(--border-input) bg-(--bg-card) text-(--text-secondary) text-xs font-medium hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
           data-testid="hn-digest"
         >
           HN digest
-        </button>
-        <button
+        </Button>
+        <Button
+          size="sm"
           onClick={() => setShowMove(true)}
           disabled={totalSelected === 0}
           title={totalSelected === 0 ? "Select books or folders to move with the checkboxes" : "Move the selection into a folder — or drag rows onto a folder"}
-          className="px-3 py-1.5 rounded-md text-xs font-medium border border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle) disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="move-to-folder"
         >
           Move to folder ({totalSelected})
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="danger"
+          size="sm"
           onClick={deleteSelected}
           disabled={totalSelected === 0 || deleteManyMutation.isPending || deleteFolderMutation.isPending}
           title={totalSelected === 0 ? "Select books or folders to delete with the checkboxes" : "Delete the selection with all its chapters, audio, and files"}
-          className="px-3 py-1.5 bg-(--danger) text-(--on-danger) hover:bg-(--danger-hover) rounded-md text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="delete-selected-books"
         >
           {deleteManyMutation.isPending || deleteFolderMutation.isPending ? "Deleting..." : `Delete selected (${totalSelected})`}
-        </button>
+        </Button>
         {(deleteManyMutation.error || dropError) && (
           <span className="text-sm text-(--danger-text)">{deleteManyMutation.error?.message ?? dropError}</span>
         )}
@@ -393,14 +396,15 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
               data-testid="new-folder-name"
             />
           ) : (
-            <button
+            <Button
+              size="sm"
               onClick={() => setNewFolderName("")}
               title="Create a folder here"
-              className="px-3 py-1.5 rounded-md text-xs font-medium border border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)"
               data-testid="new-folder"
             >
-              + New folder
-            </button>
+              <IconAdd className="h-3 w-3" />
+              New folder
+            </Button>
           )}
         </div>
       </div>

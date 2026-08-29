@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { trpc } from "../trpc.ts";
 import { getStoredProfileId, setStoredProfileId } from "../lib/profile.ts";
 import { IconAdd, IconDelete, IconProfile, IconRename } from "./icons.tsx";
+import { Button } from "./Button.tsx";
 
 export function ProfileSwitcher() {
   const navigate = useNavigate();
@@ -88,14 +89,16 @@ export function ProfileSwitcher() {
           <option key={p.id} value={p.id}>{p.name}</option>
         ))}
       </select>
-      <button
+      <Button
+        variant="icon"
+        size="sm"
+        aria-label="New profile"
         onClick={createProfile}
         title="New profile"
-        className="px-2 py-1.5 rounded-md text-xs font-medium border border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)"
         data-testid="new-profile"
       >
         <IconAdd className="h-3 w-3" />
-      </button>
+      </Button>
       <button
         onClick={renameProfile}
         title="Rename profile"

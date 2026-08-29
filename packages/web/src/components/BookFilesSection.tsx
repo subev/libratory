@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { ExtractModal, type ExtractScope } from "./ExtractModal.tsx";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
 import { IconStop, IconRefresh, IconDelete } from "./icons.tsx";
+import { Button } from "./Button.tsx";
 
 export type BookFileRow = {
   id: string;
@@ -126,16 +127,18 @@ export function BookFilesSection({
 
       <div className="flex items-center gap-2 mb-2 flex-wrap">
         <AddFilesButton bookId={bookId} onFilesAdded={onFilesAdded} />
-        <button
+        <Button
+          size="sm"
           onClick={() => onExtractOpenChange(true)}
           disabled={isEmpty}
           title={isEmpty ? "Add a PDF first" : "Extract files again, or re-detect chapter boundaries"}
-          className="px-3 py-1.5 bg-(--bg-subtle) text-(--text-secondary) rounded-md text-xs font-medium hover:bg-(--border) disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="open-extract-modal"
         >
           Extract...
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="warning"
+          size="sm"
           onClick={onCancelExtraction}
           disabled={extractingCount === 0}
           title={
@@ -143,11 +146,10 @@ export function BookFilesSection({
               ? "No files are being extracted"
               : `Stop the running extraction — ${extractingCount} file(s) will be marked as cancelled`
           }
-          className="px-3 py-1.5 bg-(--warning) text-(--on-warning) hover:bg-(--warning-hover) rounded-md text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="cancel-extraction"
         >
           Cancel extraction
-        </button>
+        </Button>
 
       </div>
 
@@ -187,13 +189,16 @@ export function BookFilesSection({
                 <td className="px-3 py-2 text-xs font-mono text-(--text-muted)">{file.index + 1}</td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-2">
-                    <button
+                    <Button
+                      variant="danger"
+                      soft
+                      size="sm"
                       onClick={() => setPreviewFileId(file.id)}
-                      className="shrink-0 h-6 w-6 rounded bg-(--danger-bg) flex items-center justify-center hover:bg-(--danger)/20 transition-colors cursor-pointer"
+                      className="shrink-0"
                       title="Preview PDF"
                     >
-                      <span className="text-(--danger-text) text-[8px] font-bold">PDF</span>
-                    </button>
+                      PDF
+                    </Button>
                     <span className="text-sm text-(--text-primary) truncate">{file.filename}</span>
                   </div>
                 </td>
@@ -229,16 +234,22 @@ export function BookFilesSection({
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1.5">
                     {/* Cancel */}
-                    <button
+                    <Button
+                      variant="warning"
+                      soft
+                      size="sm"
                       onClick={() => onCancel(file.id)}
                       disabled={file.status !== "extracting" && file.status !== "pending"}
                       title={file.status !== "extracting" && file.status !== "pending" ? "File is not extracting" : "Cancel extraction"}
-                      className="p-1 rounded text-(--warning-text) hover:bg-(--warning-bg) disabled:opacity-20 disabled:cursor-not-allowed"
+                      aria-label="Cancel extraction"
                     >
                       <IconStop className="w-4 h-4" />
-                    </button>
+                    </Button>
                     {/* Re-extract */}
-                    <button
+                    <Button
+                      variant="primary"
+                      soft
+                      size="sm"
                       onClick={() => onReExtract(file.id)}
                       disabled={file.status !== "done" && file.status !== "failed" && file.status !== "raw" && file.status !== "suspended"}
                       title={
@@ -247,12 +258,15 @@ export function BookFilesSection({
                         file.status === "raw" ? "Extract chapters from this file" :
                         "Re-extract this file"
                       }
-                      className="p-1 rounded text-(--accent-text) hover:bg-(--bg-selected) disabled:opacity-20 disabled:cursor-not-allowed"
+                      aria-label="Re-extract this file"
                     >
                       <IconRefresh className="w-4 h-4" />
-                    </button>
+                    </Button>
                     {/* Remove */}
-                    <button
+                    <Button
+                      variant="danger"
+                      soft
+                      size="sm"
                       onClick={() => {
                         const count = chapterCountForFile(file.index);
                         if (confirm(`Remove "${file.filename}" and its ${count} chapter(s)?`)) {
@@ -261,10 +275,10 @@ export function BookFilesSection({
                       }}
                       disabled={file.status === "extracting"}
                       title={file.status === "extracting" ? "Cannot remove while extracting" : "Remove this file and its chapters"}
-                      className="p-1 rounded text-(--danger-text) hover:bg-(--danger-bg) disabled:opacity-20 disabled:cursor-not-allowed"
+                      aria-label="Remove this file and its chapters"
                     >
                       <IconDelete className="w-4 h-4" />
-                    </button>
+                    </Button>
                   </div>
                 </td>
               </tr>
@@ -360,13 +374,13 @@ function AddFilesButton({
         }}
         className="hidden"
       />
-      <button
+      <Button
+        size="sm"
         onClick={() => fileInputRef.current?.click()}
         disabled={isUploading}
-        className="px-3 py-1.5 bg-(--bg-subtle) text-(--text-secondary) rounded-md text-xs font-medium hover:bg-(--border) disabled:opacity-50"
       >
         {isUploading ? "Adding..." : "Add files"}
-      </button>
+      </Button>
     </>
   );
 }

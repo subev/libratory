@@ -15,6 +15,7 @@ export function PillToggle({
   testId?: string;
   children: ReactNode;
 }) {
+  // button-ok: a toggle is not an action; aria-pressed and the pill shape are its own
   return (
     <button
       type="button"

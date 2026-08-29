@@ -195,6 +195,46 @@ Four rules the sweep of 82 hand-rolled icons established:
   decides. If you need an arrow in genuine prose (`press ←`), spell it out; if you truly cannot,
   mark the line `prose-glyph`.
 
+## Buttons — read this before styling a `<button>`
+
+Every action goes through **`packages/web/src/components/Button.tsx`**.
+
+```tsx
+<Button variant="primary" | "secondary" | "danger" | "warning" | "success" | "ghost" | "icon"
+        size="sm" | "md"
+        soft            // tinted instead of filled
+        to="/books/1"   // in-app route → react-router <Link>
+        href="https://" // external or a download → plain <a>
+        disabled />     // with to/href, renders a real disabled <button>
+```
+
+Four things it centralises that call sites kept getting wrong:
+
+- **A disabled link is a button.** Pass `to`/`href` with `disabled` and it renders a disabled
+  `<button>`, because a disabled anchor still navigates. This is what makes "show the action
+  disabled, never hide it" cheap enough to actually follow.
+- **`to` for in-app routes, `href` for everything else.** `href` renders a plain `<a>` and costs a
+  full page reload — an easy thing to get wrong and not notice, since the destination still loads.
+- **`variant="icon"` requires `aria-label`** — the type will not compile without one.
+- **Disabled styling and the focus ring are not yours to write.** `disabled:` states live in the
+  component; focus comes from the base `:focus-visible` rule in `styles.css`.
+
+`soft` is the quiet register of a variant: `danger`/`warning`/`success` become a tint rather than a
+fill, `primary` becomes accent text with no fill, and `icon` loses its border and goes faint. Reach
+for it when a control must warn rather than shout — the chapter Edit button is `warning soft` because
+saving custom text drops the chapter to mode `"text"` and the read-along stops following the page.
+
+`className` is **additive only** — `w-full`, `ml-auto`, `shrink-0`, `flex-1`. There is no
+`tailwind-merge` here, so passing `px-2` against a variant that already sets padding is undefined
+behaviour rather than an override. If a call site needs something the variants cannot express, add a
+variant; do not fight the one you picked.
+
+`scripts/check-buttons.mjs` (in `pnpm lint`) fails on any `<button>` or `<a>` carrying a hand-written
+skin — a radius, plus padding or a fixed box, plus a fill or a border. A control that is genuinely
+not an action opts out with a `button-ok` comment above it **and a reason**: `PillToggle` (a toggle),
+`VoicePicker`'s trigger (a labelled form control skinned to match the input beside it), and selection
+rows. Inconvenience is not a reason.
+
 ## The Pipeline
 
 ```
@@ -472,6 +512,7 @@ packages/web/src/
     StatusBadge.tsx     Color-coded status badge
     Modal.tsx           Shared dialog shell: sizes, Escape, focus trap + restore, header that names the dialog
     PillToggle.tsx      Shared selected/unselected pill (aria-pressed) — 9 call sites
+    Button.tsx          The one action primitive — variants, sizes, and the disabled-link rule; see "Buttons" above
     icons.tsx           The only file importing @phosphor-icons/react; see "Icons" above
 ```
 

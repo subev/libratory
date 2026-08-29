@@ -4,6 +4,7 @@ import { languageCodeFromName, normalizeVoiceId, voiceSupportsSpeedControl } fro
 import { VoicePickerProvider } from "./voice-picker/context.tsx";
 import { VoiceLibraryModal } from "./voice-picker/VoiceLibraryModal.tsx";
 import { SpeedSlider } from "./SpeedSlider.tsx";
+import { Button } from "./Button.tsx";
 
 // Picking a voice *is* the decision here, so this hosts the voice library directly rather than
 // wrapping a control that opens a second modal on top of this one.
@@ -57,23 +58,16 @@ export function SynthesizeModal({
                 Chapters that already have audio keep it until re-synthesized.
               </p>
               <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 rounded-md text-sm font-medium border border-(--border-input) text-(--text-secondary) hover:bg-(--bg-subtle)"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
+                <Button onClick={onClose}>Cancel</Button>
+                <Button
+                  variant="primary"
                   onClick={onStart}
                   disabled={!canStart}
                   title={canStart ? undefined : disabledReason}
-                  className="px-4 py-2 rounded-md text-sm font-medium bg-(--accent) text-(--on-accent) disabled:opacity-50"
                   data-testid="synthesize-start"
                 >
                   Start synthesis ({count})
-                </button>
+                </Button>
               </div>
             </div>
           </div>

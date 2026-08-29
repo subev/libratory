@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router";
+import { useParams } from "react-router";
 import { trpc } from "../trpc.ts";
 import { UploadZone } from "../components/UploadZone.tsx";
 import { BookList } from "../components/BookList.tsx";
 import { BookSearchResults } from "../components/BookSearchResults.tsx";
 import { Breadcrumbs } from "../components/Breadcrumbs.tsx";
+import { Button } from "../components/Button.tsx";
 import { ProfileSwitcher } from "../components/ProfileSwitcher.tsx";
 import { SettingsModal } from "../components/SettingsModal.tsx";
 import { IconChat, IconBook, IconSettings, IconFolder, IconClose } from "../components/icons.tsx";
@@ -43,31 +44,37 @@ export function Home() {
         <div className="flex items-center mb-2">
           <h1 className="text-2xl font-bold text-(--text-primary)">Libratory</h1>
           <ProfileSwitcher />
-          <Link
+          <Button
+            variant="secondary"
+            size="sm"
             to={folderId ? `/chat?folderId=${folderId}` : "/chat"}
-            className="ml-auto inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
+            className="ml-auto"
             data-testid="library-chat-link"
           >
             <IconChat className="h-4 w-4" />
             Chat with library
-          </Link>
-          <Link
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             to="/open"
             title="Open a synced EPUB and read along on its own pages — nothing is uploaded"
-            className="ml-2 inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
+            className="ml-2"
             data-testid="open-container-link"
           >
             <IconBook className="h-4 w-4" />
             Open a read-along EPUB
-          </Link>
-          <button
+          </Button>
+          <Button
+            variant="icon"
+            size="sm"
             onClick={() => setShowSettings(true)}
             title="AI model settings"
+            aria-label="AI model settings"
             data-testid="settings-gear"
-            className="text-sm px-2.5 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
           >
             <IconSettings className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
         {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
         {folderId && (

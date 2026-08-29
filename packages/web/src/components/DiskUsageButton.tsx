@@ -2,6 +2,7 @@ import { useState } from "react";
 import { trpc } from "../trpc.ts";
 import { formatBytes } from "../lib/format.ts";
 import { Modal, ModalHeader } from "./Modal.tsx";
+import { Button } from "./Button.tsx";
 import { IconDisk } from "./icons.tsx";
 
 export function DiskUsageButton({ bookId }: { bookId: string }) {
@@ -31,15 +32,15 @@ export function DiskUsageButton({ bookId }: { bookId: string }) {
 
   return (
     <>
-      <button
+      <Button
         onClick={() => setOpen(true)}
         title="Disk space used by this book — click for a breakdown and cleanup"
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-(--border-input) bg-(--bg-card) text-sm font-medium text-(--text-secondary) shadow-sm hover:bg-(--bg-subtle) tabular-nums"
+        className="tabular-nums"
         data-testid="disk-usage"
       >
         <IconDisk className="w-4 h-4 text-(--text-muted)" />
         {usage ? formatBytes(usage.total) : "..."}
-      </button>
+      </Button>
 
       {open && (
         <Modal size="sm" onClose={() => setOpen(false)} backdropTestId="disk-usage-modal">
@@ -62,7 +63,7 @@ export function DiskUsageButton({ bookId }: { bookId: string }) {
                   </li>
                 </ul>
 
-                <button
+                <Button
                   onClick={() => cleanupMutation.mutate({ bookId })}
                   disabled={usage.cleanableChunkWavs === 0 || cleanupMutation.isPending}
                   title={
@@ -70,13 +71,13 @@ export function DiskUsageButton({ bookId }: { bookId: string }) {
                       ? "No finished chapters have leftover WAV chunks"
                       : "Delete the WAV chunks of chapters whose audio is done — chapters, text, and audio files are kept. Chunks of unfinished chapters stay so they can resume."
                   }
-                  className="w-full px-4 py-2 bg-(--bg-subtle) text-(--text-secondary) rounded-md text-sm font-medium hover:bg-(--border) disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full"
                   data-testid="cleanup-chunks"
                 >
                   {cleanupMutation.isPending
                     ? "Cleaning up..."
                     : `Delete WAV chunks of finished chapters (frees ${formatBytes(usage.cleanableChunkWavs)})`}
-                </button>
+                </Button>
               </>
             )}
           </div>

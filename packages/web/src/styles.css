@@ -75,6 +75,7 @@
   --pal-brass-a08: --alpha(#e0913d / 8%);
   --pal-brass-a10: --alpha(#e0913d / 10%);
   --pal-brass-a15: --alpha(#e0913d / 15%);
+  --pal-brass-a25: --alpha(#e0913d / 25%);
   --pal-brass-a35: --alpha(#e0913d / 35%);
   --pal-brass-a40: --alpha(#e0913d / 40%);
 
@@ -125,6 +126,7 @@
   --pal-red-800: oklch(0.3800 0.1500 27);
   --pal-red-a10: oklch(0.4437 0.1613 26.8994 / 0.10);
   --pal-red-a20: oklch(0.5771 0.2152 27.3250 / 0.20);
+  --pal-red-a30: oklch(0.5771 0.2152 27.3250 / 0.30);
 
   /* green */
   --pal-green-300: oklch(0.8700 0.1150 150);
@@ -136,6 +138,7 @@
   --pal-green-750: oklch(0.4300 0.1050 150);
   --pal-green-a12: oklch(0.5200 0.1150 150 / 0.12);
   --pal-green-a18: oklch(0.7200 0.1400 150 / 0.18);
+  --pal-green-a28: oklch(0.7200 0.1400 150 / 0.28);
 
   /* the three categorical badge hues, from Solar Dusk's own chart ramp */
   --pal-gold-300: oklch(0.8600 0.1400 86);
@@ -195,16 +198,19 @@
   --danger: var(--pal-red-700);
   --danger-hover: var(--pal-red-800);
   --danger-bg: var(--pal-red-a10);
+  --danger-bg-hover: var(--pal-red-a20);
   --danger-text: var(--danger);
 
   --success: var(--pal-green-600);
   --success-hover: var(--pal-green-700);
   --success-bg: var(--pal-green-a12);
+  --success-bg-hover: var(--pal-green-a18);
   --success-text: var(--pal-green-750);
 
   --warning: var(--pal-brass-500);
   --warning-hover: var(--pal-brass-400);
   --warning-bg: var(--pal-brass-a15);
+  --warning-bg-hover: var(--pal-brass-a25);
   --warning-text: var(--pal-brass-700);
 
   /* Input -> Work -> Output is a sequence, so colour can encode it. */
@@ -295,11 +301,13 @@
     --danger: var(--pal-red-600);
     --danger-hover: var(--pal-red-500);
     --danger-bg: var(--pal-red-a20);
+    --danger-bg-hover: var(--pal-red-a30);
     --danger-text: var(--pal-red-400);
 
     --success: var(--pal-green-500);
     --success-hover: var(--pal-green-450);
     --success-bg: var(--pal-green-a18);
+    --success-bg-hover: var(--pal-green-a28);
     --success-text: var(--pal-green-400);
 
     --warning-hover: var(--pal-brass-300);

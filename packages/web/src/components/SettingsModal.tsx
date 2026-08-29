@@ -4,7 +4,7 @@ import type { RouterInputs } from "../../../server/src/router.ts";
 import { Modal, ModalHeader } from "./Modal.tsx";
 import { useLlmModels } from "../lib/use-llm-models.ts";
 import { formatTokens } from "../lib/ai-presets.ts";
-import { TOOLBAR_BUTTON } from "../lib/button-classes.ts";
+import { Button } from "./Button.tsx";
 
 type SecretVar = RouterInputs["secrets"]["set"]["envVar"];
 
@@ -46,23 +46,24 @@ function KeyCard({ slug, label, note, configured, keyHint, draft, onDraft, onSav
           className="flex-1 text-xs rounded-md border border-(--border-input) bg-(--bg-input) px-2 py-1.5 text-(--text-primary)"
           data-testid={`settings-key-input-${slug}`}
         />
-        <button
+        <Button
+          variant="primary"
+          size="sm"
           onClick={onSave}
           disabled={!draft.trim() || busy}
-          className="text-xs px-2.5 py-1.5 rounded-md bg-(--accent) text-(--on-accent) font-medium disabled:opacity-50"
           data-testid={`settings-key-save-${slug}`}
         >
           Save
-        </button>
-        <button
+        </Button>
+        <Button
+          size="sm"
           onClick={onRemove}
           disabled={!configured || busy}
           title={configured ? "Remove the saved key" : "No key to remove"}
-          className={TOOLBAR_BUTTON}
           data-testid={`settings-key-remove-${slug}`}
         >
           Remove
-        </button>
+        </Button>
       </div>
       {error && <p className="mt-2 text-xs text-(--danger-text)" data-testid={`settings-key-error-${slug}`}>{error}</p>}
     </div>
@@ -181,14 +182,14 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
         <section>
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold text-(--text-primary)">Local models — offline, auto-detected</h3>
-            <button
+            <Button
+              size="sm"
               onClick={() => refetch()}
               disabled={isFetching}
-              className={TOOLBAR_BUTTON}
               data-testid="settings-rescan"
             >
               {isFetching ? "Scanning…" : "Rescan"}
-            </button>
+            </Button>
           </div>
           <div className="space-y-3">
             {(status?.local ?? []).map((server) => (
@@ -225,14 +226,15 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                   )
                 ) : (
                   <div className="mt-2 flex items-center gap-2 pl-4">
-                    <button
+                    <Button
+                      variant="primary"
+                      size="sm"
                       onClick={() => startServerMutation.mutate({ name: server.name })}
                       disabled={startServerMutation.isPending}
-                      className="text-xs px-2.5 py-1 rounded-md bg-(--accent) text-(--on-accent) font-medium disabled:opacity-50"
                       data-testid={`settings-start-${server.name.replace(" ", "-").toLowerCase()}`}
                     >
                       {startServerMutation.isPending ? "Starting…" : "Start server"}
-                    </button>
+                    </Button>
                     <p className="text-xs text-(--text-muted)">{server.startHint}</p>
                   </div>
                 )}

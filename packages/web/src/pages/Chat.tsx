@@ -10,6 +10,7 @@ import { SavedAnswers } from "../components/chat/SavedAnswers.tsx";
 import { PdfPreviewModal } from "../components/PdfPreviewModal.tsx";
 import { ModelBundleNotice } from "../components/ModelBundleNotice.tsx";
 import { IconArrowLeft, IconBook, IconClose } from "../components/icons.tsx";
+import { Button } from "../components/Button.tsx";
 
 type FolderOption = { id: string; name: string; depth: number };
 
@@ -96,13 +97,14 @@ export function Chat() {
           <h1 className="text-xl font-bold text-(--text-primary)">Library chat</h1>
           <div className="ml-auto flex items-center gap-2">
             {messages.length > 0 && (
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={newChat}
-                className="text-sm px-2.5 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-muted) hover:text-(--text-primary)"
                 data-testid="chat-new"
               >
                 New chat
-              </button>
+              </Button>
             )}
             {bookId ? (
               <span
@@ -191,14 +193,14 @@ export function Chat() {
               className="flex-1 resize-none rounded-lg border border-(--border) bg-(--bg-card) text-(--text-primary) text-sm px-3 py-2 outline-none"
               data-testid="chat-input"
             />
-            <button
+            <Button
+              variant="primary"
               onClick={send}
               disabled={busy || !input.trim()}
-              className="px-4 py-2 rounded-lg bg-(--accent) text-(--on-accent) text-sm font-medium disabled:opacity-50"
               data-testid="chat-send"
             >
               Ask
-            </button>
+            </Button>
           </div>
           <SavedAnswers />
         </div>

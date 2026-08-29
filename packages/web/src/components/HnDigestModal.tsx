@@ -4,6 +4,7 @@ import { trpc } from "../trpc.ts";
 import { getStoredProfileId } from "../lib/profile.ts";
 import { Modal, ModalHeader } from "./Modal.tsx";
 import { IconChat, IconArrowRight } from "./icons.tsx";
+import { Button } from "./Button.tsx";
 
 function todayIso(): string {
   const d = new Date();
@@ -289,25 +290,26 @@ export function HnDigestModal({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="flex items-center gap-3 px-4 py-3 border-t border-(--border) shrink-0">
-        <button
+        <Button
+          size="sm"
           onClick={previewStories}
           disabled={previewLoading || state === "running"}
-          className="px-3 py-1.5 rounded-md text-xs font-medium border border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle) disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="hn-digest-preview-btn"
         >
           {previewLoading ? "Fetching stories…" : preview ? "Refresh preview" : "Preview stories"}
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
           onClick={run}
           disabled={state === "running" || includedCount === 0}
           title={includedCount === 0 ? "Every story is unchecked" : undefined}
-          className="px-3 py-1.5 bg-(--accent) text-(--on-accent) rounded-md text-xs font-medium hover:bg-(--accent-hover) disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="hn-digest-run"
         >
           {state === "running"
             ? "Building…"
             : `Build book${includedCount !== null ? ` (${includedCount} chapter${includedCount === 1 ? "" : "s"})` : ""}`}
-        </button>
+        </Button>
         {state === "running" && (
           <span className="text-xs text-(--text-muted)">
             Summarizing — takes a few minutes. Closing this window won't stop it.
