@@ -403,14 +403,13 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
             </fieldset>
           )}
 
-          <fieldset className="p-4 space-y-2">
-            <legend className="text-xs font-medium text-(--text-secondary) mb-1">About this book</legend>
-            <label className="flex flex-wrap items-center gap-2 text-xs text-(--text-muted)">
-              <span className="w-28 shrink-0 text-(--text-secondary)">Language</span>
+          <div className="p-4">
+            <label className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-(--text-primary)">Language</span>
               <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
-                className="rounded border border-(--border-input) bg-(--bg-input) px-1.5 py-1 text-xs"
+                className="rounded-md border border-(--border-input) bg-(--bg-input) px-2 py-1 text-sm text-(--text-primary)"
                 data-testid="upload-language"
               >
                 <option value="">Not set</option>
@@ -418,9 +417,9 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
                   <option key={code} value={code}>{label}</option>
                 ))}
               </select>
-              <span className="min-w-0">Decides which voices the picker offers first.</span>
+              <span className="min-w-0 text-xs text-(--text-muted)">Decides which voices the picker offers first.</span>
             </label>
-          </fieldset>
+          </div>
 
           <fieldset className="p-4 space-y-2">
             <legend className="text-xs font-medium text-(--text-secondary) mb-1">Text extraction</legend>
