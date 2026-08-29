@@ -3,6 +3,7 @@ import { VoicePicker } from "./VoicePicker.tsx";
 import { SpeedSlider } from "./SpeedSlider.tsx";
 import { getVoiceById, voiceSupportsSpeedControl, getVoiceLabel } from "../lib/voices.ts";
 import { AI_PRESETS } from "../lib/ai-presets.ts";
+import { BOOK_LANGUAGE_OPTIONS } from "../lib/languages.ts";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { PillToggle } from "./PillToggle.tsx";
 import { profileHeaders } from "../lib/profile.ts";
@@ -56,6 +57,7 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
   const [isUploading, setIsUploading] = useState(false);
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const [customTitle, setCustomTitle] = useState("");
+  const [language, setLanguage] = useState("");
   const [voice, setVoice] = useState("kokoro:af_heart");
   const [speed, setSpeed] = useState(1.0);
   const [forceOcr, setForceOcr] = useState(false);
@@ -116,6 +118,7 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
     formData.append("llmChapterDetection", String(fullExtract && llmChapterDetection));
     if (fullExtract && llmChapterDetection) formData.append("chapterModel", chapterModel);
     formData.append("skipSynthesis", String(!(fullExtract && autoSynthesize)));
+    if (language) formData.append("language", language);
     if (folderId) formData.append("folderId", folderId);
     if (askAi && notePrompt.trim()) {
       formData.append("notePrompt", notePrompt.trim());
@@ -401,6 +404,25 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
           )}
 
           <fieldset className="p-4 space-y-2">
+            <legend className="text-xs font-medium text-(--text-secondary) mb-1">About this book</legend>
+            <label className="flex flex-wrap items-center gap-2 text-xs text-(--text-muted)">
+              <span className="w-28 shrink-0 text-(--text-secondary)">Language</span>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className="rounded border border-(--border-input) bg-(--bg-input) px-1.5 py-1 text-xs"
+                data-testid="upload-language"
+              >
+                <option value="">Not set</option>
+                {BOOK_LANGUAGE_OPTIONS.map(({ code, label }) => (
+                  <option key={code} value={code}>{label}</option>
+                ))}
+              </select>
+              <span className="min-w-0">Decides which voices the picker offers first.</span>
+            </label>
+          </fieldset>
+
+          <fieldset className="p-4 space-y-2">
             <legend className="text-xs font-medium text-(--text-secondary) mb-1">Text extraction</legend>
 
             <Option
@@ -448,7 +470,7 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
               {autoSynthesize && (
                 <div className="pl-6 space-y-1">
                   <div className="flex flex-wrap items-end gap-4">
-                    <VoicePicker value={voice} onChange={setVoice} />
+                    <VoicePicker value={voice} onChange={setVoice} priorityLanguages={language ? [language] : []} />
                     <SpeedSlider value={speed} onChange={setSpeed} disabled={!speedEnabled} />
                   </div>
                   {!speedEnabled && selectedVoice && (

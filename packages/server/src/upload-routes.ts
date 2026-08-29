@@ -80,6 +80,8 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
     const fullExtract = fields.fullExtract === "true";
 
     const profileId = profileIdFromHeader(request.headers["x-profile-id"]);
+    // Same bound the book update uses (routes/books.ts), so the two paths cannot disagree
+    const language = (fields.language || "").slice(0, 8) || null;
     const folderId = fields.folderId || null;
     if (folderId) {
       const [folder] = await db
@@ -107,6 +109,7 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
         llmChapterDetection,
         chapterModel,
         skipSynthesis,
+        language,
         folderId,
         profileId,
         ...(noteJob ? { noteJob } : {}),

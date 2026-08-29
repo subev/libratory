@@ -21,6 +21,8 @@ type VoicePickerProps = {
   value: string;
   onChange: (voice: string) => void;
   title?: string;
+  /** Codes to pin at the top of the library — the language this book will be read in. */
+  priorityLanguages?: string[];
 };
 
 // Only the engine owning the current selection is queried — the modal loads the rest on demand.
@@ -54,7 +56,7 @@ function pocketLanguageOf(voiceId: string): string {
   return code === "custom" ? "en" : code;
 }
 
-function useVoiceLibrary(value: string, onChange: (voice: string) => void) {
+function useVoiceLibrary(value: string, onChange: (voice: string) => void, priorityLanguages: string[]) {
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const selectedId = normalizeVoiceId(value);
@@ -67,15 +69,15 @@ function useVoiceLibrary(value: string, onChange: (voice: string) => void) {
 
   const library = isOpen ? (
     <VoicePickerProvider selectedId={selectedId} onSelect={onChange}>
-      <VoiceLibraryModal onClose={close} />
+      <VoiceLibraryModal onClose={close} priorityLanguages={priorityLanguages} />
     </VoicePickerProvider>
   ) : null;
 
   return { open: () => setIsOpen(true), triggerRef, label, library };
 }
 
-export function VoicePicker({ value, onChange, title }: VoicePickerProps) {
-  const { open, triggerRef, label, library } = useVoiceLibrary(value, onChange);
+export function VoicePicker({ value, onChange, title, priorityLanguages = [] }: VoicePickerProps) {
+  const { open, triggerRef, label, library } = useVoiceLibrary(value, onChange, priorityLanguages);
 
   return (
     <div className="relative flex-1">
