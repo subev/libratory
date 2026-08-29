@@ -1323,7 +1323,9 @@ function ChunkedText({
     if (range.start < pos) return;
     if (range.start > pos) parts.push(marked(text, pos, range.start, mark, `gap-${i}`));
     const isSelected = range.url === selectedChunkUrl;
-    const isHovered = !isSelected && range.url === hoveredChunkUrl;
+    // The chunk band is the coarsest marker, so it yields to the sentence and word while those show
+    const showsSelected = isSelected && !marking;
+    const isHovered = !showsSelected && range.url === hoveredChunkUrl;
     parts.push(
       <span
         key={`${range.url}-${i}`}
@@ -1331,7 +1333,7 @@ function ChunkedText({
         onClick={() => onSelectChunk(range.url)}
         onMouseEnter={() => onHoverChunk(range.url)}
         onMouseLeave={() => onHoverChunk(null)}
-        className={`cursor-pointer rounded-sm transition-colors ${ isSelected ? "bg-(--bg-selected) text-(--text-primary)" : isHovered ? "bg-(--accent-subtle) text-(--text-primary)" : "" }`}
+        className={`cursor-pointer rounded-sm transition-colors ${ showsSelected ? "bg-(--bg-selected) text-(--text-primary)" : isHovered ? "bg-(--accent-subtle) text-(--text-primary)" : "" }`}
       >
         {marked(text, range.start, range.end, mark, `chunk-${i}`)}
       </span>,
