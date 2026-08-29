@@ -6,6 +6,14 @@ import { VoiceLibraryModal } from "./voice-picker/VoiceLibraryModal.tsx";
 import { SpeedSlider } from "./SpeedSlider.tsx";
 import { Button } from "./Button.tsx";
 
+// The stored voice and speed a synthesis will use, with the setters that persist them
+export type SynthSettings = {
+  voice: string;
+  speed: number;
+  onChangeVoice: (voice: string) => void;
+  onChangeSpeed: (speed: number) => void;
+};
+
 // Picking a voice *is* the decision here, so this hosts the voice library directly rather than
 // wrapping a control that opens a second modal on top of this one.
 export function SynthesizeModal({
@@ -20,16 +28,12 @@ export function SynthesizeModal({
   disabledReason,
   onStart,
   onClose,
-}: {
+}: SynthSettings & {
   count: number;
   /** Variant being synthesized, by display name ("Russian"); null for the original. */
   language: string | null;
   /** The book's own language code, so an original book opens on its language, not English. */
   bookLanguage?: string | null;
-  voice: string;
-  speed: number;
-  onChangeVoice: (voice: string) => void;
-  onChangeSpeed: (speed: number) => void;
   canStart: boolean;
   disabledReason?: string;
   onStart: () => void;

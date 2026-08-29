@@ -64,8 +64,7 @@ test.describe("full extraction", { tag: "@slow" }, () => {
     // The chapter modal opens the source PDF over itself; both are fixed overlays, so the
     // preview has to end up on top or the click looks like it did nothing
     await rows.first().getByRole("button", { name: /Chapter 1/ }).click();
-    const chapterPdf = page.getByRole("button", { name: /^p\.\d/ }).last();
-    await chapterPdf.click();
+    await page.getByTestId("chapter-view-pdf").click();
     const preview = page.getByTestId("pdf-preview-modal");
     await expect(preview).toBeVisible();
     await expect(preview.locator("iframe")).toHaveAttribute("src", /^\/pdf\/.*#page=\d+/);

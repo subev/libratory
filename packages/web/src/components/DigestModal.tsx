@@ -50,7 +50,7 @@ export function DigestModal({
   }
 
   return (
-    <Modal size="md" onClose={onClose} testId="digest-modal">
+    <Modal size="md" onClose={onClose} closeOnEscape={false} /* a typed prompt is not restored on reopen */ testId="digest-modal">
       <ModalHeader title={`Create digest from ${included.length} books`} onClose={onClose} />
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">

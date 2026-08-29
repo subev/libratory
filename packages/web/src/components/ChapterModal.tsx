@@ -1,25 +1,27 @@
-import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, memo, Fragment, type ReactNode } from "react";
 import { Link } from "react-router";
 import { trpc } from "../trpc.ts";
 import { StatusBadge } from "./StatusBadge.tsx";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
 import { ChapterAiModal } from "./ChapterAiModal.tsx";
 import { VariantModal } from "./VariantModal.tsx";
-import { VoicePickerChip } from "./VoicePicker.tsx";
 import { PillToggle } from "./PillToggle.tsx";
 import { Button } from "./Button.tsx";
 import { getVoiceLabel } from "../lib/voices.ts";
 import { useBodyScrollLock } from "../lib/use-body-scroll-lock.ts";
-import { CueTranscript } from "./reader/CueTranscript.tsx";
 import { CuePages } from "./reader/CuePages.tsx";
-import { fetchCues, fetchManifest, UNMAPPED, type ReaderCues, type ReaderManifest } from "../lib/reader-doc.ts";
+import { WordSpotlight } from "./reader/WordSpotlight.tsx";
+import { fetchCues, fetchManifest, printHoldsText, UNMAPPED, type ReaderCues, type ReaderManifest } from "../lib/reader-doc.ts";
 import { useFollowCue, type FollowBand } from "../lib/cue-follow.ts";
 import { useAudioTime } from "../lib/use-audio-time.ts";
 import { usePlayPauseKey } from "../lib/play-pause-key.ts";
 import { SPEEDS, loadSpeed, saveSpeed } from "../lib/playback-speed.ts";
 import { readingLang } from "../lib/reading-lang.ts";
+import { formatDuration } from "../lib/format.ts";
+import { cueMark, locateSpans, type TextMark, type TextSpan } from "../lib/text-cues.ts";
 import { IconChevronLeft, IconChevronRight, IconClose, IconPause, IconPlay } from "./icons.tsx";
 import type { ChapterRow, FileInfo, VariantRef } from "./ChapterTable.tsx";
+import { chapterAudioDownload, chapterAudioUrl, SYNTH_BUSY, variantLabel } from "../lib/chapters.ts";
 import { useTopmostEscape } from "./Modal.tsx";
 
 type ChapterModalProps = {
@@ -36,20 +38,10 @@ type ChapterModalProps = {
   onNavigate: (index: number) => void;
   onQueue: (id: string, resume?: boolean) => void;
   onSetSelected: (id: string, selected: boolean) => void;
-  // Voice the next synthesis will use for this view (variant lane or book)
-  synthVoice?: string;
-  // Changes the stored voice for the whole book (or the active variant lane)
-  onChangeSynthVoice?: (voice: string) => void;
+  // Asks the table above for the voice and speed the next synthesis will use
+  onPickVoice: (chapterId: string) => void;
+  voicePickerOpen: boolean;
 };
-
-export function chapterAudioDownload(chapter: ChapterRow, variant?: VariantRef | null) {
-  // Legacy chapters synthesized before the AAC switch are still .mp3 on disk
-  const ext = chapter.audioPath?.match(/\.\w+$/)?.[0] ?? ".m4a";
-  return {
-    href: chapter.audioUrl ?? `/audio/chapter/${chapter.id}`,
-    filename: `${chapter.index + 1} ${chapter.title}${variant ? ` (${variant.label ?? variant.key})` : ""}${ext}`.replace(/[\\/]/g, "-"),
-  };
-}
 
 type SourceBlock = {
   type: string;
@@ -84,7 +76,7 @@ const UNTOUCHED_UI: ModalUi = {
   pdfPage: null,
 };
 
-type ViewMode = "pages" | "text" | "custom" | "clean" | "raw" | "split" | "blocks";
+type ViewMode = "read" | "source" | "compare" | "blocks";
 
 // The open index is held across list changes — a filter or a delete can leave it past the end
 export function ChapterModal(props: ChapterModalProps) {
@@ -107,8 +99,8 @@ function ChapterModalBody({
   onNavigate,
   onQueue,
   onSetSelected,
-  synthVoice,
-  onChangeSynthVoice,
+  onPickVoice,
+  voicePickerOpen,
 }: ChapterModalProps & { chapter: ChapterRow }) {
   useBodyScrollLock();
   const hasPrev = chapterIndex > 0;
@@ -186,17 +178,21 @@ function ChapterModalBody({
   }, [cueUrl, cueKey]);
 
   const canMark = readerChapter?.mode === "page" && cues !== null;
-
-  // Reading along on the page is the experience; the transcript is the fallback that still marks
-  // words. A tab the reader picks outranks both, and is dropped when the chapter changes.
-  const viewMode: ViewMode =
-    picked ?? (canMark ? "pages" : cues ? "text" : chapter.hasCustomText ? "custom" : chapter.hasCleanText ? "clean" : "raw");
+  // A variant is another text entirely; for the original, the document says whether the print
+  // still shows this chapter's words
+  const showPages = !isVariant && hasPages && printHoldsText(readerChapter);
+  const modes = viewModes(chapter);
+  const viewMode: ViewMode = picked && modes.includes(picked) ? picked : "read";
+  const marksPages = viewMode === "read" && showPages;
+  // Marking needs a playhead finer than timeupdate's, and a cue to scroll to — on the print or in
+  // the prose, whichever the open view is showing
+  const follows = cues !== null && viewMode !== "blocks";
 
   // The modal scrolls its own panel rather than the window, which followCue works out for itself
-  useFollowCue(cues, ms, MODAL_BAND, `${chapter.id}:${viewMode}`);
+  useFollowCue(follows ? cues : null, ms, MODAL_BAND, `${chapter.id}:${viewMode}`);
 
   const isTranslationKind = variant?.kind === "translation";
-  const variantName = variant ? variant.label ?? variant.key : null;
+  const variantName = variant ? variantLabel(variant) : null;
   // Why the page below carries no highlight — the alternative is a reader waiting for one. Only
   // the lane being read and the missing audio are this component's to know; the rest the document says.
   const markReason = variantName
@@ -233,7 +229,6 @@ function ChapterModalBody({
         cleanText: null,
         customText: null,
         sourceBlocks: null,
-        chunkTextSource: "raw" as const,
         chunkPreviews: variantDetail.chunkPreviews,
       }
     : originalChapter;
@@ -258,7 +253,6 @@ function ChapterModalBody({
     : chapter.status === "synthesizing";
   // Partial audio exists, so "start over" and "carry on" are genuinely different actions here.
   const canContinueSynthesis = chapter.status === "suspended" || chapter.status === "failed";
-  const withVoice = synthVoice ? ` with ${getVoiceLabel(synthVoice)}` : "";
   const wasAudioBusyRef = useRef(audioBusy);
   useEffect(() => {
     const was = wasAudioBusyRef.current;
@@ -345,15 +339,10 @@ function ChapterModalBody({
     });
   }
 
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = ""; };
-  }, []);
-
-  // The chapter's own audio, which the preview panel falls back to once the chunks are gone — one
-  // player for one file, rather than a second control for it on the busiest line in the modal
-  const chapterAudioUrl =
-    chapter.status === "done" && chapter.audioPath ? chapter.audioUrl ?? `/audio/chapter/${chapter.id}` : null;
+  // The chapter's own audio, which the preview panel falls back to once the chunks are gone
+  const download = chapterAudioDownload(chapter, variant);
+  const chapterAudio =
+    chapter.status === "done" && chapter.audioPath ? chapterAudioUrl(chapter) : null;
 
   const changeSpeed = useCallback((rate: number) => {
     setSpeed(rate);
@@ -361,7 +350,7 @@ function ChapterModalBody({
   }, []);
 
   const togglePlay = useCallback(() => playerRef.current?.toggle() ?? false, []);
-  usePlayPauseKey(togglePlay, !isEditing && !showCompare && pdfPage === null);
+  usePlayPauseKey(togglePlay, !isEditing && !showCompare && !voicePickerOpen && pdfPage === null);
 
   // Escape goes through the shared stack, so whatever opened last owns it. This used to be a
   // hand-kept list of overlays on top of this one, which is why Ask AI was never added to it.
@@ -370,18 +359,18 @@ function ChapterModalBody({
       if (pdfPage !== null) setPdfPage(null);
       else onClose();
     },
-    !(isEditing || showCompare),
+    !(isEditing || showCompare || voicePickerOpen),
   );
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (isEditing || showCompare) return;
+      if (isEditing || showCompare || voicePickerOpen) return;
       if (e.key === "ArrowLeft" && hasPrev) onNavigate(chapterIndex - 1);
       if (e.key === "ArrowRight" && hasNext) onNavigate(chapterIndex + 1);
     }
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [onClose, isEditing, showCompare, hasPrev, hasNext, chapterIndex, onNavigate, pdfPage, setPdfPage]);
+  }, [onClose, isEditing, showCompare, voicePickerOpen, hasPrev, hasNext, chapterIndex, onNavigate, pdfPage, setPdfPage]);
 
   function startEditing() {
     if (!fullChapter) return;
@@ -399,14 +388,21 @@ function ChapterModalBody({
     resetTextMutation.mutate({ id: chapter.id });
   }
 
-  // Clickable chunk ranges for the text panel — only when the active view renders the same text
-  // the chunk offsets point into (chunkTextSource). Selecting a span mirrors the chunk buttons.
   const activeChunkUrl = selectedChunkPreviewUrl ?? fullChapter?.chunkPreviews.at(-1)?.url ?? null;
   const sourceFile =
     files?.find((f) => f.index === chapter.sourceFileIndex) ?? (files?.length === 1 ? files[0] : undefined);
-  const activeChunkPage = fullChapter?.chunkPreviews.find((p) => p.url === activeChunkUrl)?.page ?? null;
+  const paneBody = fullChapter ? paneText(fullChapter, viewMode) : "";
+  // Only the text the cues actually index gets span math; the pane renders its words either way
+  const markedText = follows && !marksPages ? paneBody : "";
+  // Locating every cue walks the whole chapter — not something to redo ten times a second
+  const spans = useMemo(
+    () => (cues && markedText ? locateSpans(markedText, cues.cues.map((c) => c.s)) : []),
+    [cues, markedText],
+  );
+  const mark = cueMark(markedText, spans, cues, ms);
+  // The chunk offsets index the spoken text, which is what Read renders when it is not the print
   const chunkRanges =
-    fullChapter && viewMode === fullChapter.chunkTextSource
+    fullChapter && viewMode === "read" && !showPages
       ? fullChapter.chunkPreviews.flatMap((p) =>
           typeof p.start === "number" && typeof p.end === "number"
             ? [{ start: p.start, end: p.end, url: p.url }]
@@ -473,33 +469,29 @@ function ChapterModalBody({
                 <span>{formatDuration(chapter.durationMs)}</span>
               ) : null}
               {chapter.pageStart ? (
-                sourceFile ? (
-                  <button
-                    onClick={() => setPdfPage(chapter.pageStart!)}
-                    className="tabular-nums text-(--accent-text) hover:text-(--accent-text-hover)"
-                    title="Open the source PDF at this chapter's first page"
-                  >
-                    p.{chapter.pageStart}{chapter.pageEnd && chapter.pageEnd !== chapter.pageStart ? `–${chapter.pageEnd}` : ""}
-                  </button>
-                ) : (
-                  <span className="tabular-nums">
-                    p.{chapter.pageStart}{chapter.pageEnd && chapter.pageEnd !== chapter.pageStart ? `–${chapter.pageEnd}` : ""}
-                  </span>
-                )
+                <button
+                  onClick={() => setPdfPage(chapter.pageStart!)}
+                  disabled={!sourceFile}
+                  className="tabular-nums text-(--accent-text) hover:text-(--accent-text-hover) disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={sourceFile ? "Open the source PDF at this chapter's first page" : "Source PDF unknown for this chapter"}
+                  data-testid="chapter-view-pdf"
+                >
+                  View PDF · p.{chapter.pageStart}{chapter.pageEnd && chapter.pageEnd !== chapter.pageStart ? `–${chapter.pageEnd}` : ""}
+                </button>
               ) : null}
               {hasPages ? (
-                canMark ? (
+                readerChapter?.audio ? (
                   <Link
                     to={`/books/${bookId}/read?chapter=${chapter.index}`}
                     className="text-(--accent-text) hover:text-(--accent-text-hover)"
-                    title="Follow the narration on the page itself, at full size"
-                    data-testid="chapter-read-along"
+                    title={canMark ? "Follow the narration on the page itself, at full size" : markReason}
+                    data-testid="chapter-open-reader"
                   >
-                    Read along on the page
+                    Open reader
                   </Link>
                 ) : (
-                  <span className="text-(--text-faint) cursor-help" title={markReason} data-testid="chapter-read-along-off">
-                    Read along on the page
+                  <span className="text-(--text-faint) cursor-help" title={markReason} data-testid="chapter-open-reader-off">
+                    Open reader
                   </span>
                 )
               ) : null}
@@ -530,8 +522,8 @@ function ChapterModalBody({
           <Button
             variant="secondary"
             size="sm"
-            href={chapterAudioDownload(chapter, variant).href}
-            download={chapterAudioDownload(chapter, variant).filename}
+            href={download.href}
+            download={download.filename}
             disabled={chapter.status !== "done" || !chapter.audioPath}
             title={
               chapter.status === "done" && chapter.audioPath
@@ -544,22 +536,6 @@ function ChapterModalBody({
 
           <Divider />
 
-          {/* The voice is the input to the buttons beside it, so it leads the group rather than
-              trailing it — and it opens a modal, so it must not read as a <select>. */}
-          {synthVoice && onChangeSynthVoice ? (
-            <VoicePickerChip
-              value={synthVoice}
-              onChange={onChangeSynthVoice}
-              title={`Voice for the next synthesis — changing it applies to the whole ${isVariant ? `${variantName} lane` : "book"}`}
-            />
-          ) : synthVoice ? (
-            <span
-              className="text-xs text-(--text-faint)"
-              title={`Next synthesis uses this voice — change it via "Synthesize selected" above the chapter table`}
-            >
-              {getVoiceLabel(synthVoice)}
-            </span>
-          ) : null}
           {canContinueSynthesis ? (
             <Button
               variant="primary"
@@ -573,16 +549,16 @@ function ChapterModalBody({
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => onQueue(chapter.id)}
-            disabled={["pending", "normalizing", "synthesizing"].includes(chapter.status) || chapter.synthesizable === false}
+            onClick={() => onPickVoice(chapter.id)}
+            disabled={SYNTH_BUSY.includes(chapter.status) || chapter.synthesizable === false}
             title={
               chapter.synthesizable === false
                 ? `No finished ${variantName} text for this chapter`
-                : ["pending", "normalizing", "synthesizing"].includes(chapter.status)
+                : SYNTH_BUSY.includes(chapter.status)
                   ? "Can't re-synthesize while it's being processed"
                   : canContinueSynthesis
-                    ? `Discard the ${chapter.progress ?? "already-synthesized"} chunks and synthesize the whole chapter again${withVoice}`
-                    : `Re-synthesize this chapter's audio from text (from scratch)${withVoice}`
+                    ? `Discard the ${chapter.progress ?? "already-synthesized"} chunks and synthesize the whole chapter again, with a voice you pick`
+                    : "Pick a voice and synthesize this chapter's audio from its text"
             }
             data-testid="chapter-synthesize"
           >
@@ -708,7 +684,7 @@ function ChapterModalBody({
                   selected={variant?.key === v.key}
                   onClick={() => onSwitchVariant(v.key)}
                 >
-                  {v.label ?? v.key}
+                  {variantLabel(v)}
                 </PillToggle>
               ))}
             </div>
@@ -758,23 +734,15 @@ function ChapterModalBody({
                   Edit
                 </Button>
               ) : null}
-              <ViewModeTabs
-                viewMode={viewMode}
-                onSetViewMode={setPicked}
-                hasCues={cues !== null}
-                hasPages={hasPages}
-                hasCleanText={chapter.hasCleanText}
-                hasCustomText={chapter.hasCustomText}
-                hasSourceBlocks={chapter.hasSourceBlocks}
-              />
+              <ViewModeTabs viewMode={viewMode} modes={modes} onSetViewMode={setPicked} />
             </div>
           )}
         </div>
 
-        {chapterAudioUrl || fullChapter?.chunkPreviews.length ? (
+        {chapterAudio || fullChapter?.chunkPreviews.length ? (
           <ChunkPreviewPanel
-            chunkPreviews={fullChapter?.chunkPreviews ?? []}
-            audioUrl={chapterAudioUrl}
+            chunkPreviews={fullChapter?.chunkPreviews ?? NO_PREVIEWS}
+            audioUrl={chapterAudio}
             selectedUrl={selectedChunkPreviewUrl}
             onSelect={selectChunk}
             onFollow={setSelectedChunkPreviewUrl}
@@ -782,12 +750,9 @@ function ChapterModalBody({
             hoveredUrl={hoveredChunkUrl}
             onHover={setHoveredChunkUrl}
             isSynthesizing={chapter.status === "synthesizing"}
-            sourcePage={activeChunkPage}
-            canOpenPdf={sourceFile !== undefined}
-            onOpenPdf={setPdfPage}
             onTime={setMs}
             playerRef={playerRef}
-            follows={viewMode === "pages" || viewMode === "text"}
+            follows={follows}
             playbackRate={speed}
             onPlaybackRate={changeSpeed}
           />
@@ -807,7 +772,7 @@ function ChapterModalBody({
                 data-testid="chapter-edit-text"
                 className="flex-1 min-h-0 w-full max-w-prose mx-auto rounded bg-(--bg-reading) border border-(--border-custom-text) px-7 py-6 font-reading text-[17px] text-(--text-primary) whitespace-pre-wrap leading-relaxed resize-none"
               />
-            ) : viewMode === "pages" && manifest && readerChapter ? (
+            ) : marksPages && manifest && readerChapter ? (
               <div className="mx-auto flex w-full max-w-3xl flex-1 min-h-0 flex-col gap-4 overflow-y-auto">
                 {canMark ? null : (
                   <p
@@ -828,15 +793,6 @@ function ChapterModalBody({
                   onHoverCue={hoverCue}
                 />
               </div>
-            ) : viewMode === "text" && cues ? (
-              <CueTranscript
-                cues={cues}
-                ms={ms}
-                onSeek={(at) => playerRef.current?.seek(at)}
-                hoverChunk={hoverChunk}
-                onHoverCue={hoverCue}
-                className="mx-auto w-full max-w-prose flex-1 min-h-0 overflow-y-auto rounded bg-(--bg-reading) border border-(--border-reading) px-7 py-6 font-reading text-[17px] leading-relaxed text-(--text-primary)"
-              />
             ) : viewMode === "blocks" && fullChapter.sourceBlocks ? (
               <BlocksPreview
                 sourceBlocks={fullChapter.sourceBlocks as SourceBlock[]}
@@ -848,9 +804,11 @@ function ChapterModalBody({
               </div>
             ) : (
               <TextPreview
-                rawText={fullChapter.rawText}
-                cleanText={fullChapter.cleanText}
-                customText={fullChapter.customText}
+                lang={lang}
+                mark={mark}
+                text={paneBody}
+                before={fullChapter.customText ? fullChapter.cleanText ?? fullChapter.rawText : fullChapter.rawText}
+                edited={!!fullChapter.customText}
                 viewMode={viewMode}
                 chunkRanges={chunkRanges}
                 selectedChunkUrl={activeChunkUrl}
@@ -909,7 +867,7 @@ function ChapterModalBody({
   );
 }
 
-function ChunkPreviewPanel({
+const ChunkPreviewPanel = memo(function ChunkPreviewPanel({
   chunkPreviews,
   audioUrl,
   selectedUrl,
@@ -919,9 +877,6 @@ function ChunkPreviewPanel({
   hoveredUrl,
   onHover,
   isSynthesizing,
-  sourcePage,
-  canOpenPdf,
-  onOpenPdf,
   onTime,
   playerRef,
   follows,
@@ -938,9 +893,6 @@ function ChunkPreviewPanel({
   hoveredUrl: string | null;
   onHover: (url: string | null) => void;
   isSynthesizing: boolean;
-  sourcePage: number | null;
-  canOpenPdf: boolean;
-  onOpenPdf: (page: number) => void;
   onTime: (ms: number) => void;
   playerRef: React.RefObject<{ seek: (ms: number) => void; toggle: () => boolean } | null>;
   // Whether the open view marks the words, and so needs a position finer than timeupdate's
@@ -950,7 +902,6 @@ function ChunkPreviewPanel({
 }) {
   const activeUrl = selectedUrl ?? chunkPreviews.at(-1)?.url ?? null;
   const activeIndex = chunkPreviews.findIndex((preview) => preview.url === activeUrl);
-  const activeChunk = activeIndex >= 0 ? chunkPreviews[activeIndex] : undefined;
   const audioRef = useRef<HTMLAudioElement>(null);
   const activeButtonRef = useRef<HTMLButtonElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -1023,8 +974,8 @@ function ChunkPreviewPanel({
         const audio = audioRef.current;
         if (!audio) return;
         onTime(ms);
-        // preload="none" means currentTime is ignored until metadata arrives; the pending seek
-        // is applied by playActive and by loadedmetadata, whichever gets there first
+        // The seek can land before metadata does, so it is held and applied by playActive and by
+        // loadedmetadata, whichever gets there first
         pendingSeekRef.current = ms / 1000;
         playActive();
       },
@@ -1039,9 +990,7 @@ function ChunkPreviewPanel({
 
   function handleTimeUpdate() {
     const audio = audioRef.current;
-    if (!syncMode || !audio) return;
-    onTime(audio.currentTime * 1000);
-    if (audio.paused) return;
+    if (!syncMode || !audio || audio.paused) return;
     const ms = audio.currentTime * 1000;
     const current = chunkPreviews.find(
       (preview) => preview.startMs! <= ms && ms < preview.endMs!,
@@ -1076,9 +1025,9 @@ function ChunkPreviewPanel({
 
   return (
     <div className="border-b border-(--border) px-4 py-3 bg-(--bg-card)">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          {activeUrl ? (
+      <div className="mb-2 flex items-center gap-2">
+        {audioSrc ? (
+          <>
             <Button
               variant="icon"
               size="sm"
@@ -1092,8 +1041,6 @@ function ChunkPreviewPanel({
                 <IconPlay className="h-3.5 w-3.5" />
               )}
             </Button>
-          ) : null}
-          {activeUrl ? (
             <select
               value={playbackRate}
               onChange={(e) => onPlaybackRate(Number(e.target.value))}
@@ -1106,36 +1053,13 @@ function ChunkPreviewPanel({
                 </option>
               ))}
             </select>
-          ) : null}
-          <div className="text-xs font-medium text-(--text-primary)">
-            {chunkPreviews.length === 0
-              ? "Chapter audio"
-              : `Chunk previews ${isSynthesizing ? `(live: ${chunkPreviews.length} ready)` : `(${chunkPreviews.length})`}`}
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => onOpenPdf(sourcePage!)}
-            disabled={!canOpenPdf || sourcePage === null}
-            title={
-              !canOpenPdf
-                ? "Source PDF unknown for this chapter"
-                : sourcePage === null
-                  ? "No page info for this chunk"
-                  : "Open the source PDF at this chunk's page"
-            }
-            className="text-xs text-(--accent-text) hover:text-(--accent-text-hover) disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            PDF{sourcePage !== null ? ` p.${sourcePage}` : ""}
-          </button>
-          <a
-            href={chunkPreviews.at(-1)?.url}
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs text-(--accent-text) hover:text-(--accent-text-hover)"
-          >
-            Open latest file
-          </a>
+            <PlayerClock audioRef={audioRef} src={audioSrc} />
+          </>
+        ) : null}
+        <div className="text-xs font-medium text-(--text-primary)">
+          {chunkPreviews.length === 0
+            ? "Chapter audio"
+            : `Chunk previews ${isSynthesizing ? `(live: ${chunkPreviews.length} ready)` : `(${chunkPreviews.length})`}`}
         </div>
       </div>
 
@@ -1161,32 +1085,54 @@ function ChunkPreviewPanel({
       </div>
 
       {audioSrc ? (
-        <div className="flex items-center gap-2">
-          {chunkPreviews.length > 0 ? (
-            <span className="text-xs text-(--text-faint) shrink-0">Chunk {activeChunk?.index ?? "—"}</span>
-          ) : null}
-          <audio
-            ref={audioRef}
-            src={audioSrc}
-            controls
-            preload={syncMode ? "metadata" : "none"}
-            className="h-8 w-full max-w-xl"
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
-            // Scrubbing can reset the rate to 1x; re-assert the chosen speed after a seek.
-            onSeeked={(e) => { e.currentTarget.playbackRate = playbackRateRef.current; }}
-            onLoadedMetadata={(e) => {
-              if (pendingSeekRef.current !== null) {
-                e.currentTarget.currentTime = pendingSeekRef.current;
-                pendingSeekRef.current = null;
-              }
-            }}
-            onTimeUpdate={handleTimeUpdate}
-            onEnded={handleEnded}
-          />
-        </div>
+        <audio
+          ref={audioRef}
+          src={audioSrc}
+          preload="metadata"
+          className="hidden"
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          // Scrubbing can reset the rate to 1x; re-assert the chosen speed after a seek.
+          onSeeked={(e) => { e.currentTarget.playbackRate = playbackRateRef.current; }}
+          onLoadedMetadata={(e) => {
+            if (pendingSeekRef.current !== null) {
+              e.currentTarget.currentTime = pendingSeekRef.current;
+              pendingSeekRef.current = null;
+            }
+          }}
+          onTimeUpdate={handleTimeUpdate}
+          onEnded={handleEnded}
+        />
       ) : null}
     </div>
+  );
+});
+
+// Its own state so the clock's ticks re-render a span, not the whole panel
+function PlayerClock({ audioRef, src }: { audioRef: React.RefObject<HTMLAudioElement | null>; src: string }) {
+  const [at, setAt] = useState(0);
+  const [total, setTotal] = useState(0);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const update = () => {
+      setAt(Math.floor(audio.currentTime));
+      setTotal(Number.isFinite(audio.duration) ? Math.floor(audio.duration) : 0);
+    };
+    update();
+    audio.addEventListener("timeupdate", update);
+    audio.addEventListener("durationchange", update);
+    return () => {
+      audio.removeEventListener("timeupdate", update);
+      audio.removeEventListener("durationchange", update);
+    };
+  }, [audioRef, src]);
+
+  return (
+    <span className="shrink-0 tabular-nums text-xs text-(--text-faint)">
+      {formatDuration(at * 1000)} / {formatDuration(total * 1000)}
+    </span>
   );
 }
 
@@ -1194,32 +1140,23 @@ function Divider() {
   return <span className="h-4 w-px bg-(--border) shrink-0" aria-hidden="true" />;
 }
 
+// Without a normalized or edited text, the extracted text is the spoken one — Read already shows it
+function viewModes(chapter: ChapterRow): ViewMode[] {
+  const modes: ViewMode[] = ["read"];
+  if (chapter.hasCleanText || chapter.hasCustomText) modes.push("source", "compare");
+  if (chapter.hasSourceBlocks) modes.push("blocks");
+  return modes;
+}
+
 function ViewModeTabs({
   viewMode,
+  modes,
   onSetViewMode,
-  hasCleanText,
-  hasCustomText,
-  hasSourceBlocks,
-  hasCues,
-  hasPages,
 }: {
   viewMode: ViewMode;
+  modes: ViewMode[];
   onSetViewMode: (mode: ViewMode) => void;
-  hasCleanText: boolean;
-  hasCustomText: boolean;
-  hasSourceBlocks: boolean;
-  hasCues: boolean;
-  hasPages: boolean;
 }) {
-  const modes: ViewMode[] = [];
-  if (hasPages) modes.push("pages");
-  if (hasCues) modes.push("text");
-  if (hasCustomText) modes.push("custom");
-  if (hasCleanText) modes.push("clean");
-  modes.push("raw");
-  if (hasCleanText) modes.push("split");
-  if (hasSourceBlocks) modes.push("blocks");
-
   if (modes.length <= 1) return null;
 
   return (
@@ -1240,23 +1177,34 @@ function ViewModeTabs({
 
 type ChunkRange = { start: number; end: number; url: string };
 
+// A stable empty list, so a chapter still loading does not re-render the panel on every tick
+const NO_PREVIEWS: never[] = [];
+
+function paneText(chapter: { rawText: string; cleanText: string | null; customText: string | null }, viewMode: ViewMode): string {
+  return viewMode === "source" ? chapter.rawText : chapter.customText ?? chapter.cleanText ?? chapter.rawText;
+}
+
 function TextPreview({
-  rawText,
-  cleanText,
-  customText,
+  text,
+  before,
+  edited,
   viewMode,
   chunkRanges,
+  mark,
   selectedChunkUrl,
   onSelectChunk,
   hoveredChunkUrl,
   onHoverChunk,
   lang,
 }: {
-  rawText: string;
-  cleanText: string | null;
-  customText: string | null;
+  /** The text this pane renders — the one the mark's offsets index */
+  text: string;
+  /** Compare's left pane: the text the spoken one was made from */
+  before: string;
+  edited: boolean;
   viewMode: ViewMode;
   chunkRanges: ChunkRange[];
+  mark: TextMark | null;
   selectedChunkUrl: string | null;
   onSelectChunk: (url: string) => void;
   hoveredChunkUrl: string | null;
@@ -1282,59 +1230,48 @@ function TextPreview({
   }
 
   const textClass = "mx-auto w-full max-w-prose flex-1 min-h-0 overflow-y-auto rounded bg-(--bg-reading) border border-(--border-reading) px-7 py-6 font-reading text-[17px] text-(--text-primary) whitespace-pre-wrap leading-relaxed";
-  
-  if (viewMode === "split" && cleanText) {
+
+  if (viewMode === "compare") {
     return (
       <div className="flex-1 min-h-0 flex gap-3">
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
-          <span className="text-[10px] uppercase tracking-wider text-(--text-faint) mb-1 font-medium shrink-0">Raw</span>
+          <span className="text-[10px] uppercase tracking-wider text-(--text-faint) mb-1 font-medium shrink-0">
+            {edited ? "Previous" : "Source"}
+          </span>
           <div
             ref={leftRef}
             onScroll={() => handleScroll("left")}
             className={textClass} lang={lang}
           >
-            {rawText}
+            {before}
           </div>
         </div>
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
-          <span className="text-[10px] uppercase tracking-wider text-(--text-faint) mb-1 font-medium shrink-0">Clean</span>
-          <div
-            ref={rightRef}
+          <span className="text-[10px] uppercase tracking-wider text-(--text-faint) mb-1 font-medium shrink-0">Spoken</span>
+          <TextBody
+            bodyRef={rightRef}
             onScroll={() => handleScroll("right")}
-            className={textClass} lang={lang}
+            className={textClass}
+            lang={lang}
+            mark={mark}
           >
-            {cleanText}
-          </div>
+            {marked(text, 0, text.length, mark, "spoken")}
+          </TextBody>
         </div>
       </div>
     );
   }
 
-  if (viewMode === "custom" && customText) {
-    return (
-      <ChunkedText
-        text={customText}
-        chunkRanges={chunkRanges}
-        selectedChunkUrl={selectedChunkUrl}
-        onSelectChunk={onSelectChunk}
-        hoveredChunkUrl={hoveredChunkUrl}
-        onHoverChunk={onHoverChunk}
-        className={textClass + " border-(--border-custom-text) bg-(--bg-custom-text)"}
-      />
-    );
-  }
-
-  const text = viewMode === "clean" && cleanText ? cleanText : rawText;
-
   return (
     <ChunkedText
       text={text}
       chunkRanges={chunkRanges}
+      mark={mark}
       selectedChunkUrl={selectedChunkUrl}
       onSelectChunk={onSelectChunk}
       hoveredChunkUrl={hoveredChunkUrl}
       onHoverChunk={onHoverChunk}
-      className={textClass}
+      className={viewMode === "read" && edited ? textClass + " border-(--border-custom-text) bg-(--bg-custom-text)" : textClass}
       lang={lang}
     />
   );
@@ -1343,6 +1280,7 @@ function TextPreview({
 function ChunkedText({
   text,
   chunkRanges,
+  mark,
   selectedChunkUrl,
   onSelectChunk,
   hoveredChunkUrl,
@@ -1352,6 +1290,7 @@ function ChunkedText({
 }: {
   text: string;
   chunkRanges: ChunkRange[];
+  mark: TextMark | null;
   selectedChunkUrl: string | null;
   onSelectChunk: (url: string) => void;
   hoveredChunkUrl: string | null;
@@ -1360,14 +1299,20 @@ function ChunkedText({
   lang?: string;
 }) {
   const selectedRef = useRef<HTMLElement>(null);
-
-  // Scroll the selected chunk into view whenever the selection changes.
+  const marking = mark !== null;
+  const followsCue = useRef(false);
   useEffect(() => {
-    selectedRef.current?.scrollIntoView({ block: "center" });
+    followsCue.current = marking;
+  }, [marking]);
+
+  // Scroll the selected chunk into view whenever the selection changes — unless the cue follower
+  // is already placing this pane, which lands the sentence rather than the whole chunk.
+  useEffect(() => {
+    if (!followsCue.current) selectedRef.current?.scrollIntoView({ block: "center" });
   }, [selectedChunkUrl]);
 
   if (chunkRanges.length === 0) {
-    return <div className={className} lang={lang}>{text}</div>;
+    return <TextBody className={className} lang={lang} mark={mark}>{marked(text, 0, text.length, mark, "all")}</TextBody>;
   }
 
   // Sort by start and drop overlaps so segments tile the text cleanly.
@@ -1376,7 +1321,7 @@ function ChunkedText({
   let pos = 0;
   ordered.forEach((range, i) => {
     if (range.start < pos) return;
-    if (range.start > pos) parts.push(text.slice(pos, range.start));
+    if (range.start > pos) parts.push(marked(text, pos, range.start, mark, `gap-${i}`));
     const isSelected = range.url === selectedChunkUrl;
     const isHovered = !isSelected && range.url === hoveredChunkUrl;
     parts.push(
@@ -1388,14 +1333,73 @@ function ChunkedText({
         onMouseLeave={() => onHoverChunk(null)}
         className={`cursor-pointer rounded-sm transition-colors ${ isSelected ? "bg-(--bg-selected) text-(--text-primary)" : isHovered ? "bg-(--accent-subtle) text-(--text-primary)" : "" }`}
       >
-        {text.slice(range.start, range.end)}
+        {marked(text, range.start, range.end, mark, `chunk-${i}`)}
       </span>,
     );
     pos = range.end;
   });
-  if (pos < text.length) parts.push(text.slice(pos));
+  if (pos < text.length) parts.push(marked(text, pos, text.length, mark, "tail"));
 
-  return <div className={className} lang={lang}>{parts}</div>;
+  return <TextBody className={className} lang={lang} mark={mark}>{parts}</TextBody>;
+}
+
+function TextBody({
+  children,
+  className,
+  lang,
+  mark,
+  bodyRef,
+  onScroll,
+}: {
+  children: ReactNode;
+  className: string;
+  lang?: string;
+  mark: TextMark | null;
+  bodyRef?: React.RefObject<HTMLDivElement | null>;
+  onScroll?: () => void;
+}) {
+  const ownRef = useRef<HTMLDivElement>(null);
+  const ref = bodyRef ?? ownRef;
+
+  return (
+    <div ref={ref} onScroll={onScroll} className={`${className} relative`} lang={lang}>
+      {mark ? <WordSpotlight containerRef={ref} at={`${mark.start}:${mark.word?.start ?? -1}`} /> : null}
+      <span className="relative">{children}</span>
+    </div>
+  );
+}
+
+function word(text: string, from: number, to: number, span: TextSpan | null): ReactNode {
+  if (!span || span.end <= from || span.start >= to) return text.slice(from, to);
+
+  const start = Math.max(from, span.start);
+  const end = Math.min(to, span.end);
+  return (
+    <>
+      {text.slice(from, start)}
+      {/* The lamp behind paints this word; a bare <mark> would cover it in the UA yellow */}
+      <mark className="bg-transparent text-inherit" data-testid="reader-word">{text.slice(start, end)}</mark>
+      {text.slice(end, to)}
+    </>
+  );
+}
+
+// The sentence being spoken, lit inside whatever slice of the page it falls in. A mark that
+// straddles a chunk boundary lights on both sides; followCue spans them as one.
+function marked(text: string, from: number, to: number, mark: TextMark | null, key: string): ReactNode {
+  if (!mark || mark.end <= from || mark.start >= to) return text.slice(from, to);
+
+  const start = Math.max(from, mark.start);
+  const end = Math.min(to, mark.end);
+  return (
+    <Fragment key={key}>
+      {text.slice(from, start)}
+      <span className="rounded-sm bg-(--accent)/35" data-testid="text-cue-active">
+        {word(text, start, end, mark.word)}
+      </span>
+      {text.slice(end, to)}
+    </Fragment>
+  );
 }
 
 function BlocksPreview({ sourceBlocks, onOpenPdf }: { sourceBlocks: SourceBlock[]; onOpenPdf?: (page: number) => void }) {
@@ -1432,15 +1436,4 @@ function BlocksPreview({ sourceBlocks, onOpenPdf }: { sourceBlocks: SourceBlock[
       })}
     </div>
   );
-}
-
-function formatDuration(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  }
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }

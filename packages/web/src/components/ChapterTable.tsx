@@ -2,9 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams } from "react-router";
 import { Button } from "./Button.tsx";
 import { StatusBadge } from "./StatusBadge.tsx";
-import { ChapterModal, chapterAudioDownload } from "./ChapterModal.tsx";
+import { ChapterModal } from "./ChapterModal.tsx";
+import { chapterAudioDownload, chapterAudioUrl, SYNTH_BUSY, variantLabel } from "../lib/chapters.ts";
 import { ChapterAiModal } from "./ChapterAiModal.tsx";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
+import { SynthesizeModal, type SynthSettings } from "./SynthesizeModal.tsx";
 import {
   IconAi,
   IconBook,
@@ -74,8 +76,7 @@ export function ChapterTable({
   variant,
   variants,
   onSwitchVariant,
-  synthVoice,
-  onChangeSynthVoice,
+  synth,
 }: {
   language?: string | null;
   bookId: string;
@@ -91,9 +92,8 @@ export function ChapterTable({
   variant?: VariantRef | null;
   variants?: VariantRef[];
   onSwitchVariant?: (key: string | null) => void;
-  // Voice the next synthesis will use for this view (variant lane or book)
-  synthVoice?: string;
-  onChangeSynthVoice?: (voice: string) => void;
+  // Voice and speed the next synthesis will use for this view (variant lane or book)
+  synth: SynthSettings;
 }) {
   const [pickedChapterIndex, setPickedChapterIndex] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -112,6 +112,7 @@ export function ChapterTable({
 
   const [aiChapter, setAiChapter] = useState<{ id: string; title: string } | null>(null);
   const [pdfPreview, setPdfPreview] = useState<{ fileId: string; page: number; filename?: string } | null>(null);
+  const [synthesizeChapterId, setSynthesizeChapterId] = useState<string | null>(null);
   const toggleAllRef = useRef<HTMLInputElement>(null);
   const lastClickedFilteredIndex = useRef<number | null>(null);
   const [playingChapterId, setPlayingChapterId] = useState<string | null>(null);
@@ -134,7 +135,7 @@ export function ChapterTable({
 
   const isMultiFile = files && files.length > 1;
 
-  // Derived: filtered chapters (no useMemo — simple filter, React Compiler handles it)
+  // Cheap enough to redo per render — there is no React Compiler here (esbuild JSX, no Babel pass)
   const filteredChapters = chapters.filter((ch) => {
     if (search && !ch.title.toLowerCase().includes(search.toLowerCase())) return false;
     if (statusFilter) {
@@ -381,8 +382,10 @@ export function ChapterTable({
       {/* Table — capped height so long books don't push the output controls off-screen */}
       <div className="overflow-x-auto overflow-y-auto max-h-[70vh] rounded-lg border border-(--border)">
         <table className="w-full min-w-[56rem] divide-y divide-(--divide)">
-          <thead className="bg-(--bg-subtle) sticky top-0 z-10">
-            <tr>
+          {/* The card colour under the tint: --bg-subtle is a 4% wash in dark mode, and rows scrolling
+              under a translucent header read as a rendering fault */}
+          <thead className="bg-(--bg-card) sticky top-0 z-10">
+            <tr className="bg-(--bg-subtle)">
               {canDrag && <th className="w-8 px-2 py-3"></th>}
               <th className="px-3 py-3 w-10">
                 <input
@@ -611,16 +614,17 @@ export function ChapterTable({
                       <Button
                         variant="icon"
                         size="sm"
-                        onClick={() => onQueue(chapter.id)}
-                        disabled={["pending", "normalizing", "synthesizing"].includes(chapter.status) || chapter.synthesizable === false}
+                        onClick={() => setSynthesizeChapterId(chapter.id)}
+                        disabled={SYNTH_BUSY.includes(chapter.status) || chapter.synthesizable === false}
                         title={
                           chapter.synthesizable === false
                             ? "No finished translation for this chapter"
-                            : ["pending", "normalizing", "synthesizing"].includes(chapter.status)
+                            : SYNTH_BUSY.includes(chapter.status)
                               ? "Can't re-synthesize while it's being processed"
-                              : "Synthesize this chapter's audio again from scratch, replacing the current audio"
+                              : "Pick a voice and synthesize this chapter's audio again, replacing the current audio"
                         }
                         aria-label="Re-synthesize chapter audio"
+                        data-testid="row-synthesize"
                       >
                         <IconRefresh className="h-4 w-4" />
                       </Button>
@@ -632,8 +636,8 @@ export function ChapterTable({
                         disabled={!(chapter.status === "done" && chapter.audioPath)}
                         title={
                           chapter.status === "done" && chapter.audioPath
-                            ? `Download the ${variant ? variant.label ?? variant.key : "chapter"} audio`
-                            : `No ${variant ? variant.label ?? variant.key : "chapter"} audio to download yet`
+                            ? `Download the ${variant ? variantLabel(variant) : "chapter"} audio`
+                            : `No ${variant ? variantLabel(variant) : "chapter"} audio to download yet`
                         }
                         aria-label="Download chapter audio"
                       >
@@ -675,7 +679,7 @@ export function ChapterTable({
           </div>
           <audio
             ref={audioRef}
-            src={playingChapter.audioUrl ?? `/audio/chapter/${playingChapterId}`}
+            src={chapterAudioUrl(playingChapter)}
             onPlay={() => setIsAudioPlaying(true)}
             onPause={() => setIsAudioPlaying(false)}
             onEnded={() => { setPlayingChapterId(null); setIsAudioPlaying(false); }}
@@ -716,8 +720,8 @@ export function ChapterTable({
           onNavigate={openChapterModal}
           onQueue={onQueue}
           onSetSelected={onSetSelected}
-          synthVoice={synthVoice}
-          onChangeSynthVoice={onChangeSynthVoice}
+          onPickVoice={setSynthesizeChapterId}
+          voicePickerOpen={synthesizeChapterId !== null}
         />
       ) : null}
 
@@ -725,6 +729,22 @@ export function ChapterTable({
         <ChapterAiModal
           scope={{ kind: "chapters", bookId, chapters: [aiChapter] }}
           onClose={() => setAiChapter(null)}
+        />
+      ) : null}
+
+      {synthesizeChapterId ? (
+        <SynthesizeModal
+          {...synth}
+          count={1}
+          language={variant ? variantLabel(variant) : null}
+          bookLanguage={language}
+          canStart={!SYNTH_BUSY.includes(chapters.find((c) => c.id === synthesizeChapterId)?.status ?? "")}
+          disabledReason="This chapter is already being processed"
+          onStart={() => {
+            onQueue(synthesizeChapterId);
+            setSynthesizeChapterId(null);
+          }}
+          onClose={() => setSynthesizeChapterId(null)}
         />
       ) : null}
     </>
