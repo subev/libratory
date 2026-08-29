@@ -25,10 +25,11 @@ export const profilesRouter = router({
   // Separate from list because it walks the library on disk; the switcher only asks once it opens.
   usage: publicProcedure.query(async () => {
     const rows = await db.select({ id: books.id, profileId: books.profileId }).from(books);
+    const sizes = await Promise.all(rows.map((book) => bookTotalSizeCached(book.id)));
     const bytes: Record<string, number> = {};
-    for (const book of rows) {
-      bytes[book.profileId] = (bytes[book.profileId] ?? 0) + (await bookTotalSizeCached(book.id));
-    }
+    rows.forEach((book, i) => {
+      bytes[book.profileId] = (bytes[book.profileId] ?? 0) + sizes[i]!;
+    });
     return bytes;
   }),
 
