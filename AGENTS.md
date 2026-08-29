@@ -707,3 +707,23 @@ See `tasks/` directory. Current tasks:
 - `tasks/chapter-merge-split.md` — Merge short chapters or split overly long ones
 - `tasks/column-filtering.md` — Filter multi-column PDFs by x-coordinate
 - `tasks/per-chapter-voice-speed.md` — Per-chapter voice and speed overrides
+
+### Bulgarian, and why `lang` is load-bearing
+
+Bulgarian Cyrillic is drawn differently from Russian: в, г, д, ж, з, и, к, л, п, т, ц, ш, щ, ю have
+their own shapes, closer to upright italic. Source Serif 4 carries them — `cyrl` → `BGR` → `locl`,
+26 substitutions — but OpenType only applies them when the text is **marked as Bulgarian**. Without
+`lang="bg"` a Bulgarian reader gets Russian letterforms out of the right font, which reads as
+foreign. `readingLang()` derives the code from the variant lane (a translation's key *is* its
+language) or the book, and every reading surface carries it.
+
+Two traps if you touch the `@font-face` block:
+
+- **Weight descriptors must match across subsets.** A variable Latin face declared `font-weight:
+  400 700` beside a static Cyrillic `400` makes Chrome resolve weight before `unicode-range`, pick
+  the Latin face, find no Cyrillic glyph, and fall through to Georgia — silently. All four faces are
+  static, one per weight per subset, for that reason.
+- **Verify with pixels, not widths.** Localised forms keep identical advance widths so text does not
+  reflow between languages; a width comparison will report "no difference" while the shapes differ
+  completely. And set `<meta charset="utf-8">` in any test harness, or the Cyrillic arrives as
+  Latin-1 mojibake and every conclusion drawn from it is wrong.

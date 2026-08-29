@@ -888,6 +888,7 @@ export function BookDetail() {
               </div>
             )}
             <ChapterTable
+          language={book.language ?? null}
               bookId={book.id}
               chapters={viewChapters}
               files={book.files?.map((f) => ({ id: f.id, index: f.index, filename: f.filename }))}

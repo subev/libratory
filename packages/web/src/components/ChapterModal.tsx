@@ -17,6 +17,7 @@ import { useFollowCue, type FollowBand } from "../lib/cue-follow.ts";
 import { useAudioTime } from "../lib/use-audio-time.ts";
 import { usePlayPauseKey } from "../lib/play-pause-key.ts";
 import { SPEEDS, loadSpeed, saveSpeed } from "../lib/playback-speed.ts";
+import { readingLang } from "../lib/reading-lang.ts";
 import type { ChapterRow, FileInfo, VariantRef } from "./ChapterTable.tsx";
 
 type ChapterModalProps = {
@@ -25,6 +26,7 @@ type ChapterModalProps = {
   files?: FileInfo[];
   chapterIndex: number;
   // When set, the modal shows this variant's text, chunk previews, and audio
+  language?: string | null;
   variant?: VariantRef | null;
   variants?: VariantRef[];
   onSwitchVariant?: (key: string | null) => void;
@@ -95,6 +97,7 @@ function ChapterModalBody({
   chapters,
   files,
   chapterIndex,
+  language,
   variant,
   variants,
   onSwitchVariant,
@@ -114,6 +117,7 @@ function ChapterModalBody({
   const playerRef = useRef<{ seek: (ms: number) => void; toggle: () => boolean } | null>(null);
   const [editText, setEditText] = useState("");
 
+  const lang = readingLang(language, variant);
   const uiKey = `${chapterIndex}:${variant?.key ?? ""}`;
   const [uiState, setUiState] = useState<ModalUi & { key: string }>({ key: uiKey, ...UNTOUCHED_UI });
   const ui = uiState.key === uiKey ? uiState : { key: uiKey, ...UNTOUCHED_UI };
@@ -777,6 +781,7 @@ function ChapterModalBody({
           ) : fullChapter ? (
             isEditing ? (
               <textarea
+                lang={lang}
                 value={editText}
                 onChange={(e) => setEditText(e.target.value)}
                 data-testid="chapter-edit-text"
@@ -1225,6 +1230,7 @@ function TextPreview({
   onSelectChunk,
   hoveredChunkUrl,
   onHoverChunk,
+  lang,
 }: {
   rawText: string;
   cleanText: string | null;
@@ -1235,6 +1241,7 @@ function TextPreview({
   onSelectChunk: (url: string) => void;
   hoveredChunkUrl: string | null;
   onHoverChunk: (url: string | null) => void;
+  lang?: string;
 }) {
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
@@ -1264,7 +1271,7 @@ function TextPreview({
           <div
             ref={leftRef}
             onScroll={() => handleScroll("left")}
-            className={textClass}
+            className={textClass} lang={lang}
           >
             {rawText}
           </div>
@@ -1274,7 +1281,7 @@ function TextPreview({
           <div
             ref={rightRef}
             onScroll={() => handleScroll("right")}
-            className={textClass}
+            className={textClass} lang={lang}
           >
             {cleanText}
           </div>
@@ -1308,6 +1315,7 @@ function TextPreview({
       hoveredChunkUrl={hoveredChunkUrl}
       onHoverChunk={onHoverChunk}
       className={textClass}
+      lang={lang}
     />
   );
 }
@@ -1320,6 +1328,7 @@ function ChunkedText({
   hoveredChunkUrl,
   onHoverChunk,
   className,
+  lang,
 }: {
   text: string;
   chunkRanges: ChunkRange[];
@@ -1328,6 +1337,7 @@ function ChunkedText({
   hoveredChunkUrl: string | null;
   onHoverChunk: (url: string | null) => void;
   className: string;
+  lang?: string;
 }) {
   const selectedRef = useRef<HTMLElement>(null);
 
@@ -1337,7 +1347,7 @@ function ChunkedText({
   }, [selectedChunkUrl]);
 
   if (chunkRanges.length === 0) {
-    return <div className={className}>{text}</div>;
+    return <div className={className} lang={lang}>{text}</div>;
   }
 
   // Sort by start and drop overlaps so segments tile the text cleanly.
@@ -1365,7 +1375,7 @@ function ChunkedText({
   });
   if (pos < text.length) parts.push(text.slice(pos));
 
-  return <div className={className}>{parts}</div>;
+  return <div className={className} lang={lang}>{parts}</div>;
 }
 
 function BlocksPreview({ sourceBlocks, onOpenPdf }: { sourceBlocks: SourceBlock[]; onOpenPdf?: (page: number) => void }) {

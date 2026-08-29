@@ -47,6 +47,7 @@ const STATUSES = ["done", "failed", "pending", "suspended", "synthesizing", "nor
 const ACTION_PILL = "text-xs px-2 py-0.5 rounded-full border border-(--border) text-(--text-secondary) font-medium hover:bg-(--bg-subtle) whitespace-nowrap";
 
 export function ChapterTable({
+  language,
   bookId,
   chapters,
   files,
@@ -62,6 +63,7 @@ export function ChapterTable({
   synthVoice,
   onChangeSynthVoice,
 }: {
+  language?: string | null;
   bookId: string;
   chapters: ChapterRow[];
   files?: FileInfo[];
@@ -669,6 +671,7 @@ export function ChapterTable({
 
       {modalChapterIndex !== null ? (
         <ChapterModal
+          language={language}
           bookId={bookId}
           chapters={chapters}
           files={files}
