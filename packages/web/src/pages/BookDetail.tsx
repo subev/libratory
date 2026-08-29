@@ -17,6 +17,7 @@ import { ChapterAiModal, type AiScope } from "../components/ChapterAiModal.tsx";
 import { NotesSection } from "../components/NotesSection.tsx";
 import { PillToggle } from "../components/PillToggle.tsx";
 import { Button } from "../components/Button.tsx";
+import { Section } from "../components/Section.tsx";
 import { loadBookSort, sortBooks } from "../lib/book-sort.ts";
 import { formatBytes, pendingExportLabel, pendingExportSummary } from "../lib/format.ts";
 import { getVoiceLabel, languageLabel } from "../lib/voices.ts";
@@ -585,7 +586,7 @@ export function BookDetail() {
         />
 
         {/* STAGE 2: Work — chapter structure, text, translation */}
-        <section className="mb-6 rounded-xl border border-(--border) border-t-2 border-t-(--step-work)/80 bg-(--bg-card) p-4">
+        <Section stripe="work" className="mb-6">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold text-(--text-secondary)">
@@ -1110,7 +1111,7 @@ export function BookDetail() {
               </div>
             </div>
           )}
-        </section>
+        </Section>
 
         <NotesSection bookId={book.id} noteJob={book.noteJob ?? null} />
 
@@ -1131,7 +1132,7 @@ export function BookDetail() {
         </div>
 
         {/* Danger zone */}
-        <section className="rounded-xl border border-(--border) border-t-2 border-t-(--danger)/70 bg-(--bg-card) p-4">
+        <Section stripe="danger">
           <h3 className="text-sm font-medium text-(--text-muted) uppercase tracking-wider mb-3">Danger zone</h3>
           <Button
             variant="danger"
@@ -1144,7 +1145,7 @@ export function BookDetail() {
           >
             Delete book
           </Button>
-        </section>
+        </Section>
 
         <LogDock
           bookId={book.id}

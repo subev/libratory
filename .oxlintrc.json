@@ -45,6 +45,10 @@
           {
             "pattern": "^-?(p|px|py|pt|pr|pb|pl|m|mx|my|mt|mr|mb|ml|gap|gap-x|gap-y|space-x|space-y)-\\[",
             "message": "Arbitrary spacing. Use a ladder step (0.5 1 1.5 2 2.5 3 4 6 7 8 12 16 20) — see \"Spacing\" in AGENTS.md."
+          },
+          {
+            "pattern": "^border-t-2$",
+            "message": "The stage stripe belongs to <Section stripe=…> — the 1 Input / 2 Work / 3 Output ramp is the one place colour encodes a sequence. See \"Surfaces\" in AGENTS.md."
           }
         ]
       }
@@ -76,6 +80,14 @@
       ],
       "rules": {
         "no-restricted-imports": "off"
+      }
+    },
+    {
+      "files": [
+        "packages/web/src/components/Section.tsx"
+      ],
+      "rules": {
+        "tailwindcss/no-restricted-classes": "off"
       }
     }
   ]

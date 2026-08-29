@@ -265,6 +265,27 @@ The ladder was derived from what the app already used, not invented: these thirt
 this app uses it on a real flex or grid container, where `gap` would belong instead. Converting the 47
 block-parent uses would mean making 47 containers flex for no gain.
 
+## Surfaces
+
+A stage card is **`packages/web/src/components/Section.tsx`**, not a hand-assembled box:
+
+```tsx
+<Section stripe="input" | "work" | "output" | "danger" | "none" className="mb-6">
+```
+
+The coloured top edge is the one place colour still encodes a *sequence* — 1 Input, 2 Work, 3 Output —
+which is why it is a fixed ramp rather than a free colour. `tailwindcss/no-restricted-classes` fails on
+a bare `border-t-2` outside this file, because that stripe is the signature of a stage card.
+
+The extraction found the drift it existed to prevent: five of the six stage sections used the stripe at
+`/80`, and `BookFilesSection` used it at full opacity. They agree now.
+
+Two other container roles are already confined to a single component or file and do **not** need
+extracting — say so before "consolidating" them:
+
+- **notice** (`px-3 py-2`, an inline message) lives in `DownloadNotice`, `ModelBundleNotice`, `UpdateProgress`
+- **panel** (`p-3`, nested inside a modal) appears only inside `SettingsModal`
+
 ## The Pipeline
 
 ```

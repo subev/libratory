@@ -1,4 +1,5 @@
 import { formatOutputDate, documentFormatLabel, pendingExportSummary, type DocumentFormat } from "../lib/format.ts";
+import { Section } from "./Section.tsx";
 
 export type DocumentRow = {
   id: string;
@@ -31,7 +32,7 @@ export function DocumentOutputsSection({
   if (documents.length === 0 && pending.length === 0) return null;
 
   return (
-    <section className="rounded-xl border border-(--border) border-t-2 border-t-(--step-output)/80 bg-(--bg-card) p-4 flex flex-col">
+    <Section stripe="output" className="flex flex-col">
       <h2 className="text-lg font-semibold text-(--text-secondary) mb-3">
         <span className="text-xs font-medium text-(--success-text) uppercase tracking-wider mr-2">3 · Output</span>
         Documents
@@ -80,6 +81,6 @@ export function DocumentOutputsSection({
           ))}
         </ul>
       )}
-    </section>
+    </Section>
   );
 }

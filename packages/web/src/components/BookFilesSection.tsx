@@ -3,6 +3,7 @@ import { ExtractModal, type ExtractScope } from "./ExtractModal.tsx";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
 import { IconStop, IconRefresh, IconDelete } from "./icons.tsx";
 import { Button } from "./Button.tsx";
+import { Section } from "./Section.tsx";
 
 export type BookFileRow = {
   id: string;
@@ -98,9 +99,7 @@ export function BookFilesSection({
   const isEmpty = files.length === 0;
 
   return (
-    <section className={`relative overflow-hidden mb-6 rounded-xl border border-(--border) border-t-2 bg-(--bg-card) p-4 ${
-      extractingCount > 0 ? "border-t-(--step-work)" : "border-t-(--step-input)"
-    }`}>
+    <Section stripe={extractingCount > 0 ? "work" : "input"} className="relative overflow-hidden mb-6">
       {extractingCount > 0 && (
         <>
           <div className="absolute inset-x-0 top-0 h-0.5 overflow-hidden" aria-hidden>
@@ -322,7 +321,7 @@ export function BookFilesSection({
           onClose={() => setPreviewFileId(null)}
         />
       )}
-    </section>
+    </Section>
   );
 }
 

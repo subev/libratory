@@ -1,4 +1,5 @@
 import { formatOutputDate, formatDuration } from "../lib/format.ts";
+import { Section } from "./Section.tsx";
 
 export type AssemblyRow = {
   id: string;
@@ -23,7 +24,7 @@ export function AudioOutputsSection({
   if (assemblies.length === 0) return null;
 
   return (
-    <section className="rounded-xl border border-(--border) border-t-2 border-t-(--step-output)/80 bg-(--bg-card) p-4 flex flex-col">
+    <Section stripe="output" className="flex flex-col">
       <h2 className="text-lg font-semibold text-(--text-secondary) mb-3">
         <span className="text-xs font-medium text-(--success-text) uppercase tracking-wider mr-2">3 · Output</span>
         Assemblies
@@ -75,6 +76,6 @@ export function AudioOutputsSection({
           })}
         </ul>
       )}
-    </section>
+    </Section>
   );
 }

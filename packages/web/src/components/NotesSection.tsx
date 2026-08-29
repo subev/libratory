@@ -4,6 +4,7 @@ import { trpc } from "../trpc.ts";
 import { MarkdownBlock } from "./MarkdownBlock.tsx";
 import { useLlmModels } from "../lib/use-llm-models.ts";
 import { IconChevronRight, IconExternal, IconCheck } from "./icons.tsx";
+import { Section } from "./Section.tsx";
 
 export type NoteJobView = {
   status: "queued" | "running" | "done" | "failed";
@@ -45,7 +46,7 @@ export function NotesSection({ bookId, noteJob }: { bookId: string; noteJob: Not
   if (notes.length === 0 && !jobActive && !showFailedJob) return null;
 
   return (
-    <section className="mb-6 rounded-xl border border-(--border) border-t-2 border-t-(--border) bg-(--bg-card) p-4" data-testid="notes-section">
+    <Section className="mb-6" data-testid="notes-section">
       <div className="flex items-center gap-3 mb-3">
         <h2 className="text-lg font-semibold text-(--text-secondary)">
           <span className="text-xs font-medium text-(--text-muted) uppercase tracking-wider mr-2">Notes</span>
@@ -146,6 +147,6 @@ export function NotesSection({ bookId, noteJob }: { bookId: string; noteJob: Not
           );
         })}
       </div>
-    </section>
+    </Section>
   );
 }
