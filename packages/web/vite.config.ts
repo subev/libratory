@@ -2,12 +2,8 @@ import { createRequire } from "node:module";
 import { createReadStream } from "node:fs";
 import { cp, stat } from "node:fs/promises";
 import path from "node:path";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 import tailwindcss from "@tailwindcss/vite";
-
-// Not "localhost": the API binds 127.0.0.1 only, so a localhost target can resolve to ::1 —
-// where a stray vite may be listening — and proxy this server into itself.
-const API = "http://127.0.0.1:3034";
 
 const PDFJS_ASSET_DIRS = ["wasm", "cmaps", "standard_fonts", "iccs"];
 const CONTENT_TYPES: Record<string, string> = {
@@ -48,27 +44,35 @@ function pdfjsAssets(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [tailwindcss(), pdfjsAssets()],
-  server: {
-    port: 3033,
-    strictPort: true, // sliding onto the next free port lands on 3034, the API's
-    proxy: {
-      "/trpc": API,
-      // /chat is both the SPA page (GET, browser refresh) and the streaming API (POST)
-      "/chat": {
-        target: API,
-        bypass: (req) => (req.method === "POST" ? undefined : "/index.html"),
+export default defineConfig(({ mode }) => {
+  // vite runs from packages/web; the ports live in the repo-root .env the server also reads.
+  const rootEnv = loadEnv(mode, path.resolve(import.meta.dirname, "../.."), "");
+  // Not "localhost": the API binds 127.0.0.1 only, so a localhost target can resolve to ::1 —
+  // where a stray vite may be listening — and proxy this server into itself.
+  const API = `http://127.0.0.1:${rootEnv.PORT ?? 3034}`;
+
+  return {
+    plugins: [tailwindcss(), pdfjsAssets()],
+    server: {
+      port: Number(rootEnv.WEB_PORT ?? 3033),
+      strictPort: true, // sliding onto the next free port lands on the API's
+      proxy: {
+        "/trpc": API,
+        // /chat is both the SPA page (GET, browser refresh) and the streaming API (POST)
+        "/chat": {
+          target: API,
+          bypass: (req) => (req.method === "POST" ? undefined : "/index.html"),
+        },
+        "/translations": API,
+        "/scripts": API,
+        "/pdf": API,
+        "/upload": API,
+        "/download": API,
+        "/audio": API,
+        "/files": API,
+        "/preview": API,
+        "/read": API,
       },
-      "/translations": API,
-      "/scripts": API,
-      "/pdf": API,
-      "/upload": API,
-      "/download": API,
-      "/audio": API,
-      "/files": API,
-      "/preview": API,
-      "/read": API,
     },
-  },
+  };
 });
