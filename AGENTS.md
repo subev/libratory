@@ -224,6 +224,13 @@ fill, `primary` becomes accent text with no fill, and `icon` loses its border an
 for it when a control must warn rather than shout — the chapter Edit button is `warning soft` because
 saving custom text drops the chapter to mode `"text"` and the read-along stops following the page.
 
+**Disabled, not hidden — and the one exception.** An action that belongs to the *object* is always
+rendered, disabled, with a title saying why: the chapter row still shows Play and Read when there is
+no audio and no page mapping. An action that belongs to a *running job* is different — with no job
+there is nothing to disable, so per-file "Cancel extraction" appears only while that file is
+extracting. The test is whether the action would ever become available on its own; if it would, show
+it disabled.
+
 `className` is **additive only** — `w-full`, `ml-auto`, `shrink-0`, `flex-1`. There is no
 `tailwind-merge` here, so passing `px-2` against a variant that already sets padding is undefined
 behaviour rather than an override. If a call site needs something the variants cannot express, add a

@@ -230,18 +230,20 @@ export function BookFilesSection({
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1.5">
-                    {/* Cancel */}
-                    <Button
-                      variant="warning"
-                      soft
-                      size="sm"
-                      onClick={() => onCancel(file.id)}
-                      disabled={file.status !== "extracting" && file.status !== "pending"}
-                      title={file.status !== "extracting" && file.status !== "pending" ? "File is not extracting" : "Cancel extraction"}
-                      aria-label="Cancel extraction"
-                    >
-                      <IconStop className="w-4 h-4" />
-                    </Button>
+                    {/* Cancelling acts on a running job, not on the file — with no job there is
+                        nothing to disable, so this one appears rather than greying out. */}
+                    {(file.status === "extracting" || file.status === "pending") && (
+                      <Button
+                        variant="warning"
+                        soft
+                        size="sm"
+                        onClick={() => onCancel(file.id)}
+                        title="Cancel extraction"
+                        aria-label="Cancel extraction"
+                      >
+                        <IconStop className="w-4 h-4" />
+                      </Button>
+                    )}
                     {/* Re-extract */}
                     <Button
                       variant="primary"
