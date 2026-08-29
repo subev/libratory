@@ -201,7 +201,6 @@
   --bg-terminal-hover: var(--pal-terminal-hover);
   --terminal-text: var(--pal-neutral-0);
   --terminal-dim: var(--pal-cream-a50);
-  --terminal-faint: var(--pal-cream-a25);
   --terminal-border: var(--pal-cream-a15);
 
   --badge-pending-bg: var(--bg-subtle);
