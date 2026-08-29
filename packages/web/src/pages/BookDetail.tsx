@@ -168,7 +168,6 @@ export function BookDetail() {
   const setAllFilesSelectedMutation = trpc.bookFiles.setAllSelected.useMutation({ onSuccess: invalidate });
   const setFileSelectedBatchMutation = trpc.bookFiles.setSelectedBatch.useMutation({ onSuccess: invalidate });
   const removeFileMutation = trpc.bookFiles.remove.useMutation({ onSuccess: invalidate });
-  const reExtractFileMutation = trpc.bookFiles.reExtract.useMutation({ onSuccess: invalidate });
   const reExtractSelectedMutation = trpc.bookFiles.reExtractSelected.useMutation({ onSuccess: invalidate });
   const cancelFileMutation = trpc.bookFiles.cancel.useMutation({ onSuccess: invalidate });
 
@@ -556,10 +555,9 @@ export function BookDetail() {
           language={book.language ?? null}
           onUpdateExtractionSettings={(settings) => updateSettingsMutation.mutate({ id: book.id, ...settings })}
           onSetSelected={(fid, selected) => setFileSelectedMutation.mutate({ id: fid, selected })}
-          onSetAllSelected={(selected) => setAllFilesSelectedMutation.mutate({ bookId: book.id, selected })}
-          onSetSelectedBatch={(ids, selected) => setFileSelectedBatchMutation.mutate({ ids, selected })}
+          onSetAllSelected={(selected) => setAllFilesSelectedMutation.mutateAsync({ bookId: book.id, selected })}
+          onSetSelectedBatch={(ids, selected) => setFileSelectedBatchMutation.mutateAsync({ ids, selected })}
           onRemove={(fid) => removeFileMutation.mutate({ id: fid })}
-          onReExtract={(fid) => reExtractFileMutation.mutate({ id: fid })}
           voiceLabel={getVoiceLabel(book.voice)}
           extractOpen={extractOpen}
           onExtractOpenChange={setExtractOpen}

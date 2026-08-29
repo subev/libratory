@@ -69,6 +69,7 @@ export function Home() {
             variant="icon"
             size="sm"
             onClick={() => setShowSettings(true)}
+            className="ml-2"
             title="AI model settings"
             aria-label="AI model settings"
             data-testid="settings-gear"
