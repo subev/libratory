@@ -27,6 +27,66 @@ const focusInput = (el: HTMLInputElement | null) => {
   el?.select();
 };
 
+function NameEditor({
+  value,
+  onChange,
+  onSave,
+  onCancel,
+  label,
+  saveLabel,
+  placeholder,
+  pending,
+  testId,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  label: string;
+  saveLabel: string;
+  placeholder?: string;
+  pending: boolean;
+  testId: string;
+}) {
+  return (
+    <>
+      <input
+        ref={focusInput}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !pending) onSave();
+          if (e.key === "Escape") onCancel();
+        }}
+        placeholder={placeholder}
+        aria-label={label}
+        className="w-full min-w-0 px-2 py-1 text-xs rounded border border-(--border-input) bg-(--bg-input) text-(--text-primary) outline-none focus:border-(--accent)"
+        data-testid={`${testId}-input`}
+      />
+      <button
+        type="button"
+        onClick={onSave}
+        disabled={pending}
+        title="Save"
+        aria-label={saveLabel}
+        className="shrink-0 w-6 h-6 flex items-center justify-center text-(--accent-text) hover:text-(--accent-text-hover) disabled:opacity-40"
+        data-testid={`${testId}-save`}
+      >
+        <IconCheck className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={onCancel}
+        title="Cancel"
+        aria-label="Cancel"
+        className="shrink-0 w-6 h-6 flex items-center justify-center text-(--text-faint) hover:text-(--text-secondary)"
+      >
+        <IconClose className="h-3.5 w-3.5" />
+      </button>
+    </>
+  );
+}
+
 export function ProfileSwitcher() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -132,21 +192,25 @@ export function ProfileSwitcher() {
   function metaFor(p: Profile) {
     const parts = [];
     if (p.books) parts.push(plural(p.books, "book"));
+    if (p.folders) parts.push(plural(p.folders, "folder"));
     const bytes = usage?.[p.id];
     if (bytes) parts.push(formatBytes(bytes));
     if (parts.length > 0) return parts.join(" · ");
     return p.isDefault ? "Default profile" : "Empty";
   }
 
-  const inputClass =
-    "w-full min-w-0 px-2 py-1 text-xs rounded border border-(--border-input) bg-(--bg-input) text-(--text-primary) outline-none focus:border-(--accent)";
-
   return (
     <div ref={root} className="relative ml-3">
       <Button
         variant="secondary"
         size="sm"
-        onClick={() => (open ? close() : setOpen(true))}
+        onClick={() => {
+          if (open) return close();
+          setOpen(true);
+          // Book and folder mutations invalidate their own lists, never this one, so the counts
+          // that decide "delete" vs "still has books" would go stale where the popover can't see it.
+          utils.profiles.list.invalidate();
+        }}
         aria-expanded={open}
         aria-controls="profile-menu"
         title="Switch profile"
@@ -179,37 +243,16 @@ export function ProfileSwitcher() {
               if (mode?.kind === "rename" && mode.id === p.id) {
                 return (
                   <div key={p.id} className="flex items-center gap-1.5 p-1 rounded-lg bg-(--bg-subtle)">
-                    <input
-                      ref={focusInput}
+                    <NameEditor
                       value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") renameProfile(p);
-                        if (e.key === "Escape") reset();
-                      }}
-                      aria-label={`Rename ${p.name}`}
-                      className={inputClass}
-                      data-testid="rename-input"
+                      onChange={setDraft}
+                      onSave={() => renameProfile(p)}
+                      onCancel={reset}
+                      label={`Rename ${p.name}`}
+                      saveLabel="Save name"
+                      pending={renameMutation.isPending}
+                      testId="rename"
                     />
-                    <button
-                      type="button"
-                      onClick={() => renameProfile(p)}
-                      title="Save"
-                      aria-label="Save name"
-                      className="shrink-0 w-6 h-6 flex items-center justify-center text-(--accent-text) hover:text-(--accent-text-hover)"
-                      data-testid="save-rename"
-                    >
-                      <IconCheck className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={reset}
-                      title="Cancel"
-                      aria-label="Cancel rename"
-                      className="shrink-0 w-6 h-6 flex items-center justify-center text-(--text-faint) hover:text-(--text-secondary)"
-                    >
-                      <IconClose className="h-3.5 w-3.5" />
-                    </button>
                   </div>
                 );
               }
@@ -301,38 +344,17 @@ export function ProfileSwitcher() {
           <div className="p-1.5 border-t border-(--border)">
             {mode?.kind === "new" ? (
               <div className="flex items-center gap-1.5 p-1">
-                <input
-                  ref={focusInput}
+                <NameEditor
                   value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") createProfile();
-                    if (e.key === "Escape") reset();
-                  }}
+                  onChange={setDraft}
+                  onSave={createProfile}
+                  onCancel={reset}
+                  label="New profile name"
+                  saveLabel="Create profile"
                   placeholder="Profile name"
-                  aria-label="New profile name"
-                  className={inputClass}
-                  data-testid="new-profile-input"
+                  pending={createMutation.isPending}
+                  testId="new-profile"
                 />
-                <button
-                  type="button"
-                  onClick={createProfile}
-                  title="Create"
-                  aria-label="Create profile"
-                  className="shrink-0 w-6 h-6 flex items-center justify-center text-(--accent-text) hover:text-(--accent-text-hover)"
-                  data-testid="save-new-profile"
-                >
-                  <IconCheck className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={reset}
-                  title="Cancel"
-                  aria-label="Cancel new profile"
-                  className="shrink-0 w-6 h-6 flex items-center justify-center text-(--text-faint) hover:text-(--text-secondary)"
-                >
-                  <IconClose className="h-3.5 w-3.5" />
-                </button>
               </div>
             ) : (
               <Button
