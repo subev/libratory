@@ -1,10 +1,31 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { trpc } from "../trpc.ts";
 import { getStoredProfileId, setStoredProfileId } from "../lib/profile.ts";
-import { IconAdd, IconDelete, IconProfile, IconRename } from "./icons.tsx";
+import { formatBytes } from "../lib/format.ts";
+import { useTopmostEscape } from "./Modal.tsx";
+import { IconAdd, IconCheck, IconChevronDown, IconClose, IconDelete, IconProfile, IconRename, IconWarning } from "./icons.tsx";
 import { Button } from "./Button.tsx";
+
+type Profile = { id: string; name: string; isDefault: boolean; books: number; folders: number };
+
+type Mode = { kind: "rename" | "delete" | "blocked"; id: string } | { kind: "new" } | null;
+
+const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
+
+function blockedReason(p: Profile) {
+  if (p.isDefault) return "The default profile stays — it is where books land when no profile is chosen.";
+  const parts = [];
+  if (p.books) parts.push(plural(p.books, "book"));
+  if (p.folders) parts.push(plural(p.folders, "folder"));
+  return `${parts.join(" and ")} still live here. Move or delete them first.`;
+}
+
+const focusInput = (el: HTMLInputElement | null) => {
+  el?.focus();
+  el?.select();
+};
 
 export function ProfileSwitcher() {
   const navigate = useNavigate();
@@ -14,7 +35,14 @@ export function ProfileSwitcher() {
   const createMutation = trpc.profiles.create.useMutation();
   const renameMutation = trpc.profiles.rename.useMutation();
   const deleteMutation = trpc.profiles.delete.useMutation();
+
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<Mode>(null);
+  const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const root = useRef<HTMLDivElement>(null);
+
+  const { data: usage } = trpc.profiles.usage.useQuery(undefined, { enabled: open, staleTime: 60_000 });
 
   const stored = getStoredProfileId();
   // Deleted-elsewhere guard; skip while fetching so a just-created id isn't wiped mid-refetch
@@ -26,96 +54,301 @@ export function ProfileSwitcher() {
     }
   }, [staleStored, queryClient]);
 
+  const reset = useCallback(() => {
+    setMode(null);
+    setDraft("");
+    setError(null);
+  }, []);
+
+  const close = useCallback(() => {
+    setOpen(false);
+    reset();
+  }, [reset]);
+
+  // Escape backs out of the row being edited first, and only then closes the popover.
+  useTopmostEscape(() => (mode ? reset() : close()), open);
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: PointerEvent) {
+      if (!root.current?.contains(e.target as Node)) close();
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open, close]);
+
   const active = profiles?.find((p) => p.id === stored) ?? profiles?.[0];
   if (!profiles || !active) return null;
 
   function activate(id: string) {
     setStoredProfileId(id);
+    close();
     navigate("/");
     queryClient.invalidateQueries();
   }
 
-  async function createProfile() {
-    const name = window.prompt("New profile name")?.trim();
-    if (!name) return;
+  async function run(action: () => Promise<void>) {
     setError(null);
     try {
-      const profile = await createMutation.mutateAsync({ name });
-      utils.profiles.list.setData(undefined, (old) =>
-        old ? [...old, { id: profile.id, name: profile.name, isDefault: false }] : old,
-      );
-      activate(profile.id);
+      await action();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
   }
 
-  const renameProfile = async () => {
-    const name = window.prompt("Rename profile", active.name)?.trim();
-    if (!name || name === active.name) return;
-    setError(null);
-    try {
-      await renameMutation.mutateAsync({ id: active.id, name });
-      utils.profiles.list.invalidate();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
+  const createProfile = () => {
+    const name = draft.trim();
+    if (!name) return reset();
+    return run(async () => {
+      const profile = await createMutation.mutateAsync({ name });
+      utils.profiles.list.setData(undefined, (old) =>
+        old ? [...old, { id: profile.id, name: profile.name, isDefault: false, books: 0, folders: 0 }] : old,
+      );
+      activate(profile.id);
+    });
   };
 
-  const deleteProfile = async () => {
-    if (!confirm(`Delete profile "${active.name}"? Its books and folders must be deleted or moved first.`)) return;
-    setError(null);
-    try {
-      await deleteMutation.mutateAsync({ id: active.id });
-      setStoredProfileId(null);
-      navigate("/");
-      queryClient.invalidateQueries();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
+  const renameProfile = (p: Profile) => {
+    const name = draft.trim();
+    if (!name || name === p.name) return reset();
+    return run(async () => {
+      await renameMutation.mutateAsync({ id: p.id, name });
+      utils.profiles.list.invalidate();
+      reset();
+    });
   };
+
+  const deleteProfile = (p: Profile) =>
+    run(async () => {
+      await deleteMutation.mutateAsync({ id: p.id });
+      reset();
+      if (p.id === stored) {
+        setStoredProfileId(null);
+        navigate("/");
+      }
+      queryClient.invalidateQueries();
+    });
+
+  function metaFor(p: Profile) {
+    const parts = [];
+    if (p.books) parts.push(plural(p.books, "book"));
+    const bytes = usage?.[p.id];
+    if (bytes) parts.push(formatBytes(bytes));
+    if (parts.length > 0) return parts.join(" · ");
+    return p.isDefault ? "Default profile" : "Empty";
+  }
+
+  const inputClass =
+    "w-full min-w-0 px-2 py-1 text-xs rounded border border-(--border-input) bg-(--bg-input) text-(--text-primary) outline-none focus:border-(--accent)";
 
   return (
-    <div className="ml-auto flex items-center gap-2">
-      {error && <span className="text-sm text-(--danger-text)">{error}</span>}
-      <span title="Profile" className="text-sm"><IconProfile className="h-4 w-4" /></span>
-      <select
-        value={active.id}
-        onChange={(e) => activate(e.target.value)}
-        className="px-2 py-1.5 text-xs rounded-md border border-(--border) bg-(--bg-card) text-(--text-primary) outline-none"
-        data-testid="profile-select"
-      >
-        {profiles.map((p) => (
-          <option key={p.id} value={p.id}>{p.name}</option>
-        ))}
-      </select>
+    <div ref={root} className="relative ml-3">
       <Button
-        variant="icon"
+        variant="secondary"
         size="sm"
-        aria-label="New profile"
-        onClick={createProfile}
-        title="New profile"
-        data-testid="new-profile"
+        onClick={() => (open ? close() : setOpen(true))}
+        aria-expanded={open}
+        aria-controls="profile-menu"
+        title="Switch profile"
+        data-testid="profile-chip"
       >
-        <IconAdd className="h-3 w-3" />
+        <IconProfile className="h-3.5 w-3.5 text-(--text-faint)" />
+        <span className="text-(--text-primary)">{active.name}</span>
+        <IconChevronDown className="h-3 w-3 text-(--text-faint)" />
       </Button>
-      <button
-        onClick={renameProfile}
-        title="Rename profile"
-        className="text-(--text-faint) hover:text-(--text-secondary) text-xs"
-        data-testid="rename-profile"
-      >
-        <IconRename className="h-3 w-3" />
-      </button>
-      <button
-        onClick={deleteProfile}
-        disabled={active.isDefault || deleteMutation.isPending}
-        title={active.isDefault ? "The default profile cannot be deleted" : "Delete this profile (must be empty)"}
-        className="text-(--text-faint) hover:text-(--danger-text) text-xs disabled:opacity-50"
-        data-testid="delete-profile"
-      >
-        <IconDelete className="h-3 w-3" />
-      </button>
+
+      {open && (
+        <div
+          id="profile-menu"
+          className="absolute left-0 top-full mt-1.5 z-50 w-76 rounded-xl border border-(--border) bg-(--bg-card) shadow-2xl overflow-hidden"
+          data-testid="profile-menu"
+        >
+          <div className="px-3 pt-2.5 pb-2 border-b border-(--border)">
+            <p className="text-[10px] font-bold tracking-widest uppercase text-(--text-faint)">Profile</p>
+            <p className="text-[11px] leading-snug text-(--text-muted)">
+              Separate libraries on this machine. No accounts, no passwords.
+            </p>
+          </div>
+
+          {error && (
+            <p className="px-3 py-2 text-xs text-(--danger-text) bg-(--danger-bg)">{error}</p>
+          )}
+
+          <div className="p-1.5 flex flex-col gap-px">
+            {profiles.map((p) => {
+              if (mode?.kind === "rename" && mode.id === p.id) {
+                return (
+                  <div key={p.id} className="flex items-center gap-1.5 p-1 rounded-lg bg-(--bg-subtle)">
+                    <input
+                      ref={focusInput}
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") renameProfile(p);
+                        if (e.key === "Escape") reset();
+                      }}
+                      aria-label={`Rename ${p.name}`}
+                      className={inputClass}
+                      data-testid="rename-input"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => renameProfile(p)}
+                      title="Save"
+                      aria-label="Save name"
+                      className="shrink-0 w-6 h-6 flex items-center justify-center text-(--accent-text) hover:text-(--accent-text-hover)"
+                      data-testid="save-rename"
+                    >
+                      <IconCheck className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={reset}
+                      title="Cancel"
+                      aria-label="Cancel rename"
+                      className="shrink-0 w-6 h-6 flex items-center justify-center text-(--text-faint) hover:text-(--text-secondary)"
+                    >
+                      <IconClose className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                );
+              }
+
+              if (mode?.kind === "delete" && mode.id === p.id) {
+                return (
+                  <div key={p.id} className="flex flex-col gap-2 p-2.5 rounded-lg bg-(--danger-bg)" data-testid="delete-confirm">
+                    <p className="text-xs leading-snug text-(--text-primary)">
+                      Delete “{p.name}”? The profile is empty, so nothing else goes with it.
+                    </p>
+                    <div className="flex gap-1.5">
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => deleteProfile(p)}
+                        disabled={deleteMutation.isPending}
+                        data-testid="confirm-delete"
+                      >
+                        Delete
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={reset}>Cancel</Button>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (mode?.kind === "blocked" && mode.id === p.id) {
+                return (
+                  <div key={p.id} className="flex gap-2 p-2.5 rounded-lg bg-(--warning-bg)" data-testid="delete-blocked">
+                    <IconWarning className="h-3.5 w-3.5 mt-0.5 shrink-0 text-(--warning-text)" />
+                    <div className="flex flex-col items-start gap-1.5">
+                      <p className="text-xs leading-snug text-(--text-secondary)">{blockedReason(p)}</p>
+                      {p.isDefault ? (
+                        <Button variant="ghost" size="sm" onClick={reset}>OK</Button>
+                      ) : (
+                        <Button variant="primary" soft size="sm" onClick={() => activate(p.id)}>Show them</Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={p.id} className="flex items-center gap-0.5 rounded-lg hover:bg-(--bg-card-hover)">
+                  <button
+                    type="button"
+                    aria-current={p.id === active.id}
+                    onClick={() => activate(p.id)}
+                    className="flex-1 min-w-0 flex items-center gap-2 px-2 py-1.5 text-left"
+                    data-testid="profile-row"
+                  >
+                    <span className="w-3.5 shrink-0 text-(--accent-text)">
+                      {p.id === active.id && <IconCheck className="h-3.5 w-3.5" />}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs font-medium text-(--text-primary)">{p.name}</span>
+                      <span className="block truncate text-[11px] tabular-nums text-(--text-faint)">{metaFor(p)}</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setError(null); setDraft(p.name); setMode({ kind: "rename", id: p.id }); }}
+                    title="Rename"
+                    aria-label={`Rename ${p.name}`}
+                    className="shrink-0 w-6 h-6 flex items-center justify-center text-(--text-faint) hover:text-(--text-secondary)"
+                    data-testid="rename-profile"
+                  >
+                    <IconRename className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setError(null);
+                      const empty = !p.isDefault && p.books === 0 && p.folders === 0;
+                      setMode({ kind: empty ? "delete" : "blocked", id: p.id });
+                    }}
+                    title="Delete"
+                    aria-label={`Delete ${p.name}`}
+                    className="shrink-0 w-6 h-6 mr-1 flex items-center justify-center text-(--text-faint) hover:text-(--danger-text)"
+                    data-testid="delete-profile"
+                  >
+                    <IconDelete className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="p-1.5 border-t border-(--border)">
+            {mode?.kind === "new" ? (
+              <div className="flex items-center gap-1.5 p-1">
+                <input
+                  ref={focusInput}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") createProfile();
+                    if (e.key === "Escape") reset();
+                  }}
+                  placeholder="Profile name"
+                  aria-label="New profile name"
+                  className={inputClass}
+                  data-testid="new-profile-input"
+                />
+                <button
+                  type="button"
+                  onClick={createProfile}
+                  title="Create"
+                  aria-label="Create profile"
+                  className="shrink-0 w-6 h-6 flex items-center justify-center text-(--accent-text) hover:text-(--accent-text-hover)"
+                  data-testid="save-new-profile"
+                >
+                  <IconCheck className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={reset}
+                  title="Cancel"
+                  aria-label="Cancel new profile"
+                  className="shrink-0 w-6 h-6 flex items-center justify-center text-(--text-faint) hover:text-(--text-secondary)"
+                >
+                  <IconClose className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setError(null); setDraft(""); setMode({ kind: "new" }); }}
+                className="w-full justify-start gap-2"
+                data-testid="new-profile"
+              >
+                <IconAdd className="h-3.5 w-3.5 shrink-0 text-(--text-faint)" />
+                New profile
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
