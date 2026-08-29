@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 
 import { renderChapterReaderHtml, type ChapterReaderSourceBlock } from "./chapter-reader.ts";
+import { isUuid } from "./uuid.ts";
 
 type ChapterReaderData = {
   bookTitle: string;
@@ -20,6 +21,7 @@ export function registerChapterReaderRoute(
 ) {
   fastify.get("/read/chapter/:chapterId", async (request, reply) => {
     const { chapterId } = request.params as { chapterId: string };
+    if (!isUuid(chapterId)) return reply.code(400).send({ error: "Invalid chapter id" });
     const result = await lookupChapter(chapterId);
 
     if (result.kind === "not-found") {

@@ -4,6 +4,7 @@ import { db } from "./db.ts";
 import { books, bookFiles, folders, type NoteJob } from "./schema.ts";
 import { eq, and, desc } from "drizzle-orm";
 import { profileIdFromHeader } from "./trpc.ts";
+import { isUuid } from "./lib/uuid.ts";
 import { tmpDir, uploadsDir } from "./lib/paths.ts";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
@@ -146,6 +147,7 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
 
   fastify.post("/upload/:bookId", async (request, reply) => {
     const { bookId } = request.params as { bookId: string };
+    if (!isUuid(bookId)) return reply.code(400).send({ error: "Invalid book id" });
     const [book] = await db.select().from(books).where(eq(books.id, bookId));
     if (!book) {
       return reply.code(404).send({ error: "Book not found" });
