@@ -2,7 +2,7 @@
 
 <p align="center">
   <b>Your free book and audiobook laboratory.</b><br>
-  Turn the PDFs you already own into chapter-marked audiobooks — on your own machine, fully offline.
+  Turn the PDFs you already own into chapter-marked audiobooks — on your own machine, offline-first.
 </p>
 
 <p align="center">
@@ -16,7 +16,9 @@ Library and laboratory — which is what the name is and what the thing is: a wo
 
 Take a book apart, clean up the OCR, translate or rewrite a chapter, pick a voice, and put it back together as a chapter-marked M4B audiobook — or as a read-along book where the narration is highlighted on the page it was printed on.
 
-Everything runs on your machine: an Apple Silicon Mac, a Linux box (x86_64 or arm64, CPU is enough), or a single Docker container on a headless server. AI features use a local model (Ollama and LM Studio are auto-discovered, no configuration) or a cloud provider (DeepSeek, OpenAI, Anthropic, Gemini) if you add an API key.
+It runs on your own machine: an Apple Silicon Mac, a Linux box (x86_64 or arm64, CPU is enough), or a single Docker container on a headless server.
+
+**Offline-first, not offline-only.** Every narrator and every AI feature has a local option — the TTS engines run on your own GPU or CPU, and translation, rewrites, cleanup, digests and chat work against Ollama or LM Studio, auto-discovered with no configuration. The cloud is strictly opt-in: add an API key and you can use DeepSeek, OpenAI, Anthropic or Gemini for the AI features, or Cartesia and ElevenLabs for their voices. Add none and, once the models have been downloaded, none of your books or audio ever leaves the machine.
 
 ## Intro videos
 
