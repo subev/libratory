@@ -189,9 +189,9 @@ export function BookFilesSection({
                 <td className="px-3 py-2 text-xs font-mono text-(--text-muted)">{file.index + 1}</td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-2">
+                    {/* Neutral, not red: red is destructive in this row, and Remove is four cells away */}
                     <Button
-                      variant="danger"
-                      soft
+                      variant="secondary"
                       size="sm"
                       onClick={() => setPreviewFileId(file.id)}
                       className="shrink-0"

@@ -8,14 +8,14 @@ const SRC = "packages/web/src";
 const HINT = `import { IconX } from ".../components/icons" — add a line to ${MODULE} if the one you need is missing`;
 
 const GLYPHS = "✓✔✕✖✗×▶▲▼◀◂▸▾▴‹›«»←→↑↓↗↘↙↖↻↺⟳⋯⋮≡⚙✎✏＋❚⏸⏹⏭⏮⌄⌃★☆⤢";
-const ENTITIES = /&(times|larr|rarr|uarr|darr|check|cross|hellip|#10005|#9654|#9650|#9660|#9664|#8592|#8594);/g;
+const ENTITIES = /&(times|larr|rarr|uarr|darr|check|cross|hellip|#x?[0-9a-fA-F]{2,5});/g;
 
 const files = [];
 (function walk(dir) {
   for (const e of readdirSync(dir)) {
     const p = join(dir, e);
     if (statSync(p).isDirectory()) walk(p);
-    else if (p.endsWith(".tsx")) files.push(p);
+    else if (p.endsWith(".tsx") || p.endsWith(".ts")) files.push(p);
   }
 })(SRC);
 
@@ -27,12 +27,20 @@ for (const f of files) {
   lines.forEach((raw, i) => {
     const at = i + 1;
     // "\u25B6" is a play triangle that no literal-character scan can see.
-    const line = raw.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)));
-    // An arrow can be prose ("press ←") rather than an icon; spell it out where you can, mark it where you cannot.
-    if (line.includes("prose-glyph")) return;
+    const line = raw
+      .replace(/\\u\{([0-9a-fA-F]{1,6})\}/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+      .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+      .replace(/&#x([0-9a-fA-F]{2,5});/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+      .replace(/&#([0-9]{2,7});/g, (_, dec) => String.fromCodePoint(Number(dec)));
+    // An arrow can be prose ("press ←") rather than an icon; spell it out where you can, mark it
+    // where you cannot. It excuses the glyph only — an inline <svg> or an emoji still fails.
+    // An arrow in a comment is prose by construction — nothing there is ever rendered.
+    const trimmed = raw.trimStart();
+    if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) return;
+    const prose = line.includes("prose-glyph");
     if (line.includes("<svg")) add(f, at, "inline <svg>", `Use a shared icon: ${HINT}`);
     for (const ch of line) {
-      if (GLYPHS.includes(ch)) add(f, at, `glyph ${ch}`, `A glyph is not an icon: ${HINT}`);
+      if (!prose && GLYPHS.includes(ch)) add(f, at, `glyph ${ch}`, `A glyph is not an icon: ${HINT}`);
     }
     for (const m of line.matchAll(/\p{Extended_Pictographic}/gu)) {
       if (GLYPHS.includes(m[0])) continue;

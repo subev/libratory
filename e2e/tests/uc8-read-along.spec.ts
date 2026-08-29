@@ -130,8 +130,12 @@ test.describe("read along on the page", { tag: "@slow" }, () => {
 
     await page.getByTestId("open-synthesize").click();
     await page.getByTestId("synthesize-start").click();
-    // Every chapter, not just the first to finish: the reader opens on one of them
-    await expect(page.getByTestId("chapter-play")).toHaveCount(3, { timeout: 5 * 60_000 });
+    // Every chapter, not just the first to finish: the reader opens on one of them. Enabled, not
+    // merely present — the play button renders disabled from the start, so a bare count is true
+    // immediately.
+    await expect(page.locator('[data-testid="chapter-play"]:not([disabled])')).toHaveCount(3, {
+      timeout: 5 * 60_000,
+    });
 
     await page.getByTestId("book-read-link").click();
 

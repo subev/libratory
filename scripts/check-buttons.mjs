@@ -19,12 +19,17 @@ const files = [];
 // A skin is padding or a fixed box, plus a shape, plus a fill or an edge.
 const skinned = (attrs) =>
   /\brounded\b|\brounded-/.test(attrs) &&
-  /\bpx-|\bpy-|\bp-[0-9]|\bw-[0-9]/.test(attrs) &&
-  /\bbg-\(--|\bborder\b|\bborder-\(--/.test(attrs);
+  /\bpx-|\bpy-|\bp-[0-9]|\bw-[0-9]|\bsize-[0-9[]|\b[hw]-\[/.test(attrs) &&
+  /\bbg-\(--|\bbg-[a-z]|\bborder\b|\bborder-\(--/.test(attrs);
 
 const fail = [];
 for (const file of files) {
   const src = readFileSync(file, "utf8");
+  // Hoisting a skin into `const CHIP = "…"` used to hide it completely, which is how the old
+  // button-classes.ts would have sailed back in. Resolve simple local string consts.
+  const consts = new Map(
+    [...src.matchAll(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*\n?\s*"([^"]*)"/g)].map((m) => [m[1], m[2]]),
+  );
   for (const m of src.matchAll(/<(button|a|Link|NavLink)[\s>]/g)) {
     // `onClick={() => …}` contains a ">", so the tag ends at the first ">" outside braces and quotes.
     let depth = 0;
@@ -43,10 +48,20 @@ for (const file of files) {
       }
     }
     if (open === -1) continue;
-    const attrs = src.slice(m.index, open);
+    let attrs = src.slice(m.index, open);
+    for (const ref of attrs.matchAll(/\{\s*`?([A-Za-z_$][\w$]*)`?\s*\}|\$\{([A-Za-z_$][\w$]*)\}/g)) {
+      const value = consts.get(ref[1] ?? ref[2]);
+      if (value) attrs += " " + value;
+    }
     // The opt-out may sit in a comment just above the element, which is where it reads best.
-    const preceding = src.slice(Math.max(0, m.index - 240), m.index);
-    if (attrs.includes("button-ok") || preceding.includes("button-ok") || !skinned(attrs)) continue;
+    // The opt-out belongs to the NEXT element, so it counts only when no other tag sits between.
+    const before = src.slice(0, m.index);
+    const marker = before.lastIndexOf("button-ok");
+    const gap = marker === -1 ? "" : before.slice(marker);
+    const optedOut =
+      attrs.includes("button-ok") ||
+      (marker !== -1 && !/<(button|a|Link|NavLink)[\s>]/.test(gap));
+    if (optedOut || !skinned(attrs)) continue;
     fail.push({ file, line: src.slice(0, m.index).split("\n").length, tag: m[1] });
   }
 }

@@ -31,7 +31,9 @@ test.describe("synthesize and assemble", { tag: "@slow" }, () => {
     await expect(page.getByTestId("synthesize-modal")).toBeVisible();
     await page.getByTestId("synthesize-start").click();
 
-    const playButtons = page.getByTestId("chapter-play");
+    // Enabled, not merely present: the play button renders disabled from the start so the action
+    // group does not go ragged, so its bare count is true before any audio exists.
+    const playButtons = page.locator('[data-testid="chapter-play"]:not([disabled])');
     await expect(playButtons).toHaveCount(2, { timeout: 2 * 60_000 });
 
     await page.getByTestId("assemble-button").click();

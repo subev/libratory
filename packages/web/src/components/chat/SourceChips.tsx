@@ -45,15 +45,9 @@ export function SourceChips({
           </>
         );
         const chapterParam = source.chapterId ? `chapter=${source.chapterId}` : "";
-        if (source.kind === "translation" && source.language) {
-          return (
-            <Link key={source.id} to={`/books/${source.bookId}?variant=${encodeURIComponent(source.language)}${chapterParam ? `&${chapterParam}` : ""}`} target="_blank" rel="noopener noreferrer" className={chipClass}>
-              {inner}
-            </Link>
-          );
-        }
         if (source.fileId) {
           return (
+            // button-ok: a citation chip — numbered, truncating and pill-shaped; its own primitive
             <button
               key={source.id}
               onClick={() => onOpenPdf({ fileId: source.fileId!, page: source.page ?? undefined, filename: source.bookTitle })}
@@ -63,8 +57,20 @@ export function SourceChips({
             </button>
           );
         }
+        const variantParam =
+          source.kind === "translation" && source.language
+            ? `variant=${encodeURIComponent(source.language)}`
+            : "";
+        const query = [variantParam, chapterParam].filter(Boolean).join("&");
         return (
-          <Link key={source.id} to={`/books/${source.bookId}${chapterParam ? `?${chapterParam}` : ""}`} target="_blank" rel="noopener noreferrer" className={chipClass}>
+          // button-ok: a citation chip — numbered, truncating and pill-shaped; its own primitive
+          <Link
+            key={source.id}
+            to={`/books/${source.bookId}${query ? `?${query}` : ""}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={chipClass}
+          >
             {inner}
           </Link>
         );
