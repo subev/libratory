@@ -3,8 +3,9 @@ import { useParams, useNavigate, useSearchParams } from "react-router";
 import { trpc } from "../trpc.ts";
 import { ModelBundleNotice, useModelBundle } from "../components/ModelBundleNotice.tsx";
 import { ChapterTable } from "../components/ChapterTable.tsx";
+import { SYNTH_BUSY, variantLabel } from "../lib/chapters.ts";
 import { Breadcrumbs } from "../components/Breadcrumbs.tsx";
-import { SynthesizeModal } from "../components/SynthesizeModal.tsx";
+import { SynthesizeModal, type SynthSettings } from "../components/SynthesizeModal.tsx";
 import { StructureModal } from "../components/StructureModal.tsx";
 import { VariantModal } from "../components/VariantModal.tsx";
 import { BookFilesSection } from "../components/BookFilesSection.tsx";
@@ -64,9 +65,7 @@ export function BookDetail() {
           f.status === "extracting" || f.status === "pending" ||
           (f.status === "raw" && !f.hasRawText && Date.now() - new Date(f.createdAt ?? 0).getTime() < 2 * 60_000)
         );
-        const hasActiveChapters = data.chapters?.some((c: { status: string }) =>
-          ["synthesizing", "normalizing", "pending"].includes(c.status)
-        );
+        const hasActiveChapters = data.chapters?.some((c: { status: string }) => SYNTH_BUSY.includes(c.status));
         const hasActiveCleanups = data.chapters?.some((c: { cleanup?: { status: string } | null }) =>
           c.cleanup?.status === "cleaning" || c.cleanup?.status === "pending"
         );
@@ -299,6 +298,20 @@ export function BookDetail() {
     );
   }
 
+  // The lane being viewed decides which stored voice and speed a synthesis will use and change
+  const synth: SynthSettings = {
+    voice: (activeVariant && book.variantVoices?.[activeVariant]?.voice) || book.voice,
+    speed: (activeVariant && book.variantVoices?.[activeVariant]?.speed) || book.speed,
+    onChangeVoice: (voice) =>
+      activeVariant
+        ? setVariantVoiceMutation.mutate({ bookId: book.id, key: activeVariant, voice })
+        : updateSettingsMutation.mutate({ id: book.id, voice }),
+    onChangeSpeed: (speed) =>
+      activeVariant
+        ? setVariantVoiceMutation.mutate({ bookId: book.id, key: activeVariant, speed })
+        : updateSettingsMutation.mutate({ id: book.id, speed }),
+  };
+
   // Derived state
   const hasActiveFiles = book.files?.some((f) => f.status === "extracting" || f.status === "pending") ?? false;
   const hasRawText = book.files?.some((f) => f.hasRawText) ?? false;
@@ -340,9 +353,7 @@ export function BookDetail() {
       });
 
   const selectedCount = viewChapters.filter((c) => c.selected).length;
-  const hasActiveChapters = viewChapters.some((c) =>
-    ["synthesizing", "normalizing", "pending"].includes(c.status)
-  );
+  const hasActiveChapters = viewChapters.some((c) => SYNTH_BUSY.includes(c.status));
   const isProcessing = hasActiveFiles || hasActiveChapters ||
     book.status === "extracting" || book.status === "assembling";
   const selectedWithAudio = viewChapters.filter((c) => c.selected && c.status === "done" && c.audioPath).length;
@@ -359,9 +370,7 @@ export function BookDetail() {
   }).length;
   const allSelectedDone = selectedCount > 0 && viewChapters.filter((c) => c.selected).every((c) => c.status === "done" && c.audioPath);
   // Outputs that need audio can be queued behind the chapters still producing it
-  const selectedInFlight = viewChapters.filter((c) =>
-    c.selected && ["pending", "normalizing", "synthesizing"].includes(c.status)
-  ).length;
+  const selectedInFlight = viewChapters.filter((c) => c.selected && SYNTH_BUSY.includes(c.status)).length;
   const deferOutputs = waitForAll && selectedInFlight > 0;
   const canAssemble = (allSelectedDone || deferOutputs) && !isAssembling;
   // Language-view audio queueing is idempotent server-side, so running chapters don't block it
@@ -510,7 +519,7 @@ export function BookDetail() {
               data-testid="book-read-link"
             >
               <IconBook className="h-4 w-4" />
-              Read along
+              Open reader
             </Button>
             <Button
               variant="secondary"
@@ -553,44 +562,55 @@ export function BookDetail() {
         )}
 
         {/* STAGE 1: Input — source files & extraction */}
-        <BookFilesSection
-          files={book.files ?? []}
-          chapters={book.chapters}
-          bookId={book.id}
-          isProcessing={isProcessing}
-          forceOcr={book.forceOcr}
-          llmChapterDetection={book.llmChapterDetection}
-          chapterModel={book.chapterModel ?? null}
-          language={book.language ?? null}
-          onUpdateExtractionSettings={(settings) => updateSettingsMutation.mutate({ id: book.id, ...settings })}
-          onSetSelected={(fid, selected) => setFileSelectedMutation.mutate({ id: fid, selected })}
-          onSetAllSelected={(selected) => setAllFilesSelectedMutation.mutateAsync({ bookId: book.id, selected })}
-          onSetSelectedBatch={(ids, selected) => setFileSelectedBatchMutation.mutateAsync({ ids, selected })}
-          onRemove={(fid) => removeFileMutation.mutate({ id: fid })}
-          voiceLabel={getVoiceLabel(book.voice)}
-          extractOpen={extractOpen}
-          onExtractOpenChange={setExtractOpen}
-          onStartExtraction={async (scope, autoSynthesize) => {
-            for (const m of [setAutoSynthesizeMutation, reExtractSelectedMutation, retryMutation, redetectMutation]) m.reset();
-            try {
-              // Starting with the previous follow-on setting is worse than not starting: it decides
-              // whether hours of synthesis begin on their own when this finishes.
-              await setAutoSynthesizeMutation.mutateAsync({ id: book.id, autoSynthesize });
-            } catch {
-              return; // The banner is already showing it
-            }
-            if (scope === "selected") reExtractSelectedMutation.mutate({ bookId: book.id });
-            else if (scope === "book") retryMutation.mutate({ id: book.id });
-            else redetectMutation.mutate({ id: book.id });
-          }}
-          onCancelExtraction={() => {
-            if (confirm("Stop the running extraction? Files already extracted are kept.")) {
-              cancelMutation.mutate({ id: book.id });
-            }
-          }}
-          onCancel={(fid) => cancelFileMutation.mutate({ id: fid })}
-          onFilesAdded={invalidate}
-        />
+        {book.kind === "pdf" ? (
+          <BookFilesSection
+            files={book.files ?? []}
+            chapters={book.chapters}
+            bookId={book.id}
+            isProcessing={isProcessing}
+            forceOcr={book.forceOcr}
+            llmChapterDetection={book.llmChapterDetection}
+            chapterModel={book.chapterModel ?? null}
+            language={book.language ?? null}
+            onUpdateExtractionSettings={(settings) => updateSettingsMutation.mutate({ id: book.id, ...settings })}
+            onSetSelected={(fid, selected) => setFileSelectedMutation.mutate({ id: fid, selected })}
+            onSetAllSelected={(selected) => setAllFilesSelectedMutation.mutateAsync({ bookId: book.id, selected })}
+            onSetSelectedBatch={(ids, selected) => setFileSelectedBatchMutation.mutateAsync({ ids, selected })}
+            onRemove={(fid) => removeFileMutation.mutate({ id: fid })}
+            voiceLabel={getVoiceLabel(book.voice)}
+            extractOpen={extractOpen}
+            onExtractOpenChange={setExtractOpen}
+            onStartExtraction={async (scope, autoSynthesize) => {
+              for (const m of [setAutoSynthesizeMutation, reExtractSelectedMutation, retryMutation, redetectMutation]) m.reset();
+              try {
+                // Starting with the previous follow-on setting is worse than not starting: it decides
+                // whether hours of synthesis begin on their own when this finishes.
+                await setAutoSynthesizeMutation.mutateAsync({ id: book.id, autoSynthesize });
+              } catch {
+                return; // The banner is already showing it
+              }
+              if (scope === "selected") reExtractSelectedMutation.mutate({ bookId: book.id });
+              else if (scope === "book") retryMutation.mutate({ id: book.id });
+              else redetectMutation.mutate({ id: book.id });
+            }}
+            onCancelExtraction={() => {
+              if (confirm("Stop the running extraction? Files already extracted are kept.")) {
+                cancelMutation.mutate({ id: book.id });
+              }
+            }}
+            onCancel={(fid) => cancelFileMutation.mutate({ id: fid })}
+            onFilesAdded={invalidate}
+          />
+        ) : (
+          <Section stripe="input" className="mb-6 flex items-baseline gap-2">
+            <span className="text-xs font-medium text-(--warning-text) uppercase tracking-wider">1 · Input</span>
+            <p className="text-sm text-(--text-muted)" data-testid="synthetic-no-input">
+              {book.kind === "digest"
+                ? "Chapters were written from other books in your library — a digest has no source files to upload or extract."
+                : "Chapters arrived through the API — this book has no source files to upload or extract."}
+            </p>
+          </Section>
+        )}
 
         {/* STAGE 2: Work — chapter structure, text, translation */}
         <Section stripe="work" className="mb-6">
@@ -676,7 +696,7 @@ export function BookDetail() {
                     onClick={() => setActiveVariant(l.key)}
                     title={`${l.done} of ${book.chapters.length} chapters ${l.kind === "translation" ? "translated" : "rewritten"}`}
                   >
-                    {l.label ?? l.key} ({l.done}/{book.chapters.length})
+                    {variantLabel(l)} ({l.done}/{book.chapters.length})
                   </PillToggle>
                 ))}
               </div>
@@ -924,12 +944,7 @@ export function BookDetail() {
               variant={activeLane ?? (activeVariant ? { key: activeVariant, kind: "translation" as const, label: null } : null)}
               variants={variantLanes.map((l) => ({ key: l.key, label: l.label, kind: l.kind }))}
               onSwitchVariant={setActiveVariant}
-              synthVoice={(activeVariant && book.variantVoices?.[activeVariant]?.voice) || book.voice}
-              onChangeSynthVoice={(voice) =>
-                activeVariant
-                  ? setVariantVoiceMutation.mutate({ bookId: book.id, key: activeVariant, voice })
-                  : updateSettingsMutation.mutate({ id: book.id, voice })
-              }
+              synth={synth}
             />
             </>
           )}
@@ -1181,18 +1196,7 @@ export function BookDetail() {
             bookLanguage={book.language ?? null}
             count={selectedSynthesizable}
             language={activeLabel}
-            voice={(activeVariant && book.variantVoices?.[activeVariant]?.voice) || book.voice}
-            speed={(activeVariant && book.variantVoices?.[activeVariant]?.speed) || book.speed}
-            onChangeVoice={(voice) =>
-              activeVariant
-                ? setVariantVoiceMutation.mutate({ bookId: book.id, key: activeVariant, voice })
-                : updateSettingsMutation.mutate({ id: book.id, voice })
-            }
-            onChangeSpeed={(speed) =>
-              activeVariant
-                ? setVariantVoiceMutation.mutate({ bookId: book.id, key: activeVariant, speed })
-                : updateSettingsMutation.mutate({ id: book.id, speed })
-            }
+            {...synth}
             canStart={canProcess && !processSelectedMutation.isPending && !processSelectedAudioMutation.isPending}
             disabledReason={
               selectedSynthesizable === 0 ? (activeVariant ? `No selected chapters have ${activeLabel} text ready or underway` : "No selected chapters are ready for synthesis") :

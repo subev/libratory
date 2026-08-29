@@ -95,11 +95,10 @@ test.describe("read along on the page", { tag: "@slow" }, () => {
     // Before a word is spoken the chapter's pages already open — with nothing marked on them,
     // and saying which of the reasons applies
     await page.getByTestId("chapter-open").first().click();
-    await page.getByTestId("view-tab-pages").click();
     await expect(page.getByTestId("reader-page").first()).toBeVisible();
     await expect(page.getByTestId("pages-unmarked")).toContainText("Synthesize");
     await expect(page.getByTestId("cue-rect")).toHaveCount(0);
-    await expect(page.getByTestId("chapter-read-along-off")).toBeVisible();
+    await expect(page.getByTestId("chapter-open-reader-off")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("chapter-modal")).toBeHidden();
 
@@ -120,9 +119,9 @@ test.describe("read along on the page", { tag: "@slow" }, () => {
 
     // Narrating a chapter with its own modal open marks the pages as soon as the run lands. The
     // modal outlives the synthesis, so nothing it holds may be left waiting for a reload.
-    await page.getByTestId("view-tab-pages").click();
     await expect(page.getByTestId("pages-unmarked")).toBeVisible();
     await page.getByTestId("chapter-synthesize").click();
+    await page.getByTestId("synthesize-start").click();
     await expect(page.getByTestId("cue-rect").first()).toBeVisible({ timeout: 5 * 60_000 });
     await expect(page.getByTestId("pages-unmarked")).toBeHidden();
     await page.keyboard.press("Escape");
@@ -237,20 +236,37 @@ test.describe("read along on the page", { tag: "@slow" }, () => {
     await expect(page.locator('[data-testid="chapter-modal"] audio')).toHaveCount(1);
 
     // The modal reads along on the same pages, and a chunk preview lights the print it became
-    await expect(page.getByTestId("view-tab-pages")).toBeVisible();
+    await expect(page.getByTestId("reader-page").first()).toBeVisible();
     await expect(page.getByTestId("cue-rect").first()).toBeVisible();
+    // Read is the pages; the extracted text and the diff against it are their own tabs
+    await expect(page.getByTestId("view-tab-source")).toBeVisible();
+    await expect(page.getByTestId("view-tab-compare")).toBeVisible();
     await page.getByRole("button", { name: /^Chunk 1$/ }).hover();
     await expect(page.getByTestId("cue-linked-rect").first()).toBeVisible();
 
     // Editing the text unbinds the narration from the print. The audio outlives the edit, so the
-    // pages must stop offering sentences to tap the moment the save lands, not on the next reload.
-    await page.getByTestId("view-tab-pages").click();
+    // print must stop being offered the moment the save lands, not on the next reload — Read
+    // falls back to the text that will actually be spoken.
     await page.getByTestId("chapter-edit").click();
     await page.getByTestId("chapter-edit-text").fill("Rewritten by hand, so the print says something else now.");
     await page.getByTestId("chapter-edit-save").click();
-    await expect(page.getByTestId("pages-unmarked")).toContainText("edited after extraction");
+    await expect(page.getByTestId("chapter-modal")).toContainText("Rewritten by hand");
+    await expect(page.getByTestId("reader-page")).toHaveCount(0);
     await expect(page.getByTestId("cue-rect")).toHaveCount(0);
-    await expect(page.getByTestId("chapter-read-along-off")).toBeVisible();
+    await expect(page.getByTestId("chapter-open-reader")).toHaveAttribute("title", /edited after extraction/);
+
+    // Losing the print must not lose the read-along: narrate the edited text and the sentence
+    // being spoken is marked in the prose itself, paragraphs and all.
+    await page.getByTestId("chapter-synthesize").click();
+    await page.getByTestId("synthesize-start").click();
+    const spoken = page.getByTestId("text-cue-active");
+    await expect(spoken).toBeVisible({ timeout: 5 * 60_000 });
+    await expect(spoken).toContainText("Rewritten by hand");
+
+    // The pane labelled Spoken marks what is spoken; the text it was made from does not
+    await page.getByTestId("view-tab-compare").click();
+    await expect(spoken).toHaveCount(1);
+    await expect(spoken).toContainText("Rewritten by hand");
   });
 });
 

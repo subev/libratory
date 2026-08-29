@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { trpc } from "../trpc.ts";
+import { variantLabel } from "../lib/chapters.ts";
 import { TRANSLATION_LANGUAGES } from "../lib/languages.ts";
 import { Modal, ModalHeader } from "./Modal.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
@@ -91,7 +92,7 @@ export function VariantModal({
   const targetLabel = draft
     ? (draft.label || (draft.presetId ? presets.find((p) => p.id === draft.presetId)?.label ?? draft.presetId : "Custom"))
     : activeLane
-      ? activeLane.label ?? activeLane.key
+      ? variantLabel(activeLane)
       : activePreset?.label ?? activeKey ?? "";
 
   // The select encodes its target: existing lane, language, preset, or a custom prompt
@@ -221,7 +222,7 @@ export function VariantModal({
           {lanes.length > 0 && (
             <optgroup label="In this book">
               {lanes.map((l) => (
-                <option key={l.key} value={`lane:${l.key}`}>{l.label ?? l.key} ({l.done}/{chapters.length})</option>
+                <option key={l.key} value={`lane:${l.key}`}>{variantLabel(l)} ({l.done}/{chapters.length})</option>
               ))}
             </optgroup>
           )}

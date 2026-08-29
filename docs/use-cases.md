@@ -90,7 +90,7 @@ book with one chapter per story.
 
 ## UC8 — Read along on the page
 
-1. Open **Read along** on a book that has chapter audio.
+1. Click **Open reader** on a book that has chapter audio.
 2. The narration plays and the sentence being spoken is highlighted on the book's own PDF page;
    the page follows along, standing back when you scroll by hand.
 3. Tap a sentence on the page and the audio jumps to it.

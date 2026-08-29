@@ -89,7 +89,6 @@ export const chaptersRouter = router({
 
       return {
         ...chapter,
-        chunkTextSource,
         chunkPreviews,
       };
     }),

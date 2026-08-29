@@ -1,4 +1,4 @@
-import { test, expect, uploadFixtureBook } from "./fixtures.ts";
+import { test, expect, createApiBook, uploadFixtureBook } from "./fixtures.ts";
 
 test("the book page keeps the PDF, disk usage, and action log at hand", async ({ page, request }) => {
   await uploadFixtureBook(page);
@@ -28,4 +28,35 @@ test("the book page keeps the PDF, disk usage, and action log at hand", async ({
   const log = page.getByTestId("log-modal");
   await expect(log).toBeVisible();
   await expect(log).toContainText(/Raw text: .* words/);
+});
+
+test("the chapter modal asks for a voice when re-synthesizing, not before", async ({ page, request, profileId }) => {
+  await createApiBook(request, profileId, {
+    title: "Voice Picking",
+    voice: "say:samantha",
+    chapters: [{ title: "Opening", text: "A very short opening chapter." }],
+  });
+
+  await page.goto("/");
+  await page.getByRole("link", { name: "Voice Picking" }).click();
+
+  // Both doors to one action ask the same question — the row's icon and the modal's button
+  await page.getByTestId("row-synthesize").first().click();
+  const picker = page.getByTestId("voice-library-modal");
+  await expect(picker).toContainText("Synthesize 1 chapter");
+  await page.keyboard.press("Escape");
+  await expect(picker).toBeHidden();
+
+  await page.getByTestId("chapter-open").first().click();
+  const modal = page.getByTestId("chapter-modal");
+  await expect(modal).toBeVisible();
+
+  await page.getByTestId("chapter-synthesize").click();
+  await expect(page.getByTestId("synthesize-modal")).toBeVisible();
+  await expect(picker).toContainText("Synthesize 1 chapter");
+
+  // Escape belongs to the picker alone — the chapter behind it must still be open
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("synthesize-modal")).toBeHidden();
+  await expect(modal).toBeVisible();
 });

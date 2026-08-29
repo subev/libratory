@@ -98,6 +98,20 @@ export const UNMAPPED: Record<ReaderUnmapped, string> = {
   unnarrated: "This chapter hasn't been narrated yet.",
 };
 
+// Whether the print still shows this chapter's words — a Record, so a fifth reason has to say
+// which it is rather than defaulting into showing pages of something else.
+const PRINT_HOLDS_TEXT: Record<ReaderUnmapped, boolean> = {
+  edited: false,
+  generated: false,
+  unmapped: true,
+  unnarrated: true,
+};
+
+export function printHoldsText(chapter: Pick<ReaderChapter, "why"> | undefined): boolean {
+  if (!chapter) return false;
+  return chapter.why === undefined ? true : PRINT_HOLDS_TEXT[chapter.why];
+}
+
 // The pages a chapter covers, in flat order — the same set both surfaces render. It reads the page
 // range and nothing else, so callers can memoize on those two fields rather than on chapter identity.
 export function chapterPages(manifest: ReaderManifest, chapter: Pick<ReaderChapter, "pageStart" | "pageEnd">): ReaderPage[] {

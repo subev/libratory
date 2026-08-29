@@ -1,7 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import { Button } from "./Button.tsx";
-import { IconMicrophone } from "./icons.tsx";
 import {
   cartesiaVoiceToEntry,
   elevenlabsVoiceToEntry,
@@ -98,31 +96,6 @@ export function VoicePicker({ value, onChange, title, priorityLanguages = NO_PRI
         <span className="truncate">{label}</span>
         <span className="shrink-0 text-xs font-medium text-(--accent-text)">Change</span>
       </button>
-      {library}
-    </div>
-  );
-}
-
-export function VoicePickerChip({ value, onChange, title }: VoicePickerProps) {
-  const { open, triggerRef, label, library } = useVoiceLibrary(value, onChange);
-
-  return (
-    <div className="relative">
-      <Button
-        variant="secondary"
-        size="sm"
-        ref={triggerRef}
-        onClick={open}
-        title={title}
-        aria-haspopup="dialog"
-        aria-label={`Voice: ${label}`}
-        data-testid="voice-picker-trigger"
-      >
-        {/* A chevron promised a dropdown; this opens a modal, so it reads as a button instead. */}
-        <IconMicrophone className="h-3.5 w-3.5 shrink-0 text-(--text-faint)" />
-        <span className="text-(--text-faint)">Voice</span>
-        <span className="truncate max-w-56">{label}</span>
-      </Button>
       {library}
     </div>
   );

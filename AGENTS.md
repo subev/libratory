@@ -238,7 +238,7 @@ variant; do not fight the one you picked.
 
 `scripts/check-buttons.mjs` (in `pnpm lint`) fails on any `<button>`, `<a>`, `<Link>` or `<NavLink>` carrying a hand-written
 skin — a radius, plus padding or a fixed box, plus a fill or a border. A control that is genuinely
-not an action opts out with a `button-ok` comment on one of the two lines directly above it. The gate
+not an action opts out with a `button-ok` comment on one of the three lines directly above it. The gate
 cannot check that you wrote a reason, so writing one is on you: `PillToggle` (a toggle),
 `VoicePicker`'s trigger (a labelled form control skinned to match the input beside it), and selection
 rows. Inconvenience is not a reason.
@@ -548,10 +548,14 @@ packages/web/src/
     LogDock.tsx         Sticky bottom log bar + full scrollable log modal
     EditableTitle.tsx   Click-to-rename book title
     ChapterTable.tsx    Chapter table (height-capped, sticky header) with filters, range selection, floating audio player with read-along chunk highlighting
-    SynthesizeModal.tsx Voice/speed picker + start button behind the toolbar's Synthesize action
-    ChapterModal.tsx    Chapter detail modal: view tabs (Pages reads along on the book's own
-                        pages, unmarked with a reason when the text no longer maps), text
-                        editing, per-chapter actions
+    SynthesizeModal.tsx Voice/speed picker + start button — behind the toolbar's Synthesize action
+                        for the selection, and behind every single-chapter re-synthesize (row icon
+                        and chapter modal), which is where a chapter's voice is chosen
+    ChapterModal.tsx    Chapter detail modal: view tabs (Read is the book's own pages while they
+                        still hold the chapter's text, else the spoken text; Source is the extracted
+                        text, Compare puts the two side by side, Blocks is the extraction diagnostic),
+                        text editing, per-chapter actions. Every text pane marks the narrated
+                        sentence and word (lib/text-cues.ts locates the cues in it)
     ChapterAiModal.tsx  Ask-AI prompt modal per chapter/book (presets, model pick)
     StructureModal.tsx  Heading-outline structure view, manual boundaries, LLM proposals
     VariantModal.tsx    Variant start/progress modal: language + rewrite-preset + custom-prompt targets, live side-by-side view
@@ -567,7 +571,7 @@ packages/web/src/
                         CueOverlay.tsx (highlight + debug boxes)
     DiskUsageButton.tsx Per-book disk usage + chunk cleanup
     MarkdownBlock.tsx   Markdown renderer for notes/AI answers
-    VoicePicker.tsx     Trigger for the voice library modal — two explicit variants, `VoicePicker` (labelled field) and `VoicePickerChip` (inline chip); queries only the engine owning the current selection to resolve its label
+    VoicePicker.tsx     Trigger for the voice library modal (labelled field); queries only the engine owning the current selection to resolve its label
     voice-picker/       VoiceLibraryModal.tsx — **language is the primary axis**: the rail lists languages (plus "Your voices" for clones), the pane groups that language's voices by engine, so "what can read my French book" is one click instead of five tabs. Every voice carries `language`/`engine` (set by the mappers in lib/voices.ts; `staticVoices` decorates the literals). Multilingual models (KugelAudio) appear under every language. Within a language the pane groups by **provider** (`providerOfVoice` in lib/voices.ts — finer than `engine`, so KugelAudio and the Bulgarian narrators are named rather than lumped as "other local models") with filter chips: the chip defaults to the provider of the current selection, typing forces "All" so a search can't silently miss behind a filter, and the combined view caps each provider at 6 rows behind "Show all N" because Cartesia alone can contribute 450 voices to one language. PocketLanguageNotice.tsx (download prompt + size), PocketVoiceCloner.tsx (record/upload + consent), VoiceRow.tsx, context.tsx (selection + preview playback), layout.tsx
     SpeedSlider.tsx     Speed range slider (0.5x-2.0x)
     StatusBadge.tsx     Color-coded status badge

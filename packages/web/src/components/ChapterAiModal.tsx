@@ -132,7 +132,7 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
   }
 
   return (
-    <Modal size="lg" onClose={onClose} testId="chapter-ai-modal">
+    <Modal size="lg" onClose={onClose} closeOnEscape={false} /* a typed prompt and its answer are not restored on reopen */ testId="chapter-ai-modal">
       <ModalHeader title="Ask about" onClose={onClose}>
         <div className="inline-flex rounded-md border border-(--border) p-0.5 gap-0.5 min-w-0" data-testid="ai-scope-toggle">
           {/* button-ok: segments of a scope toggle, not actions — the segment skin belongs to the group */}
