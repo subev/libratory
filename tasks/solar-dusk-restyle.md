@@ -123,3 +123,40 @@ valid CSS that paints nothing, which is how `--bg-hover` survived. Measured: `ox
 deprecated v4 spellings in 0.42s, but **not** an undefined custom property. Registering colours in
 `@theme` and writing `bg-accent` makes them lintable with typo suggestions, and `oxlint --fix`
 performs the conversion. That is the open decision; the plugin is installed but not yet enabled.
+
+## Two tiers, and a rule that keeps them apart
+
+`styles.css` is now a palette and a mapping.
+
+**Palette** — 81 entries, literals only, `--pal-` prefixed. Steps rise as the colour darkens and
+each carries a *contrast contract*, so picking one is a lookup rather than a judgement:
+
+| step | contract | measured |
+| --- | --- | --- |
+| 600 | brand fill, ink on it | 4.93:1 |
+| 550 | its hover — brighter, so ink survives | 6.15:1 |
+| 700 | text on cream | 5.36:1 |
+| 800 | that text's hover | 7.54:1 |
+| 500 | on charcoal | 6.45:1 |
+| 300 | its hover | 9.06:1 |
+
+Alpha steps carry their opacity in the name and live here because `--alpha()` folds at build time
+only for a literal — given a `var()` it emits an opaque fallback plus an `@supports` block.
+
+**Semantic** — every value a `var()` into the palette. No literal, no `--alpha()`. The block reads
+as a mapping you can audit in one pass.
+
+**Enforcement.** `tailwindcss/no-restricted-classes` fails the build on `\(--pal-` in any class:
+
+> "bg-(--pal-orange-600)" is restricted: Palette tokens are raw colour. Use a semantic token.
+
+Verified it fires on palette access and stays silent on semantic. This is the part that makes the
+split real — an agent reached past the semantic layer into `--brand-page` twenty times in LogDock
+before the rule existed.
+
+**Faithfulness.** All 66 semantic tokens resolved in a headless browser, both themes, before and
+after: 3 changed, all deliberate — `--accent-hover` (the "brightens" comment had been false; it was
+darkening) and two near-duplicates collapsing onto a shared step.
+
+Cost: CSS 48,548 → 51,406 bytes. The indirection is not free; the audit and the enforcement are
+what it buys.

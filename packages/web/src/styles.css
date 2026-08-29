@@ -17,8 +17,117 @@
   src: url("/fonts/source-serif-4-var-latin.woff2") format("woff2");
 }
 
-/* --alpha() folds at build time only for a literal colour; given a var() it emits an opaque
-   fallback plus an @supports block, and that fallback is the solid colour where a tint was meant. */
+/* ---------------------------------------------------------------------------
+   PALETTE — raw colour, literals only. Never referenced from a component; the
+   no-restricted-classes rule in .oxlintrc.json fails the build if one is.
+   Steps rise as the colour darkens, and each carries a contrast contract:
+
+     600  brand fill, ink on it 4.93:1    550  its hover, brighter so ink survives
+     700  text on cream 5.36:1            800  that text's hover, 7.54:1
+     500  on charcoal 6.45:1              300  its hover, 9.06:1
+
+   Alpha steps carry their own opacity in the name. --alpha() folds at build
+   time only for a literal colour, which is why the tints live here.
+   --------------------------------------------------------------------------- */
+:root {
+  /* orange — the app icon's tangerine (600) and ember (500) */
+  --pal-orange-300: oklch(0.8000 0.1500 50);
+  --pal-orange-400: oklch(0.7600 0.1600 50);
+  --pal-orange-500: #ef7734;
+  --pal-orange-550: oklch(0.7000 0.1700 45);
+  --pal-orange-600: #e2601f;
+  --pal-orange-700: oklch(0.5200 0.1550 45);
+  --pal-orange-800: oklch(0.4400 0.1550 45);
+  --pal-orange-a10: --alpha(#e2601f / 10%);
+  --pal-orange-a12: --alpha(#e2601f / 12%);
+  --pal-orange-a15: --alpha(#e2601f / 15%);
+  --pal-ember-a14: --alpha(#ef7734 / 14%);
+  --pal-ember-a16: --alpha(#ef7734 / 16%);
+  --pal-ember-a20: --alpha(#ef7734 / 20%);
+
+  /* brass */
+  --pal-brass-300: oklch(0.8200 0.1100 78);
+  --pal-brass-400: oklch(0.7700 0.1150 68);
+  --pal-brass-500: #e0913d;
+  --pal-brass-700: oklch(0.4800 0.0900 70);
+  --pal-brass-a08: --alpha(#e0913d / 8%);
+  --pal-brass-a10: --alpha(#e0913d / 10%);
+  --pal-brass-a15: --alpha(#e0913d / 15%);
+  --pal-brass-a35: --alpha(#e0913d / 35%);
+  --pal-brass-a40: --alpha(#e0913d / 40%);
+
+  /* warm neutrals — cream through ink */
+  --pal-neutral-0: #fdf1e4;
+  --pal-neutral-25: oklch(0.9885 0.0057 84.5659);
+  --pal-neutral-50: oklch(0.9686 0.0091 78.2818);
+  --pal-neutral-100: oklch(0.9600 0.0150 82);
+  --pal-neutral-150: oklch(0.9363 0.0218 83.2637);
+  --pal-neutral-200: oklch(0.9000 0.0100 70);
+  --pal-neutral-300: oklch(0.8866 0.0404 89.6994);
+  --pal-neutral-400: oklch(0.8200 0.0420 85);
+  --pal-neutral-500: oklch(0.6400 0.0100 58);
+  --pal-neutral-600: oklch(0.5534 0.0116 58.0708);
+  --pal-neutral-650: oklch(0.5000 0.0110 60);
+  --pal-neutral-700: oklch(0.4444 0.0096 73.6390);
+  --pal-neutral-800: oklch(0.3660 0.0251 49.6085);
+  --pal-neutral-900: #1e1b14;
+  --pal-neutral-950: #16140f;
+  --pal-neutral-975: #1b1813;
+  --pal-neutral-990: #100e0a;
+  --pal-ink: #2a1408;
+  --pal-white: #ffffff;
+  --pal-terminal-hover: #23201a;
+  --pal-cream-a04: --alpha(#fdf1e4 / 4%);
+  --pal-cream-a06: --alpha(#fdf1e4 / 6%);
+  --pal-cream-a08: --alpha(#fdf1e4 / 8%);
+  --pal-cream-a12: --alpha(#fdf1e4 / 12%);
+  --pal-cream-a15: --alpha(#fdf1e4 / 15%);
+  --pal-cream-a25: --alpha(#fdf1e4 / 25%);
+  --pal-cream-a26: --alpha(#fdf1e4 / 26%);
+  --pal-cream-a42: --alpha(#fdf1e4 / 42%);
+  --pal-cream-a50: --alpha(#fdf1e4 / 50%);
+  --pal-cream-a62: --alpha(#fdf1e4 / 62%);
+  --pal-cream-a72: --alpha(#fdf1e4 / 72%);
+  --pal-cream-a82: --alpha(#fdf1e4 / 82%);
+
+  /* red */
+  --pal-red-400: oklch(0.7400 0.1500 27);
+  --pal-red-500: oklch(0.6500 0.2100 27);
+  --pal-red-600: oklch(0.5771 0.2152 27.3250);
+  --pal-red-700: oklch(0.4437 0.1613 26.8994);
+  --pal-red-800: oklch(0.3800 0.1500 27);
+  --pal-red-a10: oklch(0.4437 0.1613 26.8994 / 0.10);
+  --pal-red-a20: oklch(0.5771 0.2152 27.3250 / 0.20);
+
+  /* green */
+  --pal-green-400: oklch(0.8000 0.1300 150);
+  --pal-green-450: oklch(0.7800 0.1400 150);
+  --pal-green-500: oklch(0.7200 0.1400 150);
+  --pal-green-600: oklch(0.5200 0.1150 150);
+  --pal-green-700: oklch(0.4500 0.1050 150);
+  --pal-green-750: oklch(0.4300 0.1050 150);
+  --pal-green-a12: oklch(0.5200 0.1150 150 / 0.12);
+  --pal-green-a18: oklch(0.7200 0.1400 150 / 0.18);
+
+  /* the three categorical badge hues, from Solar Dusk's own chart ramp */
+  --pal-gold-300: oklch(0.8600 0.1400 86);
+  --pal-gold-700: oklch(0.4600 0.0950 75);
+  --pal-gold-a20: oklch(0.7952 0.1617 86.0468 / 0.20);
+  --pal-gold-a22: oklch(0.7952 0.1617 86.0468 / 0.22);
+  --pal-blue-300: oklch(0.7800 0.1200 237);
+  --pal-blue-700: oklch(0.4500 0.1100 237);
+  --pal-blue-a18: oklch(0.6847 0.1479 237.3225 / 0.18);
+  --pal-blue-a20: oklch(0.6847 0.1479 237.3225 / 0.20);
+  --pal-brown-300: oklch(0.8000 0.1100 66);
+  --pal-brown-700: oklch(0.4300 0.1000 66);
+  --pal-brown-a18: oklch(0.5538 0.1207 66.4416 / 0.18);
+  --pal-brown-a24: oklch(0.5538 0.1207 66.4416 / 0.24);
+}
+
+/* ---------------------------------------------------------------------------
+   SEMANTIC — what components may use, and all they may use. Every value below
+   is a var() into the palette: no literal, no --alpha().
+   --------------------------------------------------------------------------- */
 :root {
   color-scheme: light dark;
 
@@ -27,157 +136,146 @@
   --stack-reading: "Source Serif 4", Georgia, serif;
   --stack-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 
-  /* The app icon's own pair: tangerine tile, ink figure, cream pages. */
-  --brand-tangerine: #e2601f;
-  --brand-ember: #ef7734;
-  --brand-brass: #e0913d;
-  --brand-ink: #2a1408;
-  --brand-page: #fdf1e4;
-
-  --bg-page: oklch(0.9686 0.0091 78.2818);
-  --bg-card: oklch(0.9885 0.0057 84.5659);
-  --bg-card-hover: oklch(0.9600 0.0150 82);
-  --bg-subtle: oklch(0.9363 0.0218 83.2637);
+  --bg-page: var(--pal-neutral-50);
+  --bg-card: var(--pal-neutral-25);
+  --bg-card-hover: var(--pal-neutral-100);
+  --bg-subtle: var(--pal-neutral-150);
   --bg-input: var(--bg-card);
-  --bg-drag: --alpha(#e2601f / 10%);
+  --bg-drag: var(--pal-orange-a10);
   --bg-selected: var(--bg-drag);
 
-  --border: oklch(0.8866 0.0404 89.6994);
-  --border-input: oklch(0.8200 0.0420 85);
+  --border: var(--pal-neutral-300);
+  --border-input: var(--pal-neutral-400);
   --divide: var(--border);
 
-  --text-primary: oklch(0.3660 0.0251 49.6085);
-  --text-secondary: oklch(0.4444 0.0096 73.6390);
-  --text-tertiary: oklch(0.5000 0.0110 60);
-  --text-muted: oklch(0.5534 0.0116 58.0708);
-  --text-faint: oklch(0.6400 0.0100 58);
+  --text-primary: var(--pal-neutral-800);
+  --text-secondary: var(--pal-neutral-700);
+  --text-tertiary: var(--pal-neutral-650);
+  --text-muted: var(--pal-neutral-600);
+  --text-faint: var(--pal-neutral-500);
 
-  --accent: var(--brand-tangerine);
-  /* Hover BRIGHTENS: the label on a filled accent is ink, so a darker hover would
-     drop it under AA (3.98:1). */
-  --accent-hover: oklch(0.6300 0.1620 45);
-  /* The brand tangerine is 3.23:1 as text on cream — a fill colour, not a text one. */
-  --accent-text: oklch(0.5200 0.1550 45);
-  --accent-text-hover: oklch(0.4400 0.1550 45);
-  --accent-subtle: --alpha(#e2601f / 12%);
+  --accent: var(--pal-orange-600);
+  --accent-hover: var(--pal-orange-550);
+  --accent-text: var(--pal-orange-700);
+  --accent-text-hover: var(--pal-orange-800);
+  --accent-subtle: var(--pal-orange-a12);
   --focus-ring: var(--accent);
 
-  /* --*-text is text IN that colour; --on-* is text sitting ON it as a fill. Ink, not white:
-     on tangerine that measures 4.93:1 where white is 3.54:1. */
-  --on-accent: var(--brand-ink);
-  --on-danger: #ffffff;
-  --on-success: #ffffff;
-  --on-warning: var(--brand-ink);
+  /* --*-text is text IN that colour; --on-* is text sitting ON it as a fill. */
+  --on-accent: var(--pal-ink);
+  --on-danger: var(--pal-white);
+  --on-success: var(--pal-white);
+  --on-warning: var(--pal-ink);
 
-  --danger: oklch(0.4437 0.1613 26.8994);
-  --danger-hover: oklch(0.3800 0.1500 27);
-  --danger-bg: oklch(0.4437 0.1613 26.8994 / 0.10);
+  --danger: var(--pal-red-700);
+  --danger-hover: var(--pal-red-800);
+  --danger-bg: var(--pal-red-a10);
   --danger-text: var(--danger);
 
-  --success: oklch(0.5200 0.1150 150);
-  --success-hover: oklch(0.4500 0.1050 150);
-  --success-bg: oklch(0.5200 0.1150 150 / 0.12);
-  --success-text: oklch(0.4300 0.1050 150);
+  --success: var(--pal-green-600);
+  --success-hover: var(--pal-green-700);
+  --success-bg: var(--pal-green-a12);
+  --success-text: var(--pal-green-750);
 
-  --warning: var(--brand-brass);
-  --warning-hover: oklch(0.7700 0.1150 68);
-  --warning-bg: --alpha(#e0913d / 15%);
-  --warning-text: oklch(0.4800 0.0900 70);
+  --warning: var(--pal-brass-500);
+  --warning-hover: var(--pal-brass-400);
+  --warning-bg: var(--pal-brass-a15);
+  --warning-text: var(--pal-brass-700);
 
   /* Input -> Work -> Output is a sequence, so colour can encode it. */
   --step-input: var(--warning);
   --step-work: var(--accent);
   --step-output: var(--success);
 
-  --bg-custom-text: --alpha(#e0913d / 8%);
-  --border-custom-text: --alpha(#e0913d / 40%);
+  --bg-custom-text: var(--pal-brass-a08);
+  --border-custom-text: var(--pal-brass-a40);
 
   /* Dark in both themes, so its text and lines cannot come from the theme ramp. */
-  --bg-terminal: #16140f;
-  --bg-terminal-hover: #23201a;
-  --terminal-text: var(--brand-page);
-  --terminal-dim: --alpha(#fdf1e4 / 50%);
-  --terminal-faint: --alpha(#fdf1e4 / 25%);
-  --terminal-border: --alpha(#fdf1e4 / 15%);
+  --bg-terminal: var(--pal-neutral-950);
+  --bg-terminal-hover: var(--pal-terminal-hover);
+  --terminal-text: var(--pal-neutral-0);
+  --terminal-dim: var(--pal-cream-a50);
+  --terminal-faint: var(--pal-cream-a25);
+  --terminal-border: var(--pal-cream-a15);
 
   --badge-pending-bg: var(--bg-subtle);
   --badge-pending-text: var(--text-secondary);
-  --badge-extracting-bg: oklch(0.7952 0.1617 86.0468 / 0.22);
-  --badge-extracting-text: oklch(0.4600 0.0950 75);
-  --badge-synthesizing-bg: --alpha(#e2601f / 15%);
-  --badge-synthesizing-text: oklch(0.4900 0.1400 45);
-  --badge-normalizing-bg: oklch(0.6847 0.1479 237.3225 / 0.18);
-  --badge-normalizing-text: oklch(0.4500 0.1100 237);
-  --badge-assembling-bg: oklch(0.5538 0.1207 66.4416 / 0.18);
-  --badge-assembling-text: oklch(0.4300 0.1000 66);
+  --badge-extracting-bg: var(--pal-gold-a22);
+  --badge-extracting-text: var(--pal-gold-700);
+  --badge-synthesizing-bg: var(--pal-orange-a15);
+  --badge-synthesizing-text: var(--pal-orange-700);
+  --badge-normalizing-bg: var(--pal-blue-a18);
+  --badge-normalizing-text: var(--pal-blue-700);
+  --badge-assembling-bg: var(--pal-brown-a18);
+  --badge-assembling-text: var(--pal-brown-700);
   --badge-done-bg: var(--success-bg);
   --badge-done-text: var(--success-text);
   --badge-failed-bg: var(--danger-bg);
   --badge-failed-text: var(--danger-text);
   --badge-suspended-bg: var(--warning-bg);
   --badge-suspended-text: var(--warning-text);
-  --badge-cancelled-bg: oklch(0.9000 0.0100 70);
+  --badge-cancelled-bg: var(--pal-neutral-200);
   --badge-cancelled-text: var(--text-muted);
 }
 
-/* Grounded on the marketing site's own two darks. Only tokens whose value actually differs belong
-   here — the var() aliases above re-resolve on their own. */
+/* Grounded on the marketing site's own two darks. Only tokens whose value
+   actually differs belong here — the aliases above re-resolve on their own. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg-page: #16140f;
-    --bg-card: #1e1b14;
-    --bg-card-hover: --alpha(#fdf1e4 / 6%);
-    --bg-subtle: --alpha(#fdf1e4 / 4%);
-    --bg-drag: --alpha(#ef7734 / 14%);
+    --bg-page: var(--pal-neutral-950);
+    --bg-card: var(--pal-neutral-900);
+    --bg-card-hover: var(--pal-cream-a06);
+    --bg-subtle: var(--pal-cream-a04);
+    --bg-drag: var(--pal-ember-a14);
 
-    --border: --alpha(#fdf1e4 / 12%);
-    --border-input: --alpha(#fdf1e4 / 26%);
+    --border: var(--pal-cream-a12);
+    --border-input: var(--pal-cream-a26);
 
-    --text-primary: var(--brand-page);
-    --text-secondary: --alpha(#fdf1e4 / 82%);
-    --text-tertiary: --alpha(#fdf1e4 / 72%);
-    --text-muted: --alpha(#fdf1e4 / 62%);
-    --text-faint: --alpha(#fdf1e4 / 42%);
+    --text-primary: var(--pal-neutral-0);
+    --text-secondary: var(--pal-cream-a82);
+    --text-tertiary: var(--pal-cream-a72);
+    --text-muted: var(--pal-cream-a62);
+    --text-faint: var(--pal-cream-a42);
 
     /* The tangerine loses its heat against charcoal. */
-    --accent: var(--brand-ember);
-    --accent-hover: oklch(0.7600 0.1600 50);
+    --accent: var(--pal-orange-500);
+    --accent-hover: var(--pal-orange-400);
     --accent-text: var(--accent);
-    --accent-text-hover: oklch(0.8000 0.1500 50);
-    --accent-subtle: --alpha(#ef7734 / 16%);
+    --accent-text-hover: var(--pal-orange-300);
+    --accent-subtle: var(--pal-ember-a16);
 
-    --on-success: var(--brand-ink);
+    --on-success: var(--pal-ink);
 
-    --danger: oklch(0.5771 0.2152 27.3250);
-    --danger-hover: oklch(0.6500 0.2100 27);
-    --danger-bg: oklch(0.5771 0.2152 27.3250 / 0.20);
-    --danger-text: oklch(0.7400 0.1500 27);
+    --danger: var(--pal-red-600);
+    --danger-hover: var(--pal-red-500);
+    --danger-bg: var(--pal-red-a20);
+    --danger-text: var(--pal-red-400);
 
-    --success: oklch(0.7200 0.1400 150);
-    --success-hover: oklch(0.7800 0.1400 150);
-    --success-bg: oklch(0.7200 0.1400 150 / 0.18);
-    --success-text: oklch(0.8000 0.1300 150);
+    --success: var(--pal-green-500);
+    --success-hover: var(--pal-green-450);
+    --success-bg: var(--pal-green-a18);
+    --success-text: var(--pal-green-400);
 
-    --warning-hover: oklch(0.7800 0.1200 78);
-    --warning-text: oklch(0.8200 0.1100 78);
+    --warning-hover: var(--pal-brass-300);
+    --warning-text: var(--pal-brass-300);
 
-    --bg-custom-text: --alpha(#e0913d / 10%);
-    --border-custom-text: --alpha(#e0913d / 35%);
+    --bg-custom-text: var(--pal-brass-a10);
+    --border-custom-text: var(--pal-brass-a35);
 
-    --bg-terminal: #100e0a;
-    --bg-terminal-hover: #1b1813;
+    --bg-terminal: var(--pal-neutral-990);
+    --bg-terminal-hover: var(--pal-neutral-975);
 
-    --badge-pending-bg: --alpha(#fdf1e4 / 8%);
-    --badge-pending-text: --alpha(#fdf1e4 / 72%);
-    --badge-extracting-bg: oklch(0.7952 0.1617 86.0468 / 0.20);
-    --badge-extracting-text: oklch(0.8600 0.1400 86);
-    --badge-synthesizing-bg: --alpha(#ef7734 / 20%);
-    --badge-synthesizing-text: oklch(0.8000 0.1500 50);
-    --badge-normalizing-bg: oklch(0.6847 0.1479 237.3225 / 0.20);
-    --badge-normalizing-text: oklch(0.7800 0.1200 237);
-    --badge-assembling-bg: oklch(0.5538 0.1207 66.4416 / 0.24);
-    --badge-assembling-text: oklch(0.8000 0.1100 66);
-    --badge-cancelled-bg: --alpha(#fdf1e4 / 8%);
+    --badge-pending-bg: var(--pal-cream-a08);
+    --badge-pending-text: var(--pal-cream-a72);
+    --badge-extracting-bg: var(--pal-gold-a20);
+    --badge-extracting-text: var(--pal-gold-300);
+    --badge-synthesizing-bg: var(--pal-ember-a20);
+    --badge-synthesizing-text: var(--pal-orange-300);
+    --badge-normalizing-bg: var(--pal-blue-a20);
+    --badge-normalizing-text: var(--pal-blue-300);
+    --badge-assembling-bg: var(--pal-brown-a24);
+    --badge-assembling-text: var(--pal-brown-300);
+    --badge-cancelled-bg: var(--pal-cream-a08);
   }
 }
 

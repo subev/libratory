@@ -29,7 +29,18 @@
     "tailwindcss/no-deprecated-classes": "error",
     "tailwindcss/no-duplicate-classes": "error",
     "tailwindcss/no-dark-without-light": "error",
-    "tailwindcss/no-hardcoded-colors": "warn"
+    "tailwindcss/no-hardcoded-colors": "warn",
+    "tailwindcss/no-restricted-classes": [
+      "error",
+      {
+        "patterns": [
+          {
+            "pattern": "\\(--pal-",
+            "message": "Palette tokens are raw colour. Use a semantic token (--accent, --danger, --text-muted, ...) or add one to the semantic block in styles.css."
+          }
+        ]
+      }
+    ]
   },
   "jsPlugins": [
     "oxlint-tailwindcss"
