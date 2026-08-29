@@ -25,6 +25,8 @@ import { eq } from "drizzle-orm";
 import path from "node:path";
 import { access, readdir, unlink } from "node:fs/promises";
 import { createFastifyOptions } from "./fastify-config.ts";
+import { isUuid } from "./lib/uuid.ts";
+import { registerErrorHandler } from "./lib/error-handler.ts";
 
 const { PORT } = env;
 
@@ -46,6 +48,8 @@ async function main() {
   await sweepStalePreviews();
 
   const fastify = Fastify(createFastifyOptions());
+  // Before any register: a child scope inherits the handler its parent had when the scope was made.
+  registerErrorHandler(fastify);
 
   const trustedHosts = parseTrustedHosts(env.TRUSTED_HOSTS);
   await fastify.register(cors, () => (req: FastifyRequest, callback: (error: Error | null, options: FastifyCorsOptions) => void) => {
@@ -92,6 +96,7 @@ async function main() {
 
   fastify.get("/pdf/:fileId", async (request, reply) => {
     const { fileId } = request.params as { fileId: string };
+    if (!isUuid(fileId)) return reply.code(400).send({ error: "Invalid file id" });
     const [file] = await db.select().from(bookFiles).where(eq(bookFiles.id, fileId));
     if (!file) {
       return reply.code(404).send({ error: "File not found" });
@@ -102,6 +107,7 @@ async function main() {
   // Books uploaded before book_files existed have their PDF on the book row
   fastify.get("/pdf/book/:bookId", async (request, reply) => {
     const { bookId } = request.params as { bookId: string };
+    if (!isUuid(bookId)) return reply.code(400).send({ error: "Invalid book id" });
     const [book] = await db.select().from(books).where(eq(books.id, bookId));
     if (!book?.pdfPath) {
       return reply.code(404).send({ error: "File not found" });
@@ -111,6 +117,7 @@ async function main() {
 
   fastify.get("/download/:bookId", async (request, reply) => {
     const { bookId } = request.params as { bookId: string };
+    if (!isUuid(bookId)) return reply.code(400).send({ error: "Invalid book id" });
     const [book] = await db.select().from(books).where(eq(books.id, bookId));
 
     if (!book?.outputPath) {
@@ -124,6 +131,7 @@ async function main() {
 
   fastify.get("/download/assembly/:assemblyId", async (request, reply) => {
     const { assemblyId } = request.params as { assemblyId: string };
+    if (!isUuid(assemblyId)) return reply.code(400).send({ error: "Invalid assembly id" });
     const [assembly] = await db.select().from(assemblies).where(eq(assemblies.id, assemblyId));
 
     if (!assembly?.outputPath) {
@@ -137,6 +145,7 @@ async function main() {
 
   fastify.get("/download/document/:documentId", async (request, reply) => {
     const { documentId } = request.params as { documentId: string };
+    if (!isUuid(documentId)) return reply.code(400).send({ error: "Invalid document id" });
     const [document] = await db.select().from(documents).where(eq(documents.id, documentId));
 
     if (!document?.outputPath) {
@@ -149,6 +158,7 @@ async function main() {
 
   fastify.get("/audio/chapter/:chapterId", async (request, reply) => {
     const { chapterId } = request.params as { chapterId: string };
+    if (!isUuid(chapterId)) return reply.code(400).send({ error: "Invalid chapter id" });
     const [chapter] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
 
     if (!chapter?.audioPath) {
@@ -163,6 +173,7 @@ async function main() {
 
   fastify.get("/audio/translation/:translationId", async (request, reply) => {
     const { translationId } = request.params as { translationId: string };
+    if (!isUuid(translationId)) return reply.code(400).send({ error: "Invalid translation id" });
     const [row] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId));
 
     if (!row?.audioPath) {
@@ -180,6 +191,7 @@ async function main() {
 
   fastify.get("/audio/assembly/:assemblyId", async (request, reply) => {
     const { assemblyId } = request.params as { assemblyId: string };
+    if (!isUuid(assemblyId)) return reply.code(400).send({ error: "Invalid assembly id" });
     const [assembly] = await db.select().from(assemblies).where(eq(assemblies.id, assemblyId));
 
     if (!assembly?.outputPath) {

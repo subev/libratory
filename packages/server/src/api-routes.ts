@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
+import { isUuid } from "./lib/uuid.ts";
 import { profileIdFromHeader } from "./trpc.ts";
 import {
   apiBookStatus,
@@ -32,7 +33,7 @@ export function registerApiRoutes(fastify: FastifyInstance) {
 
   fastify.post("/api/books/:bookId/chapters", async (request, reply) => {
     const { bookId } = request.params as { bookId: string };
-    if (!z.string().uuid().safeParse(bookId).success) {
+    if (!isUuid(bookId)) {
       return reply.code(400).send({ error: "Invalid book id" });
     }
     try {
@@ -47,7 +48,7 @@ export function registerApiRoutes(fastify: FastifyInstance) {
 
   fastify.get("/api/books/:bookId", async (request, reply) => {
     const { bookId } = request.params as { bookId: string };
-    if (!z.string().uuid().safeParse(bookId).success) {
+    if (!isUuid(bookId)) {
       return reply.code(400).send({ error: "Invalid book id" });
     }
     const status = await apiBookStatus(bookId);
