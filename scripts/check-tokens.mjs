@@ -27,8 +27,9 @@ for (const f of files) {
 }
 
 const undeclared = [...used].filter(([t]) => !declared.has(t));
-// Palette entries are consumed by the semantic layer inside the stylesheet, not from components.
-const unused = [...declared].filter((t) => !used.has(t) && !t.startsWith("--pal-") && !t.startsWith("--stack-") && !t.startsWith("--font-") && !css.includes(`var(${t})`));
+// A palette entry counts as used only if the semantic layer references it — that tier is the one
+// most likely to accumulate dead colour, so exempting it defeats the check.
+const unused = [...declared].filter((t) => !used.has(t) && !t.startsWith("--stack-") && !t.startsWith("--font-") && !css.includes(`var(${t})`));
 
 for (const [t, f] of undeclared) console.error(`  undeclared token ${t} — used in ${f}`);
 for (const t of unused) console.error(`  unused token ${t} — declared in ${CSS}`);

@@ -138,7 +138,7 @@ export function NotesSection({ bookId, noteJob }: { bookId: string; noteJob: Not
                       onClick={() => {
                         if (confirm("Delete this note?")) deleteMutation.mutate({ id: note.id });
                       }}
-                      className="text-xs text-(--danger-text) hover:text-(--danger-hover) font-medium"
+                      className="text-xs text-(--danger-text) hover:text-(--danger-text-hover) font-medium"
                     >
                       Delete
                     </button>

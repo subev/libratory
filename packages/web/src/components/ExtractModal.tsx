@@ -92,7 +92,7 @@ export function ExtractModal({
         </button>
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-4 overflow-y-auto">
         {hasChapters ? (
           <fieldset className="space-y-2">
             <legend className="text-xs font-medium text-(--text-secondary) mb-1">What to redo</legend>

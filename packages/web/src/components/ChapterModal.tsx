@@ -1255,8 +1255,7 @@ function TextPreview({
   }
 
   const textClass = "mx-auto w-full max-w-prose flex-1 min-h-0 overflow-y-auto rounded bg-(--bg-reading) border border-(--border-reading) px-7 py-6 font-reading text-[17px] text-(--text-primary) whitespace-pre-wrap leading-relaxed";
-  const readingColumn = " w-full max-w-4xl mx-auto";
-
+  
   if (viewMode === "split" && cleanText) {
     return (
       <div className="flex-1 min-h-0 flex gap-3">
@@ -1293,7 +1292,7 @@ function TextPreview({
         onSelectChunk={onSelectChunk}
         hoveredChunkUrl={hoveredChunkUrl}
         onHoverChunk={onHoverChunk}
-        className={textClass + readingColumn + " border-(--border-custom-text) bg-(--bg-custom-text)"}
+        className={textClass + " border-(--border-custom-text) bg-(--bg-custom-text)"}
       />
     );
   }
@@ -1308,7 +1307,7 @@ function TextPreview({
       onSelectChunk={onSelectChunk}
       hoveredChunkUrl={hoveredChunkUrl}
       onHoverChunk={onHoverChunk}
-      className={textClass + readingColumn}
+      className={textClass}
     />
   );
 }

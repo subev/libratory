@@ -95,7 +95,7 @@ export function LogDock({ bookId, isProcessing, files }: { bookId: string; isPro
               {logs.length > 0 && (
                 <button
                   onClick={() => clearLogs.mutate({ bookId })}
-                  className="text-xs text-(--terminal-dim) hover:text-(--terminal-text)"
+                  className="text-xs text-(--terminal-dim) hover:text-(--terminal-danger)"
                 >
                   Clear
                 </button>

@@ -59,7 +59,7 @@ export function DocumentOutputsSection({
                 <a
                   href={`/download/document/${doc.id}`}
                   download={doc.outputPath.split("/").pop()}
-                  className="text-xs text-(--success-text) hover:text-(--success-hover) font-medium"
+                  className="text-xs text-(--success-text) hover:text-(--success-text-hover) font-medium"
                   data-testid="document-download"
                 >
                   Download
@@ -71,7 +71,7 @@ export function DocumentOutputsSection({
                     }
                   }}
                   disabled={isDeleting}
-                  className="text-xs text-(--danger-text) hover:text-(--danger-hover) font-medium disabled:opacity-50"
+                  className="text-xs text-(--danger-text) hover:text-(--danger-text-hover) font-medium disabled:opacity-50"
                 >
                   Delete
                 </button>

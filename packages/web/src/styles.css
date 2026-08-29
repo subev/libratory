@@ -82,7 +82,6 @@
   --pal-cream-a08: --alpha(#fdf1e4 / 8%);
   --pal-cream-a12: --alpha(#fdf1e4 / 12%);
   --pal-cream-a15: --alpha(#fdf1e4 / 15%);
-  --pal-cream-a25: --alpha(#fdf1e4 / 25%);
   --pal-cream-a26: --alpha(#fdf1e4 / 26%);
   --pal-cream-a42: --alpha(#fdf1e4 / 42%);
   --pal-cream-a50: --alpha(#fdf1e4 / 50%);
@@ -91,6 +90,7 @@
   --pal-cream-a82: --alpha(#fdf1e4 / 82%);
 
   /* red */
+  --pal-red-300: oklch(0.8200 0.1300 27);
   --pal-red-400: oklch(0.7400 0.1500 27);
   --pal-red-500: oklch(0.6500 0.2100 27);
   --pal-red-600: oklch(0.5771 0.2152 27.3250);
@@ -100,6 +100,7 @@
   --pal-red-a20: oklch(0.5771 0.2152 27.3250 / 0.20);
 
   /* green */
+  --pal-green-300: oklch(0.8700 0.1150 150);
   --pal-green-400: oklch(0.8000 0.1300 150);
   --pal-green-450: oklch(0.7800 0.1400 150);
   --pal-green-500: oklch(0.7200 0.1400 150);
@@ -190,6 +191,16 @@
   --bg-custom-text: var(--pal-brass-a08);
   --border-custom-text: var(--pal-brass-a40);
 
+  /* Fixed in both themes: these paint over pdf.js's white paper, which never darkens. */
+  --cue-linked: var(--pal-orange-a15);
+  --cue-active: --alpha(#e2601f / 35%);
+  --cue-word: --alpha(#e2601f / 60%);
+  --cue-ring: var(--pal-orange-600);
+
+  --danger-text-hover: var(--pal-red-800);
+  --success-text-hover: var(--pal-green-700);
+  --terminal-danger: var(--pal-red-400);
+
   /* Reading surfaces. A warm, slightly dimmed ground rather than paper white: sepia measures
      about 25% lower effective radiance and is the one display-mode finding with evidence behind
      it. Contrast lands at 8.9:1 — comfortable, and deliberately short of pure black on white. */
@@ -269,6 +280,9 @@
 
     --bg-reading: var(--pal-neutral-900);
 
+    --danger-text-hover: var(--pal-red-300);
+    --success-text-hover: var(--pal-green-300);
+
     --bg-terminal: var(--pal-neutral-990);
     --bg-terminal-hover: var(--pal-neutral-975);
 
@@ -297,12 +311,14 @@ body {
   color: var(--text-primary);
 }
 
-/* :where() so a font-weight utility on the element still wins — a bare h1,h2 rule is unlayered
-   and would beat @layer utilities whatever its specificity. */
-:where(h1, h2) {
-  font-family: var(--stack-display);
-  font-weight: 600;
-  letter-spacing: -0.01em;
+/* @layer base, not a bare rule: an unlayered declaration beats @layer utilities whatever its
+   specificity, so font-bold on a heading would have been dead. */
+@layer base {
+  h1, h2 {
+    font-family: var(--stack-display);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
 }
 
 /* One rule rather than a ring utility per control: 45 of 266 controls carried it by hand. */

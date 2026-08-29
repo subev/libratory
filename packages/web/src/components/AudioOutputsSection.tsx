@@ -53,7 +53,7 @@ export function AudioOutputsSection({
                   <a
                     href={`/download/assembly/${assembly.id}`}
                     download={assembly.outputPath.split("/").pop()}
-                    className="text-xs text-(--success-text) hover:text-(--success-hover) font-medium shrink-0"
+                    className="text-xs text-(--success-text) hover:text-(--success-text-hover) font-medium shrink-0"
                     data-testid="assembly-download"
                   >
                     Download
@@ -65,7 +65,7 @@ export function AudioOutputsSection({
                       }
                     }}
                     disabled={isDeleting}
-                    className="text-xs text-(--danger-text) hover:text-(--danger-hover) font-medium disabled:opacity-50 shrink-0"
+                    className="text-xs text-(--danger-text) hover:text-(--danger-text-hover) font-medium disabled:opacity-50 shrink-0"
                   >
                     Delete
                   </button>

@@ -44,7 +44,7 @@ export function DiskUsageButton({ bookId }: { bookId: string }) {
 
       {open && (
         <Modal size="sm" onClose={() => setOpen(false)} backdropTestId="disk-usage-modal">
-          <div className="p-5">
+          <div className="p-5 overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-(--text-primary)">Disk usage</h3>
               <button
