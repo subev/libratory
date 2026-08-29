@@ -5,7 +5,7 @@ type StatusBadgeProps = {
   totalChapters?: number;
 };
 
-export const statusStyles = {
+export const statusStyles: Record<string, string> = {
   pending: "bg-(--badge-pending-bg) text-(--badge-pending-text)",
   extracting: "bg-(--badge-extracting-bg) text-(--badge-extracting-text)",
   synthesizing: "bg-(--badge-synthesizing-bg) text-(--badge-synthesizing-text)",
@@ -20,12 +20,12 @@ export const statusStyles = {
   translating: "bg-(--badge-synthesizing-bg) text-(--badge-synthesizing-text)",
   rewriting: "bg-(--badge-synthesizing-bg) text-(--badge-synthesizing-text)",
   cleaning: "bg-(--badge-normalizing-bg) text-(--badge-normalizing-text)",
-} satisfies Record<string, string>;
+};
 
 export function StatusBadge({ status, error, chaptersCompleted, totalChapters }: StatusBadgeProps) {
   const isCancelled = status === "failed" && error?.startsWith("Cancelled");
   const displayStatus = isCancelled ? "cancelled" : status;
-  const style = (statusStyles as Record<string, string>)[displayStatus] ?? statusStyles.pending;
+  const style = statusStyles[displayStatus] ?? statusStyles.pending;
 
   let label = displayStatus;
   if (displayStatus === "synthesizing" && totalChapters && totalChapters > 0) {

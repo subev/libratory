@@ -46,6 +46,9 @@ export function CueOverlay({
 
   return (
     <div className="pointer-events-none absolute inset-0" data-testid="cue-overlay">
+      {/* eslint-disable tailwindcss/no-restricted-classes -- debug overlays behind the rects/layout
+          checkboxes: they need hues that stay distinguishable from each other and from the cue
+          highlight, which the semantic palette deliberately does not provide. */}
       {debug.layout && (
         <>
           <div className="absolute border border-dashed border-sky-500/70" style={pointsToRect(page.content)} />

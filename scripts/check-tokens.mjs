@@ -1,6 +1,4 @@
-// bg-(--typo) compiles to background-color: var(--typo) — valid CSS that paints nothing. Tailwind
-// cannot catch it and neither can its linter, so this does: every (--token) in the source must be
-// declared in styles.css, and every declared token must be used.
+// bg-(--typo) compiles to valid CSS that paints nothing, which Tailwind cannot catch.
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
@@ -29,7 +27,7 @@ for (const f of files) {
 const undeclared = [...used].filter(([t]) => !declared.has(t));
 // A palette entry counts as used only if the semantic layer references it — that tier is the one
 // most likely to accumulate dead colour, so exempting it defeats the check.
-const unused = [...declared].filter((t) => !used.has(t) && !t.startsWith("--stack-") && !t.startsWith("--font-") && !css.includes(`var(${t})`));
+const unused = [...declared].filter((t) => !used.has(t) && !t.startsWith("--font-") && !css.includes(`var(${t})`));
 
 for (const [t, f] of undeclared) console.error(`  undeclared token ${t} — used in ${f}`);
 for (const t of unused) console.error(`  unused token ${t} — declared in ${CSS}`);

@@ -1,7 +1,10 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useRef, type ReactNode } from "react";
 import { useBodyScrollLock } from "../lib/use-body-scroll-lock.ts";
 
 export type ModalSize = "sm" | "md" | "lg" | "xl" | "full";
+
+const FOCUSABLE =
+  'input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
 
 const PANEL_SIZE: Record<ModalSize, string> = {
   sm: "w-[90vw] max-w-md max-h-[85vh]",
@@ -11,11 +14,46 @@ const PANEL_SIZE: Record<ModalSize, string> = {
   full: "w-[96vw] h-[92vh]",
 };
 
+const TitleIdContext = createContext<string | undefined>(undefined);
+
+export function ModalHeader({
+  title,
+  subtitle,
+  onClose,
+  children,
+}: {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  onClose: () => void;
+  children?: ReactNode;
+}) {
+  const titleId = useContext(TitleIdContext);
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-(--border) shrink-0">
+      <div className="min-w-0">
+        <h2 id={titleId} className="text-base font-semibold text-(--text-primary) truncate">{title}</h2>
+        {subtitle ? <p className="text-xs text-(--text-muted) mt-0.5">{subtitle}</p> : null}
+      </div>
+      {children}
+      <button
+        type="button"
+        onClick={onClose}
+        title="Close"
+        aria-label="Close"
+        className="ml-auto shrink-0 p-1 rounded text-(--text-faint) hover:text-(--text-tertiary)"
+      >
+        <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 export function Modal({
   size = "md",
   onClose,
   closeOnEscape = false,
-  labelledBy,
   testId,
   backdropTestId,
   children,
@@ -23,24 +61,22 @@ export function Modal({
   size?: ModalSize;
   onClose: () => void;
   closeOnEscape?: boolean;
-  labelledBy?: string;
   testId?: string;
   backdropTestId?: string;
   children: ReactNode;
 }) {
   useBodyScrollLock();
 
+  const titleId = useId();
+
   const panel = useRef<HTMLDivElement>(null);
 
-  // aria-modal hides the rest of the page from assistive tech, so focus has to come in with it —
-  // and go back to whatever opened the dialog on the way out.
+  // aria-modal hides the page from assistive tech, so focus must enter and return to the opener.
   useEffect(() => {
     const opener = document.activeElement;
     const node = panel.current;
     if (node && !node.contains(document.activeElement)) {
-      const first = node.querySelector<HTMLElement>(
-        'input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
-      );
+      const first = node.querySelector<HTMLElement>(FOCUSABLE);
       (first ?? node).focus();
     }
     return () => {
@@ -49,30 +85,20 @@ export function Modal({
   }, []);
 
   useEffect(() => {
-    function trap(e: KeyboardEvent) {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && closeOnEscape) return onClose();
       if (e.key !== "Tab") return;
       const node = panel.current;
       if (!node) return;
-      const focusable = [...node.querySelectorAll<HTMLElement>(
-        'input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
-      )].filter((el) => el.offsetParent !== null);
+      const focusable = [...node.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.offsetParent !== null);
       if (focusable.length === 0) return;
       const first = focusable[0]!;
       const last = focusable.at(-1)!;
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     }
-    document.addEventListener("keydown", trap);
-    return () => document.removeEventListener("keydown", trap);
-  }, []);
-
-  useEffect(() => {
-    if (!closeOnEscape) return;
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, [closeOnEscape, onClose]);
 
   return (
@@ -83,11 +109,11 @@ export function Modal({
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={labelledBy}
+        aria-labelledby={titleId}
         className={`relative bg-(--bg-card) rounded-xl shadow-2xl flex flex-col overflow-hidden ${PANEL_SIZE[size]}`}
         data-testid={testId}
       >
-        {children}
+        <TitleIdContext.Provider value={titleId}>{children}</TitleIdContext.Provider>
       </div>
     </div>
   );

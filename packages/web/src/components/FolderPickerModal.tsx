@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { trpc } from "../trpc.ts";
-import { Modal } from "./Modal.tsx";
+import { Modal, ModalHeader } from "./Modal.tsx";
 import { PRIMARY_BUTTON } from "../lib/button-classes.ts";
 
 type FolderNode = { id: string; name: string; depth: number };
@@ -103,16 +103,7 @@ export function FolderPickerModal({
 
   return (
     <Modal size="sm" onClose={onClose} testId="folder-picker-modal">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-(--border) shrink-0">
-        <span className="text-sm font-medium text-(--text-primary)">
-          Move {itemLabel} to…
-        </span>
-        <button onClick={onClose} className="text-(--text-faint) hover:text-(--text-tertiary) p-1" title="Close">
-          <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-          </svg>
-        </button>
-      </div>
+      <ModalHeader title={`Move ${itemLabel} to…`} onClose={onClose} />
 
       <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
         {row(null, "Unfiled (home)", 0)}

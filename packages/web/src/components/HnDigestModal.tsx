@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { trpc } from "../trpc.ts";
 import { getStoredProfileId } from "../lib/profile.ts";
-import { Modal } from "./Modal.tsx";
+import { Modal, ModalHeader } from "./Modal.tsx";
 
 function todayIso(): string {
   const d = new Date();
@@ -113,12 +113,7 @@ export function HnDigestModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal size="md" onClose={onClose} testId="hn-digest-modal">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-(--border) shrink-0">
-        <span className="text-sm font-medium text-(--text-primary)">Hacker News daily digest</span>
-        <button onClick={onClose} className="text-(--text-faint) hover:text-(--text-tertiary) p-1" title="Close">
-          ✕
-        </button>
-      </div>
+      <ModalHeader title="Hacker News daily digest" onClose={onClose} />
 
       <div className="p-4 space-y-3 overflow-y-auto">
         <p className="text-xs text-(--text-muted)">

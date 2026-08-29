@@ -1,13 +1,10 @@
 import type { ReactNode } from "react";
 
-// One "selected" affordance. Nine of these were written by hand in two mutually inconsistent
-// designs, and only one carried aria-pressed.
 export function PillToggle({
   selected,
   onClick,
   title,
   disabled,
-  className = "",
   testId,
   children,
 }: {
@@ -15,7 +12,6 @@ export function PillToggle({
   onClick: () => void;
   title?: string;
   disabled?: boolean;
-  className?: string;
   testId?: string;
   children: ReactNode;
 }) {
@@ -31,7 +27,7 @@ export function PillToggle({
         selected
           ? "bg-(--accent) border-(--accent) text-(--on-accent)"
           : "border-(--border) text-(--text-secondary) hover:bg-(--accent-subtle)"
-      } ${className}`}
+      }`}
     >
       {children}
     </button>

@@ -17,20 +17,11 @@
   src: url("/fonts/source-serif-4-var-latin.woff2") format("woff2");
 }
 
-/* ---------------------------------------------------------------------------
-   PALETTE — raw colour, literals only. Never referenced from a component; the
-   no-restricted-classes rule in .oxlintrc.json fails the build if one is.
-   Steps rise as the colour darkens, and each carries a contrast contract:
-
-     600  brand fill, ink on it 4.93:1    550  its hover, brighter so ink survives
-     700  text on cream 5.36:1            800  that text's hover, 7.54:1
-     500  on charcoal 6.45:1              300  its hover, 9.06:1
-
-   Alpha steps carry their own opacity in the name. --alpha() folds at build
-   time only for a literal colour, which is why the tints live here.
-   --------------------------------------------------------------------------- */
+/* PALETTE — literals only, never used from a component. Steps darken as they rise and each
+   carries a contrast contract; see AGENTS.md. --alpha() folds at build time only for a literal,
+   which is why the tints live here. */
 :root {
-  /* orange — the app icon's tangerine (600) and ember (500) */
+  /* orange — the icon's tangerine (600) and ember (500) */
   --pal-orange-300: oklch(0.8000 0.1500 50);
   --pal-orange-400: oklch(0.7600 0.1600 50);
   --pal-orange-500: #ef7734;
@@ -41,6 +32,8 @@
   --pal-orange-a10: --alpha(#e2601f / 10%);
   --pal-orange-a12: --alpha(#e2601f / 12%);
   --pal-orange-a15: --alpha(#e2601f / 15%);
+  --pal-orange-a35: --alpha(#e2601f / 35%);
+  --pal-orange-a60: --alpha(#e2601f / 60%);
   --pal-ember-a14: --alpha(#ef7734 / 14%);
   --pal-ember-a16: --alpha(#ef7734 / 16%);
   --pal-ember-a20: --alpha(#ef7734 / 20%);
@@ -125,10 +118,7 @@
   --pal-brown-a24: oklch(0.5538 0.1207 66.4416 / 0.24);
 }
 
-/* ---------------------------------------------------------------------------
-   SEMANTIC — what components may use, and all they may use. Every value below
-   is a var() into the palette: no literal, no --alpha().
-   --------------------------------------------------------------------------- */
+/* SEMANTIC — all a component may use. Every value is a var() into the palette. */
 :root {
   color-scheme: light dark;
 
@@ -143,7 +133,7 @@
   --bg-subtle: var(--pal-neutral-150);
   --bg-input: var(--bg-card);
   --bg-drag: var(--pal-orange-a10);
-  --bg-selected: var(--bg-drag);
+  --bg-selected: var(--pal-orange-a10);
 
   --border: var(--pal-neutral-300);
   --border-input: var(--pal-neutral-400);
@@ -193,17 +183,14 @@
 
   /* Fixed in both themes: these paint over pdf.js's white paper, which never darkens. */
   --cue-linked: var(--pal-orange-a15);
-  --cue-active: --alpha(#e2601f / 35%);
-  --cue-word: --alpha(#e2601f / 60%);
+  --cue-active: var(--pal-orange-a35);
+  --cue-word: var(--pal-orange-a60);
   --cue-ring: var(--pal-orange-600);
 
   --danger-text-hover: var(--pal-red-800);
   --success-text-hover: var(--pal-green-700);
-  --terminal-danger: var(--pal-red-400);
 
-  /* Reading surfaces. A warm, slightly dimmed ground rather than paper white: sepia measures
-     about 25% lower effective radiance and is the one display-mode finding with evidence behind
-     it. Contrast lands at 8.9:1 — comfortable, and deliberately short of pure black on white. */
+  /* Warm and slightly dimmed rather than paper white; see AGENTS.md. */
   --bg-reading: var(--pal-neutral-150);
   --border-reading: var(--border);
 
@@ -213,6 +200,7 @@
   --terminal-text: var(--pal-neutral-0);
   --terminal-dim: var(--pal-cream-a50);
   --terminal-border: var(--pal-cream-a15);
+  --terminal-danger: var(--pal-red-400);
 
   --badge-pending-bg: var(--bg-subtle);
   --badge-pending-text: var(--text-secondary);
@@ -234,8 +222,7 @@
   --badge-cancelled-text: var(--text-muted);
 }
 
-/* Grounded on the marketing site's own two darks. Only tokens whose value
-   actually differs belong here — the aliases above re-resolve on their own. */
+/* Only tokens whose value actually differs belong here — aliases re-resolve on their own. */
 @media (prefers-color-scheme: dark) {
   :root {
     --bg-page: var(--pal-neutral-950);
@@ -243,6 +230,7 @@
     --bg-card-hover: var(--pal-cream-a06);
     --bg-subtle: var(--pal-cream-a04);
     --bg-drag: var(--pal-ember-a14);
+    --bg-selected: var(--pal-ember-a14);
 
     --border: var(--pal-cream-a12);
     --border-input: var(--pal-cream-a26);
@@ -311,8 +299,7 @@ body {
   color: var(--text-primary);
 }
 
-/* @layer base, not a bare rule: an unlayered declaration beats @layer utilities whatever its
-   specificity, so font-bold on a heading would have been dead. */
+/* @layer base: an unlayered rule beats @layer utilities whatever its specificity. */
 @layer base {
   h1, h2 {
     font-family: var(--stack-display);
@@ -321,7 +308,7 @@ body {
   }
 }
 
-/* One rule rather than a ring utility per control: 45 of 266 controls carried it by hand. */
+/* One rule rather than a ring utility per control. */
 :where(button, a, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;

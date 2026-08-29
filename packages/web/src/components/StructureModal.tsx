@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { trpc } from "../trpc.ts";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
-import { Modal } from "./Modal.tsx";
+import { Modal, ModalHeader } from "./Modal.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { PRIMARY_BUTTON } from "../lib/button-classes.ts";
 
@@ -209,19 +209,11 @@ export function StructureModal({
   return (
     <>
       <Modal size="xl" onClose={onClose} closeOnEscape backdropTestId="structure-modal">
-        <div className="flex items-center justify-between p-5 border-b border-(--border)">
-          <div>
-            <h2 className="text-lg font-semibold text-(--text-primary)">Book structure</h2>
-            <p className="text-xs text-(--text-muted) mt-0.5">
-              Every heading found in the extraction output. Check the ones that start a chapter, then apply.
-            </p>
-          </div>
-          <button onClick={onClose} className="shrink-0 p-1 text-(--text-faint) hover:text-(--text-tertiary) rounded">
-            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-            </svg>
-          </button>
-        </div>
+        <ModalHeader
+          title="Book structure"
+          subtitle="Every heading found in the extraction output. Check the ones that start a chapter, then apply."
+          onClose={onClose}
+        />
 
         {chapterProposal && chapterProposal.status !== "running" ? (
           <div

@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { AfterExtractChoice } from "./AfterExtractChoice.tsx";
 import { BOOK_LANGUAGE_OPTIONS } from "../lib/languages.ts";
-import { Modal } from "./Modal.tsx";
+import { Modal, ModalHeader } from "./Modal.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
 
 export type ExtractScope = "selected" | "book" | "chapters";
@@ -76,21 +76,8 @@ export function ExtractModal({
   const blocked = disabledReason(scope) ?? (losing > 0 && !confirmed ? "Confirm the chapters you're replacing" : null);
 
   return (
-    <Modal size="md" onClose={onClose} labelledBy="extract-modal-title" testId="extract-modal">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-(--border)">
-        <h2 id="extract-modal-title" className="text-sm font-medium text-(--text-primary)">{hasChapters ? "Extract" : "Extract chapters"}</h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-(--text-faint) hover:text-(--text-tertiary) p-1 rounded"
-          title="Close"
-          aria-label="Close"
-        >
-          <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-          </svg>
-        </button>
-      </div>
+    <Modal size="md" onClose={onClose} testId="extract-modal">
+      <ModalHeader title={hasChapters ? "Extract" : "Extract chapters"} onClose={onClose} />
 
       <div className="p-4 space-y-4 overflow-y-auto">
         {hasChapters ? (

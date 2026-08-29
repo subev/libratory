@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { trpc } from "../trpc.ts";
 import { formatBytes } from "../lib/format.ts";
-import { Modal } from "./Modal.tsx";
+import { Modal, ModalHeader } from "./Modal.tsx";
 
 export function DiskUsageButton({ bookId }: { bookId: string }) {
   const [open, setOpen] = useState(false);
@@ -44,17 +44,8 @@ export function DiskUsageButton({ bookId }: { bookId: string }) {
 
       {open && (
         <Modal size="sm" onClose={() => setOpen(false)} backdropTestId="disk-usage-modal">
+          <ModalHeader title="Disk usage" onClose={() => setOpen(false)} />
           <div className="p-5 overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-(--text-primary)">Disk usage</h3>
-              <button
-                onClick={() => setOpen(false)}
-                className="text-(--text-muted) hover:text-(--text-primary) text-lg leading-none px-1"
-              >
-                &times;
-              </button>
-            </div>
-
             {!usage ? (
               <p className="text-sm text-(--text-muted)">Measuring...</p>
             ) : (

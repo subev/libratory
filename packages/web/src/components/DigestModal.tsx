@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { trpc } from "../trpc.ts";
-import { Modal } from "./Modal.tsx";
+import { Modal, ModalHeader } from "./Modal.tsx";
 import { DIGEST_LISTENING_PROMPT, DIGEST_PRESETS } from "../lib/ai-presets.ts";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { PillToggle } from "./PillToggle.tsx";
@@ -50,16 +50,7 @@ export function DigestModal({
 
   return (
     <Modal size="md" onClose={onClose} testId="digest-modal">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-(--border) shrink-0">
-        <span className="text-sm font-medium text-(--text-primary)">
-          Create digest from {included.length} books
-        </span>
-        <button onClick={onClose} className="text-(--text-faint) hover:text-(--text-tertiary) p-1" title="Close">
-          <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-          </svg>
-        </button>
-      </div>
+      <ModalHeader title={`Create digest from ${included.length} books`} onClose={onClose} />
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <div>

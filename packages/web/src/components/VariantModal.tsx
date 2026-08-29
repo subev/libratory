@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { trpc } from "../trpc.ts";
 import { TRANSLATION_LANGUAGES } from "../lib/languages.ts";
-import { Modal } from "./Modal.tsx";
+import { Modal, ModalHeader } from "./Modal.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
 
 type ChapterSummary = { id: string; index: number; title: string };
@@ -208,8 +208,7 @@ export function VariantModal({
 
   return (
     <Modal size="full" onClose={onClose} closeOnEscape backdropTestId="translation-modal">
-      <div className="flex items-center gap-4 p-4 border-b border-(--border)">
-        <h2 className="text-lg font-semibold text-(--text-primary)">Translate / Transform</h2>
+      <ModalHeader title="Translate / Transform" onClose={onClose}>
         <select
           value={selectValue}
           onChange={(e) => handleTargetChange(e.target.value)}
@@ -296,14 +295,7 @@ export function VariantModal({
         {mutationError ? (
           <span className="text-sm text-(--danger-text) truncate">{mutationError.message}</span>
         ) : null}
-
-        <div className="flex-1" />
-        <button onClick={onClose} className="shrink-0 p-1 text-(--text-faint) hover:text-(--text-tertiary) rounded">
-          <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-          </svg>
-        </button>
-      </div>
+      </ModalHeader>
 
       {draft ? (
         <div className="flex items-start gap-3 px-4 py-3 border-b border-(--border) bg-(--bg-subtle)" data-testid="transform-prompt-panel">

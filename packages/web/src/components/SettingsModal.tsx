@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { trpc } from "../trpc.ts";
 import type { RouterInputs } from "../../../server/src/router.ts";
-import { Modal } from "./Modal.tsx";
+import { Modal, ModalHeader } from "./Modal.tsx";
 import { useLlmModels } from "../lib/use-llm-models.ts";
 import { formatTokens } from "../lib/ai-presets.ts";
 import { TOOLBAR_BUTTON } from "../lib/button-classes.ts";
@@ -137,12 +137,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal size="md" onClose={onClose} backdropTestId="settings-modal">
-      <div className="flex items-center justify-between p-4 border-b border-(--border)">
-        <h2 className="text-lg font-semibold text-(--text-primary)">Settings</h2>
-        <button onClick={onClose} className="text-(--text-muted) hover:text-(--text-primary) text-xl leading-none px-1" title="Close">
-          ×
-        </button>
-      </div>
+      <ModalHeader title="Settings" onClose={onClose} />
 
       <div className="p-4 space-y-6 overflow-y-auto">
         <section data-testid="settings-default-model">

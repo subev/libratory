@@ -4,7 +4,7 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { trpc } from "../trpc.ts";
 import { profileHeaders } from "../lib/profile.ts";
 import { MarkdownBlock } from "./MarkdownBlock.tsx";
-import { Modal } from "./Modal.tsx";
+import { Modal, ModalHeader } from "./Modal.tsx";
 import { AI_PRESETS, estimateTokens, estimateTokensFromCounts, formatTokens } from "../lib/ai-presets.ts";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { PillToggle } from "./PillToggle.tsx";
@@ -133,29 +133,21 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
 
   return (
     <Modal size="lg" onClose={onClose} testId="chapter-ai-modal">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-(--border) shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="text-sm font-medium text-(--text-primary) shrink-0">Ask about</span>
-          <div className="inline-flex rounded-md border border-(--border) p-0.5 gap-0.5" data-testid="ai-scope-toggle">
-            {scopeOptions.map((option) => (
-              <button
-                key={option.key}
-                onClick={() => !option.disabled && switchKind(option.key)}
-                disabled={option.disabled}
-                title={option.title}
-                className={`px-2.5 py-1 rounded text-xs font-medium truncate max-w-64 ${ kind === option.key ? "bg-(--bg-subtle) text-(--text-primary)" : option.disabled ? "text-(--text-faint) cursor-not-allowed" : "text-(--text-muted) hover:text-(--text-secondary)" }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+      <ModalHeader title="Ask about" onClose={onClose}>
+        <div className="inline-flex rounded-md border border-(--border) p-0.5 gap-0.5 min-w-0" data-testid="ai-scope-toggle">
+          {scopeOptions.map((option) => (
+            <button
+              key={option.key}
+              onClick={() => !option.disabled && switchKind(option.key)}
+              disabled={option.disabled}
+              title={option.title}
+              className={`px-2.5 py-1 rounded text-xs font-medium truncate max-w-64 ${ kind === option.key ? "bg-(--bg-subtle) text-(--text-primary)" : option.disabled ? "text-(--text-faint) cursor-not-allowed" : "text-(--text-muted) hover:text-(--text-secondary)" }`}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
-        <button onClick={onClose} className="text-(--text-faint) hover:text-(--text-tertiary) p-1" title="Close">
-          <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-          </svg>
-        </button>
-      </div>
+      </ModalHeader>
 
       <div className="flex-1 flex min-h-0">
         {/* Left: presets + prompt */}
