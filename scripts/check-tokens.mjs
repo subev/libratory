@@ -1,5 +1,5 @@
 // bg-(--typo) compiles to valid CSS that paints nothing, which Tailwind cannot catch.
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const CSS = "packages/web/src/styles.css";
@@ -8,14 +8,9 @@ const SRC = "packages/web/src";
 const css = readFileSync(CSS, "utf8");
 const declared = new Set([...css.matchAll(/^\s*(--[a-z][a-z0-9-]*)\s*:/gm)].map((m) => m[1]));
 
-const files = [];
-(function walk(dir) {
-  for (const e of readdirSync(dir)) {
-    const p = join(dir, e);
-    if (statSync(p).isDirectory()) walk(p);
-    else if (/\.tsx?$/.test(p)) files.push(p);
-  }
-})(SRC);
+const files = readdirSync(SRC, { recursive: true })
+  .map((entry) => join(SRC, entry))
+  .filter((p) => /\.tsx?$/.test(p));
 
 const used = new Map();
 for (const f of files) {

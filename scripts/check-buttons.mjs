@@ -1,26 +1,21 @@
 // A hand-skinned <button> is a Button that nobody can restyle from one place. Tailwind sees valid
 // classes and TypeScript sees a valid element, so only a scan like this notices the duplication.
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const MODULE = "packages/web/src/components/Button.tsx";
 const SRC = "packages/web/src";
 const HINT = `use <Button variant=… size=…> from ".../components/Button" (with to= for in-app routes) — add a variant to ${MODULE} if none fits`;
 
-const files = [];
-(function walk(dir) {
-  for (const e of readdirSync(dir)) {
-    const p = join(dir, e);
-    if (statSync(p).isDirectory()) walk(p);
-    else if (p.endsWith(".tsx") && p !== MODULE) files.push(p);
-  }
-})(SRC);
+const files = readdirSync(SRC, { recursive: true })
+  .map((entry) => join(SRC, entry))
+  .filter((p) => p.endsWith(".tsx") && p !== MODULE);
 
 // A skin is padding or a fixed box, plus a shape, plus a fill or an edge.
 const skinned = (attrs) =>
-  /\brounded\b|\brounded-/.test(attrs) &&
+  /\brounded\b/.test(attrs) &&
   /\bpx-|\bpy-|\bp-[0-9]|\bw-[0-9]|\bsize-[0-9[]|\b[hw]-\[/.test(attrs) &&
-  /\bbg-\(--|\bbg-[a-z]|\bborder\b|\bborder-\(--/.test(attrs);
+  /\bbg-\(--|\bbg-[a-z]|\bborder\b/.test(attrs);
 
 const fail = [];
 for (const file of files) {
@@ -49,15 +44,13 @@ for (const file of files) {
     }
     if (open === -1) continue;
     let attrs = src.slice(m.index, open);
-    for (const ref of attrs.matchAll(/\{\s*`?([A-Za-z_$][\w$]*)`?\s*\}|\$\{([A-Za-z_$][\w$]*)\}/g)) {
-      const value = consts.get(ref[1] ?? ref[2]);
+    for (const ref of attrs.matchAll(/\$?\{\s*`?([A-Za-z_$][\w$]*)`?\s*\}/g)) {
+      const value = consts.get(ref[1]);
       if (value) attrs += " " + value;
     }
     // The opt-out may sit in a comment just above the element, which is where it reads best.
-    // The opt-out has to be written directly above the element it excuses. A character window is
-    // too loose — an incidental mention far above would cover everything below it — so this looks
-    // only at the two non-blank lines immediately preceding the tag.
-    // Verbatim, blanks included: a marker separated by empty lines is not "directly above".
+    // The three lines above the tag, blanks included, and only if no other tag sits between the
+    // marker and this one — an incidental mention far above must not cover everything below it.
     const above = src.slice(0, m.index).split("\n").slice(-4, -1);
     const marker = above.findIndex((l) => l.includes("button-ok"));
     const optedOut =
