@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { trpc } from "../../trpc.ts";
 import { MarkdownBlock } from "../MarkdownBlock.tsx";
+import { IconChevronRight, IconClose } from "../icons.tsx";
 
 export function SavedAnswers() {
   const [open, setOpen] = useState(false);
@@ -19,9 +20,7 @@ export function SavedAnswers() {
         onClick={() => setOpen(!open)}
         className="flex items-center gap-2 text-sm text-(--text-muted) hover:text-(--text-primary)"
       >
-        <svg className={`w-3 h-3 transition-transform ${open ? "rotate-90" : ""}`} viewBox="0 0 16 16" fill="currentColor">
-          <path d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z" />
-        </svg>
+        <IconChevronRight className={`w-3 h-3 transition-transform ${open ? "rotate-90" : ""}`} />
         Saved answers ({notes.length})
       </button>
       {open && (
@@ -45,7 +44,7 @@ export function SavedAnswers() {
                     className="text-xs text-(--text-faint) hover:text-(--danger-text) shrink-0"
                     title="Delete saved answer"
                   >
-                    ✕
+                    <IconClose className="h-3 w-3" />
                   </button>
                 </div>
                 {expanded && (

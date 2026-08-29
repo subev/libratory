@@ -2,6 +2,7 @@ import { useState } from "react";
 import { trpc } from "../trpc.ts";
 import { formatBytes } from "../lib/format.ts";
 import { Modal, ModalHeader } from "./Modal.tsx";
+import { IconDisk } from "./icons.tsx";
 
 export function DiskUsageButton({ bookId }: { bookId: string }) {
   const [open, setOpen] = useState(false);
@@ -36,9 +37,7 @@ export function DiskUsageButton({ bookId }: { bookId: string }) {
         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-(--border-input) bg-(--bg-card) text-sm font-medium text-(--text-secondary) shadow-sm hover:bg-(--bg-subtle) tabular-nums"
         data-testid="disk-usage"
       >
-        <svg className="w-4 h-4 text-(--text-muted)" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M2.75 3A1.75 1.75 0 001 4.75v2.5C1 8.216 1.784 9 2.75 9h10.5A1.75 1.75 0 0015 7.25v-2.5A1.75 1.75 0 0013.25 3H2.75zm9.75 3.75a.75.75 0 110-1.5.75.75 0 010 1.5zM2.75 10A1.75 1.75 0 001 11.75v.5c0 .966.784 1.75 1.75 1.75h10.5A1.75 1.75 0 0015 12.25v-.5A1.75 1.75 0 0013.25 10H2.75zm9.75 2.75a.75.75 0 110-1.5.75.75 0 010 1.5z"/>
-        </svg>
+        <IconDisk className="w-4 h-4 text-(--text-muted)" />
         {usage ? formatBytes(usage.total) : "..."}
       </button>
 

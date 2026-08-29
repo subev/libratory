@@ -4,6 +4,7 @@ import { StatusBadge } from "./StatusBadge.tsx";
 import { ChapterModal, chapterAudioDownload } from "./ChapterModal.tsx";
 import { ChapterAiModal } from "./ChapterAiModal.tsx";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
+import { IconChevronRight, IconClose, IconDragHandle, IconExternal, IconRename } from "./icons.tsx";
 
 export type ChapterRow = {
   id: string;
@@ -213,7 +214,7 @@ export function ChapterTable({
             onClick={() => setFiltersOpen((v) => !v)}
             className="flex items-center gap-1.5 text-sm font-medium text-(--text-tertiary) hover:text-(--text-primary)"
           >
-            <span className={`text-xs transition-transform ${filtersOpen ? "rotate-90" : ""}`}>&#9654;</span>
+            <IconChevronRight className={`h-3 w-3 transition-transform ${filtersOpen ? "rotate-90" : ""}`} />
             Filter
             {activeFilterCount > 0 && !filtersOpen ? (
               <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-(--accent-subtle) text-(--accent-text)">
@@ -430,9 +431,7 @@ export function ChapterTable({
                 >
                   {canDrag && (
                     <td className="px-2 py-3 cursor-grab text-(--text-faint)">
-                      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-                      </svg>
+                      <IconDragHandle className="h-4 w-4" />
                     </td>
                   )}
                   <td className="px-3 py-3">
@@ -483,7 +482,7 @@ export function ChapterTable({
                           title={`Open the source book: "${chapter.source.title}"`}
                           data-testid="chapter-source-link"
                         >
-                          source ↗
+                          source <IconExternal className="h-3 w-3" />
                         </Link>
                       ) : chapter.source?.kind === "url" ? (
                         <a
@@ -493,7 +492,7 @@ export function ChapterTable({
                           className="text-xs text-(--accent-text) hover:text-(--accent-text-hover)"
                           title={chapter.source.title ?? chapter.source.url}
                         >
-                          source ↗
+                          source <IconExternal className="h-3 w-3" />
                         </a>
                       ) : null}
                       {chapter.pageStart ? (
@@ -654,8 +653,9 @@ export function ChapterTable({
             onClick={handleStopPlayer}
             className="text-xs text-(--text-faint) hover:text-(--text-tertiary) shrink-0"
             title="Close player"
+            aria-label="Close player"
           >
-            &#10005;
+            <IconClose className="h-3 w-3" />
           </button>
         </div>
       ) : null}
@@ -826,10 +826,9 @@ function EditableChapterTitle({
           onClick={(e) => { e.stopPropagation(); setValue(title); setEditing(true); }}
           className="text-(--text-faint) hover:text-(--text-tertiary) opacity-0 group-hover:opacity-100 transition-opacity"
           title="Rename chapter"
+          aria-label="Rename chapter"
         >
-          <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M12.146.854a.5.5 0 0 1 .708 0l2.292 2.292a.5.5 0 0 1 0 .708l-9.5 9.5a.5.5 0 0 1-.168.11l-3.5 1.5a.5.5 0 0 1-.65-.65l1.5-3.5a.5.5 0 0 1 .11-.168l9.5-9.5zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5z"/>
-          </svg>
+          <IconRename className="w-3 h-3" />
         </button>
       )}
     </span>

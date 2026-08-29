@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import { TOOLBAR_BUTTON } from "../lib/button-classes.ts";
+import { IconMicrophone } from "./icons.tsx";
 import {
   cartesiaVoiceToEntry,
   elevenlabsVoiceToEntry,
@@ -113,10 +114,7 @@ export function VoicePickerChip({ value, onChange, title }: VoicePickerProps) {
         data-testid="voice-picker-trigger"
       >
         {/* A chevron promised a dropdown; this opens a modal, so it reads as a button instead. */}
-        <svg className="h-3.5 w-3.5 shrink-0 text-(--text-faint)" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-          <path d="M10 2.75a1.25 1.25 0 00-1.25 1.25v6a1.25 1.25 0 002.5 0v-6A1.25 1.25 0 0010 2.75z" />
-          <path d="M5.5 9.25a.75.75 0 00-1.5 0 6 6 0 005.25 5.954V17h-2a.75.75 0 000 1.5h5.5a.75.75 0 000-1.5h-2v-1.796A6 6 0 0016 9.25a.75.75 0 00-1.5 0 4.5 4.5 0 01-9 0z" />
-        </svg>
+        <IconMicrophone className="h-3.5 w-3.5 shrink-0 text-(--text-faint)" />
         <span className="text-(--text-faint)">Voice</span>
         <span className="truncate max-w-56">{label}</span>
       </button>

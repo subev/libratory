@@ -158,6 +158,43 @@ paper in **both** themes. Anything drawn on that layer must read against white; 
 do not belong there. The same applies to `LogDock`, which sits on `--bg-terminal` (dark in both
 themes) and therefore uses the `--terminal-*` tokens rather than the theme ramp.
 
+## Icons — read this before drawing an SVG
+
+Every icon comes from **`packages/web/src/components/icons.tsx`**, which is the only file allowed to
+import `@phosphor-icons/react`. Names are what the app calls the thing (`IconRename`), not what
+Phosphor calls it (`PencilSimple`), so the set can be swapped without touching a call site.
+
+```tsx
+import { IconDelete } from "./icons.tsx";
+<IconDelete className="h-4 w-4 text-(--text-muted)" />
+```
+
+**Need one that is not there?** Find it at [phosphoricons.com](https://phosphoricons.com), add one
+`Name as IconThing` line to the module, and use it. That is the whole process — the module is a flat
+re-export on purpose. Check `/components` first: it renders the full set with a name filter, read off
+the module itself, so it cannot drift from what actually exists.
+
+**Two gates enforce this**, because neither a type nor a normal lint rule can see it:
+
+- `oxlint`'s `no-restricted-imports` fails on `@phosphor-icons/react` anywhere but the module.
+- `scripts/check-icons.mjs` (in `pnpm lint`) fails on an inline `<svg>`, a unicode glyph, an emoji,
+  or an HTML entity used as an icon — and on an export in the module that nothing renders.
+
+Four rules the sweep of 82 hand-rolled icons established:
+
+- **Size with Tailwind classes, never the `size` prop.** `className="h-4 w-4"` overrides Phosphor's
+  `1em` default and keeps sizing lintable and consistent with every other box in the app.
+- **Weight carries state, colour is free for something else.** Regular is idle, `weight="fill"` is
+  active — the playing track, the selected voice. This is why Phosphor was chosen over Lucide, which
+  is stroke-only and can only signal active by recolouring.
+- **Never `aria-hidden` at the call site.** `IconDefaults` in `main.tsx` sets it for every icon;
+  Phosphor sets none of its own. An icon-only button still needs its own `aria-label`.
+- **An emoji is not an icon.** It is full-colour OS artwork that ignores the palette and redraws
+  itself differently on macOS and Windows — which matters now that the app ships on both. A `✓` is
+  not an icon either: it inherits the text font and lands at whatever size and baseline that font
+  decides. If you need an arrow in genuine prose (`press ←`), spell it out; if you truly cannot,
+  mark the line `prose-glyph`.
+
 ## The Pipeline
 
 ```

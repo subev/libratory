@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { trpc } from "../trpc.ts";
 import { formatLogTime } from "../lib/format.ts";
 import { useBodyScrollLock } from "../lib/use-body-scroll-lock.ts";
+import { IconChevronUp, IconClose } from "./icons.tsx";
 
 // Docked above the app's modals (z-50) so activity stays visible while they're open
 export function LogDock({ bookId, isProcessing, files }: { bookId: string; isProcessing: boolean; files?: { index: number; filename: string }[] }) {
@@ -59,7 +60,7 @@ export function LogDock({ bookId, isProcessing, files }: { bookId: string; isPro
         ) : (
           <span className="text-(--terminal-dim) flex-1">Waiting for logs...</span>
         )}
-        <span className="shrink-0 text-(--terminal-dim)">&#9650;</span>
+        <span className="shrink-0 text-(--terminal-dim)"><IconChevronUp className="h-3 w-3" /></span>
       </button>
 
       {open && (
@@ -105,7 +106,7 @@ export function LogDock({ bookId, isProcessing, files }: { bookId: string; isPro
                 className="text-(--terminal-dim) hover:text-(--terminal-text) text-lg leading-none px-1"
                 title="Close (Esc)"
               >
-                &times;
+                <IconClose className="h-5 w-5" />
               </button>
             </div>
             <LogScroller logs={filteredLogs} />

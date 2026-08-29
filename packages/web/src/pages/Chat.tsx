@@ -9,6 +9,7 @@ import { ChatMessage } from "../components/chat/ChatMessage.tsx";
 import { SavedAnswers } from "../components/chat/SavedAnswers.tsx";
 import { PdfPreviewModal } from "../components/PdfPreviewModal.tsx";
 import { ModelBundleNotice } from "../components/ModelBundleNotice.tsx";
+import { IconArrowLeft, IconBook, IconClose } from "../components/icons.tsx";
 
 type FolderOption = { id: string; name: string; depth: number };
 
@@ -91,7 +92,7 @@ export function Chat() {
     <div className="min-h-screen bg-(--bg-page)">
       <div className="max-w-3xl mx-auto px-6 py-6 flex flex-col min-h-screen">
         <div className="flex items-center gap-3 mb-4">
-          <Link to="/" className="text-(--text-faint) hover:text-(--text-secondary) text-sm">← Library</Link>
+          <Link to="/" className="inline-flex items-center gap-1 text-(--text-faint) hover:text-(--text-secondary) text-sm"><IconArrowLeft className="h-4 w-4" />Library</Link>
           <h1 className="text-xl font-bold text-(--text-primary)">Library chat</h1>
           <div className="ml-auto flex items-center gap-2">
             {messages.length > 0 && (
@@ -108,13 +109,14 @@ export function Chat() {
                 className="inline-flex items-center gap-1.5 max-w-72 text-sm px-2.5 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-primary)"
                 data-testid="chat-book-scope"
               >
-                <span className="truncate" title={scopedBook?.title}>📖 {scopedBook?.title ?? "…"}</span>
+                <IconBook className="h-4 w-4 shrink-0" />
+                <span className="truncate" title={scopedBook?.title}>{scopedBook?.title ?? "…"}</span>
                 <button
                   onClick={() => setSearchParams({})}
                   className="text-(--text-faint) hover:text-(--text-secondary) shrink-0"
                   title="Widen scope to the whole library"
                 >
-                  ✕
+                  <IconClose className="h-4 w-4" />
                 </button>
               </span>
             ) : (
@@ -127,7 +129,7 @@ export function Chat() {
               <option value="">Whole library</option>
               {folderOptions.map((f) => (
                 <option key={f.id} value={f.id}>
-                  {"  ".repeat(f.depth)}📁 {f.name}
+                  {"  ".repeat(f.depth)}{f.name}
                 </option>
               ))}
             </select>

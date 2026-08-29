@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 
+import { IconArrowLeft } from "../components/icons.tsx";
 import { ReaderFor } from "./Reader.tsx";
 import { containerSource, type DocumentSource } from "../lib/reader-source.ts";
 
@@ -49,7 +50,7 @@ export function ReaderOpen() {
     <div className="min-h-screen bg-(--bg-page) px-4 py-3">
       <div className="mx-auto max-w-2xl">
         <p className="mb-4 text-sm">
-          <Link to="/" className="text-(--accent-text) hover:text-(--accent-text-hover)">← Library</Link>
+          <Link to="/" className="inline-flex items-center gap-1 text-(--accent-text) hover:text-(--accent-text-hover)"><IconArrowLeft className="h-4 w-4" />Library</Link>
         </p>
         <div
           onDragOver={(e) => { e.preventDefault(); setOver(true); }}

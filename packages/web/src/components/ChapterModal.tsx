@@ -18,6 +18,7 @@ import { useAudioTime } from "../lib/use-audio-time.ts";
 import { usePlayPauseKey } from "../lib/play-pause-key.ts";
 import { SPEEDS, loadSpeed, saveSpeed } from "../lib/playback-speed.ts";
 import { readingLang } from "../lib/reading-lang.ts";
+import { IconChevronLeft, IconChevronRight, IconClose, IconPause, IconPlay } from "./icons.tsx";
 import type { ChapterRow, FileInfo, VariantRef } from "./ChapterTable.tsx";
 
 type ChapterModalProps = {
@@ -415,9 +416,10 @@ function ChapterModalBody({
           href="#prev"
           onClick={(e) => { e.preventDefault(); onNavigate(chapterIndex - 1); }}
           className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-(--bg-card)/90 shadow-md border border-(--border) text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-card) transition-colors text-xl font-light select-none no-underline"
-          title="Previous chapter (←)"
+          title="Previous chapter (Left arrow)"
+          aria-label="Previous chapter"
         >
-          &lt;
+          <IconChevronLeft className="h-5 w-5" />
         </a>
       ) : null}
       {hasNext ? (
@@ -425,9 +427,10 @@ function ChapterModalBody({
           href="#next"
           onClick={(e) => { e.preventDefault(); onNavigate(chapterIndex + 1); }}
           className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-(--bg-card)/90 shadow-md border border-(--border) text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-card) transition-colors text-xl font-light select-none no-underline"
-          title="Next chapter (→)"
+          title="Next chapter (Right arrow)"
+          aria-label="Next chapter"
         >
-          &gt;
+          <IconChevronRight className="h-5 w-5" />
         </a>
       ) : null}
       <div className="relative bg-(--bg-card) rounded-xl shadow-2xl w-[92vw] max-w-6xl h-[92vh] flex flex-col">
@@ -509,10 +512,9 @@ function ChapterModalBody({
           <button
             onClick={onClose}
             className="shrink-0 p-1 text-(--text-faint) hover:text-(--text-tertiary) rounded"
+            aria-label="Close"
           >
-            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-            </svg>
+            <IconClose className="h-5 w-5" />
           </button>
         </div>
 
@@ -1064,13 +1066,9 @@ function ChunkPreviewPanel({
               className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-(--accent) text-(--on-accent) hover:bg-(--accent-hover)"
             >
               {isPlaying ? (
-                <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M6 4h3v12H6zM11 4h3v12h-3z" />
-                </svg>
+                <IconPause className="h-3.5 w-3.5" weight="fill" />
               ) : (
-                <svg className="h-3.5 w-3.5 translate-x-px" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M6 4l10 6-10 6V4z" />
-                </svg>
+                <IconPlay className="h-3.5 w-3.5 translate-x-px" />
               )}
             </button>
           ) : null}

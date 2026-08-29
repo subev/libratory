@@ -7,6 +7,7 @@ import { BookSearchResults } from "../components/BookSearchResults.tsx";
 import { Breadcrumbs } from "../components/Breadcrumbs.tsx";
 import { ProfileSwitcher } from "../components/ProfileSwitcher.tsx";
 import { SettingsModal } from "../components/SettingsModal.tsx";
+import { IconChat, IconBook, IconSettings, IconFolder, IconClose } from "../components/icons.tsx";
 import type { DragItems } from "../lib/dnd.ts";
 
 export function Home() {
@@ -44,18 +45,20 @@ export function Home() {
           <ProfileSwitcher />
           <Link
             to={folderId ? `/chat?folderId=${folderId}` : "/chat"}
-            className="ml-auto text-sm px-3 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
+            className="ml-auto inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
             data-testid="library-chat-link"
           >
-            💬 Chat with library
+            <IconChat className="h-4 w-4" />
+            Chat with library
           </Link>
           <Link
             to="/open"
             title="Open a synced EPUB and read along on its own pages — nothing is uploaded"
-            className="ml-2 text-sm px-3 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
+            className="ml-2 inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
             data-testid="open-container-link"
           >
-            📖 Open a read-along EPUB
+            <IconBook className="h-4 w-4" />
+            Open a read-along EPUB
           </Link>
           <button
             onClick={() => setShowSettings(true)}
@@ -63,7 +66,7 @@ export function Home() {
             data-testid="settings-gear"
             className="text-sm px-2.5 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
           >
-            ⚙️
+            <IconSettings className="h-4 w-4" />
           </button>
         </div>
         {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
@@ -89,8 +92,8 @@ export function Home() {
 
         <section>
           <div className="flex items-center gap-3 mb-3">
-            <h2 className="text-lg font-semibold text-(--text-secondary)">
-              {currentFolder ? `📁 ${currentFolder.name}` : "Books"}
+            <h2 className="flex items-center gap-1.5 text-lg font-semibold text-(--text-secondary)">
+              {currentFolder ? <><IconFolder className="h-5 w-5" />{currentFolder.name}</> : "Books"}
             </h2>
             <div className="ml-auto relative">
               <input
@@ -108,7 +111,7 @@ export function Home() {
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-(--text-faint) hover:text-(--text-secondary)"
                   data-testid="clear-search"
                 >
-                  ✕
+                  <IconClose className="h-4 w-4" />
                 </button>
               )}
             </div>

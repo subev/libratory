@@ -7,6 +7,7 @@ import { ModelPicker } from "./ModelPicker.tsx";
 import { PillToggle } from "./PillToggle.tsx";
 import { profileHeaders } from "../lib/profile.ts";
 import { AfterExtractChoice } from "./AfterExtractChoice.tsx";
+import { IconDragHandle, IconClose, IconAdd } from "./icons.tsx";
 
 type UploadZoneProps = {
   onUploadComplete: () => void;
@@ -315,9 +316,7 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
               >
                 {isReorderable && (
                   <span className="cursor-grab text-(--text-faint) select-none" title="Drag to reorder">
-                    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
-                      <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-                    </svg>
+                    <IconDragHandle className="h-4 w-4" />
                   </span>
                 )}
                 {isMultiFile && (
@@ -334,18 +333,16 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
                   title={`Remove ${file.name}`}
                   className="shrink-0 p-1 text-(--text-faint) hover:text-(--text-tertiary) rounded"
                 >
-                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                  </svg>
+                  <IconClose className="h-4 w-4" />
                 </button>
               </div>
             ))}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="w-full py-2 text-xs text-(--text-muted) hover:text-(--text-secondary) border border-dashed border-(--border-input) rounded-md transition-colors"
+              className="w-full py-2 flex items-center justify-center gap-1 text-xs text-(--text-muted) hover:text-(--text-secondary) border border-dashed border-(--border-input) rounded-md transition-colors"
             >
-              + Add more files
+              <IconAdd className="h-3 w-3" /> Add more files
             </button>
           </div>
         ) : (

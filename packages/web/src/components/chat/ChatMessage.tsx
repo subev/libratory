@@ -3,6 +3,7 @@ import type { UIMessage } from "ai";
 import { trpc } from "../../trpc.ts";
 import { MarkdownBlock } from "../MarkdownBlock.tsx";
 import { SourceChips, type ChatSource } from "./SourceChips.tsx";
+import { IconSearch, IconCheck } from "../icons.tsx";
 
 function messageText(message: UIMessage): string {
   return (message.parts ?? [])
@@ -72,9 +73,7 @@ export function ChatMessage({
         if (!label) return null;
         return (
           <div key={i} className="flex items-center gap-1.5 text-xs text-(--text-faint)">
-            <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M11.742 10.344a6.5 6.5 0 10-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 001.415-1.414l-3.85-3.85a1.007 1.007 0 00-.115-.1zM12 6.5a5.5 5.5 0 11-11 0 5.5 5.5 0 0111 0z" />
-            </svg>
+            <IconSearch className="w-3 h-3" />
             {label}
           </div>
         );
@@ -85,7 +84,7 @@ export function ChatMessage({
           <SourceChips sources={sources} onOpenPdf={onOpenPdf} />
           <div className="flex items-center gap-2 mt-2">
             {savedNoteId ? (
-              <span className="text-xs text-(--success-text)">Saved to notes ✓</span>
+              <span className="inline-flex items-center gap-1 text-xs text-(--success-text)">Saved to notes <IconCheck className="h-3 w-3" /></span>
             ) : (
               <button
                 onClick={() => saveNote.mutate({ question: question || "Library chat", markdown: text, model, folderId })}

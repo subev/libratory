@@ -10,6 +10,7 @@ import { installExclusiveAudio } from "./lib/exclusive-audio.ts";
 import { installBreadcrumbs } from "./lib/breadcrumbs.ts";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
 import { UpdateProgress } from "./components/UpdateProgress.tsx";
+import { IconDefaults } from "./components/icons.tsx";
 import { Home } from "./pages/Home.tsx";
 import { BookDetail } from "./pages/BookDetail.tsx";
 import { Chat } from "./pages/Chat.tsx";
@@ -44,16 +45,18 @@ createRoot(document.getElementById("root")!).render(
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <ErrorBoundary>
-            <UpdateProgress />
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/folders/:folderId" element={<Home />} />
-              <Route path="/books/:id" element={<BookDetail />} />
-              <Route path="/books/:id/read" element={<Suspense fallback={null}><Reader /></Suspense>} />
-              <Route path="/open" element={<Suspense fallback={null}><ReaderOpen /></Suspense>} />
-              <Route path="/chat" element={<Chat />} />
-              <Route path="/components" element={<Suspense fallback={null}><Components /></Suspense>} />
-            </Routes>
+            <IconDefaults>
+              <UpdateProgress />
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/folders/:folderId" element={<Home />} />
+                <Route path="/books/:id" element={<BookDetail />} />
+                <Route path="/books/:id/read" element={<Suspense fallback={null}><Reader /></Suspense>} />
+                <Route path="/open" element={<Suspense fallback={null}><ReaderOpen /></Suspense>} />
+                <Route path="/chat" element={<Chat />} />
+                <Route path="/components" element={<Suspense fallback={null}><Components /></Suspense>} />
+              </Routes>
+            </IconDefaults>
           </ErrorBoundary>
         </BrowserRouter>
       </QueryClientProvider>

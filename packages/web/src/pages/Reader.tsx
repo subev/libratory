@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 
+import { IconArrowLeft, IconPause, IconPlay } from "../components/icons.tsx";
 import { CueTranscript } from "../components/reader/CueTranscript.tsx";
 import { CuePages } from "../components/reader/CuePages.tsx";
 import { bodyFit, chapterPages, UNMAPPED, type ReaderCues, type ReaderManifest } from "../lib/reader-doc.ts";
@@ -18,7 +19,7 @@ const READER_BAND: FollowBand = { top: 120, bottom: 140, landing: 0.3 };
 const WIDTHS = [
   { id: "full", label: "Full", px: null },
   { id: "phone", label: "Phone", px: 393 },
-  { id: "phone-landscape", label: "Phone ↻", px: 852 },
+  { id: "phone-landscape", label: "Landscape", px: 852 },
 ] as const;
 
 const VIEWS = [
@@ -215,7 +216,7 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-(--accent) text-(--on-accent) hover:bg-(--accent-hover) disabled:opacity-40"
             data-testid="reader-play"
           >
-            {playing ? "❚❚" : "▶"}
+            {playing ? <IconPause weight="fill" className="h-4 w-4" /> : <IconPlay className="h-4 w-4" />}
           </button>
 
           <select
@@ -399,8 +400,9 @@ function ReaderShell({ bookId, chapterId, title, children }: { bookId?: string; 
     <div className="min-h-screen bg-(--bg-page) px-4 py-3">
       <div className="mx-auto max-w-5xl">
         <nav className="mb-2 flex items-center gap-2 text-sm text-(--text-muted)">
-          <Link to={back} className="text-(--accent-text) hover:text-(--accent-text-hover)" data-testid="reader-back">
-            ← Back
+          <Link to={back} className="flex items-center gap-1 text-(--accent-text) hover:text-(--accent-text-hover)" data-testid="reader-back">
+            <IconArrowLeft className="h-4 w-4" />
+            Back
           </Link>
           {title && <span className="truncate text-(--text-secondary)">{title}</span>}
         </nav>

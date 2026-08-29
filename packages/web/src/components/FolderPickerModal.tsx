@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { trpc } from "../trpc.ts";
 import { Modal, ModalHeader } from "./Modal.tsx";
 import { PRIMARY_BUTTON } from "../lib/button-classes.ts";
+import { IconFolder } from "./icons.tsx";
 
 type FolderNode = { id: string; name: string; depth: number };
 
@@ -86,7 +87,7 @@ export function FolderPickerModal({
     }
   }
 
-  const row = (id: string | null, label: string, depth: number) => (
+  const row = (id: string | null, label: string, depth: number, folderIcon = false) => (
     <button
       key={id ?? "root"}
       onClick={() => setTargetId(id)}
@@ -97,6 +98,7 @@ export function FolderPickerModal({
       data-testid="folder-picker-row"
     >
       <span className={`w-3 h-3 rounded-full border shrink-0 ${targetId === id ? "bg-(--accent) border-(--accent)" : "border-(--border)"}`} />
+      {folderIcon && <IconFolder className="h-4 w-4 shrink-0" />}
       <span className="truncate">{label}</span>
     </button>
   );
@@ -107,7 +109,7 @@ export function FolderPickerModal({
 
       <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
         {row(null, "Unfiled (home)", 0)}
-        {tree.map((n) => row(n.id, `📁 ${n.name}`, n.depth))}
+        {tree.map((n) => row(n.id, n.name, n.depth, true))}
       </div>
 
       <div className="border-t border-(--border) px-4 py-3 shrink-0 space-y-2">

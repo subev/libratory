@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { trpc } from "../trpc.ts";
 import { getStoredProfileId } from "../lib/profile.ts";
 import { Modal, ModalHeader } from "./Modal.tsx";
+import { IconChat, IconArrowRight } from "./icons.tsx";
 
 function todayIso(): string {
   const d = new Date();
@@ -264,10 +265,10 @@ export function HnDigestModal({ onClose }: { onClose: () => void }) {
                   href={`https://news.ycombinator.com/item?id=${story.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="shrink-0 text-(--text-faint) hover:text-(--text-secondary)"
+                  className="inline-flex items-center gap-1 shrink-0 text-(--text-faint) hover:text-(--text-secondary)"
                   title={`${story.comments} comments on Hacker News`}
                 >
-                  💬 {story.comments}
+                  <IconChat className="h-3 w-3" /> {story.comments}
                 </a>
               </div>
             ))}
@@ -315,10 +316,10 @@ export function HnDigestModal({ onClose }: { onClose: () => void }) {
         {state === "done" && bookId && (
           <Link
             to={`/books/${bookId}`}
-            className="text-xs font-medium text-(--accent-text) hover:text-(--accent-text-hover)"
+            className="inline-flex items-center gap-1 text-xs font-medium text-(--accent-text) hover:text-(--accent-text-hover)"
             data-testid="hn-digest-open"
           >
-            Open the book →
+            Open the book <IconArrowRight className="h-3 w-3" />
           </Link>
         )}
         {state === "failed" && <span className="text-xs text-(--danger-text)">Failed — see the log above</span>}

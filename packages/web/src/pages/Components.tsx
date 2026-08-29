@@ -1,9 +1,17 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { Link } from "react-router";
 import css from "../styles.css?raw";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON, DANGER_BUTTON, TOOLBAR_BUTTON } from "../lib/button-classes.ts";
 import { PillToggle } from "../components/PillToggle.tsx";
 import { StatusBadge, statusStyles } from "../components/StatusBadge.tsx";
+import * as Icons from "../components/icons.tsx";
+
+type IconComponent = ComponentType<{ className?: string; weight?: "regular" | "fill" }>;
+
+// Read off the module rather than listed here, so an icon added there shows up without a second edit.
+const ICONS = (Object.entries(Icons) as [string, IconComponent][])
+  .filter(([name]) => name.startsWith("Icon") && name !== "IconDefaults")
+  .sort(([a], [b]) => a.localeCompare(b));
 
 type Token = { name: string; text?: boolean; on?: string };
 type Group = { title: string; tokens: Token[] };
@@ -131,6 +139,46 @@ function Swatch({ token }: { token: Token }) {
     <div>
       <div className="h-10 rounded border border-(--border)" style={{ background: `var(${token.name})` }} />
       {label}
+    </div>
+  );
+}
+
+function IconGallery() {
+  const [query, setQuery] = useState("");
+  const needle = query.trim().toLowerCase();
+  const shown = ICONS.filter(([name]) => name.toLowerCase().includes(needle));
+
+  return (
+    <div className={`space-y-4 ${CARD}`}>
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Filter by name"
+          aria-label="Filter icons"
+          className="w-56 rounded-md border border-(--border) bg-(--bg-input) px-3 py-1.5 text-sm text-(--text-primary) placeholder:text-(--text-faint)"
+        />
+        <span className="font-mono text-xs text-(--text-muted)">
+          {shown.length} of {ICONS.length}
+        </span>
+      </div>
+      {shown.length === 0 ? (
+        <p className="text-sm text-(--text-muted)">
+          Nothing matches. Find one at phosphoricons.com and add a line to components/icons.tsx.
+        </p>
+      ) : (
+        <ul className="grid grid-cols-[repeat(auto-fill,minmax(124px,1fr))] gap-2">
+          {shown.map(([name, Icon]) => (
+            <li
+              key={name}
+              className="flex flex-col items-center gap-2 rounded-md border border-(--border) px-2 py-3"
+            >
+              <Icon className="h-5 w-5 text-(--text-primary)" />
+              <span className="w-full truncate text-center font-mono text-[10px] text-(--text-muted)">{name}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -264,6 +312,31 @@ export function Components() {
               </PillToggle>
             </div>
           </div>
+        </Section>
+
+        <Section id="icons" title={`Icons (${ICONS.length})`}>
+          <p className="text-sm text-(--text-secondary)">
+            The whole set, read off components/icons.tsx. Nothing else in the app may draw an SVG or use an emoji —
+            scripts/check-icons.mjs fails the build on either. Weight carries state: regular for idle, fill for active.
+          </p>
+          <div className={`flex flex-wrap gap-8 ${CARD}`}>
+            {([["IconPlay", Icons.IconPlay], ["IconChat", Icons.IconChat], ["IconMicrophone", Icons.IconMicrophone]] as [string, IconComponent][]).map(
+              ([name, Icon]) => (
+                <div key={name} className="flex items-center gap-4">
+                  <div className="flex flex-col items-center gap-1.5">
+                    <Icon className="h-6 w-6 text-(--text-muted)" />
+                    <span className="font-mono text-[10px] text-(--text-faint)">idle</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-1.5">
+                    <Icon weight="fill" className="h-6 w-6 text-(--accent-text)" />
+                    <span className="font-mono text-[10px] text-(--text-faint)">active</span>
+                  </div>
+                  <span className="font-mono text-xs text-(--text-muted)">{name}</span>
+                </div>
+              ),
+            )}
+          </div>
+          <IconGallery />
         </Section>
 
         <Section id="badges" title="StatusBadge">

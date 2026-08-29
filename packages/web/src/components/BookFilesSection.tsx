@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { ExtractModal, type ExtractScope } from "./ExtractModal.tsx";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
+import { IconStop, IconRefresh, IconDelete } from "./icons.tsx";
 
 export type BookFileRow = {
   id: string;
@@ -234,9 +235,7 @@ export function BookFilesSection({
                       title={file.status !== "extracting" && file.status !== "pending" ? "File is not extracting" : "Cancel extraction"}
                       className="p-1 rounded text-(--warning-text) hover:bg-(--warning-bg) disabled:opacity-20 disabled:cursor-not-allowed"
                     >
-                      <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5a5.5 5.5 0 110 11 5.5 5.5 0 010-11zM6 6h4v4H6V6z"/>
-                      </svg>
+                      <IconStop className="w-4 h-4" />
                     </button>
                     {/* Re-extract */}
                     <button
@@ -250,10 +249,7 @@ export function BookFilesSection({
                       }
                       className="p-1 rounded text-(--accent-text) hover:bg-(--bg-selected) disabled:opacity-20 disabled:cursor-not-allowed"
                     >
-                      <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M11.534 7h3.932a.25.25 0 01.192.41l-1.966 2.36a.25.25 0 01-.384 0l-1.966-2.36A.25.25 0 0111.534 7zM.534 9h3.932a.25.25 0 00.192-.41L2.692 6.23a.25.25 0 00-.384 0L.342 8.59A.25.25 0 00.534 9z"/>
-                        <path d="M8 3a5 5 0 00-4.546 2.914.5.5 0 01-.908-.418A6 6 0 0114 8a.5.5 0 01-1 0 5 5 0 00-5-5zM2.5 8a.5.5 0 01.5.5A5 5 0 0012.546 11.086a.5.5 0 11.908.418A6 6 0 012 8.5a.5.5 0 01.5-.5z"/>
-                      </svg>
+                      <IconRefresh className="w-4 h-4" />
                     </button>
                     {/* Remove */}
                     <button
@@ -267,9 +263,7 @@ export function BookFilesSection({
                       title={file.status === "extracting" ? "Cannot remove while extracting" : "Remove this file and its chapters"}
                       className="p-1 rounded text-(--danger-text) hover:bg-(--danger-bg) disabled:opacity-20 disabled:cursor-not-allowed"
                     >
-                      <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M5.75 1a.75.75 0 00-.75.75v.5H2.5a.75.75 0 000 1.5h.31l.69 9.112A1.75 1.75 0 005.246 14.5h5.508a1.75 1.75 0 001.746-1.638L13.19 3.75h.31a.75.75 0 000-1.5H11V1.75a.75.75 0 00-.75-.75h-4.5zM6.5 2.25v-.5h3v.5h-3zM4.32 3.75h7.36l-.68 9.04a.25.25 0 01-.249.21H5.249a.25.25 0 01-.249-.21L4.32 3.75z"/>
-                      </svg>
+                      <IconDelete className="w-4 h-4" />
                     </button>
                   </div>
                 </td>

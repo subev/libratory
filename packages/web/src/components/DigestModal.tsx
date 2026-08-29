@@ -6,6 +6,7 @@ import { DIGEST_LISTENING_PROMPT, DIGEST_PRESETS } from "../lib/ai-presets.ts";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { PillToggle } from "./PillToggle.tsx";
 import { PRIMARY_BUTTON } from "../lib/button-classes.ts";
+import { IconWarning } from "./icons.tsx";
 
 export function DigestModal({
   sourceBooks,
@@ -120,7 +121,7 @@ export function DigestModal({
           <ol className="text-sm text-(--text-muted) list-decimal pl-5 space-y-0.5">
             {included.map((b) => (
               <li key={b.id} className="truncate" title={b.title}>
-                {noText.has(b.id) && <span title="No text available" className="mr-1">⚠️</span>}
+                {noText.has(b.id) && <span title="No text available" className="mr-1 inline-flex"><IconWarning className="h-4 w-4" /></span>}
                 {b.title}
               </li>
             ))}

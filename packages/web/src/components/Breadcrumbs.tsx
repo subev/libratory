@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { getDragItems, hasDragItems, type DragItems } from "../lib/dnd.ts";
+import { IconChevronRight } from "./icons.tsx";
 
 export type BreadcrumbItem = {
   to?: string;
@@ -43,7 +44,7 @@ export function Breadcrumbs({
         const highlight = dragOverIndex === i ? "outline outline-2 outline-(--accent) rounded" : "";
         return (
           <span key={i} className="flex items-center gap-1.5 min-w-0">
-            {i > 0 && <span className="text-(--text-faint)">›</span>}
+            {i > 0 && <IconChevronRight className="h-4 w-4 text-(--text-faint)" />}
             {item.to ? (
               <Link to={item.to} className={`text-(--accent-text) hover:text-(--accent-text-hover) truncate px-0.5 ${highlight}`} {...dropProps}>
                 {item.label}

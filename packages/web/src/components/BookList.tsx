@@ -8,6 +8,7 @@ import { HnDigestModal } from "./HnDigestModal.tsx";
 import { FolderPickerModal } from "./FolderPickerModal.tsx";
 import { setDragItems, getDragItems, hasDragItems, type DragItems } from "../lib/dnd.ts";
 import { statusStyles } from "./StatusBadge.tsx";
+import { IconCheck, IconChevronDown, IconChevronUp, IconDelete, IconFolder, IconRename } from "./icons.tsx";
 
 type SortKey = BookSortKey;
 type SortDir = BookSortDir;
@@ -108,8 +109,9 @@ function FolderTableRow({
               className="text-sm font-medium bg-transparent border-b border-(--accent) outline-none text-(--text-primary)"
             />
           ) : (
-            <Link to={`/folders/${folder.id}`} className="text-(--text-primary) hover:text-(--accent-text-hover) font-medium">
-              📁 {folder.name}
+            <Link to={`/folders/${folder.id}`} className="inline-flex items-center gap-1.5 text-(--text-primary) hover:text-(--accent-text-hover) font-medium">
+              <IconFolder className="h-4 w-4 shrink-0" />
+              {folder.name}
             </Link>
           )}
           <button
@@ -118,7 +120,7 @@ function FolderTableRow({
             title="Rename folder"
             className="text-(--text-faint) hover:text-(--text-secondary) text-xs disabled:opacity-50"
           >
-            ✎
+            <IconRename className="h-3 w-3" />
           </button>
           <button
             onClick={deleteFolder}
@@ -127,7 +129,7 @@ function FolderTableRow({
             className="text-(--text-faint) hover:text-(--danger-text) text-xs disabled:opacity-50"
             data-testid="delete-folder"
           >
-            {deleteMutation.isPending ? "…" : "🗑"}
+            {deleteMutation.isPending ? "…" : <IconDelete className="h-3 w-3" />}
           </button>
         </div>
       </td>
@@ -188,7 +190,7 @@ function SortableTh({
         title={`Sort by ${label.toLowerCase()}`}
       >
         {label}
-        <span className={`text-[9px] ${active ? "" : "invisible"}`}>{dir === "asc" ? "▲" : "▼"}</span>
+        <span className={`text-[9px] ${active ? "" : "invisible"}`}>{dir === "asc" ? <IconChevronUp className="h-3 w-3" /> : <IconChevronDown className="h-3 w-3" />}</span>
       </button>
     </th>
   );
@@ -308,7 +310,7 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
   }
 
   async function deleteSelected() {
-    const titles = [...selectedFolders.map((f) => `📁 "${f.name}"`), ...selectedBooks.map((b) => `"${b.title}"`)]
+    const titles = [...selectedFolders.map((f) => `Folder "${f.name}"`), ...selectedBooks.map((b) => `"${b.title}"`)]
       .slice(0, 5).join(", ");
     const suffix = totalSelected > 5 ? `, and ${totalSelected - 5} more` : "";
     const folderWarning = selectedFolderCount > 0 ? " Deleting a folder permanently removes ALL books and subfolders inside it." : "";
@@ -518,7 +520,7 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
                       title="Fully indexed — findable in library chat (keyword + semantic search)"
                       data-testid="index-badge-done"
                     >
-                      ✓
+                      <IconCheck className="h-3 w-3" />
                     </span>
                   )}
                   {book.searchIndex?.status === "waiting" && (

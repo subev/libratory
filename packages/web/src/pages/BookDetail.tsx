@@ -20,6 +20,16 @@ import { loadBookSort, sortBooks } from "../lib/book-sort.ts";
 import { formatBytes, pendingExportLabel, pendingExportSummary } from "../lib/format.ts";
 import { getVoiceLabel, languageLabel } from "../lib/voices.ts";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "../lib/button-classes.ts";
+import {
+  IconArrowLeft,
+  IconArrowRight,
+  IconBook,
+  IconChat,
+  IconStructure,
+  IconTranslate,
+  IconVolume,
+  IconDocument,
+} from "../components/icons.tsx";
 
 // A worker killed mid-run (restart, network drop) leaves digestJob stuck on "running"; treat a
 // stale heartbeat as interrupted, mirroring the server's resumeDigest guard.
@@ -426,10 +436,11 @@ export function BookDetail() {
               onClick={() => prevBook && navigate(`/books/${prevBook.id}`)}
               disabled={!prevBook}
               title={prevBook ? `Previous book: "${prevBook.title}" — press [` : "This is the first book in the list"}
-              className="px-2.5 py-1 rounded-md text-sm text-(--accent-text) hover:bg-(--bg-subtle) disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-sm text-(--accent-text) hover:bg-(--bg-subtle) disabled:opacity-40 disabled:cursor-not-allowed"
               data-testid="prev-book"
             >
-              &larr; Prev
+              <IconArrowLeft className="h-4 w-4" />
+              Prev
             </button>
             {bookIndex >= 0 && (
               <span className="text-xs text-(--text-faint) tabular-nums" title={`Position in the home list's current sort (${bookSort.key})`}>
@@ -440,10 +451,11 @@ export function BookDetail() {
               onClick={() => nextBook && navigate(`/books/${nextBook.id}`)}
               disabled={!nextBook}
               title={nextBook ? `Next book: "${nextBook.title}" — press ]` : "This is the last book in the list"}
-              className="px-2.5 py-1 rounded-md text-sm text-(--accent-text) hover:bg-(--bg-subtle) disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-sm text-(--accent-text) hover:bg-(--bg-subtle) disabled:opacity-40 disabled:cursor-not-allowed"
               data-testid="next-book"
             >
-              Next &rarr;
+              Next
+              <IconArrowRight className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -483,27 +495,30 @@ export function BookDetail() {
                 title={hasChapterAudio
                   ? "Follow the narration on the PDF page, and tap a sentence to jump there"
                   : "Read the book's own pages — synthesize a chapter to follow the narration across them"}
-                className="text-sm px-3 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
+                className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
                 data-testid="book-read-link"
               >
-                📖 Read along
+                <IconBook className="h-4 w-4" />
+                Read along
               </Link>
             ) : (
               <span
                 title="No chapter is on a page yet — extract chapters to read this book on its own print"
-                className="text-sm px-3 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-faint) opacity-50 cursor-not-allowed"
+                className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-faint) opacity-50 cursor-not-allowed"
                 data-testid="book-read-link"
               >
-                📖 Read along
+                <IconBook className="h-4 w-4" />
+                Read along
               </span>
             )}
             <Link
               to={`/chat?bookId=${book.id}`}
               title="Chat about this book — searches its text and translations, cites pages"
-              className="text-sm px-3 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
+              className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card-hover)"
               data-testid="book-chat-link"
             >
-              💬 Chat
+              <IconChat className="h-4 w-4" />
+              Chat
             </Link>
             <DiskUsageButton bookId={book.id} />
           </div>
@@ -615,9 +630,7 @@ export function BookDetail() {
               title={book.kind !== "pdf" ? "Synthetic book — no PDF structure to edit" : "Review every detected heading and edit chapter boundaries by hand"}
               data-testid="open-structure"
             >
-              <svg className="w-4 h-4 text-(--accent-text)" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M1.75 2.5a.75.75 0 000 1.5h12.5a.75.75 0 000-1.5H1.75zM4.75 6.5a.75.75 0 000 1.5h9.5a.75.75 0 000-1.5h-9.5zM4 11.25a.75.75 0 01.75-.75h9.5a.75.75 0 010 1.5h-9.5a.75.75 0 01-.75-.75zM1.75 14a.75.75 0 000 1.5h12.5a.75.75 0 000-1.5H1.75z" transform="translate(0 -1)"/>
-              </svg>
+              <IconStructure className="w-4 h-4 text-(--accent-text)" />
               Structure
             </button>
             <button
@@ -627,9 +640,7 @@ export function BookDetail() {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-(--border-input) bg-(--bg-card) text-sm font-medium text-(--text-primary) shadow-sm hover:bg-(--bg-subtle) disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="open-translation"
             >
-              <svg className="w-4 h-4 text-(--accent-text)" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M8 1a7 7 0 100 14A7 7 0 008 1zM2.5 8c0-.53.075-1.042.215-1.527.777.212 1.685.375 2.687.478a17.6 17.6 0 000 2.098c-1.002.103-1.91.266-2.687.478A5.48 5.48 0 012.5 8zm4.41-.94a16.1 16.1 0 000 1.88c.36.02.724.031 1.09.031s.73-.011 1.09-.031a16.1 16.1 0 000-1.88C8.73 7.04 8.366 7.03 8 7.03s-.73.011-1.09.031zm4.688.42c.014.171.021.345.021.52s-.007.349-.021.52c1.002-.103 1.91-.266 2.687-.478a5.512 5.512 0 000-.084c-.777-.212-1.685-.375-2.687-.478zM8 2.5c.474 0 1.056.607 1.474 1.885.09.276.17.575.238.892A18.7 18.7 0 008 5.25c-.585 0-1.158-.024-1.712.027.068-.317.148-.616.238-.892C6.944 3.107 7.526 2.5 8 2.5zm-2.86.79a7.28 7.28 0 00-.395 1.05 12.9 12.9 0 00-1.573.34A5.53 5.53 0 015.14 3.29zm5.72 0a5.53 5.53 0 012.368 2.39c-.485-.135-1.013-.25-1.573-.34a7.28 7.28 0 00-.394-1.05h-.001zM8 13.5c-.474 0-1.056-.607-1.474-1.885a9.05 9.05 0 01-.238-.892c.554.051 1.127.077 1.712.077s1.158-.026 1.712-.077a9.05 9.05 0 01-.238.892C9.056 12.893 8.474 13.5 8 13.5zm-3.255-2.13c.112.365.244.717.395 1.05a5.53 5.53 0 01-2.368-2.39c.485.135 1.013.25 1.573.34h.4zm6.51 0c.56-.09 1.088-.205 1.573-.34a5.53 5.53 0 01-2.368 2.39c.151-.333.283-.685.395-1.05h.4z"/>
-              </svg>
+              <IconTranslate className="w-4 h-4 text-(--accent-text)" />
               Translate / Transform
             </button>
 
@@ -928,9 +939,7 @@ export function BookDetail() {
                   }`}
                   data-testid="create-tab-audio"
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M9.5 2.06a.75.75 0 01.5.71v10.46a.75.75 0 01-1.28.53L5.94 11H3.75A1.75 1.75 0 012 9.25v-2.5C2 5.784 2.784 5 3.75 5h2.19l2.78-2.76a.75.75 0 01.78-.18zM11.7 5.05a.75.75 0 011.06.05 4.25 4.25 0 010 5.8.75.75 0 11-1.1-1.02 2.75 2.75 0 000-3.76.75.75 0 01.04-1.07z"/>
-                  </svg>
+                  <IconVolume className="w-4 h-4" />
                   Create audio
                   {(hasActiveChapters || translationAudioQueued) && (
                     <span className="w-1.5 h-1.5 rounded-full bg-(--accent) animate-pulse" title="Synthesis in progress" />
@@ -945,10 +954,7 @@ export function BookDetail() {
                   }`}
                   data-testid="create-tab-document"
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M4 1.75C4 .784 4.784 0 5.75 0h5.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0114.25 16h-8.5A1.75 1.75 0 014 14.25V1.75zm1.75-.25a.25.25 0 00-.25.25v12.5c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25V4.664a.25.25 0 00-.073-.177l-2.914-2.914a.25.25 0 00-.177-.073H5.75z"/>
-                    <path d="M1.5 4.25a.75.75 0 00-1.5 0v9.5A2.25 2.25 0 002.25 16h7a.75.75 0 000-1.5h-7a.75.75 0 01-.75-.75v-9.5z" transform="scale(0.9) translate(1, 1)" opacity="0"/>
-                  </svg>
+                  <IconDocument className="w-4 h-4" />
                   Create document
                   {viewPendingExports.length > 0 && (
                     <span className="w-1.5 h-1.5 rounded-full bg-(--accent) animate-pulse" title="Export in progress" />

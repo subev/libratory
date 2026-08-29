@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { trpc } from "../trpc.ts";
 import { MarkdownBlock } from "./MarkdownBlock.tsx";
 import { useLlmModels } from "../lib/use-llm-models.ts";
+import { IconChevronRight, IconExternal, IconCheck } from "./icons.tsx";
 
 export type NoteJobView = {
   status: "queued" | "running" | "done" | "failed";
@@ -82,13 +83,9 @@ export function NotesSection({ bookId, noteJob }: { bookId: string; noteJob: Not
                   onClick={() => setExpandedId(expanded ? null : note.id)}
                   className="flex items-center gap-3 text-left group flex-1 min-w-0"
                 >
-                  <svg
+                  <IconChevronRight
                     className={`w-3 h-3 shrink-0 text-(--text-faint) transition-transform ${expanded ? "rotate-90" : ""}`}
-                    viewBox="0 0 16 16"
-                    fill="currentColor"
-                  >
-                    <path d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z" />
-                  </svg>
+                  />
                   <span className="text-sm text-(--text-primary) truncate flex-1 group-hover:text-(--text-secondary)" title={note.prompt}>
                     {note.prompt}
                   </span>
@@ -103,10 +100,10 @@ export function NotesSection({ bookId, noteJob }: { bookId: string; noteJob: Not
                 {note.scope.kind === "book-raw" && note.scope.digestBookId && (
                   <Link
                     to={`/books/${note.scope.digestBookId}`}
-                    className="text-xs text-(--accent-text) hover:text-(--accent-text-hover) shrink-0"
+                    className="inline-flex items-center gap-1 text-xs text-(--accent-text) hover:text-(--accent-text-hover) shrink-0"
                     title="This summary is a chapter of a digest book — open it"
                   >
-                    digest ↗
+                    digest <IconExternal className="h-3 w-3" />
                   </Link>
                 )}
               </div>
@@ -124,8 +121,8 @@ export function NotesSection({ bookId, noteJob }: { bookId: string; noteJob: Not
                       Add as chapter
                     </button>
                     {addedNoteId === note.id && (
-                      <span className="text-xs text-(--success-text)" data-testid="note-chapter-added">
-                        Chapter added ✓
+                      <span className="inline-flex items-center gap-1 text-xs text-(--success-text)" data-testid="note-chapter-added">
+                        Chapter added <IconCheck className="h-3 w-3" />
                       </span>
                     )}
                     <button

@@ -40,6 +40,17 @@
           }
         ]
       }
+    ],
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "@phosphor-icons/react",
+            "message": "Import icons from components/icons instead, so the set stays swappable and reusable. Missing one? Add a line to packages/web/src/components/icons.tsx."
+          }
+        ]
+      }
     ]
   },
   "jsPlugins": [
@@ -49,5 +60,15 @@
     "tailwindcss": {
       "entryPoint": "packages/web/src/styles.css"
     }
-  }
+  },
+  "overrides": [
+    {
+      "files": [
+        "packages/web/src/components/icons.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
 }

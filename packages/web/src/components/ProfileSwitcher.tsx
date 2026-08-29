@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { trpc } from "../trpc.ts";
 import { getStoredProfileId, setStoredProfileId } from "../lib/profile.ts";
+import { IconAdd, IconDelete, IconProfile, IconRename } from "./icons.tsx";
 
 export function ProfileSwitcher() {
   const navigate = useNavigate();
@@ -76,7 +77,7 @@ export function ProfileSwitcher() {
   return (
     <div className="ml-auto flex items-center gap-2">
       {error && <span className="text-sm text-(--danger-text)">{error}</span>}
-      <span title="Profile" className="text-sm">👤</span>
+      <span title="Profile" className="text-sm"><IconProfile className="h-4 w-4" /></span>
       <select
         value={active.id}
         onChange={(e) => activate(e.target.value)}
@@ -93,7 +94,7 @@ export function ProfileSwitcher() {
         className="px-2 py-1.5 rounded-md text-xs font-medium border border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)"
         data-testid="new-profile"
       >
-        ＋
+        <IconAdd className="h-3 w-3" />
       </button>
       <button
         onClick={renameProfile}
@@ -101,7 +102,7 @@ export function ProfileSwitcher() {
         className="text-(--text-faint) hover:text-(--text-secondary) text-xs"
         data-testid="rename-profile"
       >
-        ✎
+        <IconRename className="h-3 w-3" />
       </button>
       <button
         onClick={deleteProfile}
@@ -110,7 +111,7 @@ export function ProfileSwitcher() {
         className="text-(--text-faint) hover:text-(--danger-text) text-xs disabled:opacity-50"
         data-testid="delete-profile"
       >
-        🗑
+        <IconDelete className="h-3 w-3" />
       </button>
     </div>
   );

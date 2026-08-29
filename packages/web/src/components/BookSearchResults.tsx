@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { trpc } from "../trpc.ts";
+import { IconFolder } from "./icons.tsx";
 
 export function BookSearchResults({ query }: { query: string }) {
   const [debounced, setDebounced] = useState(query);
@@ -43,7 +44,7 @@ export function BookSearchResults({ query }: { query: string }) {
                 {book.folderPath.map((f) => (
                   <Fragment key={f.id}>
                     {" / "}
-                    <Link to={`/folders/${f.id}`} className="hover:text-(--text-secondary)">📁 {f.name}</Link>
+                    <Link to={`/folders/${f.id}`} className="inline-flex items-center gap-1 hover:text-(--text-secondary)"><IconFolder className="h-3 w-3 shrink-0" />{f.name}</Link>
                   </Fragment>
                 ))}
               </div>
