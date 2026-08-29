@@ -434,6 +434,8 @@ packages/web/src/
     Home.tsx            Profile switcher, upload zone, search box, book/folder list, breadcrumbs
     BookDetail.tsx      Per-book orchestration: staged sections (1 Input → 2 Work → 3 Output → danger zone), variant view (translation or rewrite) in ?variant= query param
     Chat.tsx            Library chat: useChat + streaming /chat, folder (?folderId=) / book (?bookId=) scoping, source chips, saved answers
+    Components.tsx      /components gallery: every token, primitive and icon on one screen, derived from
+                        styles.css and icons.tsx so it cannot drift. Static — renders with the server down
     Reader.tsx          Read-along reader (/books/:id/read): Column/Page/Text views over one timeline,
                         phone width presets + legibility readout, tap-to-seek, rect/layout debug toggles.
                         Lazy-loaded so no other page pays for pdf.js; reads only the /read documents
@@ -468,17 +470,20 @@ packages/web/src/
     voice-picker/       VoiceLibraryModal.tsx — **language is the primary axis**: the rail lists languages (plus "Your voices" for clones), the pane groups that language's voices by engine, so "what can read my French book" is one click instead of five tabs. Every voice carries `language`/`engine` (set by the mappers in lib/voices.ts; `staticVoices` decorates the literals). Multilingual models (KugelAudio) appear under every language. Within a language the pane groups by **provider** (`providerOfVoice` in lib/voices.ts — finer than `engine`, so KugelAudio and the Bulgarian narrators are named rather than lumped as "other local models") with filter chips: the chip defaults to the provider of the current selection, typing forces "All" so a search can't silently miss behind a filter, and the combined view caps each provider at 6 rows behind "Show all N" because Cartesia alone can contribute 450 voices to one language. PocketLanguageNotice.tsx (download prompt + size), PocketVoiceCloner.tsx (record/upload + consent), VoiceRow.tsx, context.tsx (selection + preview playback), layout.tsx
     SpeedSlider.tsx     Speed range slider (0.5x-2.0x)
     StatusBadge.tsx     Color-coded status badge
+    Modal.tsx           Shared dialog shell: sizes, Escape, focus trap + restore, header that names the dialog
+    PillToggle.tsx      Shared selected/unselected pill (aria-pressed) — 9 call sites
+    icons.tsx           The only file importing @phosphor-icons/react; see "Icons" above
 ```
 
 ### Dark Mode
 
-Implemented via **semantic CSS custom properties** in `styles.css`. Tokens are defined under `:root` (light) and flipped via `@media (prefers-color-scheme: dark)`. All components reference tokens like `bg-(--bg-card)`, `text-(--text-primary)`, `border-(--border)` instead of hardcoded zinc colors. This avoids the need for `dark:` prefix on every utility class.
+Both themes come from the same semantic tokens in `styles.css`, flipped under
+`@media (prefers-color-scheme: dark)` — components never carry a `dark:` variant whose only job is a
+colour. See **Colour and reading surfaces** above for the palette/semantic split and what enforces it.
 
-Key tokens: `--bg-page`, `--bg-card`, `--bg-card-hover`, `--bg-subtle`, `--bg-input`, `--border`, `--border-input`, `--divide`, `--text-primary` through `--text-faint`, plus per-status badge pairs and custom text preview tokens.
-
-Accent colors (blue, red, green, amber, indigo) are **not** tokenized — they're the same in both modes. The log viewer terminal uses a fixed dark background (`bg-zinc-900`) in both modes.
-
-Vite dev server on port 3033 proxies `/trpc`, `/pdf`, `/upload`, `/download`, `/audio`, `/files`, `/preview`, and `/read` to the server on port 3034 (configured in `vite.config.ts`).
+Accents are tokenised like everything else (`--accent`, `--danger`, `--success`, `--warning`, each
+with its `-text`, `-hover` and `--on-*` partners), and the log dock is on `--bg-terminal`, not a
+fixed zinc.
 
 ## tRPC Routes
 
