@@ -208,7 +208,7 @@ export function StructureModal({
 
   return (
     <>
-      <Modal size="xl" onClose={onClose} closeOnEscape backdropTestId="structure-modal">
+      <Modal size="xl" onClose={onClose} backdropTestId="structure-modal">
         <ModalHeader
           title="Book structure"
           subtitle="Every heading found in the extraction output. Check the ones that start a chapter, then apply."

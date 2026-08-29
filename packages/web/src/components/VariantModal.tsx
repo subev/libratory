@@ -208,7 +208,7 @@ export function VariantModal({
   const mutationError = startMutation.error ?? createMutation.error ?? stopMutation.error;
 
   return (
-    <Modal size="full" onClose={onClose} closeOnEscape backdropTestId="translation-modal">
+    <Modal size="full" onClose={onClose} backdropTestId="translation-modal">
       <ModalHeader title="Translate / Transform" onClose={onClose}>
         <select
           value={selectValue}

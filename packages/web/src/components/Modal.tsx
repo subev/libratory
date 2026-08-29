@@ -52,13 +52,14 @@ export function ModalHeader({
 export function Modal({
   size = "md",
   onClose,
-  closeOnEscape = false,
+  closeOnEscape = true,
   testId,
   backdropTestId,
   children,
 }: {
   size?: ModalSize;
   onClose: () => void;
+  /** Escape closes by default; opt out only where a dialog owns the key itself. */
   closeOnEscape?: boolean;
   testId?: string;
   backdropTestId?: string;
