@@ -137,7 +137,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Modal size="md" onClose={onClose} backdropTestId="settings-modal">
+    <Modal size="md" onClose={onClose}
+      closeOnEscape={false} /* an unsaved API key is not retypeable from memory */ backdropTestId="settings-modal">
       <ModalHeader title="Settings" onClose={onClose} />
 
       <div className="p-4 space-y-6 overflow-y-auto">

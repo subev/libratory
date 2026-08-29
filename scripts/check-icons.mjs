@@ -33,7 +33,7 @@ for (const f of files) {
       .replace(/&#x([0-9a-fA-F]{2,5});/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
       .replace(/&#([0-9]{2,7});/g, (_, dec) => String.fromCodePoint(Number(dec)));
     // An arrow can be prose ("press ←") rather than an icon; spell it out where you can, mark it
-    // where you cannot. It excuses the glyph only — an inline <svg> or an emoji still fails.
+    // where you cannot. It excuses the glyph scan only — an <svg>, an emoji or an entity still fails.
     // An arrow in a comment is prose by construction — nothing there is ever rendered.
     const trimmed = raw.trimStart();
     if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) return;
@@ -46,7 +46,8 @@ for (const f of files) {
       if (GLYPHS.includes(m[0])) continue;
       add(f, at, `emoji ${m[0]}`, `Emoji are full-colour OS artwork and ignore the palette: ${HINT}`);
     }
-    for (const m of line.matchAll(ENTITIES)) {
+    // Against the raw line and never excused: prose needs an arrow, never "&#9654;".
+    for (const m of raw.matchAll(ENTITIES)) {
       add(f, at, `entity ${m[0]}`, `An entity is a glyph in disguise: ${HINT}`);
     }
   });

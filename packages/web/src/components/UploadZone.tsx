@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, type DragEvent, type ReactNode } from "react";
+import { useState, useRef, useCallback, useMemo, type DragEvent, type ReactNode } from "react";
 import { VoicePicker } from "./VoicePicker.tsx";
 import { SpeedSlider } from "./SpeedSlider.tsx";
 import { getVoiceById, voiceSupportsSpeedControl, getVoiceLabel } from "../lib/voices.ts";
@@ -58,6 +58,8 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const [customTitle, setCustomTitle] = useState("");
   const [language, setLanguage] = useState("");
+  // A new array each render would recompute the voice library's language memos on every keystroke
+  const priorityLanguages = useMemo(() => (language ? [language] : []), [language]);
   const [voice, setVoice] = useState("kokoro:af_heart");
   const [speed, setSpeed] = useState(1.0);
   const [forceOcr, setForceOcr] = useState(false);
@@ -469,7 +471,7 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
               {autoSynthesize && (
                 <div className="pl-6 space-y-1">
                   <div className="flex flex-wrap items-end gap-4">
-                    <VoicePicker value={voice} onChange={setVoice} priorityLanguages={language ? [language] : []} />
+                    <VoicePicker value={voice} onChange={setVoice} priorityLanguages={priorityLanguages} />
                     <SpeedSlider value={speed} onChange={setSpeed} disabled={!speedEnabled} />
                   </div>
                   {!speedEnabled && selectedVoice && (

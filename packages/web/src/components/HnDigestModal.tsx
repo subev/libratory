@@ -114,7 +114,8 @@ export function HnDigestModal({ onClose }: { onClose: () => void }) {
   const includedCount = preview ? preview.length - excluded.size : null;
 
   return (
-    <Modal size="md" onClose={onClose} testId="hn-digest-modal">
+    <Modal size="md" onClose={onClose}
+      closeOnEscape={false} /* the run keeps going and its live log is not restored on reopen */ testId="hn-digest-modal">
       <ModalHeader title="Hacker News daily digest" onClose={onClose} />
 
       <div className="p-4 space-y-3 overflow-y-auto">

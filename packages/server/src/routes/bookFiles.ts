@@ -133,39 +133,6 @@ export const bookFilesRouter = router({
       return { success: true };
     }),
 
-  reExtract: publicProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .mutation(async ({ input }) => {
-      const [file] = await db.select().from(bookFiles).where(eq(bookFiles.id, input.id));
-      if (!file) throw new Error("File not found");
-
-      const fileChapters = await db
-        .select({ status: chapters.status })
-        .from(chapters)
-        .where(and(eq(chapters.bookId, file.bookId), eq(chapters.sourceFileIndex, file.index)));
-
-      guardActiveChapters(fileChapters);
-
-      const deletedCount = await deleteChaptersForFile(file.bookId, file.index);
-      await rm(path.join(bookTmpDir(file.bookId), `file_${file.index}`), { recursive: true, force: true }).catch(() => {});
-
-      await db
-        .update(bookFiles)
-        .set({ status: "pending", error: null })
-        .where(eq(bookFiles.id, input.id));
-
-      await db
-        .update(books)
-        .set({ status: "pending", error: null, updatedAt: new Date() })
-        .where(eq(books.id, file.bookId));
-
-      await updateBookTotalChapters(file.bookId);
-      await appendLog(file.bookId, `Re-extracting file "${file.filename}" (removed ${deletedCount} chapter(s))`);
-      await quickAddJob({ connectionString }, "extract", { bookId: file.bookId }, { maxAttempts: 1 });
-
-      return { success: true };
-    }),
-
   reExtractSelected: publicProcedure
     .input(z.object({ bookId: z.string().uuid() }))
     .mutation(async ({ input }) => {

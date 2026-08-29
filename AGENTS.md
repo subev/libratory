@@ -281,8 +281,10 @@ A stage card is **`packages/web/src/components/Section.tsx`**, not a hand-assemb
 ```
 
 The coloured top edge is the one place colour still encodes a *sequence* — 1 Input, 2 Work, 3 Output —
-which is why it is a fixed ramp rather than a free colour. `tailwindcss/no-restricted-classes` fails on
-a bare `border-t-2` outside this file, because that stripe is the signature of a stage card.
+which is why it is a fixed ramp rather than a free colour. This one is **not** lint-enforced: a rule on
+`border-t-2` was tried and removed, because `border-t-[2px]` and `sm:border-t-2` both walk straight past
+it, and exempting `Section.tsx` from it also exempted that file from the palette and spacing rules — the
+one file where an off-ladder value would reach every stage card. A guardrail that weak is not worth that.
 
 The extraction found the drift it existed to prevent: five of the six stage sections used the stripe at
 `/80`, and `BookFilesSection` used it at full opacity. They agree now.
