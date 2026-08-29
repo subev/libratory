@@ -92,7 +92,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
           {/* Reloading lands on the same crash when the page is what broke, which is the usual case
               and the first thing anyone tries. Leaving is the action that actually works. */}
-          <div className="mt-5 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             <Button variant="primary" href="/" data-testid="crash-home">
               Back to the library
             </Button>
@@ -107,7 +107,7 @@ export class ErrorBoundary extends Component<Props, State> {
             </Button>
           </div>
 
-          <p className="mt-5 font-mono text-xs wrap-break-word text-(--danger-text)">{error.message}</p>
+          <p className="mt-4 font-mono text-xs wrap-break-word text-(--danger-text)">{error.message}</p>
           {help && (
             <p className="mt-2 text-xs text-(--text-muted)">
               React shortens its messages in a release build.{" "}

@@ -45,7 +45,7 @@ export function DiskUsageButton({ bookId }: { bookId: string }) {
       {open && (
         <Modal size="sm" onClose={() => setOpen(false)} backdropTestId="disk-usage-modal">
           <ModalHeader title="Disk usage" onClose={() => setOpen(false)} />
-          <div className="p-5 overflow-y-auto">
+          <div className="p-4 overflow-y-auto">
             {!usage ? (
               <p className="text-sm text-(--text-muted)">Measuring...</p>
             ) : (

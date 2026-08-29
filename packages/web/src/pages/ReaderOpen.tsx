@@ -62,7 +62,7 @@ export function ReaderOpen() {
             const file = e.dataTransfer.files[0];
             if (file) void open(file);
           }}
-          className={`rounded-lg border-2 border-dashed p-10 text-center ${
+          className={`rounded-lg border-2 border-dashed p-8 text-center ${
             over ? "border-(--accent) bg-(--bg-drag)" : "border-(--border)"
           }`}
           data-testid="reader-open-drop"
@@ -76,7 +76,7 @@ export function ReaderOpen() {
             variant="primary"
             onClick={() => input.current?.click()}
             disabled={busy}
-            className="mt-5"
+            className="mt-4"
             data-testid="reader-open-pick"
           >
             {busy ? "Opening…" : "Choose a file"}

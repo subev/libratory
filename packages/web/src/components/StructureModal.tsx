@@ -217,7 +217,7 @@ export function StructureModal({
 
         {chapterProposal && chapterProposal.status !== "running" ? (
           <div
-            className={`px-5 py-2 border-b border-(--border) text-sm flex items-center gap-3 ${
+            className={`px-4 py-2 border-b border-(--border) text-sm flex items-center gap-3 ${
               chapterProposal.status === "failed" ? "bg-(--danger-bg) text-(--danger-text)" : "bg-(--bg-subtle) text-(--text-secondary)"
             }`}
             data-testid="proposal-banner"

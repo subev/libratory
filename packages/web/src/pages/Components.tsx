@@ -118,7 +118,7 @@ const PROSE =
 const READING_PANE =
   "mx-auto w-full max-w-prose rounded bg-(--bg-reading) border border-(--border-reading) px-7 py-6 font-reading text-[17px] leading-relaxed text-(--text-primary)";
 
-const CARD = "rounded-lg border border-(--border) bg-(--bg-card) p-5";
+const CARD = "rounded-lg border border-(--border) bg-(--bg-card) p-4";
 
 // Lint bans --pal-* in classNames and Tailwind cannot build a class from a variable, so fills go inline.
 function Swatch({ token }: { token: Token }) {
@@ -205,7 +205,7 @@ function TokenGrid({ tokens }: { tokens: Token[] }) {
 
 function TokenGroups({ groups }: { groups: Group[] }) {
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {groups.map((group) => (
         <div key={group.title}>
           <div className="mb-2 text-xs font-medium uppercase tracking-wide text-(--text-faint)">{group.title}</div>
@@ -280,7 +280,7 @@ export function Components() {
 
   return (
     <div className="min-h-screen bg-(--bg-page) text-(--text-primary)">
-      <div className="mx-auto max-w-6xl space-y-12 px-6 py-10">
+      <div className="mx-auto max-w-6xl space-y-12 px-6 py-8">
         <header className="space-y-2">
           <h1 className="text-3xl">Component gallery</h1>
           <p className="text-sm text-(--text-secondary)">

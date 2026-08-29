@@ -119,7 +119,7 @@ export function DigestModal({
 
         <div>
           <p className="text-sm text-(--text-secondary) mb-1">Chapters, in order</p>
-          <ol className="text-sm text-(--text-muted) list-decimal pl-5 space-y-0.5">
+          <ol className="text-sm text-(--text-muted) list-decimal pl-4 space-y-0.5">
             {included.map((b) => (
               <li key={b.id} className="truncate" title={b.title}>
                 {noText.has(b.id) && <span title="No text available" className="mr-1 inline-flex"><IconWarning className="h-4 w-4" /></span>}

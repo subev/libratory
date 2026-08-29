@@ -436,7 +436,7 @@ function ChapterModalBody({
         </Button>
       ) : null}
       <div className="relative bg-(--bg-card) rounded-xl shadow-2xl w-[92vw] max-w-6xl h-[92vh] flex flex-col">
-        <div className="flex items-start justify-between p-5 border-b border-(--border)">
+        <div className="flex items-start justify-between p-4 border-b border-(--border)">
           <div className="min-w-0">
             <div className="flex items-center gap-3 mb-1">
               <input
@@ -520,7 +520,7 @@ function ChapterModalBody({
           </button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 px-5 py-2 border-b border-(--border) bg-(--bg-subtle)">
+        <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-(--border) bg-(--bg-subtle)">
           <Button
             variant="secondary"
             size="sm"
@@ -787,7 +787,7 @@ function ChapterModalBody({
           />
         ) : null}
 
-        <div className="flex-1 min-h-[40vh] flex flex-col p-5">
+        <div className="flex-1 min-h-[40vh] flex flex-col p-4">
           {isLoading ? (
             <div className="flex items-center justify-center flex-1 text-sm text-(--text-faint)">
               Loading text...
@@ -1069,7 +1069,7 @@ function ChunkPreviewPanel({
   }
 
   return (
-    <div className="border-b border-(--border) px-5 py-3 bg-(--bg-card)">
+    <div className="border-b border-(--border) px-4 py-3 bg-(--bg-card)">
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {activeUrl ? (

@@ -235,6 +235,36 @@ not an action opts out with a `button-ok` comment above it **and a reason**: `Pi
 `VoicePicker`'s trigger (a labelled form control skinned to match the input beside it), and selection
 rows. Inconvenience is not a reason.
 
+## Spacing — the ladder
+
+Padding, margin and gap come off one ladder. Every rung is a Tailwind step; there is no semantic
+`--space-*` tier, deliberately — colour needed one because `--accent` must resolve differently in dark,
+and spacing has no second theme, so `p-4` says more than `p-(--space-card)` would.
+
+```
+0.5  1  1.5  2  2.5  3  4  6  7  8  12  16  20
+```
+
+| rung | px | what it is for |
+| --- | --- | --- |
+| `0.5`–`1.5` | 2–6 | inside a badge or pill; icon to its label |
+| `2` | 8 | the default gap, and dense table rows |
+| `2.5` | 10 | the x-padding of a small control (`Button size="sm"`) |
+| `3`–`4` | 12–16 | inner and outer padding of a card |
+| `6` | 24 | between sections |
+| **`7`** | **28** | **reading gutter only.** Reading panes are `max-w-prose` and padding eats into the box, so this value *is* the measure — it was tuned to 67 characters. Do not use it elsewhere, and see "Do not widen the measure" above. |
+| `8`–`20` | 32–80 | page gutters, empty states, clearing the fixed player |
+
+The ladder was derived from what the app already used, not invented: these thirteen rungs cover 94% of
+962 existing spacing utilities. `5` and `10` sit between rungs and round **down** to `4` and `8`.
+
+`tailwindcss/no-restricted-classes` fails the build on an off-ladder step and on any arbitrary value
+(`p-[13px]`). Widths and heights are not spacing and are untouched by the rule.
+
+**`space-y-*` is not a mistake here.** It is the right tool on a plain block parent, and no element in
+this app uses it on a real flex or grid container, where `gap` would belong instead. Converting the 47
+block-parent uses would mean making 47 containers flex for no gain.
+
 ## The Pipeline
 
 ```
