@@ -4,7 +4,9 @@ services:
   postgres:
     image: pgvector/pgvector:pg17
     ports:
-      - "5433:5432"
+      # Loopback like the app's own port: the password is `libratory` and there is no other gate,
+      # so a host with a public interface would otherwise publish the whole library.
+      - "127.0.0.1:5433:5432"
     environment:
       POSTGRES_USER: libratory
       POSTGRES_PASSWORD: libratory

@@ -43,6 +43,10 @@ export function setSecret(envVar: SecretVar, value: string | null): void {
   if (cleaned && /[\r\n]/.test(cleaned)) throw new Error("API key must be a single line");
   updateEnvFile(envFilePath, envVar, cleaned);
   env[envVar] = cleaned ?? undefined;
+  // Scripts we spawn (scripts/hn-top10.mjs) read the key from the environment they inherit, and
+  // a container's LIBRATORY_ENV_FILE is not the `.env` their own fallback looks in.
+  if (cleaned) process.env[envVar] = cleaned;
+  else delete process.env[envVar];
 }
 
 // Every card in Settings comes from here. `notes` supplies the one thing this module cannot know —
