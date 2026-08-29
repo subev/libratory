@@ -64,7 +64,7 @@ export function LogDock({ bookId, isProcessing, files }: { bookId: string; isPro
 
       {open && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-(--scrim)"
           onClick={() => setOpen(false)}
           data-testid="log-modal"
         >

@@ -37,10 +37,6 @@
           {
             "pattern": "\\(--pal-",
             "message": "Palette tokens are raw colour. Use a semantic token (--accent, --danger, --text-muted, ...) or add one to the semantic block in styles.css."
-          },
-          {
-            "pattern": "^(?:bg|text|border|outline|ring|divide|fill|stroke|from|via|to|accent|decoration|shadow)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]",
-            "message": "Hardcoded palette colour. Use a semantic token, e.g. bg-(--bg-card), text-(--text-muted), border-(--border)."
           }
         ]
       }

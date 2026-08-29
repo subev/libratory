@@ -103,7 +103,7 @@ export function Modal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center" data-testid={backdropTestId}>
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-0 bg-(--scrim)" onClick={onClose} />
       <div
         ref={panel}
         tabIndex={-1}

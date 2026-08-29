@@ -109,7 +109,7 @@ export function PdfCanvas({
   return (
     <div
       ref={hostRef}
-      className={`relative w-full bg-white shadow-sm ${pointer ? "cursor-pointer" : ""}`}
+      className={`relative w-full bg-(--paper) shadow-sm ${pointer ? "cursor-pointer" : ""}`}
       style={{ aspectRatio: String(width / height) }}
       data-testid="reader-page"
       data-page={pageNumber}

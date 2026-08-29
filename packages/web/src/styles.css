@@ -69,6 +69,11 @@
   --pal-neutral-990: #100e0a;
   --pal-ink: #2a1408;
   --pal-white: #ffffff;
+  --pal-black-a50: --alpha(#000000 / 50%);
+  --pal-paper: #ffffff;
+  --pal-debug-a70: --alpha(#0ea5e9 / 70%);
+  --pal-debug-b70: --alpha(#d946ef / 70%);
+  --pal-debug-c40: --alpha(#10b981 / 40%);
   --pal-terminal-hover: #23201a;
   --pal-cream-a04: --alpha(#fdf1e4 / 4%);
   --pal-cream-a06: --alpha(#fdf1e4 / 6%);
@@ -182,6 +187,14 @@
   --border-custom-text: var(--pal-brass-a40);
 
   /* Fixed in both themes: these paint over pdf.js's white paper, which never darkens. */
+  /* Fixed in both themes: pdf.js paints white paper, and a scrim darkens whatever is behind it. */
+  --paper: var(--pal-paper);
+  --scrim: var(--pal-black-a50);
+  /* Behind the reader's debug checkboxes: three hues that must stay apart from each other
+     and from the cue, which the semantic palette deliberately has no room for. */
+  --debug-content: var(--pal-debug-a70);
+  --debug-column: var(--pal-debug-b70);
+  --debug-cue: var(--pal-debug-c40);
   --cue-linked: var(--pal-orange-a15);
   --cue-active: var(--pal-orange-a35);
   --cue-word: var(--pal-orange-a60);
@@ -286,6 +299,12 @@
     --badge-assembling-text: var(--pal-brown-300);
     --badge-cancelled-bg: var(--pal-cream-a08);
   }
+}
+
+/* No default palette: a colour class is valid only if it is ours, so no-unknown-classes
+   catches bg-blue-500 without a list of hues to keep up to date. */
+@theme {
+  --color-*: initial;
 }
 
 @theme inline {

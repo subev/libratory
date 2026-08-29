@@ -405,7 +405,7 @@ function ChapterModalBody({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" data-testid="chapter-modal">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-0 bg-(--scrim)" onClick={onClose} />
       {hasPrev ? (
         <a
           href="#prev"

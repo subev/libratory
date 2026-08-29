@@ -46,14 +46,11 @@ export function CueOverlay({
 
   return (
     <div className="pointer-events-none absolute inset-0" data-testid="cue-overlay">
-      {/* eslint-disable tailwindcss/no-restricted-classes -- debug overlays behind the rects/layout
-          checkboxes: they need hues that stay distinguishable from each other and from the cue
-          highlight, which the semantic palette deliberately does not provide. */}
       {debug.layout && (
         <>
-          <div className="absolute border border-dashed border-sky-500/70" style={pointsToRect(page.content)} />
+          <div className="absolute border border-dashed border-(--debug-content)" style={pointsToRect(page.content)} />
           {page.columns.map((column, i) => (
-            <div key={i} className="absolute border border-dashed border-fuchsia-500/70" style={pointsToRect(column)} />
+            <div key={i} className="absolute border border-dashed border-(--debug-column)" style={pointsToRect(column)} />
           ))}
         </>
       )}
@@ -63,7 +60,7 @@ export function CueOverlay({
           (other.r ?? [])
             .filter(([p]) => p === page.i)
             .map((rect, j) => (
-              <div key={`${i}-${j}`} className="absolute border border-emerald-500/40" style={style(rect[1], rect[2], rect[3], rect[4])} />
+              <div key={`${i}-${j}`} className="absolute border border-(--debug-cue)" style={style(rect[1], rect[2], rect[3], rect[4])} />
             )),
         )}
 
