@@ -98,7 +98,7 @@ export function Home() {
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Escape") setSearch(""); }}
                 placeholder="Search all books…"
-                className="w-72 pl-3 pr-8 py-1.5 text-sm rounded-md border border-(--border) bg-(--bg-card) text-(--text-primary) outline-none focus:border-(--accent)"
+                className="w-72 pl-3 pr-8 py-1.5 text-sm rounded-md border border-(--border) bg-(--bg-card) text-(--text-primary) outline-none"
                 data-testid="book-search"
               />
               {search && (

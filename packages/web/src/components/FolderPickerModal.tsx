@@ -132,7 +132,7 @@ export function FolderPickerModal({
               if (e.key === "Escape") setNewName(null);
             }}
             placeholder="New folder name — created inside the selection, Enter to create"
-            className="w-full px-2 py-1.5 text-sm rounded-md border border-(--border-input) bg-(--bg-input) text-(--text-primary) outline-none focus:border-(--focus-ring)"
+            className="w-full px-2 py-1.5 text-sm rounded-md border border-(--border-input) bg-(--bg-input) text-(--text-primary) outline-none"
             data-testid="folder-picker-new-name"
           />
         ) : (

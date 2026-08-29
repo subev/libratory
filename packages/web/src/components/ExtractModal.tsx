@@ -82,7 +82,7 @@ export function ExtractModal({
         <button
           type="button"
           onClick={onClose}
-          className="text-(--text-faint) hover:text-(--text-tertiary) p-1 rounded focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none"
+          className="text-(--text-faint) hover:text-(--text-tertiary) p-1 rounded"
           title="Close"
           aria-label="Close"
         >
@@ -103,9 +103,7 @@ export function ExtractModal({
                 <label
                   key={entry.id}
                   title={reason ?? undefined}
-                  className={`flex gap-2 rounded-md border p-2 ${
-                    scope === entry.id ? "border-(--accent) bg-(--bg-selected)" : "border-(--border)"
-                  } ${reason ? "opacity-50" : "cursor-pointer hover:bg-(--bg-subtle)"}`}
+                  className={`flex gap-2 rounded-md border p-2 ${ scope === entry.id ? "border-(--accent) bg-(--bg-selected)" : "border-(--border)" } ${reason ? "opacity-50" : "cursor-pointer hover:bg-(--bg-subtle)"}`}
                 >
                   <input
                     type="radio"
@@ -226,7 +224,7 @@ export function ExtractModal({
         <button
           type="button"
           onClick={onClose}
-          className="px-4 py-2 rounded-md text-sm font-medium border border-(--border-input) text-(--text-secondary) hover:bg-(--bg-subtle) focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none"
+          className="px-4 py-2 rounded-md text-sm font-medium border border-(--border-input) text-(--text-secondary) hover:bg-(--bg-subtle)"
         >
           Close
         </button>
@@ -235,7 +233,7 @@ export function ExtractModal({
           onClick={() => onStart(scope, autoSynthesize)}
           disabled={!!blocked}
           title={blocked ?? undefined}
-          className="px-4 py-2 rounded-md text-sm font-medium bg-(--accent) text-(--on-accent) disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none"
+          className="px-4 py-2 rounded-md text-sm font-medium bg-(--accent) text-(--on-accent) disabled:opacity-50"
           data-testid="extract-start"
         >
           {scope === "chapters" ? "Re-detect chapters" : scope === "book" ? "Extract whole book" : `Extract ${selectedCount} file${selectedCount === 1 ? "" : "s"}`}

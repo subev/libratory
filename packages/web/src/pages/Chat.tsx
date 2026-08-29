@@ -186,7 +186,7 @@ export function Chat() {
               }}
               rows={2}
               placeholder="Ask your library… (Enter to send, Shift+Enter for newline)"
-              className="flex-1 resize-none rounded-lg border border-(--border) bg-(--bg-card) text-(--text-primary) text-sm px-3 py-2 outline-none focus:border-(--accent)"
+              className="flex-1 resize-none rounded-lg border border-(--border) bg-(--bg-card) text-(--text-primary) text-sm px-3 py-2 outline-none"
               data-testid="chat-input"
             />
             <button

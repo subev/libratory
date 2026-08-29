@@ -60,7 +60,7 @@ export function SynthesizeModal({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 rounded-md text-sm font-medium border border-(--border-input) text-(--text-secondary) hover:bg-(--bg-subtle) focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none"
+                  className="px-4 py-2 rounded-md text-sm font-medium border border-(--border-input) text-(--text-secondary) hover:bg-(--bg-subtle)"
                 >
                   Cancel
                 </button>
@@ -69,7 +69,7 @@ export function SynthesizeModal({
                   onClick={onStart}
                   disabled={!canStart}
                   title={canStart ? undefined : disabledReason}
-                  className="px-4 py-2 rounded-md text-sm font-medium bg-(--accent) text-(--on-accent) disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none"
+                  className="px-4 py-2 rounded-md text-sm font-medium bg-(--accent) text-(--on-accent) disabled:opacity-50"
                   data-testid="synthesize-start"
                 >
                   Start synthesis ({count})

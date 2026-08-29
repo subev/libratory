@@ -86,7 +86,7 @@ export function VoicePicker({ value, onChange, title }: VoicePickerProps) {
         onClick={open}
         title={title}
         aria-haspopup="dialog"
-        className="w-full flex items-center justify-between rounded-md border border-(--border-input) bg-(--bg-input) px-3 py-2 text-sm shadow-sm hover:border-(--text-faint) focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none"
+        className="w-full flex items-center justify-between rounded-md border border-(--border-input) bg-(--bg-input) px-3 py-2 text-sm shadow-sm hover:border-(--text-faint)"
         data-testid="voice-picker-trigger"
       >
         <span className="truncate">{label}</span>
@@ -109,7 +109,7 @@ export function VoicePickerChip({ value, onChange, title }: VoicePickerProps) {
         title={title}
         aria-haspopup="dialog"
         aria-label={`Voice: ${label}`}
-        className={`${TOOLBAR_BUTTON} flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none`}
+        className={`${TOOLBAR_BUTTON} flex items-center gap-1.5`}
         data-testid="voice-picker-trigger"
       >
         {/* A chevron promised a dropdown; this opens a modal, so it reads as a button instead. */}

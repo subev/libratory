@@ -433,7 +433,7 @@ function ChapterModalBody({
                 type="checkbox"
                 checked={chapter.selected}
                 onChange={() => onSetSelected(chapter.id, !chapter.selected)}
-                className="rounded border-(--border-input) text-(--accent-text) focus:ring-(--focus-ring)"
+                className="rounded border-(--border-input) text-(--accent-text)"
               />
               <span className="text-sm font-mono text-(--text-faint)">#{chapter.index + 1}</span>
               <h2 className="text-lg font-semibold text-(--text-primary) truncate">{chapter.title}</h2>
@@ -682,11 +682,7 @@ function ChapterModalBody({
             <div className="flex items-center gap-1 mr-2" data-testid="modal-language-switcher">
               <button
                 onClick={() => onSwitchVariant(null)}
-                className={`text-xs px-2.5 py-1 rounded-full border font-medium ${
-                  !variant
-                    ? "bg-(--accent) border-(--accent) text-(--on-accent)"
-                    : "border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)"
-                }`}
+                className={`text-xs px-2.5 py-1 rounded-full border font-medium ${ !variant ? "bg-(--accent) border-(--accent) text-(--on-accent)" : "border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)" }`}
               >
                 Original
               </button>
@@ -694,11 +690,7 @@ function ChapterModalBody({
                 <button
                   key={v.key}
                   onClick={() => onSwitchVariant(v.key)}
-                  className={`text-xs px-2.5 py-1 rounded-full border font-medium ${
-                    variant?.key === v.key
-                      ? "bg-(--accent) border-(--accent) text-(--on-accent)"
-                      : "border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)"
-                  }`}
+                  className={`text-xs px-2.5 py-1 rounded-full border font-medium ${ variant?.key === v.key ? "bg-(--accent) border-(--accent) text-(--on-accent)" : "border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)" }`}
                 >
                   {v.label ?? v.key}
                 </button>
@@ -790,7 +782,7 @@ function ChapterModalBody({
                 value={editText}
                 onChange={(e) => setEditText(e.target.value)}
                 data-testid="chapter-edit-text"
-                className="flex-1 min-h-0 w-full max-w-prose mx-auto rounded bg-(--bg-reading) border border-(--border-custom-text) px-7 py-6 font-reading text-[17px] text-(--text-primary) whitespace-pre-wrap leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-(--warning)"
+                className="flex-1 min-h-0 w-full max-w-prose mx-auto rounded bg-(--bg-reading) border border-(--border-custom-text) px-7 py-6 font-reading text-[17px] text-(--text-primary) whitespace-pre-wrap leading-relaxed resize-none"
               />
             ) : viewMode === "pages" && manifest && readerChapter ? (
               <div className="mx-auto flex w-full max-w-3xl flex-1 min-h-0 flex-col gap-4 overflow-y-auto">
@@ -1137,13 +1129,7 @@ function ChunkPreviewPanel({
               onMouseEnter={() => onHover(preview.url)}
               onMouseLeave={() => onHover(null)}
               title={preview.page !== undefined ? `PDF page ${preview.page}` : undefined}
-              className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-                active
-                  ? "bg-(--accent) text-(--on-accent)"
-                  : linked
-                    ? "bg-(--accent-subtle) text-(--text-primary)"
-                    : "bg-(--bg-subtle) text-(--text-tertiary) hover:bg-(--border)"
-              }`}
+              className={`rounded px-2 py-1 text-xs font-medium transition-colors ${ active ? "bg-(--accent) text-(--on-accent)" : linked ? "bg-(--accent-subtle) text-(--text-primary)" : "bg-(--bg-subtle) text-(--text-tertiary) hover:bg-(--border)" }`}
             >
               Chunk {preview.index}
             </button>
@@ -1220,11 +1206,7 @@ function ViewModeTabs({
           key={mode}
           onClick={() => onSetViewMode(mode)}
           data-testid={`view-tab-${mode}`}
-          className={`px-2.5 py-1 capitalize ${
-            viewMode === mode
-              ? "bg-(--accent) text-(--on-accent)"
-              : "bg-(--bg-card) text-(--text-tertiary) hover:bg-(--bg-card-hover)"
-          }`}
+          className={`px-2.5 py-1 capitalize ${ viewMode === mode ? "bg-(--accent) text-(--on-accent)" : "bg-(--bg-card) text-(--text-tertiary) hover:bg-(--bg-card-hover)" }`}
         >
           {mode}
         </button>
@@ -1377,13 +1359,7 @@ function ChunkedText({
         onClick={() => onSelectChunk(range.url)}
         onMouseEnter={() => onHoverChunk(range.url)}
         onMouseLeave={() => onHoverChunk(null)}
-        className={`cursor-pointer rounded-sm transition-colors ${
-          isSelected
-            ? "bg-(--bg-selected) text-(--text-primary)"
-            : isHovered
-              ? "bg-(--accent-subtle) text-(--text-primary)"
-              : ""
-        }`}
+        className={`cursor-pointer rounded-sm transition-colors ${ isSelected ? "bg-(--bg-selected) text-(--text-primary)" : isHovered ? "bg-(--accent-subtle) text-(--text-primary)" : "" }`}
       >
         {text.slice(range.start, range.end)}
       </span>,

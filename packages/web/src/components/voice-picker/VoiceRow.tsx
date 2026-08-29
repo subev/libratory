@@ -38,9 +38,7 @@ export const VoiceRow = memo(function VoiceRow({ voice, action }: { voice: Voice
         onClick={() => actions.play(voice.id)}
         aria-busy={isPending}
         disabled={unavailable}
-        className={`shrink-0 h-8 w-8 rounded-full flex items-center justify-center border border-(--border) transition-colors focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none ${
-          isPending ? "cursor-progress" : "hover:border-(--accent) hover:bg-(--bg-selected)"
-        }`}
+        className={`shrink-0 h-8 w-8 rounded-full flex items-center justify-center border border-(--border) transition-colors ${ isPending ? "cursor-progress" : "hover:border-(--accent) hover:bg-(--bg-selected)" }`}
         title={status ?? (isPlaying ? "Stop preview" : `Preview ${voice.label}`)}
         aria-label={isPending ? `Generating preview of ${voice.label}` : isPlaying ? `Stop preview of ${voice.label}` : `Preview ${voice.label}`}
         data-testid={`voice-preview-${voice.id}`}
@@ -67,7 +65,7 @@ export const VoiceRow = memo(function VoiceRow({ voice, action }: { voice: Voice
         aria-pressed={isSelected}
         disabled={unavailable}
         title={unavailable ? "This narrator needs Apple's MLX, which only runs on Apple Silicon" : undefined}
-        className="flex-1 min-w-0 text-left focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none rounded disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex-1 min-w-0 text-left rounded disabled:opacity-50 disabled:cursor-not-allowed"
         data-testid={`voice-option-${voice.id}`}
       >
         <div className="text-sm text-(--text-primary) truncate">{voice.label}</div>

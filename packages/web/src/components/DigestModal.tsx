@@ -81,11 +81,7 @@ export function DigestModal({
               <button
                 key={p.key}
                 onClick={() => setPrompt(p.prompt)}
-                className={`text-xs px-3 py-1 rounded-full border font-medium ${
-                  prompt === p.prompt
-                    ? "bg-(--accent) border-(--accent) text-(--on-accent)"
-                    : "border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)"
-                }`}
+                className={`text-xs px-3 py-1 rounded-full border font-medium ${ prompt === p.prompt ? "bg-(--accent) border-(--accent) text-(--on-accent)" : "border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)" }`}
                 data-testid={`digest-preset-${p.key}`}
               >
                 {p.label}
@@ -97,7 +93,7 @@ export function DigestModal({
             onChange={(e) => setPrompt(e.target.value)}
             rows={5}
             maxLength={4000}
-            className="w-full resize-y rounded-md border border-(--border-input) bg-(--bg-input) p-2.5 text-sm text-(--text-primary) leading-relaxed focus:outline-none focus:border-(--focus-ring)"
+            className="w-full resize-y rounded-md border border-(--border-input) bg-(--bg-input) p-2.5 text-sm text-(--text-primary) leading-relaxed"
             data-testid="digest-prompt"
           />
         </div>

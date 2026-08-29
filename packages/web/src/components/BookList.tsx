@@ -387,7 +387,7 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
                 if (e.key === "Escape") setNewFolderName(null);
               }}
               placeholder="Folder name…"
-              className="px-2 py-1.5 text-xs rounded-md border border-(--border) bg-(--bg-card) text-(--text-primary) outline-none focus:border-(--focus-ring)"
+              className="px-2 py-1.5 text-xs rounded-md border border-(--border) bg-(--bg-card) text-(--text-primary) outline-none"
               data-testid="new-folder-name"
             />
           ) : (

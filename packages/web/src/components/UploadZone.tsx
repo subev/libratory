@@ -277,12 +277,7 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onClick={() => !isUploading && fileInputRef.current?.click()}
-        className={`
-          border-2 border-dashed rounded-lg text-center transition-colors
-          ${hasFiles ? "p-3" : "p-12"}
-          ${isDragging ? "border-(--accent) bg-(--bg-drag)" : hasFiles ? "border-(--border-input) bg-(--bg-card)" : "border-(--border-input) hover:border-(--text-faint) bg-(--bg-subtle)"}
-          ${isUploading ? "opacity-50 pointer-events-none" : "cursor-pointer"}
-        `}
+        className={` border-2 border-dashed rounded-lg text-center transition-colors ${hasFiles ? "p-3" : "p-12"} ${isDragging ? "border-(--accent) bg-(--bg-drag)" : hasFiles ? "border-(--border-input) bg-(--bg-card)" : "border-(--border-input) hover:border-(--text-faint) bg-(--bg-subtle)"} ${isUploading ? "opacity-50 pointer-events-none" : "cursor-pointer"} `}
       >
         <input
           ref={fileInputRef}
@@ -315,11 +310,7 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
                 onDragOver={(e) => handleRowDragOver(e, index)}
                 onDrop={(e) => handleRowDrop(e, index)}
                 onDragEnd={handleRowDragEnd}
-                className={`
-                  flex items-center gap-3 px-3 py-1.5 rounded-md transition-colors
-                  ${dragIndex === index ? "opacity-40" : ""}
-                  ${dragOverIndex === index && dragIndex !== index ? "bg-(--bg-drag) border border-(--accent) border-dashed" : "hover:bg-(--bg-subtle)"}
-                `}
+                className={` flex items-center gap-3 px-3 py-1.5 rounded-md transition-colors ${dragIndex === index ? "opacity-40" : ""} ${dragOverIndex === index && dragIndex !== index ? "bg-(--bg-drag) border border-(--accent) border-dashed" : "hover:bg-(--bg-subtle)"} `}
               >
                 {isReorderable && (
                   <span className="cursor-grab text-(--text-faint) select-none" title="Drag to reorder">
@@ -375,9 +366,7 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
               ].map((entry) => (
                 <label
                   key={entry.label}
-                  className={`flex gap-2 rounded-md border p-2 cursor-pointer ${
-                    separateBooks === entry.separate ? "border-(--accent) bg-(--bg-selected)" : "border-(--border) hover:bg-(--bg-subtle)"
-                  }`}
+                  className={`flex gap-2 rounded-md border p-2 cursor-pointer ${ separateBooks === entry.separate ? "border-(--accent) bg-(--bg-selected)" : "border-(--border) hover:bg-(--bg-subtle)" }`}
                 >
                   <input
                     type="radio"
@@ -487,11 +476,7 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
                         setNotePreset(p.key);
                         setNotePrompt(p.prompt("book"));
                       }}
-                      className={`text-xs px-2.5 py-1 rounded-full border font-medium ${
-                        notePreset === p.key
-                          ? "bg-(--accent) border-(--accent) text-(--on-accent)"
-                          : "border-(--border) text-(--text-secondary) hover:bg-(--bg-card)"
-                      }`}
+                      className={`text-xs px-2.5 py-1 rounded-full border font-medium ${ notePreset === p.key ? "bg-(--accent) border-(--accent) text-(--on-accent)" : "border-(--border) text-(--text-secondary) hover:bg-(--bg-card)" }`}
                     >
                       {p.label}
                     </button>
@@ -502,7 +487,7 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
                   onChange={(e) => setNotePrompt(e.target.value)}
                   rows={3}
                   maxLength={4000}
-                  className="w-full resize-y rounded-md border border-(--border-input) bg-(--bg-card) p-2.5 text-sm text-(--text-primary) leading-relaxed focus:outline-none focus:border-(--accent)"
+                  className="w-full resize-y rounded-md border border-(--border-input) bg-(--bg-card) p-2.5 text-sm text-(--text-primary) leading-relaxed"
                   placeholder={`What should the AI answer about ${noteTarget}?`}
                   data-testid="upload-ai-prompt"
                 />

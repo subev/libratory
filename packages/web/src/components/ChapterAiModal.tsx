@@ -142,13 +142,7 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
                 onClick={() => !option.disabled && switchKind(option.key)}
                 disabled={option.disabled}
                 title={option.title}
-                className={`px-2.5 py-1 rounded text-xs font-medium truncate max-w-64 ${
-                  kind === option.key
-                    ? "bg-(--bg-subtle) text-(--text-primary)"
-                    : option.disabled
-                      ? "text-(--text-faint) cursor-not-allowed"
-                      : "text-(--text-muted) hover:text-(--text-secondary)"
-                }`}
+                className={`px-2.5 py-1 rounded text-xs font-medium truncate max-w-64 ${ kind === option.key ? "bg-(--bg-subtle) text-(--text-primary)" : option.disabled ? "text-(--text-faint) cursor-not-allowed" : "text-(--text-muted) hover:text-(--text-secondary)" }`}
               >
                 {option.label}
               </button>
@@ -170,11 +164,7 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
               <button
                 key={p.key}
                 onClick={() => selectPreset(p.key)}
-                className={`text-xs px-2.5 py-1 rounded-full border font-medium ${
-                  activePreset === p.key
-                    ? "bg-(--accent) border-(--accent) text-(--on-accent)"
-                    : "border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)"
-                }`}
+                className={`text-xs px-2.5 py-1 rounded-full border font-medium ${ activePreset === p.key ? "bg-(--accent) border-(--accent) text-(--on-accent)" : "border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)" }`}
               >
                 {p.label}
               </button>
@@ -186,7 +176,7 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter") run();
             }}
-            className="flex-1 resize-none rounded-md border border-(--border-input) bg-(--bg-input) p-3 text-sm text-(--text-primary) leading-relaxed focus:outline-none focus:border-(--focus-ring)"
+            className="flex-1 resize-none rounded-md border border-(--border-input) bg-(--bg-input) p-3 text-sm text-(--text-primary) leading-relaxed"
             placeholder={`Ask anything about this ${subject === "chapters" ? "selection" : subject}...`}
             data-testid="ai-prompt-input"
           />

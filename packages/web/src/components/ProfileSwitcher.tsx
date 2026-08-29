@@ -80,7 +80,7 @@ export function ProfileSwitcher() {
       <select
         value={active.id}
         onChange={(e) => activate(e.target.value)}
-        className="px-2 py-1.5 text-xs rounded-md border border-(--border) bg-(--bg-card) text-(--text-primary) outline-none focus:border-(--accent)"
+        className="px-2 py-1.5 text-xs rounded-md border border-(--border) bg-(--bg-card) text-(--text-primary) outline-none"
         data-testid="profile-select"
       >
         {profiles.map((p) => (

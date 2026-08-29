@@ -37,7 +37,7 @@ export function DownloadNotice({
         type="button"
         onClick={onDownload}
         disabled={downloading || disabled}
-        className="px-2 py-1 rounded bg-(--accent) text-(--on-accent) disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:outline-none"
+        className="px-2 py-1 rounded bg-(--accent) text-(--on-accent) disabled:opacity-50"
         data-testid={`${testIdPrefix}-download`}
       >
         {downloading ? `Downloading ${settledLabel}… ${progress ?? ""}`.trimEnd() : buttonLabel}

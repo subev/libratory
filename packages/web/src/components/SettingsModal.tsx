@@ -43,7 +43,7 @@ function KeyCard({ slug, label, note, configured, keyHint, draft, onDraft, onSav
           onChange={(e) => onDraft(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && onSave()}
           placeholder={configured ? "Paste a new key to replace it" : "Paste API key"}
-          className="flex-1 text-xs rounded-md border border-(--border-input) bg-(--bg-input) px-2 py-1.5 text-(--text-primary) focus:outline-none focus:border-(--focus-ring)"
+          className="flex-1 text-xs rounded-md border border-(--border-input) bg-(--bg-input) px-2 py-1.5 text-(--text-primary)"
           data-testid={`settings-key-input-${slug}`}
         />
         <button
