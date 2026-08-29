@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { trpc } from "../trpc.ts";
 import { TRANSLATION_LANGUAGES } from "../lib/languages.ts";
-import { useBodyScrollLock } from "../lib/use-body-scroll-lock.ts";
+import { Modal } from "./Modal.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
 
 type ChapterSummary = { id: string; index: number; title: string };
@@ -25,7 +25,6 @@ export function VariantModal({
   initialChapterId?: string | null;
   onClose: () => void;
 }) {
-  useBodyScrollLock();
   const utils = trpc.useUtils();
   const [activeKey, setActiveKey] = useState<string | null>(initialKey ?? "Bulgarian");
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -38,14 +37,6 @@ export function VariantModal({
   useEffect(() => {
     selectedChapterRef.current?.scrollIntoView({ block: "nearest" });
   }, [selectedId]);
-
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [onClose]);
 
   const { data: presets = [] } = trpc.variants.presets.useQuery();
   const { data: lanes = [] } = trpc.variants.list.useQuery({ bookId });
@@ -216,197 +207,194 @@ export function VariantModal({
   const mutationError = startMutation.error ?? createMutation.error ?? stopMutation.error;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" data-testid="translation-modal">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-(--bg-card) rounded-xl shadow-2xl w-[96vw] h-[92vh] flex flex-col">
-        <div className="flex items-center gap-4 p-4 border-b border-(--border)">
-          <h2 className="text-lg font-semibold text-(--text-primary)">Translate / Transform</h2>
-          <select
-            value={selectValue}
-            onChange={(e) => handleTargetChange(e.target.value)}
+    <Modal size="full" onClose={onClose} closeOnEscape backdropTestId="translation-modal">
+      <div className="flex items-center gap-4 p-4 border-b border-(--border)">
+        <h2 className="text-lg font-semibold text-(--text-primary)">Translate / Transform</h2>
+        <select
+          value={selectValue}
+          onChange={(e) => handleTargetChange(e.target.value)}
+          disabled={running}
+          title={running ? "Stop the running job before switching target" : "Target language or rewrite"}
+          className="px-2 py-1 rounded-md border border-(--border) bg-(--bg-card) text-sm text-(--text-primary) disabled:opacity-50"
+          data-testid="translation-language"
+        >
+          {lanes.length > 0 && (
+            <optgroup label="In this book">
+              {lanes.map((l) => (
+                <option key={l.key} value={`lane:${l.key}`}>{l.label ?? l.key} ({l.done}/{chapters.length})</option>
+              ))}
+            </optgroup>
+          )}
+          <optgroup label="Translate to">
+            {TRANSLATION_LANGUAGES.filter((l) => !lanes.some((x) => x.key === l)).map((l) => (
+              <option key={l} value={`lang:${l}`}>{l}</option>
+            ))}
+          </optgroup>
+          <optgroup label="Rewrite as">
+            {presets.filter((p) => !lanes.some((x) => x.key === p.id)).map((p) => (
+              <option key={p.id} value={`preset:${p.id}`}>{p.label}</option>
+            ))}
+            <option value="custom">Custom prompt...</option>
+          </optgroup>
+        </select>
+
+        <label
+          className={`flex items-center gap-1.5 text-sm text-(--text-secondary) select-none ${running ? "opacity-50" : "cursor-pointer"}`}
+          title="Let the model reason before writing — can improve tricky passages but is several times slower"
+        >
+          <input
+            type="checkbox"
+            checked={thinkingEnabled}
+            onChange={(e) => setThinkingEnabled(e.target.checked)}
             disabled={running}
-            title={running ? "Stop the running job before switching target" : "Target language or rewrite"}
-            className="px-2 py-1 rounded-md border border-(--border) bg-(--bg-card) text-sm text-(--text-primary) disabled:opacity-50"
-            data-testid="translation-language"
-          >
-            {lanes.length > 0 && (
-              <optgroup label="In this book">
-                {lanes.map((l) => (
-                  <option key={l.key} value={`lane:${l.key}`}>{l.label ?? l.key} ({l.done}/{chapters.length})</option>
-                ))}
-              </optgroup>
-            )}
-            <optgroup label="Translate to">
-              {TRANSLATION_LANGUAGES.filter((l) => !lanes.some((x) => x.key === l)).map((l) => (
-                <option key={l} value={`lang:${l}`}>{l}</option>
-              ))}
-            </optgroup>
-            <optgroup label="Rewrite as">
-              {presets.filter((p) => !lanes.some((x) => x.key === p.id)).map((p) => (
-                <option key={p.id} value={`preset:${p.id}`}>{p.label}</option>
-              ))}
-              <option value="custom">Custom prompt...</option>
-            </optgroup>
-          </select>
+            data-testid="translation-thinking-toggle"
+          />
+          Reasoning
+        </label>
 
-          <label
-            className={`flex items-center gap-1.5 text-sm text-(--text-secondary) select-none ${running ? "opacity-50" : "cursor-pointer"}`}
-            title="Let the model reason before writing — can improve tricky passages but is several times slower"
-          >
-            <input
-              type="checkbox"
-              checked={thinkingEnabled}
-              onChange={(e) => setThinkingEnabled(e.target.checked)}
-              disabled={running}
-              data-testid="translation-thinking-toggle"
-            />
-            Reasoning
-          </label>
+        <ModelPicker value={model} onChange={setModel} testId="variant-model" />
 
-          <ModelPicker value={model} onChange={setModel} testId="variant-model" />
+        <button
+          onClick={handleStart}
+          disabled={!canStart}
+          title={
+            !selectedId ? "Select a chapter" :
+            running ? `${targetLabel} is running` :
+            draft && !draft.prompt.trim() ? "Write a prompt first" :
+            variant?.status === "suspended" && !promptEdited ? "Continue from where it stopped" :
+            variant?.status === "done" && !promptEdited ? "Discard this text and generate it again" :
+            isTranslationTarget ? "Translate this chapter" : "Rewrite this chapter"
+          }
+          className="px-3 py-1.5 bg-(--accent) text-(--on-accent) rounded-md text-sm font-medium hover:bg-(--accent-hover) disabled:opacity-50 disabled:cursor-not-allowed"
+          data-testid="translation-start"
+        >
+          {startLabel}
+        </button>
+        <button
+          onClick={() => selectedId && activeKey && stopMutation.mutate({ chapterId: selectedId, key: activeKey })}
+          disabled={!selectedId || !running || stopMutation.isPending}
+          title={running ? "Stop and keep everything generated so far" : "Nothing is running"}
+          className="px-3 py-1.5 bg-(--bg-subtle) text-(--text-secondary) rounded-md text-sm font-medium hover:bg-(--border) disabled:opacity-50 disabled:cursor-not-allowed"
+          data-testid="translation-stop"
+        >
+          Stop
+        </button>
 
-          <button
-            onClick={handleStart}
-            disabled={!canStart}
-            title={
-              !selectedId ? "Select a chapter" :
-              running ? `${targetLabel} is running` :
-              draft && !draft.prompt.trim() ? "Write a prompt first" :
-              variant?.status === "suspended" && !promptEdited ? "Continue from where it stopped" :
-              variant?.status === "done" && !promptEdited ? "Discard this text and generate it again" :
-              isTranslationTarget ? "Translate this chapter" : "Rewrite this chapter"
-            }
-            className="px-3 py-1.5 bg-(--accent) text-(--on-accent) rounded-md text-sm font-medium hover:bg-(--accent-hover) disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="translation-start"
-          >
-            {startLabel}
-          </button>
-          <button
-            onClick={() => selectedId && activeKey && stopMutation.mutate({ chapterId: selectedId, key: activeKey })}
-            disabled={!selectedId || !running || stopMutation.isPending}
-            title={running ? "Stop and keep everything generated so far" : "Nothing is running"}
-            className="px-3 py-1.5 bg-(--bg-subtle) text-(--text-secondary) rounded-md text-sm font-medium hover:bg-(--border) disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="translation-stop"
-          >
-            Stop
-          </button>
-
-          {running ? (
-            <span className="text-sm text-(--accent-text)" data-testid="translation-progress">
-              {thinking ? "Thinking" : isTranslationTarget ? "Translating" : "Rewriting"}{variant?.progress ? ` · ${variant.progress} chunks` : ""}...
-            </span>
-          ) : variant?.status === "suspended" ? (
-            <span className="text-sm text-(--text-muted)">
-              Stopped{variant.progress ? ` at ${variant.progress} chunks` : ""} — partial kept
-            </span>
-          ) : variant?.status === "failed" ? (
-            <span className="text-sm text-(--danger-text) truncate" title={variant.error ?? undefined}>
-              Failed: {variant.error}
-            </span>
-          ) : null}
-          {mutationError ? (
-            <span className="text-sm text-(--danger-text) truncate">{mutationError.message}</span>
-          ) : null}
-
-          <div className="flex-1" />
-          <button onClick={onClose} className="shrink-0 p-1 text-(--text-faint) hover:text-(--text-tertiary) rounded">
-            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-            </svg>
-          </button>
-        </div>
-
-        {draft ? (
-          <div className="flex items-start gap-3 px-4 py-3 border-b border-(--border) bg-(--bg-subtle)" data-testid="transform-prompt-panel">
-            {!draft.presetId && (
-              <input
-                value={draft.label}
-                onChange={(e) => setDraft({ ...draft, label: e.target.value })}
-                placeholder="Name (optional — inferred if empty)"
-                className="w-56 shrink-0 px-2 py-1.5 rounded-md border border-(--border-input) bg-(--bg-card) text-sm text-(--text-primary)"
-                data-testid="transform-label"
-              />
-            )}
-            <textarea
-              value={draft.prompt}
-              onChange={(e) => setDraft({ ...draft, prompt: e.target.value })}
-              placeholder="How should each chapter be rewritten? e.g. Explain everything like I'm five, keeping the chapter's structure."
-              rows={3}
-              className="flex-1 px-2 py-1.5 rounded-md border border-(--border-input) bg-(--bg-card) text-sm text-(--text-primary) resize-y font-mono leading-snug"
-              data-testid="transform-prompt"
-            />
-          </div>
+        {running ? (
+          <span className="text-sm text-(--accent-text)" data-testid="translation-progress">
+            {thinking ? "Thinking" : isTranslationTarget ? "Translating" : "Rewriting"}{variant?.progress ? ` · ${variant.progress} chunks` : ""}...
+          </span>
+        ) : variant?.status === "suspended" ? (
+          <span className="text-sm text-(--text-muted)">
+            Stopped{variant.progress ? ` at ${variant.progress} chunks` : ""} — partial kept
+          </span>
+        ) : variant?.status === "failed" ? (
+          <span className="text-sm text-(--danger-text) truncate" title={variant.error ?? undefined}>
+            Failed: {variant.error}
+          </span>
+        ) : null}
+        {mutationError ? (
+          <span className="text-sm text-(--danger-text) truncate">{mutationError.message}</span>
         ) : null}
 
-        <div className="flex-1 flex min-h-0">
-          <div className="w-64 shrink-0 overflow-y-auto border-r border-(--border) p-2">
-            {chapters.map((ch) => {
-              const t = statusByChapter.get(ch.id);
-              return (
-                <button
-                  key={ch.id}
-                  ref={selectedId === ch.id ? selectedChapterRef : undefined}
-                  onClick={() => setSelectedId(ch.id)}
-                  className={`w-full text-left px-2 py-1.5 rounded text-sm flex items-center gap-2 hover:bg-(--bg-subtle) ${
-                    selectedId === ch.id ? "bg-(--bg-selected)" : ""
-                  }`}
-                >
-                  <span className="shrink-0 text-xs font-mono text-(--text-faint) w-6 text-right">{ch.index + 1}.</span>
-                  <span className="flex-1 truncate text-(--text-primary)" title={ch.title}>{ch.title}</span>
-                  {t ? (
-                    <span
-                      className={`shrink-0 h-2 w-2 rounded-full ${
-                        t.status === "done" ? "bg-(--success)" :
-                        t.status === "translating" || t.status === "pending" ? "bg-(--accent) animate-pulse" :
-                        t.status === "suspended" ? "bg-(--warning)" :
-                        "bg-(--danger)"
-                      }`}
-                      title={`${t.status}${t.progress ? ` (${t.progress})` : ""}`}
-                    />
-                  ) : null}
-                </button>
-              );
-            })}
-            {chapters.length === 0 ? (
-              <p className="text-sm text-(--text-muted) p-2">No chapters yet.</p>
+        <div className="flex-1" />
+        <button onClick={onClose} className="shrink-0 p-1 text-(--text-faint) hover:text-(--text-tertiary) rounded">
+          <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+          </svg>
+        </button>
+      </div>
+
+      {draft ? (
+        <div className="flex items-start gap-3 px-4 py-3 border-b border-(--border) bg-(--bg-subtle)" data-testid="transform-prompt-panel">
+          {!draft.presetId && (
+            <input
+              value={draft.label}
+              onChange={(e) => setDraft({ ...draft, label: e.target.value })}
+              placeholder="Name (optional — inferred if empty)"
+              className="w-56 shrink-0 px-2 py-1.5 rounded-md border border-(--border-input) bg-(--bg-card) text-sm text-(--text-primary)"
+              data-testid="transform-label"
+            />
+          )}
+          <textarea
+            value={draft.prompt}
+            onChange={(e) => setDraft({ ...draft, prompt: e.target.value })}
+            placeholder="How should each chapter be rewritten? e.g. Explain everything like I'm five, keeping the chapter's structure."
+            rows={3}
+            className="flex-1 px-2 py-1.5 rounded-md border border-(--border-input) bg-(--bg-card) text-sm text-(--text-primary) resize-y font-mono leading-snug"
+            data-testid="transform-prompt"
+          />
+        </div>
+      ) : null}
+
+      <div className="flex-1 flex min-h-0">
+        <div className="w-64 shrink-0 overflow-y-auto border-r border-(--border) p-2">
+          {chapters.map((ch) => {
+            const t = statusByChapter.get(ch.id);
+            return (
+              <button
+                key={ch.id}
+                ref={selectedId === ch.id ? selectedChapterRef : undefined}
+                onClick={() => setSelectedId(ch.id)}
+                className={`w-full text-left px-2 py-1.5 rounded text-sm flex items-center gap-2 hover:bg-(--bg-subtle) ${
+                  selectedId === ch.id ? "bg-(--bg-selected)" : ""
+                }`}
+              >
+                <span className="shrink-0 text-xs font-mono text-(--text-faint) w-6 text-right">{ch.index + 1}.</span>
+                <span className="flex-1 truncate text-(--text-primary)" title={ch.title}>{ch.title}</span>
+                {t ? (
+                  <span
+                    className={`shrink-0 h-2 w-2 rounded-full ${
+                      t.status === "done" ? "bg-(--success)" :
+                      t.status === "translating" || t.status === "pending" ? "bg-(--accent) animate-pulse" :
+                      t.status === "suspended" ? "bg-(--warning)" :
+                      "bg-(--danger)"
+                    }`}
+                    title={`${t.status}${t.progress ? ` (${t.progress})` : ""}`}
+                  />
+                ) : null}
+              </button>
+            );
+          })}
+          {chapters.length === 0 ? (
+            <p className="text-sm text-(--text-muted) p-2">No chapters yet.</p>
+          ) : null}
+        </div>
+
+        <div className="flex-1 min-w-0 flex flex-col border-r border-(--border)">
+          <h3 className="shrink-0 px-4 pt-3 pb-1 text-xs font-medium text-(--text-muted) uppercase tracking-wider">
+            Original
+          </h3>
+          <div className="flex-1 overflow-y-auto px-4 pb-4">
+            <p className="text-sm text-(--text-primary) whitespace-pre-wrap leading-relaxed">
+              {sourceText || (selectedId ? "Loading..." : "Select a chapter.")}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex-1 min-w-0 flex flex-col">
+          <h3 className="shrink-0 px-4 pt-3 pb-1 text-xs font-medium text-(--text-muted) uppercase tracking-wider">
+            {targetLabel}
+          </h3>
+          <div ref={outputPane} className="flex-1 overflow-y-auto px-4 pb-4">
+            <p className="text-sm text-(--text-primary) whitespace-pre-wrap leading-relaxed" data-testid="translation-text">
+              {displayText || (thinking ? null : (
+                <span className="text-(--text-muted)">
+                  {running ? "Waiting for the first chunk..." : "Nothing generated yet."}
+                </span>
+              ))}
+            </p>
+            {thinking ? (
+              <p
+                className="mt-3 text-xs text-(--text-faint) italic whitespace-pre-wrap leading-relaxed"
+                data-testid="translation-thinking"
+              >
+                {thinking}
+              </p>
             ) : null}
-          </div>
-
-          <div className="flex-1 min-w-0 flex flex-col border-r border-(--border)">
-            <h3 className="shrink-0 px-4 pt-3 pb-1 text-xs font-medium text-(--text-muted) uppercase tracking-wider">
-              Original
-            </h3>
-            <div className="flex-1 overflow-y-auto px-4 pb-4">
-              <p className="text-sm text-(--text-primary) whitespace-pre-wrap leading-relaxed">
-                {sourceText || (selectedId ? "Loading..." : "Select a chapter.")}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex-1 min-w-0 flex flex-col">
-            <h3 className="shrink-0 px-4 pt-3 pb-1 text-xs font-medium text-(--text-muted) uppercase tracking-wider">
-              {targetLabel}
-            </h3>
-            <div ref={outputPane} className="flex-1 overflow-y-auto px-4 pb-4">
-              <p className="text-sm text-(--text-primary) whitespace-pre-wrap leading-relaxed" data-testid="translation-text">
-                {displayText || (thinking ? null : (
-                  <span className="text-(--text-muted)">
-                    {running ? "Waiting for the first chunk..." : "Nothing generated yet."}
-                  </span>
-                ))}
-              </p>
-              {thinking ? (
-                <p
-                  className="mt-3 text-xs text-(--text-faint) italic whitespace-pre-wrap leading-relaxed"
-                  data-testid="translation-thinking"
-                >
-                  {thinking}
-                </p>
-              ) : null}
-            </div>
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

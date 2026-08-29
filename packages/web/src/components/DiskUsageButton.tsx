@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { trpc } from "../trpc.ts";
 import { formatBytes } from "../lib/format.ts";
-import { useBodyScrollLock } from "../lib/use-body-scroll-lock.ts";
+import { Modal } from "./Modal.tsx";
 
 export function DiskUsageButton({ bookId }: { bookId: string }) {
   const [open, setOpen] = useState(false);
-  useBodyScrollLock(open);
   const utils = trpc.useUtils();
 
   const { data: usage } = trpc.books.diskUsage.useQuery(
@@ -44,15 +43,8 @@ export function DiskUsageButton({ bookId }: { bookId: string }) {
       </button>
 
       {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          onClick={() => setOpen(false)}
-          data-testid="disk-usage-modal"
-        >
-          <div
-            className="bg-(--bg-card) rounded-lg shadow-xl w-full max-w-md mx-4 p-5"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <Modal size="sm" onClose={() => setOpen(false)} backdropTestId="disk-usage-modal">
+          <div className="p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-(--text-primary)">Disk usage</h3>
               <button
@@ -98,7 +90,7 @@ export function DiskUsageButton({ bookId }: { bookId: string }) {
               </>
             )}
           </div>
-        </div>
+        </Modal>
       )}
     </>
   );

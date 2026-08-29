@@ -319,6 +319,7 @@ async function runBoot() {
 
 // After the steps so a check never competes with the Python download for bandwidth — but after a
 // failed one too, or a machine blocked on Docker gets no updater at all. install() is idempotent.
+let dockStep = -1;
 function installUpdater() {
   updater.install({
     onStatus: (text) => appLog(`[updater] ${text}`),
@@ -327,7 +328,12 @@ function installUpdater() {
 
     onProgress: (progress) => {
       if (!win || win.isDestroyed()) return;
-      win.setProgressBar(progress ? progress.percent / 100 : -1);
+      // A 190 MB download emits ~3000 of these; the Dock cannot show more than whole percents.
+      const step = progress ? Math.round(progress.percent) : -1;
+      if (step !== dockStep) {
+        dockStep = step;
+        win.setProgressBar(progress ? step / 100 : -1);
+      }
       win.webContents.send("update-progress", progress);
     },
   });

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { trpc } from "../trpc.ts";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
-import { useBodyScrollLock } from "../lib/use-body-scroll-lock.ts";
+import { Modal } from "./Modal.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { PRIMARY_BUTTON } from "../lib/button-classes.ts";
 
@@ -51,7 +51,6 @@ export function StructureModal({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  useBodyScrollLock();
   const { data: structure, isLoading } = trpc.books.structure.useQuery({ id: bookId });
   const [model, setModel] = useState<string>(chapterModel ?? "");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -71,14 +70,6 @@ export function StructureModal({
     }
     setSelected(initial);
   }, [structure]);
-
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [onClose]);
 
   const proposeMutation = trpc.books.proposeChapters.useMutation({ onSuccess: onChanged });
   const applyMutation = trpc.books.applyChapterBoundaries.useMutation({
@@ -216,9 +207,8 @@ export function StructureModal({
   const selectedCount = selected.size;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" data-testid="structure-modal">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-(--bg-card) rounded-xl shadow-2xl w-[92vw] max-w-6xl h-[85vh] flex flex-col">
+    <>
+      <Modal size="xl" onClose={onClose} closeOnEscape backdropTestId="structure-modal">
         <div className="flex items-center justify-between p-5 border-b border-(--border)">
           <div>
             <h2 className="text-lg font-semibold text-(--text-primary)">Book structure</h2>
@@ -439,8 +429,7 @@ export function StructureModal({
             Apply boundaries
           </button>
         </div>
-      </div>
-
+      </Modal>
       {pdfPreview ? (
         <PdfPreviewModal
           fileId={pdfPreview.fileId}
@@ -449,6 +438,6 @@ export function StructureModal({
           onClose={() => setPdfPreview(null)}
         />
       ) : null}
-    </div>
+    </>
   );
 }

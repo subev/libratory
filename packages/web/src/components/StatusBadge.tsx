@@ -5,7 +5,7 @@ type StatusBadgeProps = {
   totalChapters?: number;
 };
 
-const statusStyles: Record<string, string> = {
+export const statusStyles: Record<string, string> = {
   pending: "bg-(--badge-pending-bg) text-(--badge-pending-text)",
   extracting: "bg-(--badge-extracting-bg) text-(--badge-extracting-text)",
   synthesizing: "bg-(--badge-synthesizing-bg) text-(--badge-synthesizing-text)",

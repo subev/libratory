@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { trpc } from "../trpc.ts";
-import { useBodyScrollLock } from "../lib/use-body-scroll-lock.ts";
+import { Modal } from "./Modal.tsx";
 import { PRIMARY_BUTTON } from "../lib/button-classes.ts";
 
 type FolderNode = { id: string; name: string; depth: number };
@@ -16,7 +16,6 @@ export function FolderPickerModal({
   onClose: () => void;
   onMoved: () => void;
 }) {
-  useBodyScrollLock();
   const utils = trpc.useUtils();
   const { data: allFolders = [] } = trpc.folders.list.useQuery();
   const [targetId, setTargetId] = useState<string | null>(null);
@@ -103,68 +102,62 @@ export function FolderPickerModal({
   );
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div
-        className="bg-(--bg-card) rounded-lg shadow-xl w-[90vw] max-w-md max-h-[85vh] flex flex-col overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-        data-testid="folder-picker-modal"
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-(--border) shrink-0">
-          <span className="text-sm font-medium text-(--text-primary)">
-            Move {itemLabel} to…
-          </span>
-          <button onClick={onClose} className="text-(--text-faint) hover:text-(--text-tertiary) p-1" title="Close">
-            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-            </svg>
+    <Modal size="sm" onClose={onClose} testId="folder-picker-modal">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-(--border) shrink-0">
+        <span className="text-sm font-medium text-(--text-primary)">
+          Move {itemLabel} to…
+        </span>
+        <button onClick={onClose} className="text-(--text-faint) hover:text-(--text-tertiary) p-1" title="Close">
+          <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+        {row(null, "Unfiled (home)", 0)}
+        {tree.map((n) => row(n.id, `📁 ${n.name}`, n.depth))}
+      </div>
+
+      <div className="border-t border-(--border) px-4 py-3 shrink-0 space-y-2">
+        {newName !== null ? (
+          <input
+            autoFocus
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && newName.trim()) {
+                createMutation.mutate({ name: newName.trim(), parentId: targetId });
+              }
+              if (e.key === "Escape") setNewName(null);
+            }}
+            placeholder="New folder name — created inside the selection, Enter to create"
+            className="w-full px-2 py-1.5 text-sm rounded-md border border-(--border-input) bg-(--bg-input) text-(--text-primary) outline-none focus:border-(--focus-ring)"
+            data-testid="folder-picker-new-name"
+          />
+        ) : (
+          <button
+            onClick={() => setNewName("")}
+            className="text-sm text-(--accent-text) hover:text-(--accent-text-hover)"
+            data-testid="folder-picker-new"
+          >
+            + New folder…
+          </button>
+        )}
+        {(moveError || createMutation.error) && (
+          <p className="text-sm text-(--danger-text)">{moveError ?? createMutation.error!.message}</p>
+        )}
+        <div className="flex justify-end">
+          <button
+            onClick={move}
+            disabled={moving || itemCount === 0}
+            className={PRIMARY_BUTTON}
+            data-testid="folder-picker-move"
+          >
+            {moving ? "Moving..." : `Move ${itemLabel}`}
           </button>
         </div>
-
-        <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-          {row(null, "Unfiled (home)", 0)}
-          {tree.map((n) => row(n.id, `📁 ${n.name}`, n.depth))}
-        </div>
-
-        <div className="border-t border-(--border) px-4 py-3 shrink-0 space-y-2">
-          {newName !== null ? (
-            <input
-              autoFocus
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && newName.trim()) {
-                  createMutation.mutate({ name: newName.trim(), parentId: targetId });
-                }
-                if (e.key === "Escape") setNewName(null);
-              }}
-              placeholder="New folder name — created inside the selection, Enter to create"
-              className="w-full px-2 py-1.5 text-sm rounded-md border border-(--border-input) bg-(--bg-input) text-(--text-primary) outline-none focus:border-(--focus-ring)"
-              data-testid="folder-picker-new-name"
-            />
-          ) : (
-            <button
-              onClick={() => setNewName("")}
-              className="text-sm text-(--accent-text) hover:text-(--accent-text-hover)"
-              data-testid="folder-picker-new"
-            >
-              + New folder…
-            </button>
-          )}
-          {(moveError || createMutation.error) && (
-            <p className="text-sm text-(--danger-text)">{moveError ?? createMutation.error!.message}</p>
-          )}
-          <div className="flex justify-end">
-            <button
-              onClick={move}
-              disabled={moving || itemCount === 0}
-              className={PRIMARY_BUTTON}
-              data-testid="folder-picker-move"
-            >
-              {moving ? "Moving..." : `Move ${itemLabel}`}
-            </button>
-          </div>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }

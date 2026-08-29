@@ -13,6 +13,7 @@ import { UpdateProgress } from "./components/UpdateProgress.tsx";
 import { Home } from "./pages/Home.tsx";
 import { BookDetail } from "./pages/BookDetail.tsx";
 import { Chat } from "./pages/Chat.tsx";
+import { Components } from "./pages/Components.tsx";
 // Lazy so every other page stops paying for pdf.js
 const Reader = lazy(() => import("./pages/Reader.tsx").then((m) => ({ default: m.Reader })));
 const ReaderOpen = lazy(() => import("./pages/ReaderOpen.tsx").then((m) => ({ default: m.ReaderOpen })));
@@ -51,6 +52,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/books/:id/read" element={<Suspense fallback={null}><Reader /></Suspense>} />
               <Route path="/open" element={<Suspense fallback={null}><ReaderOpen /></Suspense>} />
               <Route path="/chat" element={<Chat />} />
+              <Route path="/components" element={<Components />} />
             </Routes>
           </ErrorBoundary>
         </BrowserRouter>

@@ -7,13 +7,14 @@ import { DigestModal } from "./DigestModal.tsx";
 import { HnDigestModal } from "./HnDigestModal.tsx";
 import { FolderPickerModal } from "./FolderPickerModal.tsx";
 import { setDragItems, getDragItems, hasDragItems, type DragItems } from "../lib/dnd.ts";
+import { statusStyles } from "./StatusBadge.tsx";
 
 type SortKey = BookSortKey;
 type SortDir = BookSortDir;
 
-function ActivityPill({ label, color, pulse = true }: { label: string; color: string; pulse?: boolean }) {
+function ActivityPill({ label, status, pulse = true }: { label: string; status: keyof typeof statusStyles; pulse?: boolean }) {
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${color}`}>
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${statusStyles[status] ?? statusStyles.pending}`}>
       {pulse && <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />}
       {label}
     </span>
@@ -137,7 +138,7 @@ function FolderTableRow({
       <td className="px-4 py-3">
         <div className="flex flex-wrap gap-1.5">
           {folder.activeBookCount > 0 && (
-            <ActivityPill label={`${folder.activeBookCount} active`} color="bg-(--badge-synthesizing-bg) text-(--badge-synthesizing-text)" />
+            <ActivityPill label={`${folder.activeBookCount} active`} status="synthesizing" />
           )}
           {folder.failedBookCount > 0 && (
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap bg-(--badge-failed-bg) text-(--badge-failed-text)">
@@ -550,25 +551,25 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1.5">
                     {book.activity.extracting && (
-                      <ActivityPill label="extracting" color="bg-(--badge-extracting-bg) text-(--badge-extracting-text)" />
+                      <ActivityPill label="extracting" status="extracting" />
                     )}
                     {book.activity.synthesizing > 0 && (
-                      <ActivityPill label={`synthesizing ${book.activity.synthesizing}`} color="bg-(--badge-synthesizing-bg) text-(--badge-synthesizing-text)" />
+                      <ActivityPill label={`synthesizing ${book.activity.synthesizing}`} status="synthesizing" />
                     )}
                     {book.activity.translating > 0 && (
-                      <ActivityPill label={`translating ${book.activity.translating}`} color="bg-(--badge-synthesizing-bg) text-(--badge-synthesizing-text)" />
+                      <ActivityPill label={`translating ${book.activity.translating}`} status="synthesizing" />
                     )}
                     {book.activity.cleaning > 0 && (
-                      <ActivityPill label={`cleaning ${book.activity.cleaning}`} color="bg-(--badge-normalizing-bg) text-(--badge-normalizing-text)" />
+                      <ActivityPill label={`cleaning ${book.activity.cleaning}`} status="cleaning" />
                     )}
                     {book.activity.assembling && (
-                      <ActivityPill label="assembling" color="bg-(--badge-assembling-bg) text-(--badge-assembling-text)" />
+                      <ActivityPill label="assembling" status="assembling" />
                     )}
                     {book.activity.aiNote && (
-                      <ActivityPill label="AI note" color="bg-(--badge-synthesizing-bg) text-(--badge-synthesizing-text)" />
+                      <ActivityPill label="AI note" status="synthesizing" />
                     )}
                     {book.activity.digest && (
-                      <ActivityPill label="digesting" color="bg-(--badge-synthesizing-bg) text-(--badge-synthesizing-text)" />
+                      <ActivityPill label="digesting" status="synthesizing" />
                     )}
                     {(totalFailures > 0 || book.failed) && (
                       <span
