@@ -15,6 +15,7 @@ import { EditableTitle } from "../components/EditableTitle.tsx";
 import { DiskUsageButton } from "../components/DiskUsageButton.tsx";
 import { ChapterAiModal, type AiScope } from "../components/ChapterAiModal.tsx";
 import { NotesSection } from "../components/NotesSection.tsx";
+import { PillToggle } from "../components/PillToggle.tsx";
 import { loadBookSort, sortBooks } from "../lib/book-sort.ts";
 import { formatBytes, pendingExportLabel, pendingExportSummary } from "../lib/format.ts";
 import { getVoiceLabel, languageLabel } from "../lib/voices.ts";
@@ -635,18 +636,14 @@ export function BookDetail() {
             {/* Variant view switcher */}
             {variantLanes.length > 0 && (
               <div className="flex items-center gap-2 ml-auto" data-testid="language-switcher">
-                <button
+                <PillToggle
+                  selected={!activeVariant}
                   onClick={() => setActiveVariant(null)}
                   title={
                     book.language
                       ? `The book's own text (${book.language.toUpperCase()}) — change the language in Re-extract...`
                       : "The book's own text — set its language in Re-extract... to get matching voices"
                   }
-                  className={`text-xs px-3 py-1 rounded-full border font-medium ${
-                    !activeVariant
-                      ? "bg-(--accent) border-(--accent) text-(--on-accent)"
-                      : "border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)"
-                  }`}
                 >
                   Original
                   {book.language && (
@@ -654,20 +651,16 @@ export function BookDetail() {
                       {book.language.toUpperCase()}
                     </span>
                   )}
-                </button>
+                </PillToggle>
                 {variantLanes.map((l) => (
-                  <button
+                  <PillToggle
                     key={l.key}
+                    selected={activeVariant === l.key}
                     onClick={() => setActiveVariant(l.key)}
-                    className={`text-xs px-3 py-1 rounded-full border font-medium ${
-                      activeVariant === l.key
-                        ? "bg-(--accent) border-(--accent) text-(--on-accent)"
-                        : "border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)"
-                    }`}
                     title={`${l.done} of ${book.chapters.length} chapters ${l.kind === "translation" ? "translated" : "rewritten"}`}
                   >
                     {l.label ?? l.key} ({l.done}/{book.chapters.length})
-                  </button>
+                  </PillToggle>
                 ))}
               </div>
             )}

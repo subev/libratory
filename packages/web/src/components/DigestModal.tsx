@@ -4,6 +4,7 @@ import { trpc } from "../trpc.ts";
 import { Modal } from "./Modal.tsx";
 import { DIGEST_LISTENING_PROMPT, DIGEST_PRESETS } from "../lib/ai-presets.ts";
 import { ModelPicker } from "./ModelPicker.tsx";
+import { PillToggle } from "./PillToggle.tsx";
 import { PRIMARY_BUTTON } from "../lib/button-classes.ts";
 
 export function DigestModal({
@@ -78,14 +79,14 @@ export function DigestModal({
           </label>
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             {DIGEST_PRESETS.map((p) => (
-              <button
+              <PillToggle
                 key={p.key}
+                selected={prompt === p.prompt}
                 onClick={() => setPrompt(p.prompt)}
-                className={`text-xs px-3 py-1 rounded-full border font-medium ${ prompt === p.prompt ? "bg-(--accent) border-(--accent) text-(--on-accent)" : "border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)" }`}
-                data-testid={`digest-preset-${p.key}`}
+                testId={`digest-preset-${p.key}`}
               >
                 {p.label}
-              </button>
+              </PillToggle>
             ))}
           </div>
           <textarea

@@ -7,6 +7,7 @@ import { MarkdownBlock } from "./MarkdownBlock.tsx";
 import { Modal } from "./Modal.tsx";
 import { AI_PRESETS, estimateTokens, estimateTokensFromCounts, formatTokens } from "../lib/ai-presets.ts";
 import { ModelPicker } from "./ModelPicker.tsx";
+import { PillToggle } from "./PillToggle.tsx";
 import { useActiveLlmModel } from "../lib/use-llm-models.ts";
 import { PRIMARY_BUTTON } from "../lib/button-classes.ts";
 
@@ -161,13 +162,13 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
         <div className="w-2/5 border-r border-(--border) p-4 flex flex-col gap-3 min-h-0">
           <div className="flex flex-wrap gap-1.5">
             {AI_PRESETS.map((p) => (
-              <button
+              <PillToggle
                 key={p.key}
+                selected={activePreset === p.key}
                 onClick={() => selectPreset(p.key)}
-                className={`text-xs px-2.5 py-1 rounded-full border font-medium ${ activePreset === p.key ? "bg-(--accent) border-(--accent) text-(--on-accent)" : "border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)" }`}
               >
                 {p.label}
-              </button>
+              </PillToggle>
             ))}
           </div>
           <textarea

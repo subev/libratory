@@ -6,6 +6,7 @@ import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
 import { ChapterAiModal } from "./ChapterAiModal.tsx";
 import { VariantModal } from "./VariantModal.tsx";
 import { VoicePickerChip } from "./VoicePicker.tsx";
+import { PillToggle } from "./PillToggle.tsx";
 import { TOOLBAR_BUTTON } from "../lib/button-classes.ts";
 import { getVoiceLabel } from "../lib/voices.ts";
 import { useBodyScrollLock } from "../lib/use-body-scroll-lock.ts";
@@ -680,20 +681,17 @@ function ChapterModalBody({
           <div className="flex-1" />
           {onSwitchVariant && variants && variants.length > 0 && !isEditing ? (
             <div className="flex items-center gap-1 mr-2" data-testid="modal-language-switcher">
-              <button
-                onClick={() => onSwitchVariant(null)}
-                className={`text-xs px-2.5 py-1 rounded-full border font-medium ${ !variant ? "bg-(--accent) border-(--accent) text-(--on-accent)" : "border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)" }`}
-              >
+              <PillToggle selected={!variant} onClick={() => onSwitchVariant(null)}>
                 Original
-              </button>
+              </PillToggle>
               {variants.map((v) => (
-                <button
+                <PillToggle
                   key={v.key}
+                  selected={variant?.key === v.key}
                   onClick={() => onSwitchVariant(v.key)}
-                  className={`text-xs px-2.5 py-1 rounded-full border font-medium ${ variant?.key === v.key ? "bg-(--accent) border-(--accent) text-(--on-accent)" : "border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle)" }`}
                 >
                   {v.label ?? v.key}
-                </button>
+                </PillToggle>
               ))}
             </div>
           ) : null}

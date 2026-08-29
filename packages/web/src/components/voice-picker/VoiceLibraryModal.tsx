@@ -20,6 +20,7 @@ import { PocketLanguageNotice } from "./PocketLanguageNotice.tsx";
 import { ModelBundleNotice } from "../ModelBundleNotice.tsx";
 import { PocketVoiceCloner } from "./PocketVoiceCloner.tsx";
 import { VoiceRow } from "./VoiceRow.tsx";
+import { PillToggle } from "../PillToggle.tsx";
 import { Empty, Section } from "./layout.tsx";
 import { useVoicePicker } from "./context.tsx";
 
@@ -434,14 +435,8 @@ function ProviderChip({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`px-2 py-1 text-xs rounded-full border ${ active ? "border-(--accent) text-(--accent-text) bg-(--bg-selected)" : "border-(--border) text-(--text-muted) hover:bg-(--bg-subtle)" }`}
-      data-testid={`voice-provider-${label}`}
-    >
+    <PillToggle selected={active} onClick={onClick} testId={`voice-provider-${label}`}>
       {label} <span className="tabular-nums text-(--text-faint)">{count}</span>
-    </button>
+    </PillToggle>
   );
 }

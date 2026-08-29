@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PillToggle } from "../PillToggle.tsx";
 
 const READING_SCRIPT =
   "The morning light came in sideways through the tall windows, and for a moment nobody spoke. " +
@@ -130,18 +131,9 @@ export function PocketVoiceCloner({ onAdded }: Props) {
 
       <div className="flex gap-1">
         {(["record", "upload"] as const).map((id) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setMode(id)}
-            className={`px-2 py-1 text-xs rounded border ${
-              mode === id
-                ? "border-(--accent) text-(--accent-text) bg-(--bg-selected)"
-                : "border-(--border) text-(--text-muted) hover:bg-(--bg-subtle)"
-            }`}
-          >
+          <PillToggle key={id} selected={mode === id} onClick={() => setMode(id)}>
             {id === "record" ? "Record" : "Upload a file"}
-          </button>
+          </PillToggle>
         ))}
       </div>
 

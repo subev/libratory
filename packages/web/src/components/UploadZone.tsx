@@ -4,6 +4,7 @@ import { SpeedSlider } from "./SpeedSlider.tsx";
 import { getVoiceById, voiceSupportsSpeedControl, getVoiceLabel } from "../lib/voices.ts";
 import { AI_PRESETS } from "../lib/ai-presets.ts";
 import { ModelPicker } from "./ModelPicker.tsx";
+import { PillToggle } from "./PillToggle.tsx";
 import { profileHeaders } from "../lib/profile.ts";
 import { AfterExtractChoice } from "./AfterExtractChoice.tsx";
 
@@ -469,17 +470,16 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
               <div className="ml-6 rounded-lg border border-(--border) bg-(--bg-subtle) p-3 space-y-2" data-testid="upload-ai-section">
                 <div className="flex flex-wrap gap-1.5">
                   {AI_PRESETS.map((p) => (
-                    <button
+                    <PillToggle
                       key={p.key}
-                      type="button"
+                      selected={notePreset === p.key}
                       onClick={() => {
                         setNotePreset(p.key);
                         setNotePrompt(p.prompt("book"));
                       }}
-                      className={`text-xs px-2.5 py-1 rounded-full border font-medium ${ notePreset === p.key ? "bg-(--accent) border-(--accent) text-(--on-accent)" : "border-(--border) text-(--text-secondary) hover:bg-(--bg-card)" }`}
                     >
                       {p.label}
-                    </button>
+                    </PillToggle>
                   ))}
                 </div>
                 <textarea
