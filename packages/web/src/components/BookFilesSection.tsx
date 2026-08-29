@@ -39,7 +39,6 @@ export function BookFilesSection({
   onSetAllSelected,
   onSetSelectedBatch,
   onRemove,
-  onReExtract,
   onCancelExtraction,
   onCancel,
   onFilesAdded,
@@ -58,10 +57,9 @@ export function BookFilesSection({
   onStartExtraction: (scope: ExtractScope, autoSynthesize: boolean) => void;
   onUpdateExtractionSettings: (settings: { forceOcr?: boolean; llmChapterDetection?: boolean; chapterModel?: string; language?: string | null }) => void;
   onSetSelected: (id: string, selected: boolean) => void;
-  onSetAllSelected: (selected: boolean) => void;
-  onSetSelectedBatch: (ids: string[], selected: boolean) => void;
+  onSetAllSelected: (selected: boolean) => void | Promise<unknown>;
+  onSetSelectedBatch: (ids: string[], selected: boolean) => void | Promise<unknown>;
   onRemove: (id: string) => void;
-  onReExtract: (id: string) => void;
   onCancelExtraction: () => void;
   onCancel: (id: string) => void;
   onFilesAdded: () => void;
@@ -249,13 +247,17 @@ export function BookFilesSection({
                       variant="primary"
                       soft
                       size="sm"
-                      onClick={() => onReExtract(file.id)}
+                      onClick={async () => {
+                        await onSetAllSelected(false);
+                        await onSetSelectedBatch([file.id], true);
+                        onExtractOpenChange(true);
+                      }}
                       disabled={file.status !== "done" && file.status !== "failed" && file.status !== "raw" && file.status !== "suspended"}
                       title={
                         file.status === "extracting" ? "Wait for extraction to finish" :
                         file.status === "pending" ? "File hasn't been extracted yet" :
                         file.status === "raw" ? "Extract chapters from this file" :
-                        "Re-extract this file"
+                        "Re-extract this file — opens the extract dialog with only this file selected"
                       }
                       aria-label="Re-extract this file"
                     >

@@ -1083,7 +1083,7 @@ function ChunkPreviewPanel({
               {isPlaying ? (
                 <IconPause className="h-3.5 w-3.5" weight="fill" />
               ) : (
-                <IconPlay className="h-3.5 w-3.5 translate-x-px" />
+                <IconPlay className="h-3.5 w-3.5" />
               )}
             </Button>
           ) : null}

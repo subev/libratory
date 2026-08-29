@@ -32,14 +32,17 @@ type OptionProps = {
 
 function Option({ label, hint, checked, onChange, title, testId }: OptionProps) {
   return (
-    <label className="flex gap-2 cursor-pointer" title={title}>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 rounded"
-        data-testid={testId}
-      />
+    <label className="flex items-start gap-2 cursor-pointer" title={title}>
+      {/* h-5 is the label's line-height, so the box centres on the first line at any font size */}
+      <span className="flex h-5 items-center">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="rounded"
+          data-testid={testId}
+        />
+      </span>
       <span className="min-w-0">
         <span className="block text-sm text-(--text-primary)">{label}</span>
         <span className="block text-xs text-(--text-muted)">{hint}</span>
@@ -356,7 +359,7 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
       </div>
 
       {hasFiles && (
-        <div className="max-w-3xl rounded-lg border border-(--border) bg-(--bg-card) divide-y divide-(--divide)">
+        <div className="rounded-lg border border-(--border) bg-(--bg-card) divide-y divide-(--divide)">
           {isMultiFile && (
             <fieldset className="p-4 space-y-2" data-testid="upload-mode">
               <legend className="text-xs font-medium text-(--text-secondary) mb-1">These {stagedFiles.length} files are</legend>
