@@ -15,7 +15,7 @@ test.afterEach(() => rmSync(MARKER, { force: true }));
 test("UC9: full extraction is offered with its download, not silently broken", async ({ page }) => {
   await uploadFixtureBook(page);
 
-  const notice = page.getByTestId("model-extraction-notice");
+  const notice = page.getByTestId("model-notice-extraction");
   await expect(notice).toBeVisible({ timeout: 20_000 });
   await expect(notice).toContainText("Marker layout and OCR");
   await expect(notice).toContainText("5.0 GB");
@@ -30,7 +30,7 @@ test("UC9: full extraction is offered with its download, not silently broken", a
 test("UC9: library chat says what it needs before it answers badly", async ({ page }) => {
   await page.goto("/chat");
 
-  const notice = page.getByTestId("model-search-notice");
+  const notice = page.getByTestId("model-notice-search");
   await expect(notice).toBeVisible({ timeout: 20_000 });
   await expect(notice).toContainText("BGE-M3");
   await expect(notice).toContainText("4.2 GB");
