@@ -20,6 +20,7 @@ import { SPEEDS, loadSpeed, saveSpeed } from "../lib/playback-speed.ts";
 import { readingLang } from "../lib/reading-lang.ts";
 import { IconChevronLeft, IconChevronRight, IconClose, IconPause, IconPlay } from "./icons.tsx";
 import type { ChapterRow, FileInfo, VariantRef } from "./ChapterTable.tsx";
+import { useTopmostEscape } from "./Modal.tsx";
 
 type ChapterModalProps = {
   bookId: string;
@@ -362,14 +363,19 @@ function ChapterModalBody({
   const togglePlay = useCallback(() => playerRef.current?.toggle() ?? false, []);
   usePlayPauseKey(togglePlay, !isEditing && !showCompare && pdfPage === null);
 
+  // Escape goes through the shared stack, so whatever opened last owns it. This used to be a
+  // hand-kept list of overlays on top of this one, which is why Ask AI was never added to it.
+  useTopmostEscape(
+    () => {
+      if (pdfPage !== null) setPdfPage(null);
+      else onClose();
+    },
+    !(isEditing || showCompare),
+  );
+
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      // The compare overlay has its own Escape handler — this one must not double-close.
       if (isEditing || showCompare) return;
-      if (e.key === "Escape") {
-        if (pdfPage !== null) setPdfPage(null);
-        else onClose();
-      }
       if (e.key === "ArrowLeft" && hasPrev) onNavigate(chapterIndex - 1);
       if (e.key === "ArrowRight" && hasNext) onNavigate(chapterIndex + 1);
     }

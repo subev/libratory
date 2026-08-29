@@ -49,6 +49,33 @@ export function ModalHeader({
   );
 }
 
+// Every dialog used to put its own Escape listener on document, so opening one from inside another
+// closed both. A stack means the innermost registrant wins; ChapterModal used to approximate this
+// with a hand-kept list of "things currently on top of me", which is why Ask AI was missing from it.
+const escapeStack: Array<() => void> = [];
+
+function onDocumentEscape(e: KeyboardEvent) {
+  if (e.key !== "Escape") return;
+  escapeStack.at(-1)?.();
+}
+
+export function useTopmostEscape(onEscape: () => void, enabled = true) {
+  const latest = useRef(onEscape);
+  useEffect(() => {
+    latest.current = onEscape;
+  });
+  useEffect(() => {
+    if (!enabled) return;
+    const entry = () => latest.current();
+    if (escapeStack.length === 0) document.addEventListener("keydown", onDocumentEscape);
+    escapeStack.push(entry);
+    return () => {
+      escapeStack.splice(escapeStack.indexOf(entry), 1);
+      if (escapeStack.length === 0) document.removeEventListener("keydown", onDocumentEscape);
+    };
+  }, [enabled]);
+}
+
 export function Modal({
   size = "md",
   onClose,
@@ -86,7 +113,6 @@ export function Modal({
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && closeOnEscape) return onClose();
       if (e.key !== "Tab") return;
       const node = panel.current;
       if (!node) return;
@@ -99,7 +125,9 @@ export function Modal({
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [closeOnEscape, onClose]);
+  }, []);
+
+  useTopmostEscape(onClose, closeOnEscape);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center" data-testid={backdropTestId}>
