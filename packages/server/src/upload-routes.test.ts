@@ -105,6 +105,33 @@ describe("POST /upload", () => {
     expect(book.folderId).toBe(folder.id);
   });
 
+  it("saves the language chosen at upload, so the voice picker starts in the right place", async () => {
+    const db = getDb();
+    const app = await createApp();
+    const { payload, headers } = multipartBody([
+      { name: "file", value: "%PDF-fake", filename: "my_book.pdf" },
+      { name: "language", value: "bg" },
+    ]);
+
+    const res = await app.inject({ method: "POST", url: "/upload", payload, headers });
+
+    expect(res.statusCode).toBe(200);
+    expect(row(await db.select().from(books)).language).toBe("bg");
+  });
+
+  it("leaves the language unset when the upload does not carry one", async () => {
+    const db = getDb();
+    const app = await createApp();
+    const { payload, headers } = multipartBody([
+      { name: "file", value: "%PDF-fake", filename: "my_book.pdf" },
+    ]);
+
+    const res = await app.inject({ method: "POST", url: "/upload", payload, headers });
+
+    expect(res.statusCode).toBe(200);
+    expect(row(await db.select().from(books)).language).toBeNull();
+  });
+
   it("rejects an unknown folderId", async () => {
     const app = await createApp();
     const { payload, headers } = multipartBody([
