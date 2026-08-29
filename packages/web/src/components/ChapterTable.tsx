@@ -4,7 +4,21 @@ import { StatusBadge } from "./StatusBadge.tsx";
 import { ChapterModal, chapterAudioDownload } from "./ChapterModal.tsx";
 import { ChapterAiModal } from "./ChapterAiModal.tsx";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
-import { IconChevronRight, IconClose, IconDragHandle, IconExternal, IconRename } from "./icons.tsx";
+import {
+  IconAi,
+  IconBook,
+  IconChevronRight,
+  IconClose,
+  IconContinue,
+  IconDownload,
+  IconDragHandle,
+  IconExpand,
+  IconExternal,
+  IconPause,
+  IconPlay,
+  IconRefresh,
+  IconRename,
+} from "./icons.tsx";
 
 export type ChapterRow = {
   id: string;
@@ -45,7 +59,10 @@ export type FileInfo = {
 
 const STATUSES = ["done", "failed", "pending", "suspended", "synthesizing", "normalizing"] as const;
 
-const ACTION_PILL = "text-xs px-2 py-0.5 rounded-full border border-(--border) text-(--text-secondary) font-medium hover:bg-(--bg-subtle) whitespace-nowrap";
+// Seven actions repeat on every row, so the labels stopped teaching after the first one and the
+// column outweighed the data. Each keeps its title, which is where the explanation always lived.
+const ACTION_ICON =
+  "w-7 h-7 flex items-center justify-center rounded-md border border-(--border) text-(--text-secondary) hover:bg-(--bg-subtle) hover:text-(--text-primary) shrink-0";
 
 export function ChapterTable({
   language,
@@ -530,50 +547,73 @@ export function ChapterTable({
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      {chapter.status === "done" && chapter.audioPath ? (
-                        <button
-                          onClick={() => handlePlay(chapter.id)}
-                          className={`w-6 h-6 flex items-center justify-center rounded text-sm ${ playingChapterId === chapter.id ? "text-(--accent-text) hover:text-(--accent-text-hover)" : "text-(--text-faint) hover:text-(--text-secondary)" }`}
-                          title={playingChapterId === chapter.id && isAudioPlaying ? "Pause" : "Play"}
-                          data-testid="chapter-play"
-                        >
-                          {playingChapterId === chapter.id && isAudioPlaying ? "\u23F8" : "\u25B6"}
-                        </button>
-                      ) : null}
+                      <button
+                        onClick={() => handlePlay(chapter.id)}
+                        disabled={!(chapter.status === "done" && chapter.audioPath)}
+                        className={`${ACTION_ICON} disabled:opacity-30 disabled:cursor-not-allowed ${playingChapterId === chapter.id ? "text-(--accent-text) hover:text-(--accent-text-hover)" : ""}`}
+                        title={
+                          chapter.status === "done" && chapter.audioPath
+                            ? playingChapterId === chapter.id && isAudioPlaying
+                              ? "Pause"
+                              : "Play"
+                            : "No audio yet"
+                        }
+                        aria-label={playingChapterId === chapter.id && isAudioPlaying ? "Pause" : "Play"}
+                        data-testid="chapter-play"
+                      >
+                        {playingChapterId === chapter.id && isAudioPlaying ? (
+                          <IconPause weight="fill" className="h-4 w-4" />
+                        ) : (
+                          <IconPlay className="h-4 w-4" />
+                        )}
+                      </button>
                       <button
                         onClick={() => openChapterModal(chapters.indexOf(chapter))}
                         title="Open this chapter — text, audio, editing"
-                        className={ACTION_PILL}
+                        className={ACTION_ICON}
+                        aria-label="Open chapter"
                         data-testid="chapter-open"
                       >
-                        Open
+                        <IconExpand className="h-4 w-4" />
                       </button>
                       {chapter.hasSourceBlocks ? (
                         <a
                           href={`/read/chapter/${chapter.id}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className={ACTION_PILL}
+                          className={ACTION_ICON}
                           title="Open reader view in a new tab"
+                          aria-label="Open reader view in a new tab"
                         >
-                          Read
+                          <IconBook className="h-4 w-4" />
                         </a>
-                      ) : null}
+                      ) : (
+                        <button
+                          disabled
+                          className={`${ACTION_ICON} opacity-30 cursor-not-allowed hover:bg-transparent`}
+                          title="This chapter's text no longer maps to the source pages"
+                          aria-label="Reader view unavailable"
+                        >
+                          <IconBook className="h-4 w-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => setAiChapter({ id: chapter.id, title: chapter.title })}
                         title="Summarize, question, or run any prompt against this chapter's text"
-                        className={ACTION_PILL}
+                        className={ACTION_ICON}
+                        aria-label="Ask AI about this chapter"
                         data-testid="row-ask-ai"
                       >
-                        Ask AI
+                        <IconAi className="h-4 w-4" />
                       </button>
                       {chapter.status === "suspended" || chapter.status === "failed" ? (
                         <button
                           onClick={() => onQueue(chapter.id, true)}
                           title="Continue synthesis from where it stopped — reuses already-synthesized chunks"
-                          className="text-xs px-2 py-0.5 rounded-full border border-(--success) text-(--success-text) font-medium hover:bg-(--success-bg)"
+                          className="w-7 h-7 flex items-center justify-center rounded-md border border-(--success) text-(--success-text) hover:bg-(--success-bg) shrink-0"
+                          aria-label="Continue synthesis"
                         >
-                          Continue
+                          <IconContinue className="h-4 w-4" />
                         </button>
                       ) : null}
                       <button
@@ -586,26 +626,29 @@ export function ChapterTable({
                               ? "Can't re-synthesize while it's being processed"
                               : "Synthesize this chapter's audio again from scratch, replacing the current audio"
                         }
-                        className={`${ACTION_PILL} disabled:opacity-30 disabled:cursor-not-allowed`}
+                        className={`${ACTION_ICON} disabled:opacity-30 disabled:cursor-not-allowed`}
+                        aria-label="Re-synthesize chapter audio"
                       >
-                        Re-synthesize
+                        <IconRefresh className="h-4 w-4" />
                       </button>
                       {chapter.status === "done" && chapter.audioPath ? (
                         <a
                           href={chapterAudioDownload(chapter, variant).href}
                           download={chapterAudioDownload(chapter, variant).filename}
                           title={`Download the ${variant ? variant.label ?? variant.key : "chapter"} audio`}
-                          className={`${ACTION_PILL} no-underline`}
+                          className={`${ACTION_ICON} no-underline`}
+                          aria-label="Download chapter audio"
                         >
-                          Download
+                          <IconDownload className="h-4 w-4" />
                         </a>
                       ) : (
                         <button
                           disabled
                           title={`No ${variant ? variant.label ?? variant.key : "chapter"} audio to download yet`}
-                          className={`${ACTION_PILL} opacity-30 cursor-not-allowed hover:bg-transparent`}
+                          className={`${ACTION_ICON} opacity-30 cursor-not-allowed hover:bg-transparent`}
+                          aria-label="Download chapter audio"
                         >
-                          Download
+                          <IconDownload className="h-4 w-4" />
                         </button>
                       )}
                       {chapter.error ? (
@@ -633,9 +676,11 @@ export function ChapterTable({
         <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-50 w-[min(72rem,calc(100vw-2rem))] bg-(--bg-card) border border-(--border) rounded-lg px-4 py-3 flex items-center gap-4 shadow-lg">
           <button
             onClick={() => handlePlay(playingChapter.id)}
-            className="text-lg text-(--accent-text) hover:text-(--accent-text-hover) w-8 h-8 flex items-center justify-center shrink-0"
+            className="text-(--accent-text) hover:text-(--accent-text-hover) w-8 h-8 flex items-center justify-center shrink-0"
+            title={isAudioPlaying ? "Pause" : "Play"}
+            aria-label={isAudioPlaying ? "Pause" : "Play"}
           >
-            {isAudioPlaying ? "\u23F8" : "\u25B6"}
+            {isAudioPlaying ? <IconPause weight="fill" className="h-5 w-5" /> : <IconPlay className="h-5 w-5" />}
           </button>
           <div className="text-sm text-(--text-secondary) font-medium truncate min-w-0 shrink-0 max-w-48">
             Ch {playingChapter.index + 1} &mdash; {playingChapter.title}

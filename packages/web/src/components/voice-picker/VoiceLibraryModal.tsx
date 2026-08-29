@@ -15,7 +15,7 @@ import {
   type Voice,
 } from "../../lib/voices.ts";
 import { trpc } from "../../trpc.ts";
-import { IconArrowRight, IconClose } from "../icons.tsx";
+import { IconArrowRight, IconClose, IconDownload } from "../icons.tsx";
 import { useBodyScrollLock } from "../../lib/use-body-scroll-lock.ts";
 import { PocketLanguageNotice } from "./PocketLanguageNotice.tsx";
 import { ModelBundleNotice } from "../ModelBundleNotice.tsx";
@@ -256,7 +256,9 @@ export function VoiceLibraryModal({
                 data-testid={`voice-language-${code}`}
               >
                 <span className="truncate">{languageLabel(code)}</span>
-                <span className="text-xs text-(--text-faint) tabular-nums">{languageCounts.get(code) || "\u2193"}</span>
+                <span className="text-xs text-(--text-faint) tabular-nums" title={languageCounts.get(code) ? undefined : "Not downloaded yet"}>
+                  {languageCounts.get(code) || <IconDownload className="h-3 w-3" />}
+                </span>
               </button>
             ))}
 

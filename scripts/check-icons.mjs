@@ -24,8 +24,10 @@ const add = (file, line, what, why) => fail.push({ file, line, what, why });
 
 for (const f of files) {
   const lines = readFileSync(f, "utf8").split("\n");
-  lines.forEach((line, i) => {
+  lines.forEach((raw, i) => {
     const at = i + 1;
+    // "\u25B6" is a play triangle that no literal-character scan can see.
+    const line = raw.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)));
     // An arrow can be prose ("press ←") rather than an icon; spell it out where you can, mark it where you cannot.
     if (line.includes("prose-glyph")) return;
     if (line.includes("<svg")) add(f, at, "inline <svg>", `Use a shared icon: ${HINT}`);
@@ -33,6 +35,7 @@ for (const f of files) {
       if (GLYPHS.includes(ch)) add(f, at, `glyph ${ch}`, `A glyph is not an icon: ${HINT}`);
     }
     for (const m of line.matchAll(/\p{Extended_Pictographic}/gu)) {
+      if (GLYPHS.includes(m[0])) continue;
       add(f, at, `emoji ${m[0]}`, `Emoji are full-colour OS artwork and ignore the palette: ${HINT}`);
     }
     for (const m of line.matchAll(ENTITIES)) {

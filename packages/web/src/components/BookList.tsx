@@ -516,7 +516,7 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
                   )}
                   {book.searchIndex?.status === "done" && (
                     <span
-                      className="ml-2 text-[10px] text-(--text-faint) align-middle"
+                      className="ml-2 inline-flex items-center text-(--text-faint) align-middle"
                       title="Fully indexed — findable in library chat (keyword + semantic search)"
                       data-testid="index-badge-done"
                     >
