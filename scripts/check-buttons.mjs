@@ -54,13 +54,15 @@ for (const file of files) {
       if (value) attrs += " " + value;
     }
     // The opt-out may sit in a comment just above the element, which is where it reads best.
-    // The opt-out belongs to the NEXT element, so it counts only when no other tag sits between.
-    const before = src.slice(0, m.index);
-    const marker = before.lastIndexOf("button-ok");
-    const gap = marker === -1 ? "" : before.slice(marker);
+    // The opt-out has to be written directly above the element it excuses. A character window is
+    // too loose — an incidental mention far above would cover everything below it — so this looks
+    // only at the two non-blank lines immediately preceding the tag.
+    // Verbatim, blanks included: a marker separated by empty lines is not "directly above".
+    const above = src.slice(0, m.index).split("\n").slice(-4, -1);
+    const marker = above.findIndex((l) => l.includes("button-ok"));
     const optedOut =
       attrs.includes("button-ok") ||
-      (marker !== -1 && !/<(button|a|Link|NavLink)[\s>]/.test(gap));
+      (marker !== -1 && !above.slice(marker).some((l) => /<(button|a|Link|NavLink)[\s>]/.test(l)));
     if (optedOut || !skinned(attrs)) continue;
     fail.push({ file, line: src.slice(0, m.index).split("\n").length, tag: m[1] });
   }

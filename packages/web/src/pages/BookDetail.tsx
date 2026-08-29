@@ -84,12 +84,15 @@ export function BookDetail() {
   // gets followed across them later, not what makes them worth opening
   const hasChapterPages = book?.chapters?.some((c: { pageStart?: number | null }) => c.pageStart != null) ?? false;
 
-  const invalidate = () => {
-    utils.books.get.invalidate({ id: id! });
-    utils.books.assemblies.invalidate({ bookId: id! });
-    utils.books.documents.invalidate({ bookId: id! });
-    utils.chapters.selectedAudioSize.invalidate({ bookId: id! });
-  };
+  // Returned, not fired: react-query awaits a promise from onSuccess, and callers that await
+  // mutateAsync need the refetch to have landed before they read the data back.
+  const invalidate = () =>
+    Promise.all([
+      utils.books.get.invalidate({ id: id! }),
+      utils.books.assemblies.invalidate({ bookId: id! }),
+      utils.books.documents.invalidate({ bookId: id! }),
+      utils.chapters.selectedAudioSize.invalidate({ bookId: id! }),
+    ]);
 
   const { data: bookAssemblies = [] } = trpc.books.assemblies.useQuery(
     { bookId: id! },
@@ -525,7 +528,13 @@ export function BookDetail() {
         {/* Starting an extraction can be refused before any job exists — no files selected, or
             chapters mid-synthesis — and none of these mutations renders its own error. */}
         {(() => {
-          const refusal = setAutoSynthesizeMutation.error ?? reExtractSelectedMutation.error ?? retryMutation.error ?? redetectMutation.error;
+          const refusal =
+            setAutoSynthesizeMutation.error ??
+            reExtractSelectedMutation.error ??
+            retryMutation.error ??
+            redetectMutation.error ??
+            setAllFilesSelectedMutation.error ??
+            setFileSelectedBatchMutation.error;
           return refusal ? (
             <div className="bg-(--danger-bg) border border-(--danger) rounded-lg p-3 mb-4" data-testid="extract-start-error">
               <p className="text-sm text-(--danger-text)">Could not start: {refusal.message}</p>

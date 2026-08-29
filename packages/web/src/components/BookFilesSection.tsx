@@ -65,6 +65,9 @@ export function BookFilesSection({
   onFilesAdded: () => void;
 }) {
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
+  // Selection is fire-and-forget from the checkboxes; the banner reports a failure, this only
+  // stops an unhandled rejection now that the handlers return a promise.
+  const detach = (result: void | Promise<unknown>) => void Promise.resolve(result).catch(() => {});
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
 
   // Chapters belonging to the currently selected files — what a scoped re-extract would replace.
@@ -86,7 +89,7 @@ export function BookFilesSection({
       const start = Math.min(lastClickedIndex, index);
       const end = Math.max(lastClickedIndex, index);
       const ids = files.slice(start, end + 1).map((f) => f.id);
-      onSetSelectedBatch(ids, !file.selected);
+      detach(onSetSelectedBatch(ids, !file.selected));
     } else {
       onSetSelected(file.id, !file.selected);
     }
@@ -156,7 +159,7 @@ export function BookFilesSection({
                   type="checkbox"
                   checked={allSelected}
                   ref={(el) => { if (el) el.indeterminate = !allSelected && !noneSelected; }}
-                  onChange={() => onSetAllSelected(!allSelected)}
+                  onChange={() => detach(onSetAllSelected(!allSelected))}
                   disabled={isEmpty}
                   className="rounded disabled:opacity-40"
                 />
@@ -247,8 +250,12 @@ export function BookFilesSection({
                       soft
                       size="sm"
                       onClick={async () => {
-                        await onSetAllSelected(false);
-                        await onSetSelectedBatch([file.id], true);
+                        try {
+                          await onSetAllSelected(false);
+                          await onSetSelectedBatch([file.id], true);
+                        } catch {
+                          return; // The extraction banner is already showing it
+                        }
                         onExtractOpenChange(true);
                       }}
                       disabled={file.status !== "done" && file.status !== "failed" && file.status !== "raw" && file.status !== "suspended"}

@@ -76,7 +76,9 @@ function useVoiceLibrary(value: string, onChange: (voice: string) => void, prior
   return { open: () => setIsOpen(true), triggerRef, label, library };
 }
 
-export function VoicePicker({ value, onChange, title, priorityLanguages = [] }: VoicePickerProps) {
+const NO_PRIORITY: string[] = [];
+
+export function VoicePicker({ value, onChange, title, priorityLanguages = NO_PRIORITY }: VoicePickerProps) {
   const { open, triggerRef, label, library } = useVoiceLibrary(value, onChange, priorityLanguages);
 
   return (

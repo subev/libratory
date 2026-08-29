@@ -80,8 +80,12 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
     const fullExtract = fields.fullExtract === "true";
 
     const profileId = profileIdFromHeader(request.headers["x-profile-id"]);
-    // Same bound the book update uses (routes/books.ts), so the two paths cannot disagree
-    const language = (fields.language || "").slice(0, 8) || null;
+    // routes/books.ts bounds this with z.string().max(8), which rejects. Truncating here instead
+    // would store "portugue" for "portuguese" — a code matching no voice and no option.
+    const language = fields.language?.trim() || null;
+    if (language && language.length > 8) {
+      return reply.code(400).send({ error: "language must be at most 8 characters" });
+    }
     const folderId = fields.folderId || null;
     if (folderId) {
       const [folder] = await db
