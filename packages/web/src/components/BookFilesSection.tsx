@@ -133,20 +133,17 @@ export function BookFilesSection({
         >
           Extract...
         </Button>
-        <Button
-          variant="warning"
-          size="sm"
-          onClick={onCancelExtraction}
-          disabled={extractingCount === 0}
-          title={
-            extractingCount === 0
-              ? "No files are being extracted"
-              : `Stop the running extraction — ${extractingCount} file(s) will be marked as cancelled`
-          }
-          data-testid="cancel-extraction"
-        >
-          Cancel extraction
-        </Button>
+        {extractingCount > 0 && (
+          <Button
+            variant="warning"
+            size="sm"
+            onClick={onCancelExtraction}
+            title={`Stop the running extraction — ${extractingCount} file(s) will be marked as cancelled`}
+            data-testid="cancel-extraction"
+          >
+            Cancel extraction
+          </Button>
+        )}
 
       </div>
 

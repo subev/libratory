@@ -721,19 +721,21 @@ export function BookDetail() {
               >
                 Synthesize selected ({selectedSynthesizable}){langSuffix}...
               </Button>
-              <Button
-                variant="secondary"
-                onClick={() =>
-                  activeVariant
-                    ? stopAudioMutation.mutate({ bookId: book.id, key: activeVariant })
-                    : cancelMutation.mutate({ id: book.id })
-                }
-                disabled={!(hasActiveChapters || translationAudioQueued) || cancelMutation.isPending || stopAudioMutation.isPending}
-                title={!(hasActiveChapters || translationAudioQueued) ? "No chapters are actively processing" : "Stop the running synthesis — finished chapters keep their audio, the rest resume later"}
-                data-testid="cancel-processing"
-              >
-                Cancel processing
-              </Button>
+              {(hasActiveChapters || translationAudioQueued) && (
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    activeVariant
+                      ? stopAudioMutation.mutate({ bookId: book.id, key: activeVariant })
+                      : cancelMutation.mutate({ id: book.id })
+                  }
+                  disabled={cancelMutation.isPending || stopAudioMutation.isPending}
+                  title="Stop the running synthesis — finished chapters keep their audio, the rest resume later"
+                  data-testid="cancel-processing"
+                >
+                  Cancel processing
+                </Button>
+              )}
               <Button
                 variant="secondary"
                 onClick={() => processSelectedVariantsMutation.mutate({ bookId: book.id, key: activeVariant! })}
