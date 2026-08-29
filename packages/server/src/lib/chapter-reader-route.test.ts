@@ -6,6 +6,8 @@ import {
   type ChapterReaderLookupResult,
 } from "./chapter-reader-route.ts";
 
+const CHAPTER_ID = "f81d4fae-7dec-11d0-a765-00a0c91e6bf6";
+
 const apps: Array<ReturnType<typeof Fastify>> = [];
 
 afterEach(async () => {
@@ -34,7 +36,7 @@ describe("registerChapterReaderRoute", () => {
       },
     });
 
-    const response = await app.inject({ method: "GET", url: "/read/chapter/f81d4fae-7dec-11d0-a765-00a0c91e6bf6" });
+    const response = await app.inject({ method: "GET", url: `/read/chapter/${CHAPTER_ID}` });
 
     expect(response.statusCode).toBe(200);
     expect(response.headers["content-type"]).toContain("text/html");
@@ -45,7 +47,7 @@ describe("registerChapterReaderRoute", () => {
   it("returns 404 when the chapter is missing", async () => {
     const app = await createApp({ kind: "not-found", message: "Chapter not found" });
 
-    const response = await app.inject({ method: "GET", url: "/read/chapter/2b1f5f4e-9c3a-4d21-8f0b-6f2c1a7e5d90" });
+    const response = await app.inject({ method: "GET", url: `/read/chapter/${CHAPTER_ID}` });
 
     expect(response.statusCode).toBe(404);
     expect(response.json()).toEqual({ error: "Chapter not found" });
@@ -54,7 +56,7 @@ describe("registerChapterReaderRoute", () => {
   it("returns 404 when source blocks are unavailable", async () => {
     const app = await createApp({ kind: "not-found", message: "Chapter source blocks not found" });
 
-    const response = await app.inject({ method: "GET", url: "/read/chapter/f81d4fae-7dec-11d0-a765-00a0c91e6bf6" });
+    const response = await app.inject({ method: "GET", url: `/read/chapter/${CHAPTER_ID}` });
 
     expect(response.statusCode).toBe(404);
     expect(response.json()).toEqual({ error: "Chapter source blocks not found" });

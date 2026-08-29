@@ -41,4 +41,13 @@ describe("registerErrorHandler", () => {
     expect(response.statusCode).toBe(413);
     expect(response.json()).toEqual({ error: "Request file too large" });
   });
+
+  it("treats a sub-400 status on the error as a failure", async () => {
+    const app = await createApp(Object.assign(new Error("wat"), { statusCode: 0 }));
+
+    const response = await app.inject({ method: "GET", url: "/boom" });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({ error: "Internal Server Error" });
+  });
 });
