@@ -298,7 +298,7 @@ async function runBoot() {
   // only showed on a machine whose HOME had not already been populated by an earlier run.
   setup.stageRuntime(RESOURCES, HOME);
 
-  const ctx = { url: `http://localhost:${PORT}` };
+  const ctx = { url: `http://127.0.0.1:${PORT}` };
   for (const [i, step] of STEPS.entries()) {
     send(step.id, "running");
     try {
@@ -383,12 +383,12 @@ app.whenReady().then(() => {
     return { action: "deny" };
   });
   win.webContents.on("will-navigate", (event, target) => {
-    if (!target.startsWith(`http://localhost:${PORT}`) && !target.startsWith("file://")) {
+    if (!target.startsWith(`http://127.0.0.1:${PORT}`) && !target.startsWith("file://")) {
       event.preventDefault();
       void shell.openExternal(target);
     }
   });
-  Menu.setApplicationMenu(menu(`http://localhost:${PORT}`));
+  Menu.setApplicationMenu(menu(`http://127.0.0.1:${PORT}`));
   win.loadFile(path.join(__dirname, "first-run.html"));
   win.webContents.once("did-finish-load", () => {
     win?.webContents.send("steps", STEPS.map(({ id, label }) => ({ id, label })));

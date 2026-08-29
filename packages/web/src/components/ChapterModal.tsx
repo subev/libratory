@@ -736,6 +736,8 @@ function ChapterModalBody({
               {fullChapter && !isVariant ? (
                 <button
                   onClick={startEditing}
+                  // Warning tint on purpose: saving custom text drops the chapter to mode "text"
+                  // (reader-doc.ts) and the read-along stops following the PDF page.
                   className="text-xs px-2.5 py-1 rounded bg-(--warning-bg) text-(--warning-text) font-medium"
                   data-testid="chapter-edit"
                 >

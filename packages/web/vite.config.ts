@@ -5,6 +5,10 @@ import path from "node:path";
 import { defineConfig, type Plugin } from "vite";
 import tailwindcss from "@tailwindcss/vite";
 
+// Not "localhost": the API binds 127.0.0.1 only, so a localhost target can resolve to ::1 —
+// where a stray vite may be listening — and proxy this server into itself.
+const API = "http://127.0.0.1:3034";
+
 const PDFJS_ASSET_DIRS = ["wasm", "cmaps", "standard_fonts", "iccs"];
 const CONTENT_TYPES: Record<string, string> = {
   ".wasm": "application/wasm",
@@ -48,22 +52,23 @@ export default defineConfig({
   plugins: [tailwindcss(), pdfjsAssets()],
   server: {
     port: 3033,
+    strictPort: true, // sliding onto the next free port lands on 3034, the API's
     proxy: {
-      "/trpc": "http://localhost:3034",
+      "/trpc": API,
       // /chat is both the SPA page (GET, browser refresh) and the streaming API (POST)
       "/chat": {
-        target: "http://localhost:3034",
+        target: API,
         bypass: (req) => (req.method === "POST" ? undefined : "/index.html"),
       },
-      "/translations": "http://localhost:3034",
-      "/scripts": "http://localhost:3034",
-      "/pdf": "http://localhost:3034",
-      "/upload": "http://localhost:3034",
-      "/download": "http://localhost:3034",
-      "/audio": "http://localhost:3034",
-      "/files": "http://localhost:3034",
-      "/preview": "http://localhost:3034",
-      "/read": "http://localhost:3034",
+      "/translations": API,
+      "/scripts": API,
+      "/pdf": API,
+      "/upload": API,
+      "/download": API,
+      "/audio": API,
+      "/files": API,
+      "/preview": API,
+      "/read": API,
     },
   },
 });

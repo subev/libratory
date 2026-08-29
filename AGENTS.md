@@ -139,6 +139,12 @@ single most common regression here, because it looks fine in a screenshot and is
 lower effective radiance, and it is the one display-mode claim with real evidence behind it. Text
 lands at 8.9:1 — deliberately short of pure black on white, which is harsh over long passages.
 
+Three warm-tinted controls sit together in the chapter toolbar and that is not an accident to be
+tidied away: **Reset** is `--danger-bg` because it discards edits, and **Edit** is `--warning-bg`
+because saving custom text drops the chapter to `mode: "text"` (`reader-doc.ts`) and the read-along
+stops following the PDF page. The old blue palette made these look unrelated; a warm one makes them
+look like siblings. They are both cautionary, so leave them cautionary.
+
 ### Highlighting: read-along is not annotation
 
 The read-along highlight uses the **accent**, not the conventional highlighter yellow, and that is
