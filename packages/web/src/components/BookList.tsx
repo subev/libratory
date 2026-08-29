@@ -180,7 +180,7 @@ function SortableTh({
   onSort: (key: SortKey) => void;
 }) {
   return (
-    <th className={`px-4 py-3 text-${align} text-xs font-medium text-(--text-muted) uppercase tracking-wider`}>
+    <th className={`px-4 py-3 ${align === "right" ? "text-right" : "text-left"} text-xs font-medium text-(--text-muted) uppercase tracking-wider`}>
       <button
         onClick={() => onSort(sortKey)}
         className={`inline-flex items-center gap-1 uppercase tracking-wider hover:text-(--text-secondary) ${active ? "text-(--text-secondary)" : ""}`}

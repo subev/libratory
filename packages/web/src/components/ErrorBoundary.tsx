@@ -120,7 +120,7 @@ export class ErrorBoundary extends Component<Props, State> {
             </button>
           </div>
 
-          <p className="mt-5 font-mono text-xs break-words text-(--danger-text)">{error.message}</p>
+          <p className="mt-5 font-mono text-xs wrap-break-word text-(--danger-text)">{error.message}</p>
           {help && (
             <p className="mt-2 text-xs text-(--text-muted)">
               React shortens its messages in a release build.{" "}

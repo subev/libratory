@@ -1,14 +1,42 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "react", "import"],
-  "categories": { "correctness": "error", "suspicious": "warn", "perf": "warn" },
-  "ignorePatterns": ["**/dist/**", "**/release/**", "**/node_modules/**", "packages/desktop/resources/**"],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "react",
+    "import"
+  ],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "perf": "warn"
+  },
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/release/**",
+    "**/node_modules/**",
+    "packages/desktop/resources/**"
+  ],
   "rules": {
     "no-await-in-loop": "off",
     "no-shadow": "off",
     "unicorn/consistent-function-scoping": "off",
     "unicorn/no-array-sort": "off",
     "no-control-regex": "off",
-    "react-in-jsx-scope": "off"
+    "react-in-jsx-scope": "off",
+    "tailwindcss/no-unknown-classes": "error",
+    "tailwindcss/no-conflicting-classes": "error",
+    "tailwindcss/no-deprecated-classes": "error",
+    "tailwindcss/no-duplicate-classes": "error",
+    "tailwindcss/no-dark-without-light": "error",
+    "tailwindcss/no-hardcoded-colors": "warn"
+  },
+  "jsPlugins": [
+    "oxlint-tailwindcss"
+  ],
+  "settings": {
+    "tailwindcss": {
+      "entryPoint": "packages/web/src/styles.css"
+    }
   }
 }

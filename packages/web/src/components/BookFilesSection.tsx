@@ -217,7 +217,7 @@ export function BookFilesSection({
                   {/* Thirty characters cut "marker_single could not be run (exit 126) — the Python
                       environment looks broken" down to the half that says nothing. */}
                   {file.error && (
-                    <span className="mt-0.5 block text-xs text-(--danger-text) break-words line-clamp-2" title={file.error}>
+                    <span className="mt-0.5 text-xs text-(--danger-text) wrap-break-word line-clamp-2" title={file.error}>
                       {file.error}
                     </span>
                   )}
