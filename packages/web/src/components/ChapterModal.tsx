@@ -400,6 +400,9 @@ function ChapterModalBody({
     [cues, markedText],
   );
   const mark = cueMark(markedText, spans, cues, ms);
+  // cueIndexAt lights cue 0 at ms 0, and outside sync mode the playhead never moves — so a mark
+  // alone does not mean the cue layer is tracking anything. Only a moved playhead does.
+  const cueLive = mark !== null && ms > 0;
   // The chunk offsets index the spoken text, which is what Read renders when it is not the print
   const chunkRanges =
     fullChapter && viewMode === "read" && !showPages
@@ -811,6 +814,7 @@ function ChapterModalBody({
                 edited={!!fullChapter.customText}
                 viewMode={viewMode}
                 chunkRanges={chunkRanges}
+                cueLive={cueLive}
                 selectedChunkUrl={activeChunkUrl}
                 onSelectChunk={selectChunk}
                 hoveredChunkUrl={hoveredChunkUrl}
@@ -1190,6 +1194,7 @@ function TextPreview({
   edited,
   viewMode,
   chunkRanges,
+  cueLive,
   mark,
   selectedChunkUrl,
   onSelectChunk,
@@ -1204,6 +1209,8 @@ function TextPreview({
   edited: boolean;
   viewMode: ViewMode;
   chunkRanges: ChunkRange[];
+  /** The cue mark is following real playback, so the chunk band would be a third redundant layer */
+  cueLive: boolean;
   mark: TextMark | null;
   selectedChunkUrl: string | null;
   onSelectChunk: (url: string) => void;
@@ -1266,6 +1273,7 @@ function TextPreview({
     <ChunkedText
       text={text}
       chunkRanges={chunkRanges}
+      cueLive={cueLive}
       mark={mark}
       selectedChunkUrl={selectedChunkUrl}
       onSelectChunk={onSelectChunk}
@@ -1280,6 +1288,7 @@ function TextPreview({
 function ChunkedText({
   text,
   chunkRanges,
+  cueLive,
   mark,
   selectedChunkUrl,
   onSelectChunk,
@@ -1290,6 +1299,7 @@ function ChunkedText({
 }: {
   text: string;
   chunkRanges: ChunkRange[];
+  cueLive: boolean;
   mark: TextMark | null;
   selectedChunkUrl: string | null;
   onSelectChunk: (url: string) => void;
@@ -1323,8 +1333,8 @@ function ChunkedText({
     if (range.start < pos) return;
     if (range.start > pos) parts.push(marked(text, pos, range.start, mark, `gap-${i}`));
     const isSelected = range.url === selectedChunkUrl;
-    // The chunk band is the coarsest marker, so it yields to the sentence and word while those show
-    const showsSelected = isSelected && !marking;
+    // The chunk band is the coarsest marker, so it yields to the sentence and word while those follow
+    const showsSelected = isSelected && !cueLive;
     const isHovered = !showsSelected && range.url === hoveredChunkUrl;
     parts.push(
       <span

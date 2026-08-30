@@ -27,8 +27,9 @@ services:
     build: .
     ports:
       # Published on localhost for the same reason HOST defaults to 127.0.0.1 — there is no login.
-      # To serve the LAN, override with e.g. "3034:3034" in a docker-compose.override.yml and mind
-      # who is on that network.
+      # To serve the LAN, override with `ports: !override ["3034:3034"]` in a
+      # docker-compose.override.yml — plain entries are appended, not replaced, and the second
+      # binding fails on the port this one already holds — and mind who is on that network.
       - "127.0.0.1:3034:3034"
     environment:
       DATABASE_URL: postgres://libratory:libratory@postgres:5432/libratory
