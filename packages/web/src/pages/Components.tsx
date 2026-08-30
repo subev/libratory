@@ -330,6 +330,20 @@ export function Components() {
                 status colour without the weight of a fill — for a control that must warn, not shout
               </span>
             </div>
+            <div className="flex flex-wrap items-center gap-3 border-t border-(--border) pt-3">
+              <span className="w-24 shrink-0 font-mono text-xs text-(--text-muted)">square</span>
+              <Button variant="icon" size="sm" aria-label="Refresh">
+                <IconRefresh className="h-4 w-4" />
+              </Button>
+              {SOFT_VARIANTS.map((variant) => (
+                <Button key={variant} variant={variant} soft square size="sm" aria-label={variant}>
+                  <IconRefresh className="h-4 w-4" />
+                </Button>
+              ))}
+              <span className="text-xs text-(--text-muted)">
+                the variant="icon" box on any skin, so a coloured icon lines up in a row of plain ones
+              </span>
+            </div>
             <div className="flex items-center gap-3">
               <span className="w-40 shrink-0 font-mono text-xs text-(--text-muted)">PillToggle</span>
               <PillToggle selected onClick={noop}>

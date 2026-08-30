@@ -236,6 +236,7 @@ export function BookFilesSection({
                       <Button
                         variant="warning"
                         soft
+                        square
                         size="sm"
                         onClick={() => onCancel(file.id)}
                         title="Cancel extraction"
@@ -248,6 +249,7 @@ export function BookFilesSection({
                     <Button
                       variant="primary"
                       soft
+                      square
                       size="sm"
                       onClick={async () => {
                         try {
@@ -273,6 +275,7 @@ export function BookFilesSection({
                     <Button
                       variant="danger"
                       soft
+                      square
                       size="sm"
                       onClick={() => {
                         const count = chapterCountForFile(file.index);

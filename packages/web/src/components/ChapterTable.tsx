@@ -603,6 +603,7 @@ export function ChapterTable({
                         <Button
                           variant="success"
                           soft
+                          square
                           size="sm"
                           onClick={() => onQueue(chapter.id, true)}
                           title="Continue synthesis from where it stopped — reuses already-synthesized chunks"

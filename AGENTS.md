@@ -203,6 +203,7 @@ Every action goes through **`packages/web/src/components/Button.tsx`**.
 <Button variant="primary" | "secondary" | "danger" | "warning" | "success" | "ghost" | "icon"
         size="sm" | "md"
         soft            // tinted instead of filled
+        square          // the variant="icon" box on any skin, for a coloured icon-only button
         to="/books/1"   // in-app route → react-router <Link>
         href="https://" // external or a download → plain <a>
         disabled />     // with to/href, renders a real disabled <button>
@@ -215,7 +216,9 @@ Four things it centralises that call sites kept getting wrong:
   disabled, never hide it" cheap enough to actually follow.
 - **`to` for in-app routes, `href` for everything else.** `href` renders a plain `<a>` and costs a
   full page reload — an easy thing to get wrong and not notice, since the destination still loads.
-- **`variant="icon"` requires `aria-label`** — the type will not compile without one.
+- **`variant="icon"` and `square` require `aria-label`** — an icon-only button has no text to name
+  it, and the type will not compile without one. `square` exists because a `soft` icon-only button
+  used to fall through to the text padding and sat visibly wrong in a row of `variant="icon"` ones.
 - **Disabled styling and the focus ring are not yours to write.** `disabled:` states live in the
   component; focus comes from the base `:focus-visible` rule in `styles.css`.
 

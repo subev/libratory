@@ -20,9 +20,11 @@ const VARIANT: Record<Variant, string> = {
 
 // Only two variants deviate on size; the filled ones were five identical rows.
 const PAD: Record<Size, string> = { sm: "text-xs px-2.5 py-1 rounded", md: "text-sm px-4 py-2 rounded-md" };
+// The icon box, available to every skin, so a coloured icon lines up in a row of plain ones.
+const BOX: Record<Size, string> = { sm: "w-7 h-7 rounded-md", md: "w-9 h-9 rounded-md" };
 const SIZE: Partial<Record<Variant, Record<Size, string>>> = {
   ghost: { sm: "text-xs px-2 py-1 rounded", md: "text-sm px-3 py-1.5 rounded-md" },
-  icon: { sm: "w-7 h-7 rounded-md", md: "w-9 h-9 rounded-md" },
+  icon: BOX,
 };
 
 // The quiet register of a variant: colour without the weight of a fill, for a control that must warn
@@ -38,10 +40,13 @@ type SoftVariant = keyof typeof SOFT;
 
 export const SOFT_VARIANTS = Object.keys(SOFT) as SoftVariant[];
 
-type Common = { variant?: Variant; size?: Size };
+type Common = { variant?: Variant; size?: Size; square?: boolean };
 
 // An icon-only button has no text to name it, so the label is not optional.
-type Labelled = { variant: "icon"; "aria-label": string } | { variant?: Exclude<Variant, "icon"> };
+type Labelled =
+  | { variant: "icon"; "aria-label": string }
+  | { square: true; "aria-label": string }
+  | { variant?: Exclude<Variant, "icon">; square?: false };
 
 type Softness = { soft: true; variant: SoftVariant } | { soft?: false };
 
@@ -52,9 +57,10 @@ type AsRoute = Common & Omit<ComponentPropsWithRef<"a">, "href"> & { to: string;
 type ButtonProps = (AsButton | AsLink | AsRoute) & Labelled & Softness;
 
 export function Button(props: ButtonProps) {
-  const { variant = "secondary", soft = false, size = "md", className = "", children, ...rest } = props;
+  const { variant = "secondary", soft = false, square = false, size = "md", className = "", children, ...rest } = props;
   const skin = soft ? SOFT[variant as SoftVariant] : VARIANT[variant];
-  const classes = `${BASE} ${skin} ${(SIZE[variant] ?? PAD)[size]} ${className}`.trim();
+  const geometry = square ? BOX[size] : (SIZE[variant] ?? PAD)[size];
+  const classes = `${BASE} ${skin} ${geometry} ${className}`.trim();
   const { href, to, disabled, download, target, rel, ...attrs } = rest as {
     href?: string;
     to?: string;
