@@ -8,6 +8,7 @@ import { Breadcrumbs } from "../components/Breadcrumbs.tsx";
 import { Button } from "../components/Button.tsx";
 import { ProfileSwitcher } from "../components/ProfileSwitcher.tsx";
 import { SettingsModal } from "../components/SettingsModal.tsx";
+import { ThemeToggle } from "../components/ThemeToggle.tsx";
 import { IconChat, IconBook, IconSettings, IconFolder, IconClose } from "../components/icons.tsx";
 import type { DragItems } from "../lib/dnd.ts";
 
@@ -65,6 +66,7 @@ export function Home() {
             <IconBook className="h-4 w-4" />
             Open a read-along EPUB
           </Button>
+          <ThemeToggle />
           <Button
             variant="icon"
             size="sm"

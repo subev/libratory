@@ -523,7 +523,8 @@ packages/server/src/
 packages/web/src/
   main.tsx              React root, tRPC/QueryClient providers (x-profile-id header), BrowserRouter
   trpc.ts               tRPC React client (imports AppRouter type from server)
-  styles.css            Tailwind v4 import + semantic CSS custom properties for dark mode
+  styles.css            Tailwind v4 import + semantic CSS custom properties; light-dark() pairs
+                        switched by color-scheme, so a stored preference can pin either theme
   lib/
     voices.ts           Voice list across all TTS engines
     reader-doc.ts       Types + fetchers for the /read documents, cue lookup, crop math, legibility fit
@@ -532,10 +533,11 @@ packages/web/src/
     ai-presets.ts       AI prompt presets (digest, notes, "Did you know?")
     book-sort.ts        Book list sort keys persisted in localStorage
     profile.ts          Active profile id in localStorage → x-profile-id header
+    theme.ts            Appearance preference (auto/light/dark) in localStorage → data-theme on :root
     dnd.ts              Drag-and-drop payloads for book/folder moves
     use-body-scroll-lock.ts  Modal scroll lock hook
   pages/
-    Home.tsx            Profile switcher, upload zone, search box, book/folder list, breadcrumbs
+    Home.tsx            Profile switcher, appearance toggle, upload zone, search box, book/folder list, breadcrumbs
     BookDetail.tsx      Per-book orchestration: staged sections (1 Input → 2 Work → 3 Output → danger zone), variant view (translation or rewrite) in ?variant= query param
     Chat.tsx            Library chat: useChat + streaming /chat, folder (?folderId=) / book (?bookId=) scoping, source chips, saved answers
     Components.tsx      /components gallery: every token, primitive and icon on one screen, derived from
@@ -568,6 +570,7 @@ packages/web/src/
     BookSearchResults.tsx Search results across all folders with folder-path breadcrumbs
     BookList.tsx        Books overview table (activity pills, no-text pill, languages, outputs, size) with polling
     ProfileSwitcher.tsx Profile dropdown in the Home header (create/rename/delete)
+    ThemeToggle.tsx     Appearance menu in the Home header (auto/light/dark)
     UploadZone.tsx      Drag-and-drop PDF upload; separate-books mode; upload-time AI prompt
     PdfPreviewModal.tsx Inline source-PDF preview
     reader/             PdfCanvas.tsx (pdf.js page or column crop, rendered near the viewport),
@@ -586,9 +589,23 @@ packages/web/src/
 
 ### Dark Mode
 
-Both themes come from the same semantic tokens in `styles.css`, flipped under
-`@media (prefers-color-scheme: dark)` — components never carry a `dark:` variant whose only job is a
-colour. See **Colour and reading surfaces** above for the palette/semantic split and what enforces it.
+Both themes come from the same semantic tokens in `styles.css` — components never carry a `dark:`
+variant whose only job is a colour. A token that differs between themes is one `light-dark()` pair,
+so there is no second block to keep in sync; which half applies is decided by `color-scheme` on
+`:root`. See **Colour and reading surfaces** above for the palette/semantic split and what enforces it.
+
+Appearance is a user preference, not just an OS one: `lib/theme.ts` stores `auto` / `light` / `dark`
+under the `theme` localStorage key. `auto` leaves `:root` with **no** `data-theme` attribute — that
+is what lets `color-scheme: light dark` keep following the OS — and the other two set it, which is
+why a pinned theme wins over the OS query where the old media block could not. Pinning also corrects
+native scrollbars and form controls, which a token swap alone never reached.
+
+The attribute is stamped **before first paint** by an inline `<script>` in `packages/web/index.html`:
+the app's module script is deferred and sits behind a 1.4 MB bundle, so applying the preference from
+`main.tsx` would flash the OS ramp on every launch. The server-rendered chapter reader
+(`server/src/lib/chapter-reader.ts`) inlines the same three-line bootstrap for the same reason — it
+is same-origin, so the preference reaches it. Those two copies and `lib/theme.ts` share the `theme`
+key by hand; change it in all three or none.
 
 Accents are tokenised like everything else (`--accent`, `--danger`, `--success`, `--warning`, each
 with its `-text`, `-hover` and `--on-*` partners), and the log dock is on `--bg-terminal`, not a

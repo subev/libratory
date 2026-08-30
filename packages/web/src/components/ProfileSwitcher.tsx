@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { trpc } from "../trpc.ts";
 import { getStoredProfileId, setStoredProfileId } from "../lib/profile.ts";
 import { formatBytes } from "../lib/format.ts";
-import { useTopmostEscape } from "./Modal.tsx";
+import { useDismissOnOutsidePointer, useTopmostEscape } from "./Modal.tsx";
 import { IconAdd, IconCheck, IconChevronDown, IconClose, IconDelete, IconProfile, IconRename, IconWarning } from "./icons.tsx";
 import { Button } from "./Button.tsx";
 
@@ -128,14 +128,7 @@ export function ProfileSwitcher() {
   // Escape backs out of the row being edited first, and only then closes the popover.
   useTopmostEscape(() => (mode ? reset() : close()), open);
 
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(e: PointerEvent) {
-      if (!root.current?.contains(e.target as Node)) close();
-    }
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [open, close]);
+  useDismissOnOutsidePointer(root, close, open);
 
   const active = profiles?.find((p) => p.id === stored) ?? profiles?.[0];
   if (!profiles || !active) return null;

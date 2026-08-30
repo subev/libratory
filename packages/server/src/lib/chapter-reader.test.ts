@@ -44,6 +44,21 @@ describe("renderChapterReaderHtml", () => {
     expect(html).toMatch(/<p>2 &lt; 3 &amp; 4 &gt; 1<\/p>/);
   });
 
+  it("follows the appearance pinned in the app", () => {
+    const html = renderChapterReaderHtml({
+      bookTitle: "Sample Book",
+      chapterTitle: "Sample Chapter",
+      pageStart: null,
+      pageEnd: null,
+      sourceBlocks: [{ type: "Text", text: "Body.", page: 1, included: true }],
+    });
+
+    expect(html).toContain('localStorage.getItem("theme")');
+    expect(html).toMatch(/:root\[data-theme="dark"\]\s*\{\s*color-scheme: dark;/);
+    expect(html).toContain("background: light-dark(#f4f4f5, #09090b)");
+    expect(html).not.toContain("prefers-color-scheme");
+  });
+
   it("adds article metadata and Bulgarian language hints for Cyrillic chapters", () => {
     const html = renderChapterReaderHtml({
       bookTitle: "Изгонени",

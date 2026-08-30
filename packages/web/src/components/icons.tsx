@@ -37,6 +37,8 @@ export {
   ArrowLeft as IconArrowLeft,
   ArrowRight as IconArrowRight,
   ArrowSquareOut as IconExternal,
+  Sun as IconThemeLight,
+  Moon as IconThemeDark,
 } from "@phosphor-icons/react";
 
 import type { ReactNode } from "react";

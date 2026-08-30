@@ -155,7 +155,8 @@
   --pal-brown-a24: oklch(0.5538 0.1207 66.4416 / 0.24);
 }
 
-/* SEMANTIC — all a component may use. Every value is a var() into the palette. */
+/* SEMANTIC — all a component may use. Every value is a var() into the palette. Only a token whose
+   value actually differs takes a light-dark() pair; aliases re-resolve on their own. */
 :root {
   color-scheme: light dark;
 
@@ -164,62 +165,63 @@
   --stack-reading: "Source Serif 4", Georgia, serif;
   --stack-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 
-  --bg-page: var(--pal-neutral-50);
-  --bg-card: var(--pal-neutral-25);
-  --bg-card-hover: var(--pal-neutral-100);
-  --bg-subtle: var(--pal-neutral-150);
+  --bg-page: light-dark(var(--pal-neutral-50), var(--pal-neutral-950));
+  --bg-card: light-dark(var(--pal-neutral-25), var(--pal-neutral-900));
+  --bg-card-hover: light-dark(var(--pal-neutral-100), var(--pal-cream-a06));
+  --bg-subtle: light-dark(var(--pal-neutral-150), var(--pal-cream-a04));
   --bg-input: var(--bg-card);
-  --bg-drag: var(--pal-orange-a10);
-  --bg-selected: var(--pal-orange-a10);
+  --bg-drag: light-dark(var(--pal-orange-a10), var(--pal-ember-a14));
+  --bg-selected: light-dark(var(--pal-orange-a10), var(--pal-ember-a14));
 
-  --border: var(--pal-neutral-300);
-  --border-input: var(--pal-neutral-400);
+  --border: light-dark(var(--pal-neutral-300), var(--pal-cream-a12));
+  --border-input: light-dark(var(--pal-neutral-400), var(--pal-cream-a26));
   --divide: var(--border);
 
-  --text-primary: var(--pal-neutral-800);
-  --text-secondary: var(--pal-neutral-700);
-  --text-tertiary: var(--pal-neutral-650);
-  --text-muted: var(--pal-neutral-600);
-  --text-faint: var(--pal-neutral-500);
+  --text-primary: light-dark(var(--pal-neutral-800), var(--pal-neutral-0));
+  --text-secondary: light-dark(var(--pal-neutral-700), var(--pal-cream-a82));
+  --text-tertiary: light-dark(var(--pal-neutral-650), var(--pal-cream-a72));
+  --text-muted: light-dark(var(--pal-neutral-600), var(--pal-cream-a62));
+  --text-faint: light-dark(var(--pal-neutral-500), var(--pal-cream-a42));
 
-  --accent: var(--pal-orange-600);
-  --accent-hover: var(--pal-orange-550);
-  --accent-text: var(--pal-orange-700);
-  --accent-text-hover: var(--pal-orange-800);
-  --accent-subtle: var(--pal-orange-a12);
+  /* The tangerine loses its heat against charcoal, so dark takes the ember step. */
+  --accent: light-dark(var(--pal-orange-600), var(--pal-orange-500));
+  --accent-hover: light-dark(var(--pal-orange-550), var(--pal-orange-400));
+  --accent-text: light-dark(var(--pal-orange-700), var(--accent));
+  --accent-text-hover: light-dark(var(--pal-orange-800), var(--pal-orange-300));
+  --accent-subtle: light-dark(var(--pal-orange-a12), var(--pal-ember-a16));
   --focus-ring: var(--accent);
 
   /* --*-text is text IN that colour; --on-* is text sitting ON it as a fill. */
   --on-accent: var(--pal-ink);
   --on-danger: var(--pal-white);
-  --on-success: var(--pal-white);
+  --on-success: light-dark(var(--pal-white), var(--pal-ink));
   --on-warning: var(--pal-ink);
 
-  --danger: var(--pal-red-700);
-  --danger-hover: var(--pal-red-800);
-  --danger-bg: var(--pal-red-a10);
-  --danger-bg-hover: var(--pal-red-a20);
-  --danger-text: var(--danger);
+  --danger: light-dark(var(--pal-red-700), var(--pal-red-600));
+  --danger-hover: light-dark(var(--pal-red-800), var(--pal-red-500));
+  --danger-bg: light-dark(var(--pal-red-a10), var(--pal-red-a20));
+  --danger-bg-hover: light-dark(var(--pal-red-a20), var(--pal-red-a30));
+  --danger-text: light-dark(var(--danger), var(--pal-red-400));
 
-  --success: var(--pal-green-600);
-  --success-hover: var(--pal-green-700);
-  --success-bg: var(--pal-green-a12);
-  --success-bg-hover: var(--pal-green-a18);
-  --success-text: var(--pal-green-750);
+  --success: light-dark(var(--pal-green-600), var(--pal-green-500));
+  --success-hover: light-dark(var(--pal-green-700), var(--pal-green-450));
+  --success-bg: light-dark(var(--pal-green-a12), var(--pal-green-a18));
+  --success-bg-hover: light-dark(var(--pal-green-a18), var(--pal-green-a28));
+  --success-text: light-dark(var(--pal-green-750), var(--pal-green-400));
 
   --warning: var(--pal-brass-500);
-  --warning-hover: var(--pal-brass-400);
+  --warning-hover: light-dark(var(--pal-brass-400), var(--pal-brass-300));
   --warning-bg: var(--pal-brass-a15);
   --warning-bg-hover: var(--pal-brass-a25);
-  --warning-text: var(--pal-brass-700);
+  --warning-text: light-dark(var(--pal-brass-700), var(--pal-brass-300));
 
   /* Input -> Work -> Output is a sequence, so colour can encode it. */
   --step-input: var(--warning);
   --step-work: var(--accent);
   --step-output: var(--success);
 
-  --bg-custom-text: var(--pal-brass-a08);
-  --border-custom-text: var(--pal-brass-a40);
+  --bg-custom-text: light-dark(var(--pal-brass-a08), var(--pal-brass-a10));
+  --border-custom-text: light-dark(var(--pal-brass-a40), var(--pal-brass-a35));
 
   /* Fixed in both themes: these paint over pdf.js's white paper, which never darkens. */
   /* Fixed in both themes: pdf.js paints white paper, and a scrim darkens whatever is behind it. */
@@ -235,107 +237,48 @@
   --cue-word: var(--pal-orange-a60);
   --cue-ring: var(--pal-orange-600);
 
-  --danger-text-hover: var(--pal-red-800);
-  --success-text-hover: var(--pal-green-700);
+  --danger-text-hover: light-dark(var(--pal-red-800), var(--pal-red-300));
+  --success-text-hover: light-dark(var(--pal-green-700), var(--pal-green-300));
 
   /* Warm and slightly dimmed rather than paper white; see AGENTS.md. */
-  --bg-reading: var(--pal-neutral-150);
+  --bg-reading: light-dark(var(--pal-neutral-150), var(--pal-neutral-900));
   --border-reading: var(--border);
 
   /* Dark in both themes, so its text and lines cannot come from the theme ramp. */
-  --bg-terminal: var(--pal-neutral-950);
-  --bg-terminal-hover: var(--pal-terminal-hover);
+  --bg-terminal: light-dark(var(--pal-neutral-950), var(--pal-neutral-990));
+  --bg-terminal-hover: light-dark(var(--pal-terminal-hover), var(--pal-neutral-975));
   --terminal-text: var(--pal-neutral-0);
   --terminal-dim: var(--pal-cream-a50);
   --terminal-border: var(--pal-cream-a15);
   --terminal-danger: var(--pal-red-400);
 
-  --badge-pending-bg: var(--bg-subtle);
-  --badge-pending-text: var(--text-secondary);
-  --badge-extracting-bg: var(--pal-gold-a22);
-  --badge-extracting-text: var(--pal-gold-700);
-  --badge-synthesizing-bg: var(--pal-orange-a15);
-  --badge-synthesizing-text: var(--pal-orange-700);
-  --badge-normalizing-bg: var(--pal-blue-a18);
-  --badge-normalizing-text: var(--pal-blue-700);
-  --badge-assembling-bg: var(--pal-brown-a18);
-  --badge-assembling-text: var(--pal-brown-700);
+  --badge-pending-bg: light-dark(var(--bg-subtle), var(--pal-cream-a08));
+  --badge-pending-text: light-dark(var(--text-secondary), var(--pal-cream-a72));
+  --badge-extracting-bg: light-dark(var(--pal-gold-a22), var(--pal-gold-a20));
+  --badge-extracting-text: light-dark(var(--pal-gold-700), var(--pal-gold-300));
+  --badge-synthesizing-bg: light-dark(var(--pal-orange-a15), var(--pal-ember-a20));
+  --badge-synthesizing-text: light-dark(var(--pal-orange-700), var(--pal-orange-300));
+  --badge-normalizing-bg: light-dark(var(--pal-blue-a18), var(--pal-blue-a20));
+  --badge-normalizing-text: light-dark(var(--pal-blue-700), var(--pal-blue-300));
+  --badge-assembling-bg: light-dark(var(--pal-brown-a18), var(--pal-brown-a24));
+  --badge-assembling-text: light-dark(var(--pal-brown-700), var(--pal-brown-300));
   --badge-done-bg: var(--success-bg);
   --badge-done-text: var(--success-text);
   --badge-failed-bg: var(--danger-bg);
   --badge-failed-text: var(--danger-text);
   --badge-suspended-bg: var(--warning-bg);
   --badge-suspended-text: var(--warning-text);
-  --badge-cancelled-bg: var(--pal-neutral-200);
+  --badge-cancelled-bg: light-dark(var(--pal-neutral-200), var(--pal-cream-a08));
   --badge-cancelled-text: var(--text-muted);
 }
 
-/* Only tokens whose value actually differs belong here — aliases re-resolve on their own. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-page: var(--pal-neutral-950);
-    --bg-card: var(--pal-neutral-900);
-    --bg-card-hover: var(--pal-cream-a06);
-    --bg-subtle: var(--pal-cream-a04);
-    --bg-drag: var(--pal-ember-a14);
-    --bg-selected: var(--pal-ember-a14);
+/* A stored preference has to beat the OS query, and only color-scheme can override it. */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
 
-    --border: var(--pal-cream-a12);
-    --border-input: var(--pal-cream-a26);
-
-    --text-primary: var(--pal-neutral-0);
-    --text-secondary: var(--pal-cream-a82);
-    --text-tertiary: var(--pal-cream-a72);
-    --text-muted: var(--pal-cream-a62);
-    --text-faint: var(--pal-cream-a42);
-
-    /* The tangerine loses its heat against charcoal. */
-    --accent: var(--pal-orange-500);
-    --accent-hover: var(--pal-orange-400);
-    --accent-text: var(--accent);
-    --accent-text-hover: var(--pal-orange-300);
-    --accent-subtle: var(--pal-ember-a16);
-
-    --on-success: var(--pal-ink);
-
-    --danger: var(--pal-red-600);
-    --danger-hover: var(--pal-red-500);
-    --danger-bg: var(--pal-red-a20);
-    --danger-bg-hover: var(--pal-red-a30);
-    --danger-text: var(--pal-red-400);
-
-    --success: var(--pal-green-500);
-    --success-hover: var(--pal-green-450);
-    --success-bg: var(--pal-green-a18);
-    --success-bg-hover: var(--pal-green-a28);
-    --success-text: var(--pal-green-400);
-
-    --warning-hover: var(--pal-brass-300);
-    --warning-text: var(--pal-brass-300);
-
-    --bg-custom-text: var(--pal-brass-a10);
-    --border-custom-text: var(--pal-brass-a35);
-
-    --bg-reading: var(--pal-neutral-900);
-
-    --danger-text-hover: var(--pal-red-300);
-    --success-text-hover: var(--pal-green-300);
-
-    --bg-terminal: var(--pal-neutral-990);
-    --bg-terminal-hover: var(--pal-neutral-975);
-
-    --badge-pending-bg: var(--pal-cream-a08);
-    --badge-pending-text: var(--pal-cream-a72);
-    --badge-extracting-bg: var(--pal-gold-a20);
-    --badge-extracting-text: var(--pal-gold-300);
-    --badge-synthesizing-bg: var(--pal-ember-a20);
-    --badge-synthesizing-text: var(--pal-orange-300);
-    --badge-normalizing-bg: var(--pal-blue-a20);
-    --badge-normalizing-text: var(--pal-blue-300);
-    --badge-assembling-bg: var(--pal-brown-a24);
-    --badge-assembling-text: var(--pal-brown-300);
-    --badge-cancelled-bg: var(--pal-cream-a08);
-  }
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 /* No default palette: a colour class is valid only if it is ours, so no-unknown-classes

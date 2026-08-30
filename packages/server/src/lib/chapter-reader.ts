@@ -55,15 +55,25 @@ export function renderChapterReaderHtml({
   <meta property="og:title" content="${escapedChapterTitle}" />
   <meta property="og:description" content="${escapedDescription}" />
   <script type="application/ld+json">${schema}</script>
+  <!-- Same origin as the app, so the appearance pinned there reaches this page too. -->
+  <script>try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
   <style>
     :root {
       color-scheme: light dark;
     }
 
+    :root[data-theme="light"] {
+      color-scheme: light;
+    }
+
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+    }
+
     body {
       margin: 0;
-      background: #f4f4f5;
-      color: #18181b;
+      background: light-dark(#f4f4f5, #09090b);
+      color: light-dark(#18181b, #e4e4e7);
       font: 19px/1.7 Georgia, serif;
     }
 
@@ -75,20 +85,20 @@ export function renderChapterReaderHtml({
       max-width: 760px;
       margin: 0 auto;
       padding: 40px;
-      background: #ffffff;
+      background: light-dark(#ffffff, #18181b);
       border-radius: 18px;
-      box-shadow: 0 10px 30px rgba(24, 24, 27, 0.08);
+      box-shadow: 0 10px 30px light-dark(rgba(24, 24, 27, 0.08), transparent);
     }
 
     header {
       margin-bottom: 32px;
       padding-bottom: 24px;
-      border-bottom: 1px solid #e4e4e7;
+      border-bottom: 1px solid light-dark(#e4e4e7, #3f3f46);
     }
 
     .eyebrow {
       margin: 0 0 10px;
-      color: #52525b;
+      color: light-dark(#52525b, #a1a1aa);
       font: 600 13px/1.4 system-ui, sans-serif;
       letter-spacing: 0.08em;
       text-transform: uppercase;
@@ -96,12 +106,12 @@ export function renderChapterReaderHtml({
 
     .meta {
       margin: 10px 0 0;
-      color: #71717a;
+      color: light-dark(#71717a, #a1a1aa);
       font: 14px/1.5 system-ui, sans-serif;
     }
 
     h1, h2, h3, h4, h5, h6 {
-      color: #09090b;
+      color: light-dark(#09090b, #fafafa);
       line-height: 1.25;
     }
 
@@ -127,30 +137,6 @@ export function renderChapterReaderHtml({
       margin-top: 0.35em;
     }
 
-    @media (prefers-color-scheme: dark) {
-      body {
-        background: #09090b;
-        color: #e4e4e7;
-      }
-
-      article {
-        background: #18181b;
-        box-shadow: none;
-      }
-
-      header {
-        border-bottom-color: #3f3f46;
-      }
-
-      .eyebrow,
-      .meta {
-        color: #a1a1aa;
-      }
-
-      h1, h2, h3, h4, h5, h6 {
-        color: #fafafa;
-      }
-    }
   </style>
 </head>
 <body>

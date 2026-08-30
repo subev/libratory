@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useId, useRef, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useRef, type ReactNode, type RefObject } from "react";
 import { useBodyScrollLock } from "../lib/use-body-scroll-lock.ts";
 import { IconClose } from "./icons.tsx";
 
@@ -74,6 +74,22 @@ export function useTopmostEscape(onEscape: () => void, enabled = true) {
       if (escapeStack.length === 0) document.removeEventListener("keydown", onDocumentEscape);
     };
   }, [enabled]);
+}
+
+// The other half of the popover dismissal contract useTopmostEscape owns.
+export function useDismissOnOutsidePointer(
+  ref: RefObject<HTMLElement | null>,
+  onDismiss: () => void,
+  enabled = true,
+) {
+  useEffect(() => {
+    if (!enabled) return;
+    function onPointerDown(e: PointerEvent) {
+      if (!ref.current?.contains(e.target as Node)) onDismiss();
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [enabled, ref, onDismiss]);
 }
 
 export function Modal({
