@@ -15,6 +15,50 @@ def write_chunk_manifest(chunks_dir, chunk_texts):
         json.dump(manifest, f, ensure_ascii=False)
 
 
+def join_timestamps(tokens, pred_dur, vocab):
+    """Kokoro's own join_timestamps spends two duration frames on a token that has no phonemes —
+    a bullet, a stray bracket left by URL stripping — where the phoneme string spent one. The
+    cursor then runs a frame short per such token, and the last words of the chunk fall off the
+    end untimed, which costs the whole chunk its word highlighting."""
+    MAGIC_DIVISOR = 80
+    if not tokens or len(pred_dur) < 3:
+        return
+    left = right = 2 * max(0, pred_dur[0].item() - 3)
+    i = 1
+    # en_tokenize strips the phoneme string, so the spaces of the tokens before the first one
+    # that phonemized never reached it — and never got a frame
+    stripped_lead = True
+    for token in tokens:
+        if i >= len(pred_dur) - 1:
+            break
+        phonemes = token.phonemes or ""
+        if phonemes:
+            stripped_lead = False
+        # The model drops phonemes it has no id for, so those own no frame either
+        frames = sum(1 for p in phonemes if p in vocab)
+        if frames == 0:
+            if token.whitespace and not stripped_lead:
+                space_dur = pred_dur[i].item()
+                left = right + space_dur
+                right = left + space_dur
+                i += 1
+            continue
+        j = i + frames
+        if j >= len(pred_dur):
+            break
+        token.start_ts = left / MAGIC_DIVISOR
+        token_dur = pred_dur[i:j].sum().item()
+        space_dur = pred_dur[j].item() if token.whitespace else 0
+        left = right + (2 * token_dur) + space_dur
+        token.end_ts = left / MAGIC_DIVISOR
+        right = left + space_dur
+        i = j + (1 if token.whitespace else 0)
+
+
+def chunk_words_file(index):
+    return f"chunk-{index:03d}.words.json"
+
+
 def write_chunk_words(chunks_dir, index, tokens):
     """Chunk-relative ms, beside the chunk WAV so a resumed run keeps what it skips."""
     if not chunks_dir:
@@ -41,16 +85,20 @@ def write_chunk_words(chunks_dir, index, tokens):
     if not words:
         return
     os.makedirs(chunks_dir, exist_ok=True)
-    with open(os.path.join(chunks_dir, f"chunk-{index:03d}.words.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(chunks_dir, chunk_words_file(index)), "w", encoding="utf-8") as f:
         json.dump(words, f, ensure_ascii=False)
 
 
-def load_existing_chunk(chunks_dir, index):
+def load_existing_chunk(chunks_dir, index, needs_words):
     """Return a previously-synthesized chunk's audio so resume can skip regenerating it."""
     if not chunks_dir:
         return None
     path = os.path.join(chunks_dir, f"chunk-{index:03d}.wav")
     if not os.path.exists(path):
+        return None
+    # Timings come out of inference, so a chunk kept from before they existed can only get
+    # them by being synthesized again — reusing it leaves the chapter unhighlightable
+    if needs_words and not os.path.exists(os.path.join(chunks_dir, chunk_words_file(index))):
         return None
     try:
         import soundfile as sf
@@ -155,12 +203,12 @@ def main():
     voice_pack = pipeline.load_voice(args.voice)
     audio_chunks = []
     for i, ps in enumerate(phoneme_chunks):
-        chunk_audio = load_existing_chunk(args.chunks_dir, i + 1)
+        chunk_audio = load_existing_chunk(args.chunks_dir, i + 1, chunk_tokens[i] is not None)
         if chunk_audio is None:
             output = KPipeline.infer(pipeline.model, ps, voice_pack, args.speed)
             chunk_audio = output.audio.numpy()
             if chunk_tokens[i] is not None and output.pred_dur is not None:
-                KPipeline.join_timestamps(chunk_tokens[i], output.pred_dur)
+                join_timestamps(chunk_tokens[i], output.pred_dur, pipeline.model.vocab)
                 write_chunk_words(args.chunks_dir, i + 1, chunk_tokens[i])
             if args.chunks_dir:
                 os.makedirs(args.chunks_dir, exist_ok=True)

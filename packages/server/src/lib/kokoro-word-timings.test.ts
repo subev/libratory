@@ -78,3 +78,73 @@ describe("write_chunk_words", () => {
     ).toBeNull();
   });
 });
+
+type Phoneme = { text: string; phonemes: string; whitespace: string; start_ts: null; end_ts: null };
+
+const spoken = (text: string, phonemes: string, whitespace = " "): Phoneme =>
+  ({ text, phonemes, whitespace, start_ts: null, end_ts: null });
+// A bullet, a bracket left behind by URL stripping: in the token stream, never in the audio
+const silent = (text: string, whitespace = " "): Phoneme => spoken(text, "", whitespace);
+
+// One frame per phoneme the model kept, plus <bos>/<eos> — the shape KModel returns for the
+// phoneme string en_tokenize builds from these tokens, whose leading/trailing space it strips
+const durations = (tokens: Phoneme[], missing: string): number[] => {
+  const ps = tokens.map((t) => t.phonemes + (t.whitespace ? " " : "")).join("").trim();
+  return Array([...ps].filter((p) => p !== missing).length + 2).fill(4);
+};
+
+async function timedWords(tokens: Phoneme[], missing = ""): Promise<string[]> {
+  const ps = tokens.map((t) => t.phonemes).join("");
+  const vocab = [...new Set([...ps, " "])].filter((p) => p !== missing);
+  const driver = `
+import json, sys
+sys.path.insert(0, ${JSON.stringify(SCRIPTS)})
+from synthesize import join_timestamps
+
+class Token:
+    def __init__(self, d): self.__dict__.update(d)
+
+class Frame:
+    def __init__(self, value): self.value = value
+    def item(self): return self.value
+
+class Durations(list):
+    def __getitem__(self, key):
+        got = list.__getitem__(self, key)
+        return Durations(got) if isinstance(key, slice) else Frame(got)
+    def sum(self): return Frame(sum(list.__getitem__(self, slice(None))))
+
+tokens = [Token(d) for d in json.loads(sys.argv[1])]
+join_timestamps(tokens, Durations(json.loads(sys.argv[2])), set(json.loads(sys.argv[3])))
+print(json.dumps([t.text for t in tokens if t.start_ts is not None]))
+`;
+  const { stdout } = await run("python3", [
+    "-c",
+    driver,
+    JSON.stringify(tokens),
+    JSON.stringify(durations(tokens, missing)),
+    JSON.stringify(vocab),
+  ]);
+  return JSON.parse(stdout);
+}
+
+describe("join_timestamps", () => {
+  it("times the last word of a chunk a bullet opens", async () => {
+    // The phoneme string is stripped, so the bullet's space never reached the model: charging it
+    // a frame anyway walked the cursor off the end and cost the chunk its highlighting
+    expect(await timedWords([silent("•"), spoken("A", "ɐ"), spoken("service", "sˈɜrvɪs", "")]))
+      .toEqual(["A", "service"]);
+  });
+
+  it("times the last word of a chunk with a bracket in the middle", async () => {
+    expect(
+      await timedWords([spoken("such", "sˈʌʧ"), spoken("as", "æz"), silent("<"), spoken("and", "ænd", "")]),
+    ).toEqual(["such", "as", "and"]);
+  });
+
+  it("times the last word when a phoneme has no id in the model's vocabulary", async () => {
+    // Misaki emits a bracket for some citations; the model drops it, so it owns no frame either
+    expect(await timedWords([spoken("[81,", "[ˈeɪtiwˌʌn"), spoken("subjobs", "sˈʌbʤɑbz", "")], "["))
+      .toEqual(["[81,", "subjobs"]);
+  });
+});
