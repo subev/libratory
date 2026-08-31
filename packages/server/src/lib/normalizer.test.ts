@@ -32,6 +32,18 @@ describe("normalizeForTts", () => {
     );
   });
 
+  it("takes the bracket a book wraps a URL in with the URL", () => {
+    expect(normalizeForTts("a predicate such as <http://my.com/ns#within> or WITHIN")).toBe(
+      "a predicate such as or WITHIN",
+    );
+  });
+
+  it("leaves the underscores inside an identifier alone", () => {
+    expect(normalizeForTts("just WITHIN or LIVES_IN, not lives_in either")).toBe(
+      "just WITHIN or LIVES_IN, not lives_in either",
+    );
+  });
+
   it("rejoins hyphenated line breaks", () => {
     expect(normalizeForTts("con-\ntinue")).toBe("continue");
   });

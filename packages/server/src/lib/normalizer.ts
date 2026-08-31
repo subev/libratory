@@ -4,7 +4,7 @@ export function normalizeForTts(text: string): string {
   // Strip markdown bold/italic
   out = out.replace(/\*\*(.+?)\*\*/g, "$1");
   out = out.replace(/\*(.+?)\*/g, "$1");
-  out = out.replace(/_(.+?)_/g, "$1");
+  out = out.replace(/(?<![\w])_([^_\n]+)_(?!\w)/g, "$1");
 
   // Strip markdown inline code
   out = out.replace(/`(.+?)`/g, "$1");
@@ -22,8 +22,8 @@ export function normalizeForTts(text: string): string {
   out = out.replace(/\[\d+\]/g, "");
   out = out.replace(/\[(?:i{1,3}|iv|v|vi{0,3}|ix|x{0,3})\]/gi, "");
 
-  // Remove bare URLs
-  out = out.replace(/https?:\/\/\S+/g, "");
+  // Remove bare URLs, and the bracket a book wraps them in — a lone < is read as a word
+  out = out.replace(/<?https?:\/\/\S+/g, "");
 
   // Rejoin hyphenated line breaks: "con-\n" → "con"
   out = out.replace(/(\w)-\n(\w)/g, "$1$2");
