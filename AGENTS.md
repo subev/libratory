@@ -505,7 +505,7 @@ packages/server/src/
     document-html.ts    HTML rendering for Vivliostyle document exports
     vivliostyle.ts      Vivliostyle CLI subprocess wrapper
     chunk-previews.ts   Chunk WAV preview listing + text locating (read-along in the web UI)
-    chapter-artifacts.ts / chapter-reader.ts / chapter-reader-route.ts  Print-view chapter reader (/read/:chapterId)
+    chapter-artifacts.ts  Removal of a chapter's audio/sync artifacts from disk
     page-geometry.ts    Page/line/character boxes via scripts/page_geometry.py; content + column boxes, median body pt
     cue-rects.ts        Cue text → the rectangles it occupies on the page (see docs/read-along.md)
     reader-doc.ts / reader-routes.ts  The read-along documents: /read/book/:id/book.json and
@@ -602,10 +602,8 @@ native scrollbars and form controls, which a token swap alone never reached.
 
 The attribute is stamped **before first paint** by an inline `<script>` in `packages/web/index.html`:
 the app's module script is deferred and sits behind a 1.4 MB bundle, so applying the preference from
-`main.tsx` would flash the OS ramp on every launch. The server-rendered chapter reader
-(`server/src/lib/chapter-reader.ts`) inlines the same three-line bootstrap for the same reason — it
-is same-origin, so the preference reaches it. Those two copies and `lib/theme.ts` share the `theme`
-key by hand; change it in all three or none.
+`main.tsx` would flash the OS ramp on every launch. That copy and `lib/theme.ts` share the `theme`
+key by hand; change it in both or neither.
 
 Accents are tokenised like everything else (`--accent`, `--danger`, `--success`, `--warning`, each
 with its `-text`, `-hover` and `--on-*` partners), and the log dock is on `--bg-terminal`, not a
@@ -644,7 +642,6 @@ fixed zinc.
 - `GET /audio/chapter/:chapterId` — Serve individual chapter audio
 - `GET /audio/translation/:translationId` — Serve translated chapter audio
 - `GET /audio/assembly/:assemblyId` — Stream an assembly
-- `GET /read/:chapterId` — Print-friendly chapter reader (source blocks HTML)
 - `GET /preview/:voiceId` — Voice preview M4A (generated on demand, cached in data/previews)
 - `GET /files/*` — Static mount of the whole output dir (chunk WAV previews, direct file access)
 - `POST /api/books` / `POST /api/books/:bookId/chapters` / `GET /api/books/:bookId` — External JSON API for scripts and other projects (`api-routes.ts` + `lib/api-books.ts`, full reference in `docs/synthetic-books-api.md`): create synthetic `kind:"api"` books, append source-tagged chapters to any book (rebuild-safe), poll synthesis status. Optional `synthesize: true` queues TTS per chapter (text is normalized inline at insert); optional `x-profile-id` scopes like the web app.

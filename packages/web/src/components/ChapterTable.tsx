@@ -549,6 +549,16 @@ export function ChapterTable({
                       <Button
                         variant="icon"
                         size="sm"
+                        onClick={() => openChapterModal(chapters.indexOf(chapter))}
+                        title="Open this chapter — text, audio, editing"
+                        aria-label="Open chapter"
+                        data-testid="chapter-open"
+                      >
+                        <IconExpand className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="icon"
+                        size="sm"
                         onClick={() => handlePlay(chapter.id)}
                         disabled={!(chapter.status === "done" && chapter.audioPath)}
                         title={
@@ -567,28 +577,20 @@ export function ChapterTable({
                           <IconPlay className="h-4 w-4" />
                         )}
                       </Button>
-                      <Button
-                        variant="icon"
-                        size="sm"
-                        onClick={() => openChapterModal(chapters.indexOf(chapter))}
-                        title="Open this chapter — text, audio, editing"
-                        aria-label="Open chapter"
-                        data-testid="chapter-open"
-                      >
-                        <IconExpand className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="icon"
-                        size="sm"
-                        href={`/read/chapter/${chapter.id}`}
-                        disabled={!chapter.hasSourceBlocks}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={chapter.hasSourceBlocks ? "Open reader view in a new tab" : "This chapter's text no longer maps to the source pages"}
-                        aria-label={chapter.hasSourceBlocks ? "Open reader view in a new tab" : "Reader view unavailable"}
-                      >
-                        <IconBook className="h-4 w-4" />
-                      </Button>
+                      {!variant ? (
+                        <Button
+                          variant="icon"
+                          size="sm"
+                          href={`/books/${bookId}/read?chapter=${chapter.index}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Open the read-along reader in a new tab"
+                          aria-label="Open the read-along reader"
+                          data-testid="chapter-reader"
+                        >
+                          <IconBook className="h-4 w-4" />
+                        </Button>
+                      ) : null}
                       <Button
                         variant="icon"
                         size="sm"

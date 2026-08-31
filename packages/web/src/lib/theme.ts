@@ -2,7 +2,7 @@ export const THEMES = ["auto", "light", "dark"] as const;
 
 export type Theme = (typeof THEMES)[number];
 
-// Also read by the pre-paint bootstraps in web/index.html and server/src/lib/chapter-reader.ts.
+// Also read by the pre-paint bootstrap in web/index.html.
 const KEY = "theme";
 
 export function loadTheme(): Theme {

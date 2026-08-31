@@ -8,7 +8,6 @@ import { fastifyTRPCPlugin } from "@trpc/server/adapters/fastify";
 import { appRouter } from "./router.ts";
 import { createContext } from "./trpc.ts";
 import { startWorker, stopWorker } from "./workers/setup.ts";
-import { registerChapterReaderRoute, type ChapterReaderLookupResult } from "./lib/chapter-reader-route.ts";
 import { registerReaderRoutes } from "./lib/reader-routes.ts";
 import { registerUploadRoutes } from "./upload-routes.ts";
 import { registerChatRoutes } from "./chat-routes.ts";
@@ -204,33 +203,6 @@ async function main() {
   });
 
   registerReaderRoutes(fastify);
-
-  registerChapterReaderRoute(fastify, async (chapterId): Promise<ChapterReaderLookupResult> => {
-    const [chapter] = await db.select().from(chapters).where(eq(chapters.id, chapterId));
-    if (!chapter) {
-      return { kind: "not-found", message: "Chapter not found" };
-    }
-
-    const [book] = await db.select().from(books).where(eq(books.id, chapter.bookId));
-    if (!book) {
-      return { kind: "not-found", message: "Book not found" };
-    }
-
-    if (!Array.isArray(chapter.sourceBlocks)) {
-      return { kind: "not-found", message: "Chapter source blocks not found" };
-    }
-
-    return {
-      kind: "ok",
-      chapter: {
-        bookTitle: book.title,
-        chapterTitle: chapter.title,
-        pageStart: chapter.pageStart,
-        pageEnd: chapter.pageEnd,
-        sourceBlocks: chapter.sourceBlocks,
-      },
-    };
-  });
 
   // Keyed by voice: a second request for a preview already being synthesized waits on the same run
   // rather than being told to come back later, so the client needs no polling protocol.
