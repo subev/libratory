@@ -4,6 +4,7 @@ import { db } from "../db.ts";
 import { bookFiles, chapters, books, type Book, type Chapter } from "../schema.ts";
 import { cuesFromSyncMap, type Cue } from "./cues.ts";
 import { rectsForRange } from "./cue-rects.ts";
+import { describeError } from "./errors.ts";
 import { locateChunks } from "./chunk-previews.ts";
 import { listMarkerSources, type MarkerSource } from "./marker-sources.ts";
 import { languageCode } from "./readaloud-epub.ts";
@@ -106,7 +107,12 @@ export async function buildManifest(book: Book): Promise<ReaderManifest> {
 const loaded = new WeakMap<MarkerSource, Awaited<ReturnType<typeof ensureSourceGeometry>>>();
 
 async function pageOffsets(sources: MarkerSource[]): Promise<Map<number | null, number>> {
-  const geometries = await Promise.all(sources.map((source) => ensureSourceGeometry(source).catch(() => null)));
+  const geometries = await Promise.all(sources.map((source) =>
+    ensureSourceGeometry(source).catch((error: unknown) => {
+      console.error(`Page geometry for ${source.filename}: ${describeError(error)}`);
+      return null;
+    }),
+  ));
   const offsets = new Map<number | null, number>();
   let flat = 0;
   sources.forEach((source, index) => {

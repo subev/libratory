@@ -5,6 +5,7 @@
 import argparse
 import json
 import os
+import re
 import sys
 
 
@@ -16,6 +17,10 @@ def rounded(values):
 # width to count as one — a right-to-left script moves backwards a character at a time, and
 # kerning overlaps by a fraction of one, and neither is a new row.
 WRAP_FRACTION = 0.5
+
+# pdftext reports an astral character as its two UTF-16 halves, each with a box. Escaped, they
+# survive a UTF-8 write and JSON.parse pairs them back into one character of length two.
+SURROGATE = re.compile("[\ud800-\udfff]")
 
 
 def split_rows(chars, line_width):
@@ -98,8 +103,12 @@ def main():
 
     doc.close()
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-    with open(args.out, "w", encoding="utf-8") as f:
-        json.dump({"version": 3, "pages": out}, f, ensure_ascii=False)
+    payload = json.dumps({"version": 3, "pages": out}, ensure_ascii=False)
+    payload = SURROGATE.sub(lambda m: f"\\u{ord(m.group()):04x}", payload)
+    partial = args.out + ".partial"
+    with open(partial, "w", encoding="utf-8") as f:
+        f.write(payload)
+    os.replace(partial, args.out)
 
     print(json.dumps({"type": "done", "pages": len(out), "lines": sum(len(p["lines"]) for p in out)}), flush=True)
 
