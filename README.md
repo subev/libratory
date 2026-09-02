@@ -267,7 +267,7 @@ During synthesis the server keeps a text↔audio timing map (`chNNN.sync.json`) 
 
 ### Project structure
 
-pnpm monorepo: `packages/server` (Fastify + tRPC + Graphile Worker + Drizzle/Postgres, port 3034) and `packages/web` (React 19 + Vite + Tailwind v4 + react-router 7, port 3033). Python TTS/extraction scripts live in `scripts/`; the optional Storyteller companion in `storyteller/`.
+pnpm monorepo: `packages/server` (Fastify + tRPC + Graphile Worker + Drizzle/Postgres, port 3034) and `packages/web` (React 19 + Vite + Tailwind v4 + react-router 7, port 3033). Python TTS/extraction scripts live in `scripts/`; the optional Storyteller companion in `storyteller/`; `get/` is the small Cloudflare Pages project behind the download link.
 
 **The detailed, maintained map of files, tables, routes, and pipeline internals is in [AGENTS.md](AGENTS.md)** — this README stays intentionally high-level.
 
@@ -371,7 +371,7 @@ The database stores absolute paths to audio and PDFs, so both halves must use th
 
 A crash writes `crash.log` beside the app's data and offers to open a prefilled GitHub issue. Updates come from GitHub Releases via `electron-updater`, and the launch after one brings the Python environment forward to match — see `tasks/desktop-updates.md`.
 
-It is signed with a Developer ID certificate and notarised by Apple, so the download opens with no warning and the in-app updater can install what it finds. Releasing is a version bump and a `v*` tag; the steps are in [packages/desktop/README.md](packages/desktop/README.md#releasing). `scripts/vm-verify.sh` runs the whole thing inside a fresh macOS VM, checking first that the VM has no Homebrew, no Python and no cached models — this machine has all three and hides bugs because of it.
+It is signed with a Developer ID certificate and notarised by Apple, so the download opens with no warning and the in-app updater can install what it finds. Releasing is a version bump and a `v*` tag; the steps are in [packages/desktop/README.md](packages/desktop/README.md#releasing). The public download link is [get.libratory.dev/mac](https://get.libratory.dev/mac), which redirects to the newest DMG and never needs updating; `node scripts/download-stats.mjs` reports how often it has been taken. `scripts/vm-verify.sh` runs the whole thing inside a fresh macOS VM, checking first that the VM has no Homebrew, no Python and no cached models — this machine has all three and hides bugs because of it.
 
 </details>
 
