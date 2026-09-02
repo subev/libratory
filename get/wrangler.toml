@@ -1,0 +1,14 @@
+name = "libratory-get"
+compatibility_date = "2026-09-02"
+pages_build_output_dir = "public"
+
+# Every click on the Download button lands here as one row: country, source tag, user agent.
+# The dataset is created on first write — there is nothing to provision in the dashboard.
+[[analytics_engine_datasets]]
+binding = "DOWNLOADS"
+dataset = "libratory_downloads"
+
+[env.preview]
+[[env.preview.analytics_engine_datasets]]
+binding = "DOWNLOADS"
+dataset = "libratory_downloads_preview"
