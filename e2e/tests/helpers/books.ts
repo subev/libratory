@@ -22,6 +22,8 @@ export async function createApiBook(
 
 export async function uploadFixtureBook(page: Page, { waitForIndex = false } = {}) {
   await page.goto("/");
+  // Upload lives in a modal now: the library's first screen is the library, not a drop zone
+  await page.getByTestId("open-upload").click();
   await page.locator('input[type="file"]').setInputFiles(FIXTURE_PDF);
   await page.getByRole("button", { name: /^Upload$/ }).click();
   const row = page.getByRole("row", { name: /tiny.book/i });

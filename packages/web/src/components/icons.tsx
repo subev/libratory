@@ -9,6 +9,7 @@ export {
   Trash as IconDelete,
   PencilSimple as IconRename,
   MagnifyingGlass as IconSearch,
+  UploadSimple as IconUpload,
   Gear as IconSettings,
   User as IconProfile,
   DotsSixVertical as IconDragHandle,

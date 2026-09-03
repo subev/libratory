@@ -12,7 +12,8 @@ import { IconDragHandle, IconClose, IconAdd } from "./icons.tsx";
 import { Button } from "./Button.tsx";
 
 type UploadZoneProps = {
-  onUploadComplete: () => void;
+  /** ok=false means the staged files are still there with an error to read — do not dismiss. */
+  onUploadComplete: (ok: boolean) => void;
   folderId?: string | null;
 };
 
@@ -167,10 +168,10 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
 
       setStagedFiles([]);
       setCustomTitle("");
-      onUploadComplete();
+      onUploadComplete(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
-      onUploadComplete();
+      onUploadComplete(false);
     } finally {
       setIsUploading(false);
     }
