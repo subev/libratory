@@ -1,4 +1,4 @@
-import { test, expect, createApiBook } from "./fixtures.ts";
+import { test, expect, createApiBook, exportAs } from "./fixtures.ts";
 
 // Vivliostyle renders the PDF in a subprocess — real work, so full tier
 test.describe("document export", { tag: "@slow" }, () => {
@@ -20,16 +20,9 @@ test.describe("document export", { tag: "@slow" }, () => {
 
     // Exports are serialized per book server-side — run them one after the other. One modal with one
     // CTA is what makes that safe: the old UI only disabled the format you had clicked.
-    const exportAs = async (format: "pdf" | "epub") => {
-      await page.getByTestId("stage-tab-chapters").click();
-      await page.getByTestId("open-export").click();
-      await page.getByTestId(`export-format-${format}`).click();
-      await page.getByTestId("export-confirm").click();
-    };
-
-    await exportAs("pdf");
+    await exportAs(page, "pdf");
     await expect(rows.filter({ hasText: "PDF" })).toHaveCount(1, { timeout: 2 * 60_000 });
-    await exportAs("epub");
+    await exportAs(page, "epub");
     await expect(rows).toHaveCount(2, { timeout: 60_000 });
     await expect(rows.filter({ hasText: "PDF" })).toHaveCount(1);
     await expect(rows.filter({ hasText: "EPUB" })).toHaveCount(1);

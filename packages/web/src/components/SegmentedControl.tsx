@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 // unselected half was byte-identical across every hand-written copy and the selected half never was:
 // "raised" is a trough with a card-coloured thumb, "accent" fills, for a control that has to carry a
 // dense toolbar on its own.
-export type SegmentedOption = {
+type SegmentedOption = {
   id: string;
   label: ReactNode;
   title?: string;
@@ -38,7 +38,6 @@ export function SegmentedControl({
   testId,
   variant = "raised",
   size = "md",
-  className = "",
 }: {
   options: SegmentedOption[];
   value: string;
@@ -46,10 +45,9 @@ export function SegmentedControl({
   testId: string;
   variant?: keyof typeof SELECTED;
   size?: keyof typeof PAD;
-  className?: string;
 }) {
   return (
-    <div className={`inline-flex border p-0.5 gap-0.5 min-w-0 ${CONTAINER[variant]} ${className}`} data-testid={testId}>
+    <div className={`inline-flex border p-0.5 gap-0.5 min-w-0 ${CONTAINER[variant]}`} data-testid={testId}>
       {options.map((option) => {
         const selected = value === option.id;
         return (

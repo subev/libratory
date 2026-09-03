@@ -292,9 +292,8 @@ each a state someone designed, all seven booleans under test.
 
 `Section.tsx` and the `--step-input` / `--step-work` / `--step-output` ramp are **gone**. The stripe
 was "the one place colour still encodes a sequence", and the numbered tab chips do that job now — the
-sequence is the tab row, so a card carrying a coloured edge would be saying it twice. A row inside a
-tab is `book/ResourceRow.tsx` (tile, title, subtitle, badge, actions), shared by source files,
-assemblies and documents.
+sequence is the tab row, so a card carrying a coloured edge would be saying it twice. A produced-file row is `book/ResourceRow.tsx` (tile, title, subtitle, badge, actions), shared by
+assemblies and documents — source files stay a table because they carry a shift-range selection.
 
 Two other container roles are already confined to a single component or file and do **not** need
 extracting — say so before "consolidating" them:

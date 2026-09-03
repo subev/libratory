@@ -1,4 +1,4 @@
-import { test, expect, createApiBook, uploadFixtureBook } from "./fixtures.ts";
+import { test, expect, createApiBook, exportAs, uploadFixtureBook } from "./fixtures.ts";
 
 test("UC1: uploaded PDF becomes a readable book with raw text", async ({ page }) => {
   await uploadFixtureBook(page);
@@ -37,9 +37,7 @@ test.describe("synthesize and assemble", { tag: "@slow" }, () => {
     await expect(playButtons).toHaveCount(2, { timeout: 2 * 60_000 });
 
     // Assembling is one format among four in the export modal now, not a button of its own
-    await page.getByTestId("open-export").click();
-    await page.getByTestId("export-format-m4b").click();
-    await page.getByTestId("export-confirm").click();
+    await exportAs(page, "m4b");
     const assembly = page.getByTestId("assembly-row").first();
     await expect(assembly).toBeVisible({ timeout: 60_000 });
 

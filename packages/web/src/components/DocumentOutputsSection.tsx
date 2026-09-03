@@ -2,6 +2,7 @@ import { formatOutputDate, documentFormatLabel, pendingExportSummary, type Docum
 import { Button } from "./Button.tsx";
 import { IconBook, IconDelete, IconDocument, IconDownload } from "./icons.tsx";
 import { ResourceGroup, ResourceRow } from "./book/ResourceRow.tsx";
+import { ActivityDot } from "./book/StageTabs.tsx";
 
 export type DocumentRow = {
   id: string;
@@ -37,7 +38,7 @@ export function DocumentOutputsSection({
       count={
         pending.length > 0 ? (
           <span className="inline-flex items-center gap-1.5 font-medium text-(--accent-text)" data-testid="export-pending">
-            <span className="w-1.5 h-1.5 rounded-full bg-(--accent) animate-[pulse-dot_1.15s_ease-in-out_infinite]" />
+            <ActivityDot className="text-(--accent)" />
             {pending.map(pendingExportSummary).join(" · ")}...
           </span>
         ) : documents.length === 0 ? (

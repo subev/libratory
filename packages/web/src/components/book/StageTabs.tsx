@@ -1,17 +1,14 @@
 import { IconLocked } from "../icons.tsx";
+import { statusStyles } from "../StatusBadge.tsx";
 import { useShellLayout } from "./BookShell.tsx";
 
 // Colour encodes the pipeline sequence here now, in the numbered chips, rather than on Section's
 // top stripe — the tabs are the order the page used to spell out in stacked cards.
-export type StageBadgeTone = "extracting" | "synthesizing" | "assembling";
+// The tones are pipeline statuses, so they read the table StatusBadge already owns rather than
+// keeping a second copy of the same three token pairs in step with it.
+type StageBadgeTone = "extracting" | "synthesizing" | "assembling";
 
-const BADGE: Record<StageBadgeTone, string> = {
-  extracting: "bg-(--badge-extracting-bg) text-(--badge-extracting-text)",
-  synthesizing: "bg-(--badge-synthesizing-bg) text-(--badge-synthesizing-text)",
-  assembling: "bg-(--badge-assembling-bg) text-(--badge-assembling-text)",
-};
-
-export type StageTab = {
+type StageTab = {
   id: string;
   /** Numbered stages carry a chip; Notes is not a stage and carries none. */
   step?: number;
@@ -23,8 +20,10 @@ export type StageTab = {
   trailing?: boolean;
 };
 
-function ActivityDot({ className = "" }: { className?: string }) {
-  return <span className={`w-1.5 h-1.5 rounded-full bg-current animate-[pulse-dot_1.15s_ease-in-out_infinite] ${className}`} />;
+export const PULSE = "animate-[pulse-dot_1.15s_ease-in-out_infinite]";
+
+export function ActivityDot({ className = "" }: { className?: string }) {
+  return <span className={`w-1.5 h-1.5 rounded-full bg-current ${PULSE} ${className}`} />;
 }
 
 export function StageTabs({
@@ -51,6 +50,8 @@ export function StageTabs({
               type="button"
               role="tab"
               aria-selected={active}
+              aria-controls={`panel-${tab.id}`}
+              id={`stage-tab-${tab.id}`}
               disabled={tab.locked}
               onClick={() => onChange(tab.id)}
               title={tab.title}
@@ -74,7 +75,7 @@ export function StageTabs({
               {tab.count !== undefined && <span className="text-(--text-faint) font-normal tabular-nums">{tab.count}</span>}
               {tab.locked && <IconLocked className="h-3 w-3" />}
               {tab.badge && (
-                <span className={`flex items-center gap-1.5 px-1.5 rounded-full text-[10.5px] font-semibold ${BADGE[tab.badge.tone]}`}>
+                <span className={`flex items-center gap-1.5 px-1.5 rounded-full text-[10.5px] font-semibold ${statusStyles[tab.badge.tone]}`}>
                   <ActivityDot />
                   {layout.showLabels && tab.badge.text}
                 </span>

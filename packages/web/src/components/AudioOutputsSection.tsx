@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { formatOutputDate, formatDuration } from "../lib/format.ts";
 import { Button } from "./Button.tsx";
 import { IconDelete, IconDownload, IconPlay } from "./icons.tsx";
@@ -18,19 +17,16 @@ export function AudioOutputsSection({
   latestOutputPath,
   onDelete,
   isDeleting,
-  action,
 }: {
   assemblies: AssemblyRow[];
   latestOutputPath: string | null;
   onDelete: (id: string) => void;
   isDeleting: boolean;
-  action?: ReactNode;
 }) {
   return (
     <ResourceGroup
       title="Audio"
       count={assemblies.length === 0 ? "nothing assembled yet" : `${assemblies.length} file${assemblies.length === 1 ? "" : "s"}`}
-      action={action}
     >
       {assemblies.map((assembly) => {
         const isLatest = assembly.outputPath === latestOutputPath;

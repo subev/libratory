@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bookLayout } from "./book-layout.ts";
+import { bookLayout, sameLayout } from "./book-layout.ts";
 
 describe("bookLayout", () => {
   it("shows everything at the design's widest step", () => {
@@ -7,6 +7,7 @@ describe("bookLayout", () => {
       showHeadMeta: true,
       showStageHint: true,
       showPosition: true,
+      showSource: true,
       showWords: true,
       showDuration: true,
       showPages: true,
@@ -47,5 +48,15 @@ describe("bookLayout", () => {
   ] as const)("turns %s on exactly at its own width", (width, key) => {
     expect(bookLayout(width)[key]).toBe(true);
     expect(bookLayout(width - 1)[key]).toBe(false);
+  });
+});
+
+describe("sameLayout", () => {
+  // The provider bails on this rather than publishing ~60 identical layouts a second during a drag.
+  it("holds across widths inside one step and breaks across a boundary", () => {
+    expect(sameLayout(bookLayout(1200), bookLayout(1439))).toBe(true);
+    expect(sameLayout(bookLayout(1180), bookLayout(1179))).toBe(false);
+    expect(sameLayout(bookLayout(1120), bookLayout(1119))).toBe(false);
+    expect(sameLayout(bookLayout(1000), bookLayout(999))).toBe(false);
   });
 });

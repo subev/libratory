@@ -1,10 +1,10 @@
-import type { ReactNode } from "react";
 import { Breadcrumbs } from "../Breadcrumbs.tsx";
 import { Button } from "../Button.tsx";
 import { EditableTitle } from "../EditableTitle.tsx";
 import { Menu, MenuDivider, MenuItem } from "../Menu.tsx";
 import { ThemeToggle } from "../ThemeToggle.tsx";
 import { VariantMenu, type VariantLane } from "./VariantMenu.tsx";
+import { PULSE } from "./StageTabs.tsx";
 import { useShellLayout } from "./BookShell.tsx";
 import {
   IconAi,
@@ -70,7 +70,6 @@ export function BookHeader({
   diskTotal,
   deleteAudio,
   onDeleteBook,
-  extraMenuItems,
 }: {
   bookId: string;
   title: string;
@@ -104,7 +103,6 @@ export function BookHeader({
   diskTotal: string | null;
   deleteAudio: { count: number; size: string; disabled: boolean; title: string; onDelete: () => void };
   onDeleteBook: () => void;
-  extraMenuItems?: ReactNode;
 }) {
   const layout = useShellLayout();
 
@@ -223,7 +221,6 @@ export function BookHeader({
             >
               Disk usage{diskTotal ? ` — ${diskTotal}` : ""}
             </MenuItem>
-            {extraMenuItems}
             <MenuDivider />
             <MenuItem
               onClick={() => {
@@ -265,10 +262,7 @@ function ChatLink({ bookId, state, showLabel }: { bookId: string; state: IndexSt
     >
       <IconChat className="h-4 w-4" />
       {showLabel && "Chat"}
-      <span
-        title={state.hint}
-        className={`w-1.5 h-1.5 rounded-full ${state.dot} ${state.pulse ? "animate-[pulse-dot_1.15s_ease-in-out_infinite]" : ""}`}
-      />
+      <span title={state.hint} className={`w-1.5 h-1.5 rounded-full ${state.dot} ${state.pulse ? PULSE : ""}`} />
     </Button>
   );
 }

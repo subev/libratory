@@ -6,7 +6,7 @@ import { startFakeLlm, FAKE_REPLY, FAKE_CITED_REPLY } from "../fixtures/fake-llm
 export { FAKE_REPLY, FAKE_CITED_REPLY };
 export { FAKE_MODEL_KEY, FAKE_NOTOOLS_KEY, FAKE_TINY_KEY } from "./helpers/fake-llm-registry.ts";
 export { API_URL } from "./helpers/env.ts";
-export { createApiBook, uploadFixtureBook, FIXTURE_PDF, FIXTURE_CONTAINER } from "./helpers/books.ts";
+export { createApiBook, uploadFixtureBook, exportAs, FIXTURE_PDF, FIXTURE_CONTAINER } from "./helpers/books.ts";
 
 // Every test runs inside a fresh profile so the user's real library is never
 // touched; the profile and everything it accumulated is deleted afterwards.

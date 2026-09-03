@@ -1,5 +1,5 @@
-import { createContext, useContext, type ReactNode } from "react";
-import { bookLayout, type BookLayout } from "../../lib/book-layout.ts";
+import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { bookLayout, sameLayout, type BookLayout } from "../../lib/book-layout.ts";
 import { useElementWidth } from "../../lib/use-element-width.ts";
 
 // The page is the window: header, tabs and tray are pinned and the tab body is the only scroller.
@@ -9,6 +9,12 @@ const LayoutContext = createContext<BookLayout>(bookLayout(1280));
 
 export function useShellLayout(): BookLayout {
   return useContext(LayoutContext);
+}
+
+// For a component that takes the layout as a prop rather than reading the context — the page that
+// owns the shell sits above the provider, so it cannot call the hook itself.
+export function WithShellLayout({ children }: { children: (layout: BookLayout) => ReactNode }) {
+  return children(useContext(LayoutContext));
 }
 
 export function BookShell({
@@ -26,10 +32,20 @@ export function BookShell({
   dock?: ReactNode;
   children: ReactNode;
 }) {
-  const { measure, width } = useElementWidth();
+  // The layout is the state, not the width. bookLayout has three thresholds, so publishing the raw
+  // width would push ~60 identical values a second through a context ChapterTable reads — and a
+  // context change walks straight past the children-identity bailout that otherwise protects it.
+  const [layout, setLayout] = useState(() => bookLayout(0));
+  const onWidth = useCallback((next: number) => {
+    setLayout((prev) => {
+      const candidate = bookLayout(next);
+      return sameLayout(prev, candidate) ? prev : candidate;
+    });
+  }, []);
+  const measure = useElementWidth(onWidth);
 
   return (
-    <LayoutContext.Provider value={bookLayout(width)}>
+    <LayoutContext.Provider value={layout}>
       <div ref={measure} className="h-screen flex flex-col overflow-hidden bg-(--bg-page)">
         <div className="shrink-0">{header}</div>
         <div className="shrink-0">{tabs}</div>
@@ -49,23 +65,24 @@ export function BookShell({
 // overscroll-contain because the body no longer scrolls — without it a modal's overscroll chains
 // into whichever tab is behind it, which is what useBodyScrollLock used to catch.
 export function TabPanel({
+  id,
   active,
   scroll = true,
   children,
 }: {
+  id: string;
   active: boolean;
   /** Off for a tab that pins part of itself and scrolls the rest. */
   scroll?: boolean;
   children: ReactNode;
 }) {
   return (
-    // The class does the hiding, not the attribute: a display utility beats [hidden]'s UA
-    // display:none, so "flex flex-col" on an inactive panel would leave it on screen.
     <div
+      id={`panel-${id}`}
+      role="tabpanel"
+      aria-labelledby={`stage-tab-${id}`}
       hidden={!active}
-      className={
-        !active ? "hidden" : `flex-1 min-h-0 ${scroll ? "overflow-y-auto overscroll-contain" : "flex flex-col"}`
-      }
+      className={`flex-1 min-h-0 ${scroll ? "overflow-y-auto overscroll-contain" : "flex flex-col"}`}
     >
       {children}
     </div>

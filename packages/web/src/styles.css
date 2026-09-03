@@ -214,7 +214,6 @@
   --warning-bg-hover: var(--pal-brass-a25);
   --warning-text: light-dark(var(--pal-brass-700), var(--pal-brass-300));
 
-  /* Input -> Work -> Output is a sequence, so colour can encode it. */
 
   --bg-custom-text: light-dark(var(--pal-brass-a08), var(--pal-brass-a10));
   --border-custom-text: light-dark(var(--pal-brass-a40), var(--pal-brass-a35));
@@ -295,6 +294,9 @@ body {
 
 /* @layer base: an unlayered rule beats @layer utilities whatever its specificity. */
 @layer base {
+  /* Preflight ships no [hidden] rule, so any display utility silently outranks the attribute. */
+  [hidden] { display: none !important; }
+
   h1, h2 {
     font-family: var(--stack-display);
     font-weight: 600;

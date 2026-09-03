@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useId, useRef, type ReactNode, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import { useBodyScrollLock } from "../lib/use-body-scroll-lock.ts";
 import { IconClose } from "./icons.tsx";
 
@@ -145,7 +146,10 @@ export function Modal({
 
   useTopmostEscape(onClose, closeOnEscape);
 
-  return (
+  // Portalled to the body: a dialog rendered inside a hidden tab panel inherits its display:none,
+  // and a fixed descendant of a display:none ancestor does not paint. It also makes the panel immune
+  // to any future transform/filter/contain on an ancestor, which would re-anchor `fixed`.
+  return createPortal(
     <div className="fixed inset-0 z-[60] flex items-center justify-center" data-testid={backdropTestId}>
       <div className="absolute inset-0 bg-(--scrim)" onClick={onClose} />
       <div
@@ -159,6 +163,7 @@ export function Modal({
       >
         <TitleIdContext.Provider value={titleId}>{children}</TitleIdContext.Provider>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

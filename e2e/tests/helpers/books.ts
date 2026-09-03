@@ -30,3 +30,11 @@ export async function uploadFixtureBook(page: Page, { waitForIndex = false } = {
   await row.getByRole("link", { name: /tiny.book/i }).click();
   await expect(page.getByTestId("raw-book-block")).toContainText(/Raw text extracted/);
 }
+
+/** Open the export modal from the chapter tray, pick a format, and confirm. */
+export async function exportAs(page: Page, format: "epub-sync" | "m4b" | "epub" | "pdf") {
+  await page.getByTestId("stage-tab-chapters").click();
+  await page.getByTestId("open-export").click();
+  await page.getByTestId(`export-format-${format}`).click();
+  await page.getByTestId("export-confirm").click();
+}

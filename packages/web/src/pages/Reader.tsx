@@ -12,6 +12,7 @@ import { formatDuration } from "../lib/format.ts";
 import { useFollowCue, type FollowBand } from "../lib/cue-follow.ts";
 import { useAudioTime } from "../lib/use-audio-time.ts";
 import { usePlayPauseKey } from "../lib/play-pause-key.ts";
+import { useElementWidth } from "../lib/use-element-width.ts";
 import { SPEEDS, loadSpeed, saveSpeed } from "../lib/playback-speed.ts";
 
 // The band a cue may start in without the page moving: clear of the sticky bar, clear of the fold
@@ -68,7 +69,6 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
   const [debug, setDebug] = useState({ rects: false, layout: false });
 
   const audioRef = useRef<HTMLAudioElement>(null);
-  const pagesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     source.manifest().then(setManifest).catch((err: Error) => setError(err.message));
@@ -183,15 +183,9 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
   // Measured rather than read off a ref during render, which is a frame behind on the first paint
   // and never notices the window being resized
   const [pagesWidth, setPagesWidth] = useState(0);
-  // The host only exists once the manifest has rendered the page frame
-  const hasManifest = manifest !== null;
-  useEffect(() => {
-    const host = pagesRef.current;
-    if (!host) return;
-    const observer = new ResizeObserver(([entry]) => { if (entry) setPagesWidth(entry.contentRect.width); });
-    observer.observe(host);
-    return () => observer.disconnect();
-  }, [hasManifest]);
+  // A callback ref fires when the host mounts, so this no longer needs a hasManifest dependency to
+  // re-run the effect once the manifest has rendered the page frame.
+  const measurePages = useElementWidth(setPagesWidth);
 
   const fit = useMemo(() => {
     // What the reader is actually looking at: a column in column view, the whole page otherwise
@@ -351,7 +345,7 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
         className="hidden"
       />
 
-      <div ref={pagesRef} className="mx-auto flex flex-col gap-4" style={maxWidth ? { maxWidth } : { maxWidth: "48rem" }}>
+      <div ref={measurePages} className="mx-auto flex flex-col gap-4" style={maxWidth ? { maxWidth } : { maxWidth: "48rem" }}>
         {view === "text" ? (
           <CueTranscript cues={cues} ms={ms} onSeek={seek} />
         ) : (

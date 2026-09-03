@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router";
 import { Button } from "./Button.tsx";
 import { PillToggle } from "./PillToggle.tsx";
 import { Menu } from "./Menu.tsx";
-import { useShellLayout } from "./book/BookShell.tsx";
+import type { BookLayout } from "../lib/book-layout.ts";
 import { StatusBadge } from "./StatusBadge.tsx";
 import { ChapterModal } from "./ChapterModal.tsx";
 import { chapterAudioDownload, chapterAudioUrl, SYNTH_BUSY, variantLabel } from "../lib/chapters.ts";
@@ -79,6 +79,7 @@ export function ChapterTable({
   variants,
   onSwitchVariant,
   synth,
+  layout,
 }: {
   language?: string | null;
   bookId: string;
@@ -96,6 +97,8 @@ export function ChapterTable({
   onSwitchVariant?: (key: string | null) => void;
   // Voice and speed the next synthesis will use for this view (variant lane or book)
   synth: SynthSettings;
+  /** Which columns and labels fit — supplied by the page, so the table stays portable. */
+  layout: BookLayout;
 }) {
   const [pickedChapterIndex, setPickedChapterIndex] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -188,13 +191,13 @@ export function ChapterTable({
     sourceFileFilter,
     quickFilter === "all" ? "" : quickFilter,
   ].filter(Boolean).length;
-  const quickCounts = {
-    all: chapters.length,
-    noaudio: chapters.filter((c) => !c.audioPath).length,
-    flight: chapters.filter((c) => SYNTH_BUSY.includes(c.status)).length,
-    attention: chapters.filter((c) => c.status === "failed").length,
-  };
-  const layout = useShellLayout();
+  // One pass, not four: none of these depends on the search box, and every keystroke re-renders.
+  const quickCounts = { all: chapters.length, noaudio: 0, flight: 0, attention: 0 };
+  for (const chapter of chapters) {
+    if (!chapter.audioPath) quickCounts.noaudio++;
+    if (SYNTH_BUSY.includes(chapter.status)) quickCounts.flight++;
+    if (chapter.status === "failed") quickCounts.attention++;
+  }
 
   // Checkbox state based on visible (filtered) chapters
   const visibleSelectedCount = filteredChapters.filter((c) => c.selected).length;
@@ -275,16 +278,14 @@ export function ChapterTable({
         </PillToggle>
         {/* Not width-gated like the rest of the chrome: hiding the chip that is doing the
             filtering would leave the table filtered with the reason off screen. */}
-        {(
-          <PillToggle
-            selected={quickFilter === "flight"}
-            onClick={() => setQuickFilter("flight")}
-            title="Queued, normalizing or synthesizing right now"
-            testId="chapter-filter-flight"
-          >
-            In flight {quickCounts.flight}
-          </PillToggle>
-        )}
+        <PillToggle
+          selected={quickFilter === "flight"}
+          onClick={() => setQuickFilter("flight")}
+          title="Queued, normalizing or synthesizing right now"
+          testId="chapter-filter-flight"
+        >
+          In flight {quickCounts.flight}
+        </PillToggle>
         <PillToggle
           selected={quickFilter === "attention"}
           onClick={() => setQuickFilter("attention")}
@@ -486,7 +487,7 @@ export function ChapterTable({
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">#</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Title</th>
-              {isMultiFile && layout.showHeadMeta && (
+              {isMultiFile && layout.showSource && (
                 <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Source</th>
               )}
               <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider w-40">Status</th>
@@ -622,7 +623,7 @@ export function ChapterTable({
                       ) : null}
                     </div>
                   </td>
-                  {isMultiFile && layout.showHeadMeta && (
+                  {isMultiFile && layout.showSource && (
                     <td className="px-4 py-3 text-xs text-(--text-muted) truncate max-w-32" title={files!.find((f) => f.index === chapter.sourceFileIndex)?.filename}>
                       {files!.find((f) => f.index === chapter.sourceFileIndex)?.filename ?? "\u2014"}
                     </td>

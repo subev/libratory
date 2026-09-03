@@ -4,6 +4,7 @@ export type BookLayout = {
   showHeadMeta: boolean;
   showStageHint: boolean;
   showPosition: boolean;
+  showSource: boolean;
   showWords: boolean;
   showDuration: boolean;
   showPages: boolean;
@@ -19,6 +20,7 @@ export function bookLayout(width: number): BookLayout {
     showHeadMeta: roomy,
     showStageHint: roomy,
     showPosition: roomy,
+    showSource: roomy,
     showWords: width >= 1120,
     showDuration: !tight,
     showPages: !tight,
@@ -26,4 +28,8 @@ export function bookLayout(width: number): BookLayout {
     trayCompact: tight,
     filterColumns: tight ? 1 : 2,
   };
+}
+
+export function sameLayout(a: BookLayout, b: BookLayout): boolean {
+  return (Object.keys(a) as (keyof BookLayout)[]).every((key) => a[key] === b[key]);
 }

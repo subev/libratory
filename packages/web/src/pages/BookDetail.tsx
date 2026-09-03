@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router";
 import { trpc } from "../trpc.ts";
 import { ModelBundleNotice, useModelBundle } from "../components/ModelBundleNotice.tsx";
 import { ChapterTable } from "../components/ChapterTable.tsx";
-import { SYNTH_BUSY } from "../lib/chapters.ts";
+import { SYNTH_BUSY, variantLabel } from "../lib/chapters.ts";
 import { SynthesizeModal, type SynthSettings } from "../components/SynthesizeModal.tsx";
 import { StructureModal } from "../components/StructureModal.tsx";
 import { VariantModal } from "../components/VariantModal.tsx";
@@ -15,8 +15,8 @@ import { DiskUsageModal, useDiskUsageTotal } from "../components/DiskUsage.tsx";
 import { ChapterAiModal, type AiScope } from "../components/ChapterAiModal.tsx";
 import { NotesSection } from "../components/NotesSection.tsx";
 import { Button } from "../components/Button.tsx";
-import { BookShell, TabPanel } from "../components/book/BookShell.tsx";
-import { StageTabs } from "../components/book/StageTabs.tsx";
+import { BookShell, TabPanel, WithShellLayout } from "../components/book/BookShell.tsx";
+import { ActivityDot, StageTabs } from "../components/book/StageTabs.tsx";
 import { BookHeader } from "../components/book/BookHeader.tsx";
 import { BookDetailsModal } from "../components/book/BookDetailsModal.tsx";
 import { ActionTray, type TrayAction } from "../components/book/ActionTray.tsx";
@@ -196,7 +196,7 @@ export function BookDetail() {
     { enabled: !!id },
   );
   const activeLane = activeVariant ? variantLanes.find((l) => l.key === activeVariant) ?? null : null;
-  const activeLabel = activeVariant ? activeLane?.label ?? activeVariant : null;
+  const activeLabel = activeLane ? variantLabel(activeLane) : activeVariant;
   const activeKind = activeLane?.kind ?? "translation";
 
   // Prev/next navigation follows the home list's persisted sort order, scoped to the book's folder
@@ -729,10 +729,9 @@ export function BookDetail() {
               : "Translate or rewrite chapters (ELI5, summary, custom prompts) and review side by side"
           }
           onExtract={() => {
-            // ExtractModal is rendered by BookFilesSection, and an inactive TabPanel is display:none
-            // — which suppresses fixed descendants, so opening it from another tab showed nothing.
-            // Switching first is also the honest thing: the modal's own copy talks about the file
-            // list, and its "selected files" scope is a selection you cannot see from here.
+            // Not a workaround any more — Modal portals to the body, so this opens from anywhere. It
+            // switches because the modal is *about* the file list: its copy points at it, and its
+            // "selected files" scope is a selection you cannot see from another tab.
             setTab("files");
             setExtractOpen(true);
           }}
@@ -883,7 +882,7 @@ export function BookDetail() {
         </div>
       )}
 
-      <TabPanel active={tab === "files"}>
+      <TabPanel id="files" active={tab === "files"}>
         <div className="p-4">
           {book.kind === "pdf" ? (
             <BookFilesSection
@@ -938,7 +937,7 @@ export function BookDetail() {
                 <div className="rounded-lg border border-(--border) bg-(--bg-subtle) p-4 space-y-3" data-testid="digest-block">
                   {digestLive ? (
                     <div className="flex items-center gap-2 text-sm text-(--text-secondary)">
-                      <span className="w-2 h-2 rounded-full bg-(--accent) animate-[pulse-dot_1.15s_ease-in-out_infinite]" />
+                      <ActivityDot className="text-(--accent)" />
                       Generating digest — {book.digestJob?.progress ? `${book.digestJob.progress} books` : "starting"}... chapters appear as summaries finish.
                     </div>
                   ) : (
@@ -1004,7 +1003,7 @@ export function BookDetail() {
         </div>
       </TabPanel>
 
-      <TabPanel active={tab === "chapters"} scroll={false}>
+      <TabPanel id="chapters" active={tab === "chapters"} scroll={false}>
         <div className="p-4 flex flex-col min-h-0 flex-1">
           {book.chapters.length === 0 ? (
             <p className="text-sm text-(--text-muted)">No chapters yet — extract them from the source files.</p>
@@ -1050,14 +1049,11 @@ export function BookDetail() {
                   </span>
                 )}
                 <div className="flex-1" />
-                <span className="text-sm text-(--text-muted)">
-                  {selectedCount} of {book.chapters.length} selected
-                </span>
               </div>
 
               {isSynthetic && digestLive && (
                 <div className="flex items-center gap-2 text-sm text-(--text-muted) mb-2" data-testid="digest-progress">
-                  <span className="w-2 h-2 rounded-full bg-(--accent) animate-[pulse-dot_1.15s_ease-in-out_infinite]" />
+                  <ActivityDot className="text-(--accent)" />
                   Generating digest — {book.digestJob?.progress ? `${book.digestJob.progress} books` : "starting"}...
                 </div>
               )}
@@ -1079,7 +1075,10 @@ export function BookDetail() {
                 </div>
               )}
 
+              <WithShellLayout>
+                {(layout) => (
               <ChapterTable
+                layout={layout}
                 language={book.language ?? null}
                 bookId={book.id}
                 chapters={viewChapters}
@@ -1099,22 +1098,24 @@ export function BookDetail() {
                 onSwitchVariant={setActiveVariant}
                 synth={synth}
               />
+                )}
+              </WithShellLayout>
 
             </>
           )}
         </div>
       </TabPanel>
 
-      <TabPanel active={tab === "outputs"}>
+      <TabPanel id="outputs" active={tab === "outputs"}>
         <div className="p-4 space-y-6">
+          {book.chapters.length > 0 && (
+            <div className="flex justify-end">
+              <Button variant="secondary" size="sm" onClick={() => setExportOpen(true)} data-testid="outputs-export">
+                Export…
+              </Button>
+            </div>
+          )}
           <AudioOutputsSection
-            action={
-              book.chapters.length > 0 ? (
-                <Button variant="secondary" size="sm" onClick={() => setExportOpen(true)} data-testid="outputs-export">
-                  Export…
-                </Button>
-              ) : undefined
-            }
             assemblies={bookAssemblies.filter((a) => (a.language ?? null) === activeVariant)}
             latestOutputPath={activeVariant ? null : book.outputPath}
             onDelete={(aid) => deleteAssemblyMutation.mutate({ id: aid })}
@@ -1129,7 +1130,7 @@ export function BookDetail() {
         </div>
       </TabPanel>
 
-      <TabPanel active={tab === "notes"}>
+      <TabPanel id="notes" active={tab === "notes"}>
         <div className="p-4">
           <NotesSection bookId={book.id} noteJob={book.noteJob ?? null} />
         </div>

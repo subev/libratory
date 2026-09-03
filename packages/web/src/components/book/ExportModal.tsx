@@ -34,14 +34,14 @@ export function ExportModal({
   value: ExportFormatId;
   onChange: (id: ExportFormatId) => void;
   scopeSummary: string;
-  timing?: {
+  timing: {
     inFlight: number;
     readyCount: number;
     totalCount: number;
     waitForAll: boolean;
     onChange: (waitForAll: boolean) => void;
-  } | null;
-  dropDir?: { path: string; checked: boolean; onChange: (next: boolean) => void } | null;
+  };
+  dropDir: { path: string; checked: boolean; onChange: (next: boolean) => void } | null;
   busy: boolean;
   onConfirm: () => void;
   onClose: () => void;

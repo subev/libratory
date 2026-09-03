@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 
-// The same row four times over in the artboard — source files, assemblies, documents, notes. Tile,
-// title, subtitle, a status word, then the actions.
+// Tile, title, subtitle, a status word, then the actions — the shape the artboard draws for every
+// produced file. Assemblies and documents share it; source files stay a <table> (they carry a
+// selection with shift-range) and notes are expandable prose, so neither is forced through it.
 export function ResourceRow({
   icon,
   tone = "muted",
