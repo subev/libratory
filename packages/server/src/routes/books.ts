@@ -8,6 +8,7 @@ import { eq, desc, asc, gt, and, ne, inArray, ilike, sql } from "drizzle-orm";
 import { uploadsDir, bookOutputDir } from "../lib/paths.ts";
 import { deleteBook } from "../lib/delete-book.ts";
 import { folderAncestors } from "../lib/folders.ts";
+import { bookFilterState } from "../lib/book-filter.ts";
 import { appendLog } from "../lib/log.ts";
 import { parseTtsVoice } from "../lib/tts.ts";
 import { collectBlocksFromMarkerOutput, sliceChaptersAtIndices, type ExtractedChapter } from "../lib/marker.ts";
@@ -210,7 +211,7 @@ export const booksRouter = router({
         Math.max(new Date(book.updatedAt).getTime(), lastLog ? new Date(lastLog).getTime() : 0),
       );
 
-      return {
+      const base = {
         chapterCount,
         chaptersWithAudio,
         // Mirrors the createDigest/textAvailability guard
@@ -230,9 +231,8 @@ export const booksRouter = router({
         },
         lastActivityAt,
       };
+      return { ...base, filterState: bookFilterState({ ...base, kind: book.kind }) };
     };
-    const isActive = (a: ReturnType<typeof deriveBookStats>["activity"]) =>
-      a.extracting || a.synthesizing > 0 || a.translating > 0 || a.cleaning > 0 || a.assembling || a.aiNote || a.digest;
 
     const overview = await Promise.all(
       allBooks
@@ -271,17 +271,27 @@ export const booksRouter = router({
         }
         const descendantBooks = allBooks.filter((b) => b.folderId && subtree.has(b.folderId));
         const stats = descendantBooks.map((b) => deriveBookStats(b));
+        // The pill's own count: books that actually failed. Not the same question as the
+        // attention filter, which also takes a PDF that produced no text.
         const failedCount = stats.filter(
           ({ failed, failures: f }) => failed || f.files + f.chapters + f.translations + f.cleanup > 0,
         ).length;
+        // A folder survives a filter only when something inside it matches, so it carries the same
+        // three answers its books do — counted over the whole subtree, not just its direct children.
+        const filterCounts = {
+          working: stats.filter((s) => s.filterState.working).length,
+          attention: stats.filter((s) => s.filterState.attention).length,
+          ready: stats.filter((s) => s.filterState.ready).length,
+        };
         const sizes = await Promise.all(descendantBooks.map((b) => bookTotalSizeCached(b.id)));
         return {
           id: folder.id,
           name: folder.name,
           createdAt: folder.createdAt,
           bookCount: descendantBooks.length,
-          activeBookCount: stats.filter((s) => isActive(s.activity)).length,
+          activeBookCount: filterCounts.working,
           failedBookCount: failedCount,
+          filterCounts,
           sizeBytes: sizes.reduce((sum, n) => sum + n, 0),
           lastActivityAt: stats.length
             ? new Date(Math.max(...stats.map((s) => s.lastActivityAt.getTime())))

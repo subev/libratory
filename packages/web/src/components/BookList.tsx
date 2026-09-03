@@ -12,7 +12,7 @@ import { IconBook, IconCheck, IconChevronDown, IconChevronUp, IconDelete, IconFo
 import { Button } from "./Button.tsx";
 import { Menu, MenuDivider, MenuItem } from "./Menu.tsx";
 import { ActionTray } from "./ActionTray.tsx";
-import { matchesFilter, type LibraryFilter } from "../lib/library-filter.ts";
+import { folderMatchesFilter, matchesFilter, type LibraryFilter } from "../lib/library-filter.ts";
 import { useLibraryLayout } from "./library/LibraryShell.tsx";
 import type { BookRow } from "../lib/book-sort.ts";
 
@@ -307,8 +307,8 @@ export function BookList({
   }
 
   const sorted = sortBooks((books ?? []).filter((b) => matchesFilter(b, filter)), sortKey, sortDir);
-  const sortedFolders = sortFolders(folderRows, sortKey, sortDir);
-  const isEmpty = sorted.length === 0 && folderRows.length === 0;
+  const sortedFolders = sortFolders(folderRows.filter((f) => folderMatchesFilter(f, filter)), sortKey, sortDir);
+  const isEmpty = sorted.length === 0 && sortedFolders.length === 0 && filter === "all";
 
   // Prune ids of rows deleted/moved elsewhere so counts never lie
   const selectedBooks = sorted.filter((b) => selectedIds.has(b.id));
