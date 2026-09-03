@@ -49,7 +49,7 @@ export function LibraryFilters({
           value={search}
           onChange={(e) => onSearch(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Escape") onSearch(""); }}
-          placeholder="Search all books…"
+          placeholder={layout.showLabels ? "Search all books…" : "Search…"}
           className={`${layout.showLabels ? "w-52" : "w-32"} pl-3 pr-8 py-1 text-xs rounded-md border border-(--border-input) bg-(--bg-card) text-(--text-primary) outline-none`}
           data-testid="book-search"
         />
