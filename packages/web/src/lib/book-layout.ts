@@ -29,7 +29,3 @@ export function bookLayout(width: number): BookLayout {
     filterColumns: tight ? 1 : 2,
   };
 }
-
-export function sameLayout(a: BookLayout, b: BookLayout): boolean {
-  return (Object.keys(a) as (keyof BookLayout)[]).every((key) => a[key] === b[key]);
-}

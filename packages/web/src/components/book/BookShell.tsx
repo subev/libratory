@@ -1,6 +1,6 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
-import { bookLayout, sameLayout, type BookLayout } from "../../lib/book-layout.ts";
-import { useElementWidth } from "../../lib/use-element-width.ts";
+import { createContext, useContext, type ReactNode } from "react";
+import { bookLayout, type BookLayout } from "../../lib/book-layout.ts";
+import { useLayoutState } from "../../lib/use-layout-state.ts";
 
 // The page is the window: header, tabs and tray are pinned and the tab body is the only scroller.
 // It replaces a scrolling page whose chapter table had a height cap and a scrollbar of its own, so
@@ -32,17 +32,7 @@ export function BookShell({
   dock?: ReactNode;
   children: ReactNode;
 }) {
-  // The layout is the state, not the width. bookLayout has three thresholds, so publishing the raw
-  // width would push ~60 identical values a second through a context ChapterTable reads — and a
-  // context change walks straight past the children-identity bailout that otherwise protects it.
-  const [layout, setLayout] = useState(() => bookLayout(0));
-  const onWidth = useCallback((next: number) => {
-    setLayout((prev) => {
-      const candidate = bookLayout(next);
-      return sameLayout(prev, candidate) ? prev : candidate;
-    });
-  }, []);
-  const measure = useElementWidth(onWidth);
+  const [layout, measure] = useLayoutState(bookLayout);
 
   return (
     <LayoutContext.Provider value={layout}>
