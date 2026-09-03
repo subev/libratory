@@ -291,10 +291,27 @@ block-parent uses would mean making 47 containers flex for no gain.
 
 ## Surfaces
 
-The book page's shell is **`packages/web/src/components/book/BookShell.tsx`** — header, tabs, one
-scroll pane, tray, log dock, all pinned but the pane. Its width is published through
-`useShellLayout()`, derived by the pure `lib/book-layout.ts` from a `ResizeObserver`; four steps,
-each a state someone designed, all seven booleans under test.
+Two pages are shells: **`components/book/BookShell.tsx`** (header, tabs, one scroll pane, tray, log
+dock) and **`components/library/LibraryShell.tsx`** (header, crumb-and-add bar, filter bar, one
+pane). Everything is pinned but the pane, and the pane's child owns its own scrolling and its own
+tray — the tray has to sit outside the scroller it acts on.
+
+Each publishes its own contract through its own context, from a pure module: `lib/book-layout.ts`
+(four steps, ten booleans) and `lib/library-layout.ts` (four steps, five). Both are under test, and
+both drive the same `lib/use-layout-state.ts`, which is the part worth sharing — it holds the
+*layout* rather than the width and bails when a resize lands inside the same step, because a context
+change walks straight past the children-identity bailout that protects the tables reading it. The
+frames themselves are a dozen lines of flex column each and are deliberately not generalised; the
+tray is, and `components/ActionTray.tsx` takes `compact` as a prop so both surfaces can use it.
+
+The library's own rules, both of which look like oversights until you hit them: **a folder survives a
+filter only while its subtree still has a matching book**, which is why `books.list` returns
+`filterState` per book and `filterCounts` per folder — the predicate is `lib/book-filter.ts` on the
+*server*, because a folder row has to answer for books the client never receives. And **dropping a
+PDF anywhere on the library still works** even though the upload zone now lives in a modal: the pane
+catches the drop, `captureDrop` (`lib/dnd.ts`) reads both halves synchronously because a
+DataTransfer is dead after the first await, and `UploadZone` ingests them a frame later through its
+own folder-scanning path.
 
 `Section.tsx` and the `--step-input` / `--step-work` / `--step-output` ramp are **gone**. The stripe
 was "the one place colour still encodes a sequence", and the numbered tab chips do that job now — the
@@ -548,7 +565,8 @@ packages/web/src/
     dnd.ts              Drag-and-drop payloads for book/folder moves
     use-body-scroll-lock.ts  Modal scroll lock hook
   pages/
-    Home.tsx            Profile switcher, appearance toggle, upload zone, search box, book/folder list, breadcrumbs
+    Home.tsx            Library shell: header (profile, chat, reader, appearance, settings), crumb +
+                        add bar (upload modal, new folder), filter chips + search, book/folder list
     BookDetail.tsx      Per-book orchestration: staged sections (1 Input → 2 Work → 3 Output → danger zone), variant view (translation or rewrite) in ?variant= query param
     Chat.tsx            Library chat: useChat + streaming /chat, folder (?folderId=) / book (?bookId=) scoping, source chips, saved answers
     Components.tsx      /components gallery: every token, primitive and icon on one screen, derived from
@@ -560,8 +578,11 @@ packages/web/src/
     book/               The book page's shell. BookShell.tsx (pinned header/tabs/tray/dock, one scroll
                         pane, useShellLayout width context) + TabPanel (inactive tabs stay mounted and
                         hidden — unmounting ChapterTable clears nine filters and stops playback);
-                        StageTabs.tsx, BookHeader.tsx, VariantMenu.tsx, ActionTray.tsx,
-                        ExportModal.tsx, BookDetailsModal.tsx, ResourceRow.tsx
+                        StageTabs.tsx, BookHeader.tsx, VariantMenu.tsx, ExportModal.tsx,
+                        BookDetailsModal.tsx, ResourceRow.tsx
+    library/            The library page's shell. LibraryShell.tsx (pinned header/bar/filters, one
+                        pane that is also the PDF drop target, useLibraryLayout width context),
+                        LibraryFilters.tsx (chips + search + showing-count), UploadModal.tsx
     BookFilesSection.tsx    Tab 1 body: source-file table, add files, re-extract, extraction settings
     AudioOutputsSection.tsx Tab 3: produced audiobook assemblies (play/download/delete)
     DocumentOutputsSection.tsx Tab 3: exported PDF/EPUB/synced-EPUB documents
@@ -586,10 +607,14 @@ packages/web/src/
     FolderPickerModal.tsx Move-to-folder tree picker
     Breadcrumbs.tsx     Droppable folder breadcrumbs
     BookSearchResults.tsx Search results across all folders with folder-path breadcrumbs
-    BookList.tsx        Books overview table (activity pills, no-text pill, languages, outputs, size) with polling
+    BookList.tsx        Books overview table (activity pills, no-text pill, languages, outputs, size)
+                        with polling, per-row Read + overflow, and the library's pinned ActionTray
     ProfileSwitcher.tsx Profile dropdown in the Home header (create/rename/delete)
     ThemeToggle.tsx     Appearance menu in the Home header (auto/light/dark)
-    UploadZone.tsx      Drag-and-drop PDF upload; separate-books mode; upload-time AI prompt
+    UploadZone.tsx      Drag-and-drop PDF upload; separate-books mode; upload-time AI prompt. Lives
+                        inside library/UploadModal.tsx; also ingests a drop the library pane caught
+    ActionTray.tsx      Pinned selection summary + verbs + a primary slot, shared by both shells
+    BookKindBadge.tsx   digest / api label, so the list and the search results say it the same way
     PdfPreviewModal.tsx Inline source-PDF preview
     reader/             PdfCanvas.tsx (pdf.js page or column crop, rendered near the viewport),
                         CueOverlay.tsx (highlight + debug boxes)
@@ -632,7 +657,7 @@ fixed zinc.
 
 ## tRPC Routes
 
-**books** (library): `list` ({folders, books} for one folder, profile-scoped, activity/failure/size stats + recursive folder rollups + hasText flag) · `search` (title words across all folders, returns folder paths) · `textAvailability` (which books have chapters or raw text — digest precheck) · `get` · `logs` / `clearLogs` · `rename` · `updateSettings` · `moveToFolder` · `delete` / `deleteMany` · `diskUsage` / `cleanupChunks`
+**books** (library): `list` ({folders, books} for one folder, profile-scoped, activity/failure/size stats + recursive folder rollups + hasText/hasPages flags + per-book `filterState` and per-folder subtree `filterCounts`) · `search` (title words across all folders, returns folder paths) · `textAvailability` (which books have chapters or raw text — digest precheck) · `get` · `logs` / `clearLogs` · `rename` · `updateSettings` · `moveToFolder` · `delete` / `deleteMany` · `diskUsage` / `cleanupChunks`
 
 **books** (pipeline): `upload` (legacy tRPC path) · `retry` · `extractChapters` · `processSelected` · `cancel` · `assemble` · `assemblies` / `deleteAssembly` · `structure` / `proposeChapters` / `applyChapterBoundaries` / `redetectChapters` · `chapterList` · `rawTextStats` (Ask AI itself moved to the streaming `POST /chat/ask` route)
 

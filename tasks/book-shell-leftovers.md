@@ -35,6 +35,16 @@ nothing behind them yet. None of them blocked the branch; all of them are cheap 
 cures — it is unreachable today only because the chapter modal's scrim covers the tab bar. Route it
 through `Modal` when someone next touches the voice picker.
 
+## The library page's own leftovers
+
+- **Rename a book from the row menu.** The artboard puts `Rename…` between Move and Delete. Folder
+  rows rename in place with an input; book rows are rendered inline in a `.map()` with no per-row
+  state to flip, so it needs a `BookTableRow` extraction or a small rename dialog first. New
+  functionality either way — nothing was lost.
+- **The profile menu restyle.** The artboard redraws `ProfileSwitcher` at 304px with rename and
+  delete inline per row and a "New profile" footer. All of that already works in its own popover;
+  this is the lowest-value part of the redesign and the only piece of the library artboard not built.
+
 ## Deliberately not built
 
 - **"Manage versions…"** — the artboard's variant menu ends with it, but renaming and deleting a lane
