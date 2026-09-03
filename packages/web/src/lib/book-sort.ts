@@ -9,7 +9,7 @@ export type BookSortDir = "asc" | "desc";
 export const BOOK_SORT_VALUE: Record<BookSortKey, (b: BookRow) => string | number> = {
   title: (b) => b.title.toLowerCase(),
   chapters: (b) => b.chapterCount,
-  outputs: (b) => b.outputs.assemblies + b.outputs.pdfs + b.outputs.epubs,
+  outputs: (b) => b.outputs.assemblies + b.outputs.pdfs + b.outputs.epubs + b.outputs.syncedEpubs,
   size: (b) => b.sizeBytes,
   created: (b) => new Date(b.createdAt).getTime(),
   lastActivity: (b) => new Date(b.lastActivityAt).getTime(),

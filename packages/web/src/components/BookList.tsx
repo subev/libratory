@@ -8,7 +8,7 @@ import { HnDigestModal } from "./HnDigestModal.tsx";
 import { FolderPickerModal } from "./FolderPickerModal.tsx";
 import { setDragItems, getDragItems, hasDragItems, type DragItems } from "../lib/dnd.ts";
 import { statusStyles } from "./StatusBadge.tsx";
-import { IconAdd, IconCheck, IconChevronDown, IconChevronUp, IconDelete, IconFolder, IconRename } from "./icons.tsx";
+import { IconAdd, IconBook, IconCheck, IconChevronDown, IconChevronUp, IconDelete, IconFolder, IconRename } from "./icons.tsx";
 import { Button } from "./Button.tsx";
 
 type SortKey = BookSortKey;
@@ -153,6 +153,7 @@ function FolderTableRow({
           )}
         </div>
       </td>
+      <td className="px-4 py-3"><span className="text-xs text-(--text-faint)">—</span></td>
       <td className="px-4 py-3"><span className="text-xs text-(--text-faint)">—</span></td>
       <td className="px-4 py-3"><span className="text-xs text-(--text-faint)">—</span></td>
       <td className="px-4 py-3 text-right text-sm tabular-nums text-(--text-tertiary)">
@@ -432,6 +433,7 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
             <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Activity</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Languages</th>
             {th("Outputs", "outputs")}
+            <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Read</th>
             {th("Size", "size", "right")}
             {th("Created", "created", "right")}
             {th("Last activity", "lastActivity", "right")}
@@ -472,6 +474,7 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
               book.outputs.assemblies > 0 ? `${book.outputs.assemblies} M4B` : null,
               book.outputs.pdfs > 0 ? `${book.outputs.pdfs} PDF` : null,
               book.outputs.epubs > 0 ? `${book.outputs.epubs} EPUB` : null,
+              book.outputs.syncedEpubs > 0 ? `${book.outputs.syncedEpubs} Synced EPUB` : null,
             ].filter(Boolean);
 
             return (
@@ -616,6 +619,22 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
                 </td>
                 <td className="px-4 py-3 text-sm text-(--text-tertiary)">
                   {outputParts.length === 0 ? <span className="text-xs text-(--text-faint)">—</span> : outputParts.join(" · ")}
+                </td>
+                <td className="px-4 py-3">
+                  {book.chaptersWithAudio > 0 ? (
+                    <Button
+                      variant="icon"
+                      size="sm"
+                      to={`/books/${book.id}/read`}
+                      title="Open the read-along reader"
+                      aria-label="Open the read-along reader"
+                      data-testid="library-read-link"
+                    >
+                      <IconBook className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <span className="text-xs text-(--text-faint)">—</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-right text-sm tabular-nums text-(--text-tertiary)">
                   {formatBytes(book.sizeBytes)}

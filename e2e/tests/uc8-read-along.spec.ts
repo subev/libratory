@@ -26,6 +26,12 @@ test("UC8: read along is offered only once a chapter is on a page", async ({ pag
   });
 
   await page.goto("/");
+  // The library offers the reader on the same terms the book page does, so a book with nothing to
+  // play carries no control at all rather than a dead one. The row is asserted first, or a missing
+  // row would satisfy the count on its own.
+  const libraryRow = page.getByRole("row", { name: /Nothing Spoken Yet/ });
+  await expect(libraryRow).toBeVisible();
+  await expect(libraryRow.getByTestId("library-read-link")).toHaveCount(0);
   await page.getByRole("link", { name: "Nothing Spoken Yet" }).click();
 
   const entry = page.getByTestId("book-read-link");
@@ -267,6 +273,12 @@ test.describe("read along on the page", { tag: "@slow" }, () => {
     await page.getByTestId("view-tab-compare").click();
     await expect(spoken).toHaveCount(1);
     await expect(spoken).toContainText("Rewritten by hand");
+
+    // And a level up: once a chapter is narrated the library row opens the same reader, so nobody
+    // has to go through the book page to reach it
+    await page.goto("/");
+    await page.getByRole("row", { name: /tiny.book/i }).getByTestId("library-read-link").click();
+    await expect(page).toHaveURL(/\/books\/[^/]+\/read$/);
   });
 });
 
