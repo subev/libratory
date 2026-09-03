@@ -5,7 +5,7 @@ const quiet = { extracting: false, assembling: false, aiNote: false, digest: fal
 const clean = { files: 0, chapters: 0, translations: 0, cleanup: 0 };
 
 const book = (over: Partial<BookFilterInput> = {}): BookFilterInput => ({
-  kind: "pdf", hasText: true, failed: false, chapterCount: 10, chaptersWithAudio: 10,
+  kind: "pdf", status: "done", hasText: true, failed: false, chapterCount: 10, chaptersWithAudio: 10,
   activity: quiet, failures: clean, ...over,
 });
 
@@ -41,6 +41,14 @@ describe("bookFilterState", () => {
   it("reports noText on its own, not only folded into attention", () => {
     expect(bookFilterState(book({ hasText: false })).noText).toBe(true);
     expect(bookFilterState(book({ failed: true })).noText).toBe(false);
+  });
+
+  // books.cancel suspends the book and its files; nagging about that forever is the one thing
+  // "cancelled means cancelled" forbids, and there is no way to dismiss a chip
+  it("does not nag about an extraction the user cancelled before any text landed", () => {
+    const cancelled = book({ hasText: false, status: "suspended" });
+    expect(bookFilterState(cancelled).noText).toBe(false);
+    expect(bookFilterState(cancelled).attention).toBe(false);
   });
 
   it("calls a book ready only when every chapter is narrated and nothing is in flight", () => {

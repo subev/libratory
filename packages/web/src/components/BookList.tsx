@@ -216,8 +216,8 @@ function BookRowActions({
   onDelete: (book: BookRow) => void;
 }) {
   // The reader opens on audio or on pages — the same gate the book page applies, which is why
-  // books.list carries hasPages at all: a reader-mode book has no audio and is still readable.
-  const canRead = book.chaptersWithAudio > 0 || book.hasPages;
+  // books.list carries these two at all: a reader-mode book has no audio and is still readable.
+  const canRead = book.hasAudio || book.hasPages;
 
   return (
     <div className="flex items-center justify-end gap-1">
@@ -319,13 +319,26 @@ export function BookList({
 
   const isEmpty = sorted.length === 0 && sortedFolders.length === 0 && filter === "all";
 
-  // Prune ids of rows deleted/moved elsewhere so counts never lie
-  const selectedBooks = sorted.filter((b) => selectedIds.has(b.id));
+  // Prune ids of rows deleted/moved elsewhere so counts never lie — but against everything in this
+  // folder, not against what a filter is showing. The poll moves books between filters on its own,
+  // and a selection that quietly shrank under you is a delete that acts on fewer books than you picked.
+  const selectedBooks = (books ?? []).filter((b) => selectedIds.has(b.id));
   const selectedCount = selectedBooks.length;
-  const selectedFolders = sortedFolders.filter((f) => selectedFolderIds.has(f.id));
+  const selectedFolders = (data?.folders ?? []).filter((f) => selectedFolderIds.has(f.id));
   const selectedFolderCount = selectedFolders.length;
   const totalSelected = selectedCount + selectedFolderCount;
-  const allSelected = selectedCount === sorted.length && sorted.length > 0;
+  // The header box is about the rows under it, so it reads and writes only those
+  const visibleSelected = sorted.filter((b) => selectedIds.has(b.id)).length;
+  const allVisibleSelected = visibleSelected === sorted.length && sorted.length > 0;
+  const toggleVisible = () =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const book of sorted) {
+        if (allVisibleSelected) next.delete(book.id);
+        else next.add(book.id);
+      }
+      return next;
+    });
 
   const selectionLabel = [
     selectedCount > 0 ? `${selectedCount} book${selectedCount === 1 ? "" : "s"}` : null,
@@ -403,7 +416,7 @@ export function BookList({
   const trayTitle =
     totalSelected === 0 ? "Nothing selected"
     : selectedFolders.length > 0 ? `${selectedCount} books · ${selectedFolders.length} folders`
-    : selectedCount === sorted.length ? `All ${selectedCount} books selected`
+    : selectedCount === (books ?? []).length ? `All ${selectedCount} books selected`
     : `${selectedCount} selected`;
   const traySub =
     totalSelected === 0
@@ -434,10 +447,10 @@ export function BookList({
             <th className="w-10 px-3 py-3">
               <input
                 type="checkbox"
-                checked={allSelected}
-                ref={(el) => { if (el) el.indeterminate = !allSelected && selectedCount > 0; }}
-                onChange={() => setSelectedIds(allSelected ? new Set() : new Set(sorted.map((b) => b.id)))}
-                title={allSelected ? "Deselect all" : "Select all"}
+                checked={allVisibleSelected}
+                ref={(el) => { if (el) el.indeterminate = !allVisibleSelected && visibleSelected > 0; }}
+                onChange={toggleVisible}
+                title={allVisibleSelected ? "Deselect all" : "Select all"}
                 className="rounded"
               />
             </th>

@@ -1,5 +1,6 @@
 export type BookFilterInput = {
   kind: string;
+  status: string;
   hasText: boolean;
   failed: boolean;
   chapterCount: number;
@@ -26,9 +27,10 @@ export function bookFilterState(book: BookFilterInput): BookFilterState {
   const working =
     a.extracting || a.assembling || a.aiNote || a.digest ||
     a.synthesizing > 0 || a.translating > 0 || a.cleaning > 0;
-  // A PDF that produced no text is stuck, not idle. Cancellations never reach here: `failed` and
-  // the failure counts both exclude them, so nothing a user deliberately stopped is nagged about.
-  const noText = !book.hasText && book.kind === "pdf" && !a.extracting;
+  // A PDF that produced no text is stuck, not idle — unless the user stopped it, which is what
+  // `suspended` means. `failed` and the failure counts already exclude cancellations; this is the
+  // one path that would otherwise nag forever about a deliberate stop, with no way to dismiss it.
+  const noText = !book.hasText && book.kind === "pdf" && !a.extracting && book.status !== "suspended";
   return {
     working,
     noText,

@@ -120,9 +120,10 @@ export const booksRouter = router({
 
     const chapterAgg = (await db.execute(sql`
       SELECT book_id, status, count(*)::int AS count,
-        count(*) FILTER (WHERE page_start IS NOT NULL)::int AS with_pages
+        count(*) FILTER (WHERE page_start IS NOT NULL)::int AS with_pages,
+        count(*) FILTER (WHERE audio_path IS NOT NULL)::int AS with_audio
       FROM chapters GROUP BY book_id, status
-    `)) as unknown as Array<{ book_id: string; status: string; count: number; with_pages: number }>;
+    `)) as unknown as Array<{ book_id: string; status: string; count: number; with_pages: number; with_audio: number }>;
 
     const cleanupAgg = (await db.execute(sql`
       SELECT book_id, cleanup->>'status' AS status, count(*)::int AS count
@@ -216,9 +217,10 @@ export const booksRouter = router({
         chaptersWithAudio,
         // Mirrors the createDigest/textAvailability guard
         hasText: chapterCount > 0 || fileRows.reduce((sum, r) => sum + r.with_raw_text, 0) > 0,
-        // The other half of the reader's gate: books.get answers it per chapter, but the library
-        // only ever asks whether *any* chapter landed on a page
+        // The reader's gate, both halves, asked the way the book page asks it: a chapter keeps its
+        // audio file while it re-synthesizes or after a cancel, so a `done` count is the wrong test
         hasPages: chapterCounts.reduce((sum, r) => sum + r.with_pages, 0) > 0,
+        hasAudio: chapterCounts.reduce((sum, r) => sum + r.with_audio, 0) > 0,
         activity,
         failures,
         // Cancellations are deliberate — only real failures get the red badge (mirrors hard_failed)
@@ -231,7 +233,7 @@ export const booksRouter = router({
         },
         lastActivityAt,
       };
-      return { ...base, filterState: bookFilterState({ ...base, kind: book.kind }) };
+      return { ...base, filterState: bookFilterState({ ...base, kind: book.kind, status: book.status }) };
     };
 
     const overview = await Promise.all(

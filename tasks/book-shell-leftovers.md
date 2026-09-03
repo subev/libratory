@@ -41,6 +41,16 @@ through `Modal` when someone next touches the voice picker.
   rows rename in place with an input; book rows are rendered inline in a `.map()` with no per-row
   state to flip, so it needs a `BookTableRow` extraction or a small rename dialog first. New
   functionality either way — nothing was lost.
+- **The row overflow menu can be clipped by the list's own scroller.** `Menu` positions absolutely
+  and the list is now `overflow-y-auto`, so for the last rows the popover contributes to scroll
+  overflow rather than opening over the tray. It is reachable by scrolling, not lost. A real fix is
+  either a portal in `Menu` or a placement that flips near the bottom edge; the book page's tray
+  sidesteps it with a fixed `placement="above"`, which a row cannot use because rows near the top
+  would clip the other way.
+- **A chip can read 0 while a folder row is still visible.** The chips count books at this level;
+  a folder survives on its subtree, which is what was asked for. In a folder-only view that reads as
+  "Working 0" above a visible folder. Folding subtree counts into the chips would make "All" disagree
+  with the list instead, so this stays until someone decides which number the chip is promising.
 - **The profile menu restyle.** The artboard redraws `ProfileSwitcher` at 304px with rename and
   delete inline per row and a "New profile" footer. All of that already works in its own popover;
   this is the lowest-value part of the redesign and the only piece of the library artboard not built.

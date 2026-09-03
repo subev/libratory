@@ -3,11 +3,11 @@ import { IconClose } from "../icons.tsx";
 import { PillToggle } from "../PillToggle.tsx";
 import { useLibraryLayout } from "./LibraryShell.tsx";
 
-const CHIPS: { id: LibraryFilter; label: string; title: string }[] = [
-  { id: "all", label: "All", title: "Every book in this folder" },
-  { id: "working", label: "Working", title: "Something is running — extracting, narrating, translating, cleaning up or assembling" },
-  { id: "attention", label: "Needs attention", title: "Failed, or a PDF that produced no text" },
-  { id: "ready", label: "Ready to read", title: "Every chapter narrated, nothing in flight" },
+const CHIPS: { id: LibraryFilter; label: string; short: string; title: string }[] = [
+  { id: "all", label: "All", short: "All", title: "Every book in this folder" },
+  { id: "working", label: "Working", short: "Working", title: "Something is running — extracting, narrating, translating, cleaning up or assembling" },
+  { id: "attention", label: "Needs attention", short: "Attention", title: "Failed, or a PDF that produced no text" },
+  { id: "ready", label: "Ready to read", short: "Ready", title: "Every chapter narrated, nothing in flight" },
 ];
 
 export function LibraryFilters({
@@ -26,13 +26,13 @@ export function LibraryFilters({
   const layout = useLibraryLayout();
   const searching = search.trim().length > 0;
   const showing = counts[filter] === counts.all ? null : `Showing ${counts[filter]} of ${counts.all}`;
-  // "Ready to read" is the longest chip and the least urgent, so it is the one the width takes
-  const chips = layout.showLabels ? CHIPS : CHIPS.filter((c) => c.id !== "ready");
+  // Narrow, the labels shorten rather than a chip dropping out: a hidden chip leaves its own filter
+  // applied with nothing showing it is on and no way to switch it off.
 
   return (
     <div className="flex items-center gap-2 h-10 px-4 border-b border-(--border)">
       {!searching &&
-        chips.map((chip) => (
+        CHIPS.map((chip) => (
           <PillToggle
             key={chip.id}
             selected={chip.id === filter}
@@ -40,7 +40,7 @@ export function LibraryFilters({
             title={chip.title}
             testId={`library-filter-${chip.id}`}
           >
-            {chip.label} {counts[chip.id]}
+            {layout.showLabels ? chip.label : chip.short} {counts[chip.id]}
           </PillToggle>
         ))}
       {!searching && <div className="w-px h-4 bg-(--border)" />}

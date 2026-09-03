@@ -223,18 +223,28 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
 
   function handleDrop(e: DragEvent) {
     e.preventDefault();
+    // The library pane is this dialog's React parent even though the portal puts it elsewhere in the
+    // DOM, and synthetic events climb the React tree — without this the pane catches the same drop
+    // and hands it back, staging every file twice.
+    e.stopPropagation();
     setIsDragging(false);
     void ingest(captureDrop(e));
   }
 
-  // A drop the library caught on our behalf: the same path, one frame later
+  // A drop the library caught on our behalf: the same path, one frame later. Keyed on the batch
+  // itself rather than on the effect running once — StrictMode invokes it twice, and staging
+  // appends, so "runs once" is not something an effect is allowed to assume.
+  const ingested = useRef<DroppedItems | null>(null);
   useEffect(() => {
-    if (initialDrop) void ingest(initialDrop);
+    if (!initialDrop || ingested.current === initialDrop) return;
+    ingested.current = initialDrop;
+    void ingest(initialDrop);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one shot per dropped batch
   }, [initialDrop]);
 
   function handleDragOver(e: DragEvent) {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragging(true);
   }
 
