@@ -8,9 +8,11 @@ import { HnDigestModal } from "./HnDigestModal.tsx";
 import { FolderPickerModal } from "./FolderPickerModal.tsx";
 import { setDragItems, getDragItems, hasDragItems, type DragItems } from "../lib/dnd.ts";
 import { statusStyles } from "./StatusBadge.tsx";
-import { IconAdd, IconBook, IconCheck, IconChevronDown, IconChevronUp, IconDelete, IconFolder, IconMore, IconRename } from "./icons.tsx";
+import { IconBook, IconCheck, IconChevronDown, IconChevronUp, IconDelete, IconFolder, IconMore, IconRename, IconUpload } from "./icons.tsx";
 import { Button } from "./Button.tsx";
 import { Menu, MenuDivider, MenuItem } from "./Menu.tsx";
+import { ActionTray } from "./ActionTray.tsx";
+import { matchesFilter, type LibraryFilter } from "../lib/library-filter.ts";
 import { useLibraryLayout } from "./library/LibraryShell.tsx";
 import type { BookRow } from "../lib/book-sort.ts";
 
@@ -254,7 +256,17 @@ function BookRowActions({
   );
 }
 
-export function BookList({ folderId = null }: { folderId?: string | null }) {
+export function BookList({
+  folderId = null,
+  filter = "all",
+  onClearFilter,
+  onAddBooks,
+}: {
+  folderId?: string | null;
+  filter?: LibraryFilter;
+  onClearFilter: () => void;
+  onAddBooks: () => void;
+}) {
   const utils = trpc.useUtils();
   const layout = useLibraryLayout();
   const { data, isLoading } = trpc.books.list.useQuery({ folderId }, {
@@ -270,7 +282,6 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
   const [showHnDigest, setShowHnDigest] = useState(false);
   const [moveTarget, setMoveTarget] = useState<{ bookIds: string[]; folderIds: string[] } | null>(null);
   const [dropError, setDropError] = useState<string | null>(null);
-  const [newFolderName, setNewFolderName] = useState<string | null>(null);
   const deleteManyMutation = trpc.books.deleteMany.useMutation({
     onSuccess: () => {
       setSelectedIds(new Set());
@@ -280,12 +291,6 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
   const deleteFolderMutation = trpc.folders.delete.useMutation();
   const moveBooksMutation = trpc.books.moveToFolder.useMutation();
   const moveFolderMutation = trpc.folders.move.useMutation();
-  const createFolderMutation = trpc.folders.create.useMutation({
-    onSuccess: () => {
-      setNewFolderName(null);
-      utils.books.list.invalidate();
-    },
-  });
 
   const [sortKey, setSortKey] = useState<SortKey>(() => loadBookSort().key);
   const [sortDir, setSortDir] = useState<SortDir>(() => loadBookSort().dir);
@@ -301,7 +306,7 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
     return <p className="text-(--text-muted) py-4">Loading...</p>;
   }
 
-  const sorted = sortBooks(books ?? [], sortKey, sortDir);
+  const sorted = sortBooks((books ?? []).filter((b) => matchesFilter(b, filter)), sortKey, sortDir);
   const sortedFolders = sortFolders(folderRows, sortKey, sortDir);
   const isEmpty = sorted.length === 0 && folderRows.length === 0;
 
@@ -386,93 +391,35 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
     setSelectedFolderIds(new Set());
   }
 
+  const trayTitle =
+    totalSelected === 0 ? "Nothing selected"
+    : selectedFolders.length > 0 ? `${selectedCount} books · ${selectedFolders.length} folders`
+    : selectedCount === sorted.length ? `All ${selectedCount} books selected`
+    : `${selectedCount} selected`;
+  const traySub =
+    totalSelected === 0
+      ? "Shift-click a checkbox to take a range"
+      : `${selectedBooks.reduce((n, b) => n + b.chapterCount, 0)} chapters · ${selectedBooks.filter((b) => b.searchIndex?.status === "done").length} indexed`;
+
   const th = (label: string, key: SortKey, align?: "left" | "right") => (
     <SortableTh label={label} sortKey={key} align={align} active={sortKey === key} dir={sortDir} onSort={handleSort} />
   );
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3">
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => setShowDigest(true)}
-          disabled={selectedCount < 2}
-          title={selectedCount < 2 ? "Select at least 2 books with the checkboxes" : "Create a digest book — one AI summary chapter per selected book, ready to listen to"}
-          data-testid="create-digest"
-        >
-          Create digest ({selectedCount})
-        </Button>
-        <Button
-          size="sm"
-          onClick={() => setShowHnDigest(true)}
-          title="Build a podcast-style book from a day's top Hacker News stories"
-          data-testid="hn-digest"
-        >
-          HN digest
-        </Button>
-        <Button
-          size="sm"
-          onClick={() => setMoveTarget({ bookIds: selectedBooks.map((b) => b.id), folderIds: selectedFolders.map((f) => f.id) })}
-          disabled={totalSelected === 0}
-          title={totalSelected === 0 ? "Select books or folders to move with the checkboxes" : "Move the selection into a folder — or drag rows onto a folder"}
-          data-testid="move-to-folder"
-        >
-          Move to folder ({totalSelected})
-        </Button>
-        <Button
-          variant="danger"
-          size="sm"
-          onClick={deleteSelected}
-          disabled={totalSelected === 0 || deleteManyMutation.isPending || deleteFolderMutation.isPending}
-          title={totalSelected === 0 ? "Select books or folders to delete with the checkboxes" : "Delete the selection with all its chapters, audio, and files"}
-          data-testid="delete-selected-books"
-        >
-          {deleteManyMutation.isPending || deleteFolderMutation.isPending ? "Deleting..." : `Delete selected (${totalSelected})`}
-        </Button>
-        {(deleteManyMutation.error || dropError) && (
-          <span className="text-sm text-(--danger-text)">{deleteManyMutation.error?.message ?? dropError}</span>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          {createFolderMutation.error && (
-            <span className="text-sm text-(--danger-text)">{createFolderMutation.error.message}</span>
-          )}
-          {newFolderName !== null ? (
-            <input
-              autoFocus
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              onBlur={() => { if (!newFolderName.trim()) setNewFolderName(null); }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && newFolderName.trim()) {
-                  createFolderMutation.mutate({ name: newFolderName.trim(), parentId: folderId });
-                }
-                if (e.key === "Escape") setNewFolderName(null);
-              }}
-              placeholder="Folder name…"
-              className="px-2 py-1.5 text-xs rounded-md border border-(--border) bg-(--bg-card) text-(--text-primary) outline-none"
-              data-testid="new-folder-name"
-            />
-          ) : (
-            <Button
-              size="sm"
-              onClick={() => setNewFolderName("")}
-              title="Create a folder here"
-              data-testid="new-folder"
-            >
-              <IconAdd className="h-3 w-3" />
-              New folder
-            </Button>
-          )}
-        </div>
-      </div>
+    <>
+      {(deleteManyMutation.error || dropError) && (
+        <p className="px-4 pt-3 text-sm text-(--danger-text)" data-testid="library-error">
+          {deleteManyMutation.error?.message ?? dropError}
+        </p>
+      )}
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4">
       {isEmpty ? (
         <p className="text-(--text-muted) py-4">
           {folderId ? "This folder is empty." : "No books yet. Upload a PDF to get started."}
         </p>
       ) : (
-      <div className="overflow-x-auto rounded-lg border border-(--border)">
-      <table className="w-full min-w-[72rem] divide-y divide-(--divide)">
+      <div className="rounded-lg border border-(--border)">
+      <table className="w-full divide-y divide-(--divide)">
         <thead className="bg-(--bg-subtle)">
           <tr>
             <th className="w-10 px-3 py-3">
@@ -706,8 +653,70 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
           })}
         </tbody>
       </table>
+      {/* Folders are navigation, not results, so they survive a filter — which means the list is
+          not "empty" and the message above never fires for a filter that matches no book. */}
+      {sorted.length === 0 && filter !== "all" && (
+        <div className="flex flex-col items-center gap-2 py-12 text-(--text-muted)" data-testid="no-books-in-filter">
+          <IconBook className="h-6 w-6 text-(--text-faint)" />
+          <span className="text-sm">No book in this filter.</span>
+          <Button size="sm" onClick={onClearFilter} data-testid="clear-filter">Clear filters</Button>
+        </div>
+      )}
       </div>
       )}
+      </div>
+
+      <ActionTray
+        compact={layout.trayCompact}
+        title={trayTitle}
+        subtitle={traySub}
+        actions={[
+          {
+            id: "create-digest",
+            label: `Create digest (${selectedCount})`,
+            onClick: () => setShowDigest(true),
+            disabled: selectedCount < 2,
+            title: selectedCount < 2
+              ? "Select at least 2 books with the checkboxes"
+              : "Create a digest book — one AI summary chapter per selected book, ready to listen to",
+            pinned: true,
+          },
+          {
+            id: "hn-digest",
+            label: "HN digest",
+            onClick: () => setShowHnDigest(true),
+            title: "Build a podcast-style book from a day's top Hacker News stories",
+          },
+          {
+            id: "move-to-folder",
+            label: `Move to folder (${totalSelected})`,
+            onClick: () => setMoveTarget({ bookIds: selectedBooks.map((b) => b.id), folderIds: selectedFolders.map((f) => f.id) }),
+            disabled: totalSelected === 0,
+            title: totalSelected === 0
+              ? "Select books or folders to move with the checkboxes"
+              : "Move the selection into a folder — or drag rows onto a folder",
+          },
+          {
+            id: "delete-selected-books",
+            label: deleteManyMutation.isPending || deleteFolderMutation.isPending
+              ? "Deleting..."
+              : `Delete selected (${totalSelected})`,
+            onClick: deleteSelected,
+            disabled: totalSelected === 0 || deleteManyMutation.isPending || deleteFolderMutation.isPending,
+            title: totalSelected === 0
+              ? "Select books or folders to delete with the checkboxes"
+              : "Delete the selection with all its chapters, audio, and files",
+            danger: true,
+            pinned: true,
+          },
+        ]}
+        primary={
+          <Button variant="primary" size="sm" onClick={onAddBooks} data-testid="tray-add-books">
+            <IconUpload className="h-4 w-4" />
+            Add books
+          </Button>
+        }
+      />
 
       {showDigest && (
         <DigestModal
@@ -728,6 +737,6 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
           }}
         />
       )}
-    </div>
+    </>
   );
 }

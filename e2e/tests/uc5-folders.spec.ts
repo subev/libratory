@@ -12,7 +12,7 @@ test("UC5: folders organize the library — create one, move a book in, see it i
   await expect(folder).toContainText("0");
 
   await page.getByRole("row", { name: /Folder Cargo/ }).getByRole("checkbox").click();
-  await page.getByTestId("move-to-folder").click();
+  await page.getByTestId("tray-move-to-folder").click();
   const picker = page.getByTestId("folder-picker-modal");
   await picker.getByTestId("folder-picker-row").filter({ hasText: "Research" }).click();
   await picker.getByTestId("folder-picker-move").click();

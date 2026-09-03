@@ -19,7 +19,7 @@ import { BookShell, TabPanel, WithShellLayout } from "../components/book/BookShe
 import { ActivityDot, StageTabs } from "../components/book/StageTabs.tsx";
 import { BookHeader } from "../components/book/BookHeader.tsx";
 import { BookDetailsModal } from "../components/book/BookDetailsModal.tsx";
-import { ActionTray, type TrayAction } from "../components/book/ActionTray.tsx";
+import { ActionTray, type TrayAction } from "../components/ActionTray.tsx";
 import { ExportModal, type ExportFormat, type ExportFormatId } from "../components/book/ExportModal.tsx";
 import { loadBookSort, sortBooks } from "../lib/book-sort.ts";
 import { formatBytes, formatDuration, pendingExportLabel, pendingExportSummary } from "../lib/format.ts";
@@ -848,20 +848,26 @@ export function BookDetail() {
       }
       tray={
         tab === "chapters" && book.chapters.length > 0 ? (
-          <ActionTray
-            title={selectedCount === book.chapters.length ? `All ${selectedCount} selected` : `${selectedCount} of ${book.chapters.length} selected`}
-            subtitle={
-              selectedInFlight > 0
-                ? `${chaptersWithAudio} with audio · ${selectedInFlight} in flight`
-                : `${chaptersWithAudio} with audio`
-            }
-            actions={trayActions}
-            primary={
-              <Button variant="primary" size="sm" onClick={() => setExportOpen(true)} data-testid="open-export">
-                Export…
-              </Button>
-            }
-          />
+          // The page sits above the provider, so the tray takes the layout as a render prop
+          <WithShellLayout>
+            {(layout) => (
+              <ActionTray
+                title={selectedCount === book.chapters.length ? `All ${selectedCount} selected` : `${selectedCount} of ${book.chapters.length} selected`}
+                subtitle={
+                  selectedInFlight > 0
+                    ? `${chaptersWithAudio} with audio · ${selectedInFlight} in flight`
+                    : `${chaptersWithAudio} with audio`
+                }
+                actions={trayActions}
+                compact={layout.trayCompact}
+                primary={
+                  <Button variant="primary" size="sm" onClick={() => setExportOpen(true)} data-testid="open-export">
+                    Export…
+                  </Button>
+                }
+              />
+            )}
+          </WithShellLayout>
         ) : null
       }
       dock={

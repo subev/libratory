@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
-import { Button } from "../Button.tsx";
-import { Menu, MenuDivider, MenuItem } from "../Menu.tsx";
-import { IconChevronUp } from "../icons.tsx";
-import { useShellLayout } from "./BookShell.tsx";
+import { Button } from "./Button.tsx";
+import { Menu, MenuDivider, MenuItem } from "./Menu.tsx";
+import { IconChevronUp } from "./icons.tsx";
 
 export type TrayAction = {
   id: string;
@@ -21,19 +20,21 @@ export function ActionTray({
   subtitle,
   actions,
   primary,
+  compact,
 }: {
   title: string;
   subtitle: string;
   actions: TrayAction[];
   primary: ReactNode;
+  /** Both shells derive this from their own width contract; the tray does not know either. */
+  compact: boolean;
 }) {
-  const layout = useShellLayout();
-  const shown = layout.trayCompact ? actions.filter((a) => a.pinned) : actions;
-  const collapsed = layout.trayCompact ? actions.filter((a) => !a.pinned) : [];
+  const shown = compact ? actions.filter((a) => a.pinned) : actions;
+  const collapsed = compact ? actions.filter((a) => !a.pinned) : [];
 
   return (
     <div className="flex items-center gap-2 px-4 py-2 border-t border-(--border) bg-(--bg-card)" data-testid="action-tray">
-      <span className={`flex flex-col ${layout.trayCompact ? "min-w-32" : "min-w-44"}`}>
+      <span className={`flex flex-col ${compact ? "min-w-32" : "min-w-44"}`}>
         <span className="text-xs font-bold text-(--text-primary)">{title}</span>
         <span className="text-[11px] text-(--text-muted)">{subtitle}</span>
       </span>

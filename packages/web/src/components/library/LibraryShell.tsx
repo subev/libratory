@@ -15,13 +15,11 @@ export function LibraryShell({
   header,
   bar,
   filters,
-  tray,
   children,
 }: {
   header: ReactNode;
   bar: ReactNode;
   filters: ReactNode;
-  tray?: ReactNode;
   children: ReactNode;
 }) {
   const [layout, measure] = useLayoutState(libraryLayout);
@@ -32,12 +30,11 @@ export function LibraryShell({
         <div className="shrink-0">{header}</div>
         <div className="shrink-0">{bar}</div>
         <div className="shrink-0">{filters}</div>
-        {/* overscroll-contain because the body no longer scrolls: without it a modal's overscroll
-            chains into the list behind it. */}
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain" data-testid="library-pane">
+        {/* The list owns its own scrolling and its own tray, the way each tab does on the book
+            page: the tray has to sit outside the scroller it acts on. */}
+        <div className="flex-1 min-h-0 flex flex-col" data-testid="library-pane">
           {children}
         </div>
-        {tray ? <div className="shrink-0">{tray}</div> : null}
       </div>
     </LayoutContext.Provider>
   );

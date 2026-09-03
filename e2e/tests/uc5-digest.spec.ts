@@ -12,7 +12,7 @@ test("UC5: a digest writes one suspended AI chapter per source book, with a note
   await page.goto("/");
   await page.getByRole("row", { name: /Source Alpha/ }).getByRole("checkbox").click();
   await page.getByRole("row", { name: /Source Beta/ }).getByRole("checkbox").click();
-  await page.getByTestId("create-digest").click();
+  await page.getByTestId("tray-create-digest").click();
 
   const modal = page.getByTestId("digest-modal");
   await modal.getByTestId("digest-title").fill("Evening Digest");

@@ -9,8 +9,10 @@ import { ProfileSwitcher } from "../components/ProfileSwitcher.tsx";
 import { SettingsModal } from "../components/SettingsModal.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
 import { LibraryShell } from "../components/library/LibraryShell.tsx";
+import { LibraryFilters } from "../components/library/LibraryFilters.tsx";
+import { filterCounts, type LibraryFilter } from "../lib/library-filter.ts";
 import { UploadModal } from "../components/library/UploadModal.tsx";
-import { IconChat, IconBook, IconSettings, IconClose, IconUpload } from "../components/icons.tsx";
+import { IconAdd, IconChat, IconBook, IconSettings, IconUpload } from "../components/icons.tsx";
 import type { DragItems } from "../lib/dnd.ts";
 
 export function Home() {
@@ -19,10 +21,22 @@ export function Home() {
   const [search, setSearch] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+  const [filter, setFilter] = useState<LibraryFilter>("all");
+  const [newFolderName, setNewFolderName] = useState<string | null>(null);
   const { data: folderPath = [] } = trpc.folders.path.useQuery(
     { id: folderId! },
     { enabled: !!folderId },
   );
+  // The same query BookList runs, so react-query serves both observers from one request — the chips
+  // need the unfiltered counts, and the list needs the rows.
+  const { data: listData } = trpc.books.list.useQuery({ folderId }, { refetchInterval: 3000 });
+  const counts = filterCounts(listData?.books ?? []);
+  const createFolderMutation = trpc.folders.create.useMutation({
+    onSuccess: () => {
+      setNewFolderName(null);
+      utils.books.list.invalidate();
+    },
+  });
 
   const moveBooksMutation = trpc.books.moveToFolder.useMutation();
   const moveFolderMutation = trpc.folders.move.useMutation();
@@ -107,44 +121,57 @@ export function Home() {
             <IconUpload className="h-4 w-4" />
             Drop PDFs or <span className="font-semibold text-(--accent-text)">browse…</span>
           </button>
-        </div>
-      }
-      filters={
-        <div className="flex items-center gap-2 h-10 px-4 border-b border-(--border)">
-          <div className="relative">
+          {createFolderMutation.error && (
+            <span className="text-xs text-(--danger-text)">{createFolderMutation.error.message}</span>
+          )}
+          {newFolderName !== null ? (
             <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Escape") setSearch(""); }}
-              placeholder="Search all books…"
-              className="w-64 pl-3 pr-8 py-1 text-xs rounded-md border border-(--border-input) bg-(--bg-card) text-(--text-primary) outline-none"
-              data-testid="book-search"
+              autoFocus
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              onBlur={() => { if (!newFolderName.trim()) setNewFolderName(null); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newFolderName.trim()) {
+                  createFolderMutation.mutate({ name: newFolderName.trim(), parentId: folderId });
+                }
+                if (e.key === "Escape") setNewFolderName(null);
+              }}
+              placeholder="Folder name…"
+              className="px-2 py-1 text-xs rounded-md border border-(--border-input) bg-(--bg-card) text-(--text-primary) outline-none"
+              data-testid="new-folder-name"
             />
-            {search && (
-              <button
-                onClick={() => setSearch("")}
-                title="Clear search"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-(--text-faint) hover:text-(--text-secondary) cursor-pointer"
-                data-testid="clear-search"
-              >
-                <IconClose className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-          <div className="flex-1" />
-          {search.trim() && (
-            <span className="text-xs text-(--text-faint)">Searching every book, in every folder</span>
+          ) : (
+            <Button size="sm" onClick={() => setNewFolderName("")} title="Create a folder here" data-testid="new-folder">
+              <IconAdd className="h-3 w-3" />
+              New folder
+            </Button>
           )}
         </div>
       }
+      filters={
+        <LibraryFilters
+          filter={filter}
+          onFilter={setFilter}
+          counts={counts}
+          search={search}
+          onSearch={setSearch}
+          showing={counts[filter] === counts.all ? null : `Showing ${counts[filter]} of ${counts.all}`}
+        />
+      }
     >
-      <div className="p-4">
-        {search.trim() ? (
+      {search.trim() ? (
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4">
           <BookSearchResults query={search.trim()} />
-        ) : (
-          <BookList key={folderId ?? "root"} folderId={folderId} />
-        )}
-      </div>
+        </div>
+      ) : (
+        <BookList
+          key={folderId ?? "root"}
+          folderId={folderId}
+          filter={filter}
+          onClearFilter={() => setFilter("all")}
+          onAddBooks={() => setShowUpload(true)}
+        />
+      )}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showUpload && (
         <UploadModal
