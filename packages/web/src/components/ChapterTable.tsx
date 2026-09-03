@@ -105,9 +105,18 @@ export function ChapterTable({
   const modalChapterIndex = pickedChapterIndex ?? (deepLinkedIndex >= 0 ? deepLinkedIndex : null);
   const openChapterModal = (index: number | null) => {
     setPickedChapterIndex(index);
-    if (!searchParams.has("chapter")) return;
-    searchParams.delete("chapter");
-    setSearchParams(searchParams, { replace: true });
+    // The updater form, and the has() check inside it: ?variant= and the shell's own param are
+    // written from elsewhere, so the render's snapshot is neither safe to write back nor to read
+    // the answer out of — a deep link that arrived since this render would survive the delete.
+    setSearchParams(
+      (current) => {
+        if (!current.has("chapter")) return current;
+        const next = new URLSearchParams(current);
+        next.delete("chapter");
+        return next;
+      },
+      { replace: true },
+    );
   };
 
   const [aiChapter, setAiChapter] = useState<{ id: string; title: string } | null>(null);

@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 
 import { IconArrowLeft, IconPause, IconPlay } from "../components/icons.tsx";
 import { Button } from "../components/Button.tsx";
+import { SegmentedControl } from "../components/SegmentedControl.tsx";
 import { CueTranscript } from "../components/reader/CueTranscript.tsx";
 import { CuePages } from "../components/reader/CuePages.tsx";
 import { bodyFit, chapterPages, UNMAPPED, type ReaderCues, type ReaderManifest } from "../lib/reader-doc.ts";
@@ -253,14 +254,16 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
             {formatDuration(ms)} / {formatDuration(cues?.totalMs ?? chapter.durationMs ?? 0)}
           </span>
 
-          <Segmented
+          <SegmentedControl
             options={VIEWS.map((entry) => ({ id: entry.id, label: entry.label, title: entry.hint }))}
             value={view}
             onChange={(next) => setChosenView(next as View)}
             testId="reader-view"
+            variant="accent"
+            size="sm"
           />
 
-          <Segmented
+          <SegmentedControl
             options={WIDTHS.map((entry) => ({
               id: entry.id,
               label: entry.label,
@@ -269,6 +272,8 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
             value={width}
             onChange={(next) => setWidth(next as typeof width)}
             testId="reader-width"
+            variant="accent"
+            size="sm"
           />
 
           <div className="ml-auto flex items-center gap-3 text-xs text-(--text-muted)">
@@ -364,36 +369,6 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
         )}
       </div>
     </ReaderShell>
-  );
-}
-
-function Segmented({
-  options,
-  value,
-  onChange,
-  testId,
-}: {
-  options: { id: string; label: string; title: string }[];
-  value: string;
-  onChange: (id: string) => void;
-  testId: string;
-}) {
-  return (
-    <div className="flex rounded border border-(--border) bg-(--bg-card) p-0.5" data-testid={testId}>
-      {options.map((option) => (
-        // button-ok: a segmented selection — data-active marks the chosen option, it is not an action
-        <button
-          key={option.id}
-          onClick={() => onChange(option.id)}
-          title={option.title}
-          data-testid={`${testId}-${option.id}`}
-          data-active={value === option.id}
-          className={`rounded px-2 py-0.5 text-xs ${value === option.id ? "bg-(--accent) text-(--on-accent)" : "text-(--text-tertiary) hover:bg-(--bg-subtle)"}`}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
   );
 }
 

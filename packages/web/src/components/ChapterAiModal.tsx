@@ -5,6 +5,7 @@ import { trpc } from "../trpc.ts";
 import { profileHeaders } from "../lib/profile.ts";
 import { MarkdownBlock } from "./MarkdownBlock.tsx";
 import { Modal, ModalHeader } from "./Modal.tsx";
+import { SegmentedControl } from "./SegmentedControl.tsx";
 import { AI_PRESETS, estimateTokens, estimateTokensFromCounts, formatTokens } from "../lib/ai-presets.ts";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { PillToggle } from "./PillToggle.tsx";
@@ -134,20 +135,12 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
   return (
     <Modal size="lg" onClose={onClose} closeOnEscape={false} /* a typed prompt and its answer are not restored on reopen */ testId="chapter-ai-modal">
       <ModalHeader title="Ask about" onClose={onClose}>
-        <div className="inline-flex rounded-md border border-(--border) p-0.5 gap-0.5 min-w-0" data-testid="ai-scope-toggle">
-          {/* button-ok: segments of a scope toggle, not actions — the segment skin belongs to the group */}
-          {scopeOptions.map((option) => (
-            <button
-              key={option.key}
-              onClick={() => !option.disabled && switchKind(option.key)}
-              disabled={option.disabled}
-              title={option.title}
-              className={`px-2.5 py-1 rounded text-xs font-medium truncate max-w-64 ${ kind === option.key ? "bg-(--bg-subtle) text-(--text-primary)" : option.disabled ? "text-(--text-faint) cursor-not-allowed" : "text-(--text-muted) hover:text-(--text-secondary)" }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          options={scopeOptions.map((option) => ({ id: option.key, label: option.label, title: option.title, disabled: option.disabled }))}
+          value={kind}
+          onChange={(next) => switchKind(next as "book-raw" | "chapters")}
+          testId="ai-scope-toggle"
+        />
       </ModalHeader>
 
       <div className="flex-1 flex min-h-0">
