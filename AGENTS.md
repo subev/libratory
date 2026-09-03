@@ -21,7 +21,14 @@ This is a personal power-user tool, not a polished consumer product. The design 
 
 **Visibility into what's happening.** Worker activity logs to both the terminal and the UI. Every subprocess event is captured. The user should never wonder "what is it doing right now?"
 
-**UI layout mirrors the pipeline order.** Every page reads top-to-bottom in the order things are needed: source files (input) → chapter structure & text work (translate, cleanup, edit) → output creation (assemble audio, export PDF/EPUB) → produced outputs. Controls live inside the stage they affect — extraction options belong with source files, not in a generic actions area at the bottom. One deliberate exception: Synthesize and Cancel processing sit at the top of the chapter toolbar (voice/speed live in a modal behind the Synthesize button) so a 180-chapter table never buries the primary action; the chapter table itself is height-capped with its own scroll for the same reason. When adding UI, place it by asking "at which pipeline stage does the user need this?"
+**UI layout mirrors the pipeline order.** The book page is a fixed-viewport shell whose numbered tabs
+*are* that order: 1 Source files (input) → 2 Chapters (structure and text work) → 3 Outputs (what was
+produced), with Notes trailing after them because it is not a stage. Controls live inside the stage
+they affect — extraction options belong with source files, not in a generic actions area. The
+selection's actions sit in a tray pinned under the chapter table, because a toolbar above a long table
+scrolls away from the very selection it acts on. When adding UI, place it by asking "at which pipeline
+stage does the user need this?" — and if the honest answer is "none", it belongs in the book menu (⋯)
+or a modal, not wedged into a tab.
 
 ### Task Tracking
 
@@ -278,20 +285,16 @@ block-parent uses would mean making 47 containers flex for no gain.
 
 ## Surfaces
 
-A stage card is **`packages/web/src/components/Section.tsx`**, not a hand-assembled box:
+The book page's shell is **`packages/web/src/components/book/BookShell.tsx`** — header, tabs, one
+scroll pane, tray, log dock, all pinned but the pane. Its width is published through
+`useShellLayout()`, derived by the pure `lib/book-layout.ts` from a `ResizeObserver`; four steps,
+each a state someone designed, all seven booleans under test.
 
-```tsx
-<Section stripe="input" | "work" | "output" | "danger" | "none" className="mb-6">
-```
-
-The coloured top edge is the one place colour still encodes a *sequence* — 1 Input, 2 Work, 3 Output —
-which is why it is a fixed ramp rather than a free colour. This one is **not** lint-enforced: a rule on
-`border-t-2` was tried and removed, because `border-t-[2px]` and `sm:border-t-2` both walk straight past
-it, and exempting `Section.tsx` from it also exempted that file from the palette and spacing rules — the
-one file where an off-ladder value would reach every stage card. A guardrail that weak is not worth that.
-
-The extraction found the drift it existed to prevent: five of the six stage sections used the stripe at
-`/80`, and `BookFilesSection` used it at full opacity. They agree now.
+`Section.tsx` and the `--step-input` / `--step-work` / `--step-output` ramp are **gone**. The stripe
+was "the one place colour still encodes a sequence", and the numbered tab chips do that job now — the
+sequence is the tab row, so a card carrying a coloured edge would be saying it twice. A row inside a
+tab is `book/ResourceRow.tsx` (tile, title, subtitle, badge, actions), shared by source files,
+assemblies and documents.
 
 Two other container roles are already confined to a single component or file and do **not** need
 extracting — say so before "consolidating" them:
@@ -546,13 +549,20 @@ packages/web/src/
                         phone width presets + legibility readout, tap-to-seek, rect/layout debug toggles.
                         Lazy-loaded so no other page pays for pdf.js; reads only the /read documents
   components/
-    BookFilesSection.tsx    Stage 1 card: source-file table, add files, re-extract, extraction settings
-    AudioOutputsSection.tsx Stage 3 card: produced audiobook assemblies (download/delete)
-    DocumentOutputsSection.tsx Stage 3 card: PDF/EPUB/synced-EPUB export actions + documents list
-    NotesSection.tsx    Auto-saved AI notes per book (markdown, copy, add as chapter, delete)
-    LogDock.tsx         Sticky bottom log bar + full scrollable log modal
+    book/               The book page's shell. BookShell.tsx (pinned header/tabs/tray/dock, one scroll
+                        pane, useShellLayout width context) + TabPanel (inactive tabs stay mounted and
+                        hidden — unmounting ChapterTable clears nine filters and stops playback);
+                        StageTabs.tsx, BookHeader.tsx, VariantMenu.tsx, ActionTray.tsx,
+                        ExportModal.tsx, BookDetailsModal.tsx, ResourceRow.tsx
+    BookFilesSection.tsx    Tab 1 body: source-file table, add files, re-extract, extraction settings
+    AudioOutputsSection.tsx Tab 3: produced audiobook assemblies (play/download/delete)
+    DocumentOutputsSection.tsx Tab 3: exported PDF/EPUB/synced-EPUB documents
+    NotesSection.tsx    The Notes tab: saved AI answers (markdown, copy, add as chapter, delete)
+    LogDock.tsx         Bottom log bar (a flex child of the shell, not fixed) + full log modal
     EditableTitle.tsx   Click-to-rename book title
-    ChapterTable.tsx    Chapter table (height-capped, sticky header) with filters, range selection, floating audio player with read-along chunk highlighting
+    ChapterTable.tsx    Chapter table — quick-filter chips, title search, the rest behind a Filters
+                        popover; sticky header over its own scroller (the pinned filter bar is why the
+                        table scrolls rather than the tab), range selection, floating audio player
     SynthesizeModal.tsx Voice/speed picker + start button — behind the toolbar's Synthesize action
                         for the selection, and behind every single-chapter re-synthesize (row icon
                         and chapter modal), which is where a chapter's voice is chosen
@@ -575,7 +585,10 @@ packages/web/src/
     PdfPreviewModal.tsx Inline source-PDF preview
     reader/             PdfCanvas.tsx (pdf.js page or column crop, rendered near the viewport),
                         CueOverlay.tsx (highlight + debug boxes)
-    DiskUsageButton.tsx Per-book disk usage + chunk cleanup
+    DiskUsage.tsx       useDiskUsageTotal (labels the book-menu item) + DiskUsageModal (breakdown + chunk cleanup)
+    Menu.tsx            The one popover — book menu, variant picker, tray overflow. Its outside-click
+                        is swallowed, or dismissing a menu inside a dialog would close the dialog too
+    SegmentedControl.tsx  Promoted out of Reader.tsx; "raised" and "accent" skins
     MarkdownBlock.tsx   Markdown renderer for notes/AI answers
     VoicePicker.tsx     Trigger for the voice library modal (labelled field); queries only the engine owning the current selection to resolve its label
     voice-picker/       VoiceLibraryModal.tsx — **language is the primary axis**: the rail lists languages (plus "Your voices" for clones), the pane groups that language's voices by engine, so "what can read my French book" is one click instead of five tabs. Every voice carries `language`/`engine` (set by the mappers in lib/voices.ts; `staticVoices` decorates the literals). Multilingual models (KugelAudio) appear under every language. Within a language the pane groups by **provider** (`providerOfVoice` in lib/voices.ts — finer than `engine`, so KugelAudio and the Bulgarian narrators are named rather than lumped as "other local models") with filter chips: the chip defaults to the provider of the current selection, typing forces "All" so a search can't silently miss behind a filter, and the combined view caps each provider at 6 rows behind "Show all N" because Cartesia alone can contribute 450 voices to one language. PocketLanguageNotice.tsx (download prompt + size), PocketVoiceCloner.tsx (record/upload + consent), VoiceRow.tsx, context.tsx (selection + preview playback), layout.tsx
@@ -862,7 +875,7 @@ Facts agents get wrong without reading the suite first:
 - **TTS voice licensing is mixed across engines** — some voices are non-commercial-only. Nothing binds while the project is PolyForm Noncommercial, so no voice is excluded today. Read [docs/tts-licensing.md](docs/tts-licensing.md) before relicensing, charging for hosting, or exposing an engine to paying users.
 - **Voice ids are engine-prefixed lowercase slugs** — `say:samantha`, not `say:Samantha`. `parseTtsVoice()` in `lib/tts.ts` validates per engine; the `say` slugs come from `sayVoiceSlug()` lowercasing the macOS voice name.
 - **Destructive UI actions confirm via native `confirm()`** (apply chapter boundaries, delete audio, delete folder…), not custom modals. Browser automation dismisses these by default — Playwright needs `page.once("dialog", d => d.accept())` before the click.
-- **Document exports are serialized per book** — a second `books.exportDocument` while one renders throws "Assembly already in progress". The UI only disables the clicked format's button, so the other format's button is enabled but will error.
+- **Document exports are serialized per book** — a second `books.exportDocument` while one renders throws "Assembly already in progress". The UI can no longer walk into it: every format lives in one Export modal behind one CTA, so there is a single disabled state rather than one per button.
 - **`books.list` returns `{folders, books}`**, and the root listing hides books that live inside folders — deleting "all a profile's books" via the root list alone misses foldered ones.
 
 ## Pending Task Files

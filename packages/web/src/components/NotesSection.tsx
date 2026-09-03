@@ -4,7 +4,6 @@ import { trpc } from "../trpc.ts";
 import { MarkdownBlock } from "./MarkdownBlock.tsx";
 import { useLlmModels } from "../lib/use-llm-models.ts";
 import { IconChevronRight, IconExternal, IconCheck } from "./icons.tsx";
-import { Section } from "./Section.tsx";
 
 export type NoteJobView = {
   status: "queued" | "running" | "done" | "failed";
@@ -46,14 +45,10 @@ export function NotesSection({ bookId, noteJob }: { bookId: string; noteJob: Not
   if (notes.length === 0 && !jobActive && !showFailedJob) return null;
 
   return (
-    <Section className="mb-6" data-testid="notes-section">
-      <div className="flex items-center gap-3 mb-3">
-        <h2 className="text-lg font-semibold text-(--text-secondary)">
-          <span className="text-xs font-medium text-(--text-muted) uppercase tracking-wider mr-2">Notes</span>
-          AI answers
-        </h2>
-        <span className="text-sm text-(--text-muted)">{notes.length}</span>
-      </div>
+    <div data-testid="notes-section">
+      <p className="text-xs text-(--text-muted) mb-3">
+        AI answers saved about this book — from upload prompts, chapter questions and library chat.
+      </p>
 
       {jobActive && (
         <div className="flex items-center gap-2 text-sm text-(--text-muted) mb-2" data-testid="note-job-running">
@@ -147,6 +142,6 @@ export function NotesSection({ bookId, noteJob }: { bookId: string; noteJob: Not
           );
         })}
       </div>
-    </Section>
+    </div>
   );
 }

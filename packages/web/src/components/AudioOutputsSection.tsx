@@ -1,5 +1,8 @@
+import type { ReactNode } from "react";
 import { formatOutputDate, formatDuration } from "../lib/format.ts";
-import { Section } from "./Section.tsx";
+import { Button } from "./Button.tsx";
+import { IconDelete, IconDownload, IconPlay } from "./icons.tsx";
+import { ResourceGroup, ResourceRow } from "./book/ResourceRow.tsx";
 
 export type AssemblyRow = {
   id: string;
@@ -15,67 +18,83 @@ export function AudioOutputsSection({
   latestOutputPath,
   onDelete,
   isDeleting,
+  action,
 }: {
   assemblies: AssemblyRow[];
   latestOutputPath: string | null;
   onDelete: (id: string) => void;
   isDeleting: boolean;
+  action?: ReactNode;
 }) {
-  if (assemblies.length === 0) return null;
-
   return (
-    <Section stripe="output" className="flex flex-col">
-      <h2 className="text-lg font-semibold text-(--text-secondary) mb-3">
-        <span className="text-xs font-medium text-(--success-text) uppercase tracking-wider mr-2">3 · Output</span>
-        Assemblies
-      </h2>
-      {(
-        <ul className="divide-y divide-(--divide) rounded-lg border border-(--border)">
-          {assemblies.map((assembly) => {
-            const isLatest = assembly.outputPath === latestOutputPath;
-            return (
-              <li key={assembly.id} className="px-3 py-2.5 hover:bg-(--bg-card-hover)" data-testid="assembly-row">
-                <div className="flex items-center gap-2 text-sm text-(--text-secondary)">
-                  {formatOutputDate(assembly.createdAt)}
-                  {isLatest && (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-(--success-bg) text-(--success-text)">
-                      latest
-                    </span>
-                  )}
-                  <span className="text-(--text-tertiary)" title={assembly.chapterSummary}>
-                    {assembly.chapterCount} chapter{assembly.chapterCount !== 1 ? "s" : ""}
-                  </span>
-                  <span className="ml-auto tabular-nums text-(--text-tertiary)">{formatDuration(assembly.durationMs)}</span>
-                </div>
-                <div className="flex items-center gap-3 mt-1.5">
-                  <audio controls preload="none" className="h-8 min-w-0 flex-1">
-                    <source src={`/audio/assembly/${assembly.id}`} type="audio/mpeg" />
-                  </audio>
-                  <a
-                    href={`/download/assembly/${assembly.id}`}
-                    download={assembly.outputPath.split("/").pop()}
-                    className="text-xs text-(--success-text) hover:text-(--success-text-hover) font-medium shrink-0"
-                    data-testid="assembly-download"
-                  >
-                    Download
-                  </a>
-                  <button
-                    onClick={() => {
-                      if (confirm("Delete this assembly?")) {
-                        onDelete(assembly.id);
-                      }
-                    }}
-                    disabled={isDeleting}
-                    className="text-xs text-(--danger-text) hover:text-(--danger-text-hover) font-medium disabled:opacity-50 shrink-0"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </Section>
+    <ResourceGroup
+      title="Audio"
+      count={assemblies.length === 0 ? "nothing assembled yet" : `${assemblies.length} file${assemblies.length === 1 ? "" : "s"}`}
+      action={action}
+    >
+      {assemblies.map((assembly) => {
+        const isLatest = assembly.outputPath === latestOutputPath;
+        const filename = assembly.outputPath.split("/").pop();
+        return (
+          <ResourceRow
+            key={assembly.id}
+            testId="assembly-row"
+            tone={isLatest ? "accent" : "muted"}
+            icon={<IconPlay className="h-3.5 w-3.5" />}
+            title={filename}
+            subtitle={
+              <>
+                {formatDuration(assembly.durationMs)} ·{" "}
+                <span title={assembly.chapterSummary}>
+                  {assembly.chapterCount} chapter mark{assembly.chapterCount === 1 ? "" : "s"}
+                </span>{" "}
+                · {formatOutputDate(assembly.createdAt)}
+              </>
+            }
+            badge={
+              isLatest ? (
+                <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-(--success-bg) text-(--success-text)">
+                  latest
+                </span>
+              ) : undefined
+            }
+            actions={
+              <>
+                <Button
+                  variant="icon"
+                  size="sm"
+                  href={`/download/assembly/${assembly.id}`}
+                  aria-label={`Download ${filename}`}
+                  title="Download"
+                  data-testid="assembly-download"
+                >
+                  <IconDownload className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="danger"
+                  soft
+                  square
+                  size="sm"
+                  onClick={() => {
+                    if (confirm("Delete this assembly?")) onDelete(assembly.id);
+                  }}
+                  disabled={isDeleting}
+                  aria-label={`Delete ${filename}`}
+                  title="Delete"
+                >
+                  <IconDelete className="h-4 w-4" />
+                </Button>
+              </>
+            }
+          >
+            {/* Kept, though the artboard drops it: the leading tile there is decoration, and this is
+                the only place an assembly can be listened to without downloading it first. */}
+            <audio controls preload="none" className="h-8 w-full mt-1.5">
+              <source src={`/audio/assembly/${assembly.id}`} type="audio/mp4" />
+            </audio>
+          </ResourceRow>
+        );
+      })}
+    </ResourceGroup>
   );
 }

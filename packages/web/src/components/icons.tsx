@@ -25,6 +25,7 @@ export {
   CircleNotch as IconSpinner,
   ArrowsClockwise as IconRefresh,
   Folder as IconFolder,
+  FileText as IconDocument,
   BookOpen as IconBook,
   ChatCircle as IconChat,
   ListBullets as IconStructure,

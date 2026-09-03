@@ -1,5 +1,7 @@
 import { formatOutputDate, documentFormatLabel, pendingExportSummary, type DocumentFormat } from "../lib/format.ts";
-import { Section } from "./Section.tsx";
+import { Button } from "./Button.tsx";
+import { IconBook, IconDelete, IconDocument, IconDownload } from "./icons.tsx";
+import { ResourceGroup, ResourceRow } from "./book/ResourceRow.tsx";
 
 export type DocumentRow = {
   id: string;
@@ -29,58 +31,72 @@ export function DocumentOutputsSection({
   onDelete: (id: string) => void;
   isDeleting: boolean;
 }) {
-  if (documents.length === 0 && pending.length === 0) return null;
-
   return (
-    <Section stripe="output" className="flex flex-col">
-      <h2 className="text-lg font-semibold text-(--text-secondary) mb-3">
-        <span className="text-xs font-medium text-(--success-text) uppercase tracking-wider mr-2">3 · Output</span>
-        Documents
-        {pending.length > 0 && (
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-(--step-output) ml-3" data-testid="export-pending">
-            <span className="w-2 h-2 rounded-full bg-(--step-output) animate-pulse" />
+    <ResourceGroup
+      title="Documents"
+      count={
+        pending.length > 0 ? (
+          <span className="inline-flex items-center gap-1.5 font-medium text-(--accent-text)" data-testid="export-pending">
+            <span className="w-1.5 h-1.5 rounded-full bg-(--accent) animate-[pulse-dot_1.15s_ease-in-out_infinite]" />
             {pending.map(pendingExportSummary).join(" · ")}...
           </span>
-        )}
-      </h2>
-      {documents.length === 0 ? (
-        <p className="text-sm text-(--text-muted)">Rendering...</p>
-      ) : (
-        <ul className="divide-y divide-(--divide) rounded-lg border border-(--border)">
-          {documents.map((doc) => (
-            <li key={doc.id} className="px-3 py-2.5 flex items-center gap-2 hover:bg-(--bg-card-hover)" data-testid="document-row">
-              <span className="text-sm text-(--text-secondary)">{formatOutputDate(doc.createdAt)}</span>
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-(--success-bg) text-(--success-text) uppercase">
-                {documentFormatLabel(doc.format)}
-              </span>
-              <span className="text-sm text-(--text-tertiary)" title={doc.chapterSummary}>
-                {doc.chapterCount} chapter{doc.chapterCount !== 1 ? "s" : ""}
-              </span>
-              <div className="ml-auto flex items-center gap-3 shrink-0">
-                <a
+        ) : documents.length === 0 ? (
+          "nothing exported yet"
+        ) : (
+          `${documents.length} file${documents.length === 1 ? "" : "s"}`
+        )
+      }
+    >
+      {documents.map((doc) => {
+        const filename = doc.outputPath.split("/").pop();
+        const readAlong = doc.format === "epub-sync";
+        return (
+          <ResourceRow
+            key={doc.id}
+            testId="document-row"
+            tone={readAlong ? "accent" : "muted"}
+            icon={readAlong ? <IconBook className="h-3.5 w-3.5" /> : <IconDocument className="h-3.5 w-3.5" />}
+            title={filename}
+            subtitle={
+              <>
+                {documentFormatLabel(doc.format)} ·{" "}
+                <span title={doc.chapterSummary}>
+                  {doc.chapterCount} chapter{doc.chapterCount === 1 ? "" : "s"}
+                </span>{" "}
+                · {formatOutputDate(doc.createdAt)}
+              </>
+            }
+            actions={
+              <>
+                <Button
+                  variant="icon"
+                  size="sm"
                   href={`/download/document/${doc.id}`}
-                  download={doc.outputPath.split("/").pop()}
-                  className="text-xs text-(--success-text) hover:text-(--success-text-hover) font-medium"
+                  aria-label={`Download ${filename}`}
+                  title="Download"
                   data-testid="document-download"
                 >
-                  Download
-                </a>
-                <button
+                  <IconDownload className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="danger"
+                  soft
+                  square
+                  size="sm"
                   onClick={() => {
-                    if (confirm("Delete this document?")) {
-                      onDelete(doc.id);
-                    }
+                    if (confirm("Delete this document?")) onDelete(doc.id);
                   }}
                   disabled={isDeleting}
-                  className="text-xs text-(--danger-text) hover:text-(--danger-text-hover) font-medium disabled:opacity-50"
+                  aria-label={`Delete ${filename}`}
+                  title="Delete"
                 >
-                  Delete
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Section>
+                  <IconDelete className="h-4 w-4" />
+                </Button>
+              </>
+            }
+          />
+        );
+      })}
+    </ResourceGroup>
   );
 }

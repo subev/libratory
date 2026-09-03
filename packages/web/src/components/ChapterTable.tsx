@@ -862,7 +862,7 @@ function ChapterStatusCell({ chapter, cleanup }: { chapter: ChapterRow; cleanup:
         </div>
         <div className="w-full bg-(--bg-page) rounded-full h-1">
           <div
-            className="bg-(--step-work) h-1 rounded-full transition-all duration-500"
+            className="bg-(--accent) h-1 rounded-full transition-all duration-500"
             style={{ width: `${percent}%` }}
           />
         </div>

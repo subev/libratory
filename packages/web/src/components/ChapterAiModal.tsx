@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { trpc } from "../trpc.ts";
@@ -146,6 +147,16 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
       <div className="flex-1 flex min-h-0">
         {/* Left: presets + prompt */}
         <div className="w-2/5 border-r border-(--border) p-4 flex flex-col gap-3 min-h-0">
+          {/* The artboard's framing, because the two doors are easy to confuse: this one sends the
+              whole text in a single request, Chat searches it and cites pages across turns. */}
+          <p className="text-xs text-(--text-muted)">
+            The text below is sent in one request — one prompt, one answer, saved to Notes. For a
+            back-and-forth that searches the book and cites pages, use{" "}
+            <Link to={`/chat?bookId=${scope.bookId}`} className="text-(--accent-text) hover:underline font-medium">
+              Chat
+            </Link>
+            .
+          </p>
           <div className="flex flex-wrap gap-1.5">
             {AI_PRESETS.map((p) => (
               <PillToggle

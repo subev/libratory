@@ -1098,6 +1098,13 @@ export function BookDetail() {
       <TabPanel active={tab === "outputs"}>
         <div className="p-4 space-y-6">
           <AudioOutputsSection
+            action={
+              book.chapters.length > 0 ? (
+                <Button variant="secondary" size="sm" onClick={() => setExportOpen(true)} data-testid="outputs-export">
+                  Export…
+                </Button>
+              ) : undefined
+            }
             assemblies={bookAssemblies.filter((a) => (a.language ?? null) === activeVariant)}
             latestOutputPath={activeVariant ? null : book.outputPath}
             onDelete={(aid) => deleteAssemblyMutation.mutate({ id: aid })}

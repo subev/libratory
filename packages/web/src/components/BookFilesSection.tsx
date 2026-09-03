@@ -3,7 +3,6 @@ import { ExtractModal, type ExtractScope } from "./ExtractModal.tsx";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
 import { IconStop, IconRefresh, IconDelete } from "./icons.tsx";
 import { Button } from "./Button.tsx";
-import { Section } from "./Section.tsx";
 
 export type BookFileRow = {
   id: string;
@@ -100,7 +99,7 @@ export function BookFilesSection({
   const isEmpty = files.length === 0;
 
   return (
-    <Section stripe={extractingCount > 0 ? "work" : "input"} className="relative overflow-hidden mb-6">
+    <div className="relative overflow-hidden rounded-xl border border-(--border) bg-(--bg-card) p-4">
       {extractingCount > 0 && (
         <>
           <div className="absolute inset-x-0 top-0 h-0.5 overflow-hidden" aria-hidden>
@@ -111,10 +110,10 @@ export function BookFilesSection({
       )}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold text-(--text-secondary)">
-            <span className="text-xs font-medium text-(--warning-text) uppercase tracking-wider mr-2">1 · Input</span>
-            Source files
-          </h2>
+          <h2 className="font-(family-name:--stack-display) text-base font-semibold text-(--text-primary)">Source files</h2>
+          <span className="text-xs text-(--text-muted)">
+            Chapters are numbered in file order — reorder them in the Chapters tab.
+          </span>
           {extractingCount > 0 && (
             <span className="inline-flex items-center gap-1.5 text-xs font-medium text-(--accent-text)" data-testid="extracting-indicator">
               <span className="w-2 h-2 rounded-full bg-(--accent) animate-pulse" />
@@ -332,7 +331,7 @@ export function BookFilesSection({
           onClose={() => setPreviewFileId(null)}
         />
       )}
-    </Section>
+    </div>
   );
 }
 
