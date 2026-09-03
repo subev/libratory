@@ -1,12 +1,15 @@
+import type { DroppedItems } from "../../lib/dnd.ts";
 import { Modal, ModalHeader } from "../Modal.tsx";
 import { UploadZone } from "../UploadZone.tsx";
 
 export function UploadModal({
   folderId,
+  initialDrop = null,
   onUploaded,
   onClose,
 }: {
   folderId: string | null;
+  initialDrop?: DroppedItems | null;
   onUploaded: (ok: boolean) => void;
   onClose: () => void;
 }) {
@@ -18,7 +21,7 @@ export function UploadModal({
         onClose={onClose}
       />
       <div className="p-4 overflow-y-auto">
-        <UploadZone folderId={folderId} onUploadComplete={onUploaded} />
+        <UploadZone folderId={folderId} initialDrop={initialDrop} onUploadComplete={onUploaded} />
       </div>
     </Modal>
   );

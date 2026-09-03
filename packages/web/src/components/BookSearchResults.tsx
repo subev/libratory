@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { trpc } from "../trpc.ts";
 import { IconFolder } from "./icons.tsx";
+import { BookKindBadge } from "./BookKindBadge.tsx";
 
 export function BookSearchResults({ query }: { query: string }) {
   const [debounced, setDebounced] = useState(query);
@@ -19,7 +20,7 @@ export function BookSearchResults({ query }: { query: string }) {
     return <p className="text-(--text-muted) py-4">Searching…</p>;
   }
   if (results.length === 0) {
-    return <p className="text-(--text-muted) py-4">No books match "{query}".</p>;
+    return <p className="text-(--text-muted) py-4">No book matches “{query}”.</p>;
   }
 
   return (
@@ -31,14 +32,10 @@ export function BookSearchResults({ query }: { query: string }) {
         {results.map((book) => (
           <div key={book.id} className="px-4 py-3 flex items-center gap-3">
             <div className="min-w-0">
-              <Link to={`/books/${book.id}`} className="text-(--accent-text) hover:text-(--accent-text-hover) font-medium">
+              <Link to={`/books/${book.id}`} className="text-(--accent-text) hover:text-(--accent-text-hover) text-sm font-semibold">
                 {book.title}
               </Link>
-              {book.kind === "digest" && (
-                <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-(--bg-subtle) text-(--text-secondary) align-middle" title="Digest — AI summary chapters from other books">
-                  digest
-                </span>
-              )}
+              <BookKindBadge kind={book.kind} />
               <div className="text-xs text-(--text-faint)">
                 <Link to="/" className="hover:text-(--text-secondary)">Home</Link>
                 {book.folderPath.map((f) => (

@@ -12,6 +12,7 @@ import { IconBook, IconCheck, IconChevronDown, IconChevronUp, IconDelete, IconFo
 import { Button } from "./Button.tsx";
 import { Menu, MenuDivider, MenuItem } from "./Menu.tsx";
 import { ActionTray } from "./ActionTray.tsx";
+import { BookKindBadge } from "./BookKindBadge.tsx";
 import { folderMatchesFilter, matchesFilter, type LibraryFilter } from "../lib/library-filter.ts";
 import { useLibraryLayout } from "./library/LibraryShell.tsx";
 import type { BookRow } from "../lib/book-sort.ts";
@@ -499,16 +500,7 @@ export function BookList({
                   <Link to={`/books/${book.id}`} className="text-(--accent-text) hover:text-(--accent-text-hover) font-medium">
                     {book.title}
                   </Link>
-                  {book.kind === "digest" && (
-                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-(--bg-subtle) text-(--text-secondary) align-middle" data-testid="digest-badge" title="Digest — AI summary chapters from other books">
-                      digest
-                    </span>
-                  )}
-                  {book.kind === "api" && (
-                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-(--bg-subtle) text-(--text-secondary) align-middle" data-testid="api-badge" title="Created through the external API by a script or another project">
-                      api
-                    </span>
-                  )}
+                  <BookKindBadge kind={book.kind} />
                   {book.skipSynthesis && book.kind === "pdf" && (
                     <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-(--bg-subtle) text-(--text-muted) align-middle" title="Reader mode — extraction only, audio on demand">
                       reader

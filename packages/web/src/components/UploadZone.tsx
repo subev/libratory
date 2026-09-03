@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback, useMemo, type DragEvent, type ReactNode } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo, type DragEvent, type ReactNode } from "react";
+import { captureDrop, type DroppedItems } from "../lib/dnd.ts";
 import { VoicePicker } from "./VoicePicker.tsx";
 import { SpeedSlider } from "./SpeedSlider.tsx";
 import { getVoiceById, voiceSupportsSpeedControl, getVoiceLabel } from "../lib/voices.ts";
@@ -14,6 +15,8 @@ import { Button } from "./Button.tsx";
 type UploadZoneProps = {
   /** ok=false means the staged files are still there with an error to read — do not dismiss. */
   onUploadComplete: (ok: boolean) => void;
+  /** A drop that landed on the library behind this dialog, handed over to be staged here. */
+  initialDrop?: DroppedItems | null;
   folderId?: string | null;
 };
 
@@ -53,7 +56,7 @@ function Option({ label, hint, checked, onChange, title, testId }: OptionProps) 
   );
 }
 
-export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProps) {
+export function UploadZone({ onUploadComplete, folderId = null, initialDrop = null }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
@@ -197,17 +200,9 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
     return [];
   }
 
-  async function handleDrop(e: DragEvent) {
-    e.preventDefault();
-    setIsDragging(false);
-
-    // Entries must be captured synchronously — the DataTransfer is dead after the first await
-    const entries = [...e.dataTransfer.items]
-      .map((item) => (item.webkitGetAsEntry ? item.webkitGetAsEntry() : null))
-      .filter((entry): entry is FileSystemEntry => entry !== null);
-
+  async function ingest({ entries, files }: DroppedItems) {
     if (!entries.some((entry) => entry.isDirectory)) {
-      if (e.dataTransfer.files.length > 0) stageFiles(e.dataTransfer.files);
+      if (files.length > 0) stageFiles(files);
       return;
     }
 
@@ -225,6 +220,18 @@ export function UploadZone({ onUploadComplete, folderId = null }: UploadZoneProp
       setError("Could not read the dropped folder");
     }
   }
+
+  function handleDrop(e: DragEvent) {
+    e.preventDefault();
+    setIsDragging(false);
+    void ingest(captureDrop(e));
+  }
+
+  // A drop the library caught on our behalf: the same path, one frame later
+  useEffect(() => {
+    if (initialDrop) void ingest(initialDrop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one shot per dropped batch
+  }, [initialDrop]);
 
   function handleDragOver(e: DragEvent) {
     e.preventDefault();
