@@ -13,8 +13,8 @@ describe("sameFlags", () => {
   });
 
   it("does the same job for the library's own contract", () => {
-    expect(sameFlags(libraryLayout(1200), libraryLayout(1319))).toBe(true);
-    expect(sameFlags(libraryLayout(1320), libraryLayout(1319))).toBe(false);
+    expect(sameFlags(libraryLayout(1200), libraryLayout(1440))).toBe(true);
+    expect(sameFlags(libraryLayout(1180), libraryLayout(1179))).toBe(false);
     expect(sameFlags(libraryLayout(1080), libraryLayout(1079))).toBe(false);
   });
 });

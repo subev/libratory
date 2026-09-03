@@ -3,18 +3,19 @@ import type { RouterOutputs } from "../../../server/src/router.ts";
 export type BookRow = RouterOutputs["books"]["list"]["books"][number];
 export type FolderRow = RouterOutputs["books"]["list"]["folders"][number];
 
-export type BookSortKey = "title" | "chapters" | "outputs" | "size" | "created" | "lastActivity";
+export type BookSortKey = "title" | "chapters" | "langs" | "outputs" | "size" | "lastActivity";
 export type BookSortDir = "asc" | "desc";
 
 export const BOOK_SORT_VALUE: Record<BookSortKey, (b: BookRow) => string | number> = {
   title: (b) => b.title.toLowerCase(),
   chapters: (b) => b.chapterCount,
+  langs: (b) => b.languages.length,
   outputs: (b) => b.outputs.assemblies + b.outputs.pdfs + b.outputs.epubs,
   size: (b) => b.sizeBytes,
-  created: (b) => new Date(b.createdAt).getTime(),
   lastActivity: (b) => new Date(b.lastActivityAt).getTime(),
 };
 
+// A key that has since been retired — "created" was one — falls back rather than throwing
 export function loadBookSort(): { key: BookSortKey; dir: BookSortDir } {
   const stored = localStorage.getItem("bookList.sortKey");
   const key = stored && stored in BOOK_SORT_VALUE ? (stored as BookSortKey) : "lastActivity";
@@ -31,9 +32,9 @@ export function saveBookSort(key: BookSortKey, dir: BookSortDir) {
 const FOLDER_SORT_VALUE: Record<BookSortKey, (f: FolderRow) => string | number> = {
   title: (f) => f.name.toLowerCase(),
   chapters: (f) => f.bookCount,
+  langs: () => 0,
   outputs: () => 0,
   size: (f) => f.sizeBytes,
-  created: (f) => new Date(f.createdAt).getTime(),
   lastActivity: (f) => (f.lastActivityAt ? new Date(f.lastActivityAt).getTime() : 0),
 };
 

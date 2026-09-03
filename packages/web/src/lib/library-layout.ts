@@ -5,7 +5,6 @@ export type LibraryLayout = {
   showSize: boolean;
   showOutputs: boolean;
   showLangs: boolean;
-  showCreated: boolean;
   trayCompact: boolean;
 };
 
@@ -16,9 +15,6 @@ export function libraryLayout(width: number): LibraryLayout {
     showSize: !tight,
     showOutputs: width >= 1080,
     showLangs: width >= 1180,
-    // Above every step the artboard draws: it has one date column, the app has two, and Created is
-    // the one that only earns its width when nothing else needs it.
-    showCreated: width >= 1320,
     trayCompact: tight,
   };
 }

@@ -118,8 +118,10 @@ export const booksRouter = router({
       .orderBy(desc(books.createdAt));
 
     const chapterAgg = (await db.execute(sql`
-      SELECT book_id, status, count(*)::int AS count FROM chapters GROUP BY book_id, status
-    `)) as unknown as Array<{ book_id: string; status: string; count: number }>;
+      SELECT book_id, status, count(*)::int AS count,
+        count(*) FILTER (WHERE page_start IS NOT NULL)::int AS with_pages
+      FROM chapters GROUP BY book_id, status
+    `)) as unknown as Array<{ book_id: string; status: string; count: number; with_pages: number }>;
 
     const cleanupAgg = (await db.execute(sql`
       SELECT book_id, cleanup->>'status' AS status, count(*)::int AS count
@@ -213,6 +215,9 @@ export const booksRouter = router({
         chaptersWithAudio,
         // Mirrors the createDigest/textAvailability guard
         hasText: chapterCount > 0 || fileRows.reduce((sum, r) => sum + r.with_raw_text, 0) > 0,
+        // The other half of the reader's gate: books.get answers it per chapter, but the library
+        // only ever asks whether *any* chapter landed on a page
+        hasPages: chapterCounts.reduce((sum, r) => sum + r.with_pages, 0) > 0,
         activity,
         failures,
         // Cancellations are deliberate — only real failures get the red badge (mirrors hard_failed)

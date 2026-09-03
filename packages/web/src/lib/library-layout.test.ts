@@ -8,14 +8,8 @@ describe("libraryLayout", () => {
       showSize: true,
       showOutputs: true,
       showLangs: true,
-      showCreated: true,
       trayCompact: false,
     });
-  });
-
-  it("keeps Created out of the artboard's own widest step", () => {
-    expect(libraryLayout(1319).showCreated).toBe(false);
-    expect(libraryLayout(1319).showLangs).toBe(true);
   });
 
   it("drops Languages below 1180 and Outputs below 1080", () => {
@@ -32,7 +26,6 @@ describe("libraryLayout", () => {
     [1000, "showSize"],
     [1080, "showOutputs"],
     [1180, "showLangs"],
-    [1320, "showCreated"],
   ] as const)("turns %s on exactly at its own width", (width, key) => {
     expect(libraryLayout(width)[key]).toBe(true);
     expect(libraryLayout(width - 1)[key]).toBe(false);

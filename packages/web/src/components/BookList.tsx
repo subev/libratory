@@ -8,8 +8,11 @@ import { HnDigestModal } from "./HnDigestModal.tsx";
 import { FolderPickerModal } from "./FolderPickerModal.tsx";
 import { setDragItems, getDragItems, hasDragItems, type DragItems } from "../lib/dnd.ts";
 import { statusStyles } from "./StatusBadge.tsx";
-import { IconAdd, IconCheck, IconChevronDown, IconChevronUp, IconDelete, IconFolder, IconRename } from "./icons.tsx";
+import { IconAdd, IconBook, IconCheck, IconChevronDown, IconChevronUp, IconDelete, IconFolder, IconMore, IconRename } from "./icons.tsx";
 import { Button } from "./Button.tsx";
+import { Menu, MenuDivider, MenuItem } from "./Menu.tsx";
+import { useLibraryLayout } from "./library/LibraryShell.tsx";
+import type { BookRow } from "../lib/book-sort.ts";
 
 type SortKey = BookSortKey;
 type SortDir = BookSortDir;
@@ -37,6 +40,7 @@ function FolderTableRow({
   onDropItems: (items: DragItems) => void;
 }) {
   const utils = trpc.useUtils();
+  const layout = useLibraryLayout();
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(folder.name);
   const [dragOver, setDragOver] = useState(false);
@@ -153,17 +157,17 @@ function FolderTableRow({
           )}
         </div>
       </td>
-      <td className="px-4 py-3"><span className="text-xs text-(--text-faint)">—</span></td>
-      <td className="px-4 py-3"><span className="text-xs text-(--text-faint)">—</span></td>
-      <td className="px-4 py-3 text-right text-sm tabular-nums text-(--text-tertiary)">
-        {formatBytes(folder.sizeBytes)}
-      </td>
-      <td className="px-4 py-3 text-right text-sm tabular-nums text-(--text-tertiary)">
-        {new Date(folder.createdAt).toLocaleDateString()}
-      </td>
+      {layout.showLangs && <td className="px-4 py-3"><span className="text-xs text-(--text-faint)">—</span></td>}
+      {layout.showOutputs && <td className="px-4 py-3"><span className="text-xs text-(--text-faint)">—</span></td>}
+      {layout.showSize && (
+        <td className="px-4 py-3 text-right text-sm tabular-nums text-(--text-tertiary)">
+          {formatBytes(folder.sizeBytes)}
+        </td>
+      )}
       <td className="px-4 py-3 text-right text-sm text-(--text-tertiary)" title={folder.lastActivityAt ? new Date(folder.lastActivityAt).toLocaleString() : undefined}>
         {folder.lastActivityAt ? formatRelativeTime(folder.lastActivityAt) : <span className="text-xs text-(--text-faint)">—</span>}
       </td>
+      <td className="px-4 py-3" />
     </tr>
   );
 }
@@ -197,8 +201,62 @@ function SortableTh({
   );
 }
 
+// Read is the one action worth a button of its own; the rest live behind the overflow so a row of
+// nine columns does not end in a row of buttons.
+function BookRowActions({
+  book,
+  onMove,
+  onDelete,
+}: {
+  book: BookRow;
+  onMove: (id: string) => void;
+  onDelete: (book: BookRow) => void;
+}) {
+  // The reader opens on audio or on pages — the same gate the book page applies, which is why
+  // books.list carries hasPages at all: a reader-mode book has no audio and is still readable.
+  const canRead = book.chaptersWithAudio > 0 || book.hasPages;
+
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <Button
+        variant="icon"
+        size="sm"
+        to={`/books/${book.id}/read`}
+        disabled={!canRead}
+        title={canRead ? "Open the read-along reader" : "Nothing to read yet — this book has no audio and no pages"}
+        aria-label={`Read ${book.title}`}
+        data-testid="row-read"
+      >
+        <IconBook className="h-4 w-4" />
+      </Button>
+      <Menu
+        testId="book-row-menu"
+        width="w-52"
+        trigger={({ toggle }) => (
+          <Button variant="icon" size="sm" onClick={toggle} title="More actions" aria-label={`More actions for ${book.title}`}>
+            <IconMore className="h-4 w-4" />
+          </Button>
+        )}
+      >
+        {(close) => (
+          <>
+            <MenuItem icon={<IconFolder className="h-4 w-4" />} onClick={() => { close(); onMove(book.id); }} testId="row-move">
+              Move to folder…
+            </MenuItem>
+            <MenuDivider />
+            <MenuItem danger icon={<IconDelete className="h-4 w-4" />} onClick={() => { close(); onDelete(book); }} testId="row-delete">
+              Delete book…
+            </MenuItem>
+          </>
+        )}
+      </Menu>
+    </div>
+  );
+}
+
 export function BookList({ folderId = null }: { folderId?: string | null }) {
   const utils = trpc.useUtils();
+  const layout = useLibraryLayout();
   const { data, isLoading } = trpc.books.list.useQuery({ folderId }, {
     refetchInterval: 3000,
   });
@@ -210,7 +268,7 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   const [showDigest, setShowDigest] = useState(false);
   const [showHnDigest, setShowHnDigest] = useState(false);
-  const [showMove, setShowMove] = useState(false);
+  const [moveTarget, setMoveTarget] = useState<{ bookIds: string[]; folderIds: string[] } | null>(null);
   const [dropError, setDropError] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState<string | null>(null);
   const deleteManyMutation = trpc.books.deleteMany.useMutation({
@@ -355,7 +413,7 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
         </Button>
         <Button
           size="sm"
-          onClick={() => setShowMove(true)}
+          onClick={() => setMoveTarget({ bookIds: selectedBooks.map((b) => b.id), folderIds: selectedFolders.map((f) => f.id) })}
           disabled={totalSelected === 0}
           title={totalSelected === 0 ? "Select books or folders to move with the checkboxes" : "Move the selection into a folder — or drag rows onto a folder"}
           data-testid="move-to-folder"
@@ -428,13 +486,13 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
               />
             </th>
             {th("Title", "title")}
-            {th("Chapters", "chapters", "right")}
-            <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Activity</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Languages</th>
-            {th("Outputs", "outputs")}
-            {th("Size", "size", "right")}
-            {th("Created", "created", "right")}
+            {th("Ch.", "chapters", "right")}
+            <th className="px-4 py-2 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Status</th>
+            {layout.showLangs && th("Languages", "langs")}
+            {layout.showOutputs && th("Outputs", "outputs")}
+            {layout.showSize && th("Size", "size", "right")}
             {th("Last activity", "lastActivity", "right")}
+            <th className="px-4 py-2 w-24" />
           </tr>
         </thead>
         <tbody className="bg-(--bg-card) divide-y divide-(--divide)">
@@ -597,6 +655,7 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
                     {idle && totalFailures === 0 && !book.failed && !noText && <span className="text-xs text-(--text-faint)">—</span>}
                   </div>
                 </td>
+                {layout.showLangs && (
                 <td className="px-4 py-3">
                   {book.languages.length === 0 ? (
                     <span className="text-xs text-(--text-faint)">—</span>
@@ -614,17 +673,33 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-3 text-sm text-(--text-tertiary)">
-                  {outputParts.length === 0 ? <span className="text-xs text-(--text-faint)">—</span> : outputParts.join(" · ")}
-                </td>
-                <td className="px-4 py-3 text-right text-sm tabular-nums text-(--text-tertiary)">
-                  {formatBytes(book.sizeBytes)}
-                </td>
-                <td className="px-4 py-3 text-right text-sm tabular-nums text-(--text-tertiary)">
-                  {new Date(book.createdAt).toLocaleDateString()}
-                </td>
-                <td className="px-4 py-3 text-right text-sm text-(--text-tertiary)" title={new Date(book.lastActivityAt).toLocaleString()}>
+                )}
+                {layout.showOutputs && (
+                  <td className="px-4 py-3 text-sm text-(--text-tertiary)">
+                    {outputParts.length === 0 ? <span className="text-xs text-(--text-faint)">—</span> : outputParts.join(" · ")}
+                  </td>
+                )}
+                {layout.showSize && (
+                  <td className="px-4 py-3 text-right text-sm tabular-nums text-(--text-tertiary)">
+                    {formatBytes(book.sizeBytes)}
+                  </td>
+                )}
+                <td
+                  className="px-4 py-3 text-right text-sm text-(--text-tertiary)"
+                  title={`Created ${new Date(book.createdAt).toLocaleDateString()} · last activity ${new Date(book.lastActivityAt).toLocaleString()}`}
+                >
                   {formatRelativeTime(book.lastActivityAt)}
+                </td>
+                <td className="px-4 py-3">
+                  <BookRowActions
+                    book={book}
+                    onMove={(id) => setMoveTarget({ bookIds: [id], folderIds: [] })}
+                    onDelete={(b) => {
+                      if (confirm(`Delete “${b.title}” and everything made from it?`)) {
+                        deleteManyMutation.mutate({ ids: [b.id] });
+                      }
+                    }}
+                  />
                 </td>
               </tr>
             );
@@ -642,13 +717,13 @@ export function BookList({ folderId = null }: { folderId?: string | null }) {
         />
       )}
       {showHnDigest && <HnDigestModal onClose={() => setShowHnDigest(false)} />}
-      {showMove && (
+      {moveTarget && (
         <FolderPickerModal
-          bookIds={selectedBooks.map((b) => b.id)}
-          folderIds={selectedFolders.map((f) => f.id)}
-          onClose={() => setShowMove(false)}
+          bookIds={moveTarget.bookIds}
+          folderIds={moveTarget.folderIds}
+          onClose={() => setMoveTarget(null)}
           onMoved={() => {
-            setShowMove(false);
+            setMoveTarget(null);
             clearSelection();
           }}
         />
