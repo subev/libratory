@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams } from "react-router";
 import { trpc } from "../trpc.ts";
 import { BookList } from "../components/BookList.tsx";
@@ -20,8 +20,8 @@ export function Home() {
   const { folderId = null } = useParams<{ folderId: string }>();
   const [search, setSearch] = useState("");
   const [showSettings, setShowSettings] = useState(false);
-  const [showUpload, setShowUpload] = useState(false);
-  const [droppedFiles, setDroppedFiles] = useState<DroppedItems | null>(null);
+  // undefined is shut; null or a drop is open, so the two can never disagree
+  const [upload, setUpload] = useState<DroppedItems | null | undefined>(undefined);
   const [filter, setFilter] = useState<LibraryFilter>("all");
   const [newFolderName, setNewFolderName] = useState<string | null>(null);
   const { data: folderPath = [] } = trpc.folders.path.useQuery(
@@ -31,7 +31,8 @@ export function Home() {
   // The same query BookList runs, so react-query serves both observers from one request — the chips
   // need the unfiltered counts, and the list needs the rows.
   const { data: listData } = trpc.books.list.useQuery({ folderId }, { refetchInterval: 3000 });
-  const counts = filterCounts(listData?.books ?? []);
+  // Home re-renders on every keystroke in the search box; the counts only move when the poll does
+  const counts = useMemo(() => filterCounts(listData?.books ?? []), [listData]);
   const createFolderMutation = trpc.folders.create.useMutation({
     onSuccess: () => {
       setNewFolderName(null);
@@ -114,7 +115,7 @@ export function Home() {
           {/* button-ok: a dashed edge is the affordance — it reads as the drop target the page used
               to have in full, which no Button variant expresses. */}
           <button
-            onClick={() => { setDroppedFiles(null); setShowUpload(true); }}
+            onClick={() => setUpload(null)}
             title="Drop PDF files or a folder anywhere in the library — folders are scanned recursively for PDFs"
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-dashed border-(--border-input) text-xs text-(--text-muted) hover:bg-(--bg-subtle) hover:text-(--text-primary) cursor-pointer"
             data-testid="open-upload"
@@ -156,13 +157,9 @@ export function Home() {
           counts={counts}
           search={search}
           onSearch={setSearch}
-          showing={counts[filter] === counts.all ? null : `Showing ${counts[filter]} of ${counts.all}`}
         />
       }
-      onFilesDropped={(drop) => {
-        setDroppedFiles(drop);
-        setShowUpload(true);
-      }}
+      onFilesDropped={setUpload}
     >
       {search.trim() ? (
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4">
@@ -174,20 +171,20 @@ export function Home() {
           folderId={folderId}
           filter={filter}
           onClearFilter={() => setFilter("all")}
-          onAddBooks={() => { setDroppedFiles(null); setShowUpload(true); }}
+          onAddBooks={() => setUpload(null)}
         />
       )}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
-      {showUpload && (
+      {upload !== undefined && (
         <UploadModal
           folderId={folderId}
-          initialDrop={droppedFiles}
+          initialDrop={upload}
           onUploaded={(ok) => {
             utils.books.list.invalidate();
             // A failed upload keeps its files staged and its reason on screen; only success is done
-            if (ok) { setShowUpload(false); setDroppedFiles(null); }
+            if (ok) setUpload(undefined);
           }}
-          onClose={() => { setShowUpload(false); setDroppedFiles(null); }}
+          onClose={() => setUpload(undefined)}
         />
       )}
     </LibraryShell>

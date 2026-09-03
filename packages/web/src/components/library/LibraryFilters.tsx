@@ -1,12 +1,13 @@
 import type { LibraryFilter } from "../../lib/library-filter.ts";
 import { IconClose } from "../icons.tsx";
+import { PillToggle } from "../PillToggle.tsx";
 import { useLibraryLayout } from "./LibraryShell.tsx";
 
 const CHIPS: { id: LibraryFilter; label: string; title: string }[] = [
   { id: "all", label: "All", title: "Every book in this folder" },
   { id: "working", label: "Working", title: "Something is running — extracting, narrating, translating, cleaning up or assembling" },
   { id: "attention", label: "Needs attention", title: "Failed, or a PDF that produced no text" },
-  { id: "done", label: "Ready to read", title: "Every chapter narrated, nothing in flight" },
+  { id: "ready", label: "Ready to read", title: "Every chapter narrated, nothing in flight" },
 ];
 
 export function LibraryFilters({
@@ -15,45 +16,33 @@ export function LibraryFilters({
   counts,
   search,
   onSearch,
-  showing,
 }: {
   filter: LibraryFilter;
   onFilter: (next: LibraryFilter) => void;
   counts: Record<LibraryFilter, number>;
   search: string;
   onSearch: (next: string) => void;
-  /** Null while searching: the chips describe this folder, the search crosses all of them. */
-  showing: string | null;
 }) {
   const layout = useLibraryLayout();
   const searching = search.trim().length > 0;
+  const showing = counts[filter] === counts.all ? null : `Showing ${counts[filter]} of ${counts.all}`;
   // "Ready to read" is the longest chip and the least urgent, so it is the one the width takes
-  const chips = layout.showLabels ? CHIPS : CHIPS.filter((c) => c.id !== "done");
+  const chips = layout.showLabels ? CHIPS : CHIPS.filter((c) => c.id !== "ready");
 
   return (
     <div className="flex items-center gap-2 h-10 px-4 border-b border-(--border)">
       {!searching &&
-        chips.map((chip) => {
-          const active = chip.id === filter;
-          return (
-            // button-ok: a filter chip is a pill that fills when it is on; no Button variant is
-            // round, and the counted label is part of the control rather than beside it.
-            <button
-              key={chip.id}
-              onClick={() => onFilter(chip.id)}
-              title={chip.title}
-              aria-pressed={active}
-              className={`px-2.5 py-1 rounded-full border text-xs font-semibold whitespace-nowrap cursor-pointer ${
-                active
-                  ? "border-(--accent) bg-(--accent-subtle) text-(--accent-text)"
-                  : "border-(--border-input) text-(--text-secondary) hover:bg-(--bg-subtle) hover:text-(--text-primary)"
-              }`}
-              data-testid={`library-filter-${chip.id}`}
-            >
-              {chip.label} {counts[chip.id]}
-            </button>
-          );
-        })}
+        chips.map((chip) => (
+          <PillToggle
+            key={chip.id}
+            selected={chip.id === filter}
+            onClick={() => onFilter(chip.id)}
+            title={chip.title}
+            testId={`library-filter-${chip.id}`}
+          >
+            {chip.label} {counts[chip.id]}
+          </PillToggle>
+        ))}
       {!searching && <div className="w-px h-4 bg-(--border)" />}
       <div className="relative">
         <input

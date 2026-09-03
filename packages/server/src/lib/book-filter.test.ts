@@ -34,6 +34,13 @@ describe("bookFilterState", () => {
 
   it("leaves a synthetic book with no text alone — it has no PDF to have failed", () => {
     expect(bookFilterState(book({ hasText: false, kind: "api" })).attention).toBe(false);
+    expect(bookFilterState(book({ hasText: false, kind: "api" })).noText).toBe(false);
+  });
+
+  // The row draws a pill for exactly this, so it is answered once rather than re-derived there
+  it("reports noText on its own, not only folded into attention", () => {
+    expect(bookFilterState(book({ hasText: false })).noText).toBe(true);
+    expect(bookFilterState(book({ failed: true })).noText).toBe(false);
   });
 
   it("calls a book ready only when every chapter is narrated and nothing is in flight", () => {

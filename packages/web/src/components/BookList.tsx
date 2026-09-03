@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { trpc } from "../trpc.ts";
 import { formatBytes, formatRelativeTime } from "../lib/format.ts";
@@ -274,7 +274,6 @@ export function BookList({
     refetchInterval: 3000,
   });
   const books = data?.books;
-  const folderRows = data?.folders ?? [];
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectedFolderIds, setSelectedFolderIds] = useState<Set<string>>(new Set());
@@ -303,18 +302,27 @@ export function BookList({
     saveBookSort(key, dir);
   }
 
+  // Above the early return, and memoized: this component re-renders on every checkbox click, and
+  // neither a selection nor an open modal changes what the list holds or how it is ordered.
+  const sorted = useMemo(
+    () => sortBooks((books ?? []).filter((b) => matchesFilter(b, filter)), sortKey, sortDir),
+    [books, filter, sortKey, sortDir],
+  );
+  const sortedFolders = useMemo(
+    () => sortFolders((data?.folders ?? []).filter((f) => folderMatchesFilter(f, filter)), sortKey, sortDir),
+    [data?.folders, filter, sortKey, sortDir],
+  );
+
   if (isLoading) {
     return <p className="text-(--text-muted) py-4">Loading...</p>;
   }
 
-  const sorted = sortBooks((books ?? []).filter((b) => matchesFilter(b, filter)), sortKey, sortDir);
-  const sortedFolders = sortFolders(folderRows.filter((f) => folderMatchesFilter(f, filter)), sortKey, sortDir);
   const isEmpty = sorted.length === 0 && sortedFolders.length === 0 && filter === "all";
 
   // Prune ids of rows deleted/moved elsewhere so counts never lie
   const selectedBooks = sorted.filter((b) => selectedIds.has(b.id));
   const selectedCount = selectedBooks.length;
-  const selectedFolders = folderRows.filter((f) => selectedFolderIds.has(f.id));
+  const selectedFolders = sortedFolders.filter((f) => selectedFolderIds.has(f.id));
   const selectedFolderCount = selectedFolders.length;
   const totalSelected = selectedCount + selectedFolderCount;
   const allSelected = selectedCount === sorted.length && sorted.length > 0;
@@ -470,10 +478,10 @@ export function BookList({
               book.failures.translations > 0 ? `${book.failures.translations} translation(s)` : null,
               book.failures.cleanup > 0 ? `${book.failures.cleanup} cleanup(s)` : null,
             ].filter(Boolean).join(", ");
-            const idle =
-              !book.activity.extracting && !book.activity.assembling && !book.activity.aiNote && !book.activity.digest &&
-              book.activity.synthesizing === 0 && book.activity.translating === 0 && book.activity.cleaning === 0;
-            const noText = !book.hasText && book.kind === "pdf" && !book.activity.extracting;
+            // Both answered by the server, so the chip counting these books and the pill on the row
+            // can never come to different conclusions about the same rule.
+            const idle = !book.filterState.working;
+            const noText = book.filterState.noText;
             const outputParts = [
               book.outputs.assemblies > 0 ? `${book.outputs.assemblies} M4B` : null,
               book.outputs.pdfs > 0 ? `${book.outputs.pdfs} PDF` : null,

@@ -16,7 +16,7 @@ export type BookFilterInput = {
   failures: { files: number; chapters: number; translations: number; cleanup: number };
 };
 
-export type BookFilterState = { working: boolean; attention: boolean; ready: boolean };
+export type BookFilterState = { working: boolean; attention: boolean; ready: boolean; noText: boolean };
 
 // Derived here rather than in the library page, because a folder row has to answer the same
 // question about books the client never receives — the ones in its subtree.
@@ -31,6 +31,7 @@ export function bookFilterState(book: BookFilterInput): BookFilterState {
   const noText = !book.hasText && book.kind === "pdf" && !a.extracting;
   return {
     working,
+    noText,
     attention: book.failed || noText || f.files + f.chapters + f.translations + f.cleanup > 0,
     ready: !working && book.chapterCount > 0 && book.chaptersWithAudio === book.chapterCount,
   };

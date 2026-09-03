@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { filterCounts, folderMatchesFilter, matchesFilter, type LibraryFilter } from "./library-filter.ts";
 import type { BookRow, FolderRow } from "./book-sort.ts";
 
-const FILTERS: LibraryFilter[] = ["all", "working", "attention", "done"];
+const FILTERS: LibraryFilter[] = ["all", "working", "attention", "ready"];
 
 const book = (working = false, attention = false, ready = false) =>
   ({ filterState: { working, attention, ready } }) as BookRow;
@@ -12,7 +12,7 @@ const folder = (working = 0, attention = 0, ready = 0) =>
 describe("matchesFilter", () => {
   it("reads the server's answer, and All takes everything", () => {
     expect(FILTERS.filter((f) => matchesFilter(book(true), f))).toEqual(["all", "working"]);
-    expect(FILTERS.filter((f) => matchesFilter(book(false, false, true), f))).toEqual(["all", "done"]);
+    expect(FILTERS.filter((f) => matchesFilter(book(false, false, true), f))).toEqual(["all", "ready"]);
     expect(FILTERS.filter((f) => matchesFilter(book(), f))).toEqual(["all"]);
   });
 });
@@ -27,7 +27,7 @@ describe("folderMatchesFilter", () => {
 describe("filterCounts", () => {
   it("counts each chip in one pass, and a book can land in more than one", () => {
     expect(filterCounts([book(true, true), book(false, false, true), book()])).toEqual({
-      all: 3, working: 1, attention: 1, done: 1,
+      all: 3, working: 1, attention: 1, ready: 1,
     });
   });
 
