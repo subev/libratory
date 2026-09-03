@@ -1,6 +1,9 @@
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { pickNumberedChapterIndices, type FlatBlock } from "./marker.ts";
+import { findMarkerJson, pickNumberedChapterIndices, type FlatBlock } from "./marker.ts";
 
 function heading(text: string, page: number, level = 1): FlatBlock {
   return { type: "SectionHeader", text, hierarchy: null, level, page, included: true };
@@ -129,5 +132,41 @@ describe("pickNumberedChapterIndices", () => {
       { ...heading("Chapter 3 Three", 30), included: false },
     ];
     expect(pickNumberedChapterIndices(excluded)).toEqual([]);
+  });
+});
+
+
+describe("findMarkerJson", () => {
+  async function outDir(files: Record<string, string[]>): Promise<string> {
+    const root = await mkdtemp(path.join(tmpdir(), "marker-out-"));
+    for (const [dir, names] of Object.entries(files)) {
+      const target = dir === "." ? root : path.join(root, dir);
+      if (dir !== ".") await mkdir(target, { recursive: true });
+      for (const name of names) await writeFile(path.join(target, name), "{}");
+    }
+    return root;
+  }
+
+  it("takes the json that has marker's own _meta sibling", async () => {
+    const root = await outDir({ ".": ["book.json", "book_meta.json"] });
+    expect(await findMarkerJson(root)).toBe(path.join(root, "book.json"));
+  });
+
+  // The reader writes geometry.json into marker's own output directory the first time a book is
+  // opened. It used to win, because it is a .json that is not a _meta.json — and every book anyone
+  // had read lost its structure view and both Propose buttons to "extraction output missing".
+  it("ignores the reader's geometry.json and keeps looking", async () => {
+    const root = await outDir({ ".": ["geometry.json"], book: ["book.json", "book_meta.json"] });
+    expect(await findMarkerJson(root)).toBe(path.join(root, "book", "book.json"));
+  });
+
+  it("still finds marker's output one directory down", async () => {
+    const root = await outDir({ book: ["book.json", "book_meta.json"] });
+    expect(await findMarkerJson(root)).toBe(path.join(root, "book", "book.json"));
+  });
+
+  it("refuses a directory that only holds someone else's json", async () => {
+    const root = await outDir({ ".": ["geometry.json"] });
+    await expect(findMarkerJson(root)).rejects.toThrow(/did not produce a JSON output file/);
   });
 });

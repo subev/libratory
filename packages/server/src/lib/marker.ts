@@ -458,10 +458,18 @@ export type ExtractOptions = {
   signal?: AbortSignal;
 };
 
+// Marker writes its blocks as `<stem>.json` beside a `<stem>_meta.json`, so the sibling is what
+// identifies the file as ours. Anything else may share the directory: the reader drops a
+// geometry.json in here the first time a book is opened, and it was being picked up instead —
+// which turned the structure view and both Propose buttons into "extraction output missing" on
+// every book anyone had actually read.
+const markerJsonIn = (files: string[]) =>
+  files.find((f) => f.endsWith(".json") && !f.endsWith("_meta.json") && files.includes(`${f.slice(0, -5)}_meta.json`));
+
 export async function findMarkerJson(outDir: string): Promise<string> {
   let searchDir = outDir;
   const files = await readdir(outDir);
-  let jsonFile = files.find((f) => f.endsWith(".json") && !f.endsWith("_meta.json"));
+  let jsonFile = markerJsonIn(files);
 
   if (!jsonFile) {
     for (const entry of files) {
@@ -469,7 +477,7 @@ export async function findMarkerJson(outDir: string): Promise<string> {
       const s = await stat(entryPath);
       if (!s.isDirectory()) continue;
       const subFiles = await readdir(entryPath);
-      const found = subFiles.find((f) => f.endsWith(".json") && !f.endsWith("_meta.json"));
+      const found = markerJsonIn(subFiles);
       if (!found) continue;
       searchDir = entryPath;
       jsonFile = found;
