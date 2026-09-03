@@ -217,21 +217,25 @@ function BookRowActions({
 }) {
   // The reader opens on audio or on pages — the same gate the book page applies, which is why
   // books.list carries these two at all: a reader-mode book has no audio and is still readable.
+  // Absent rather than disabled: a book with neither has no reader to open, so there is no target.
   const canRead = book.hasAudio || book.hasPages;
 
   return (
     <div className="flex items-center justify-end gap-1">
-      <Button
-        variant="icon"
-        size="sm"
-        to={`/books/${book.id}/read`}
-        disabled={!canRead}
-        title={canRead ? "Open the read-along reader" : "Nothing to read yet — this book has no audio and no pages"}
-        aria-label={`Read ${book.title}`}
-        data-testid="row-read"
-      >
-        <IconBook className="h-4 w-4" />
-      </Button>
+      {canRead ? (
+        <Button
+          variant="icon"
+          size="sm"
+          to={`/books/${book.id}/read`}
+          title="Open the read-along reader"
+          aria-label={`Read ${book.title}`}
+          data-testid="library-read-link"
+        >
+          <IconBook className="h-4 w-4" />
+        </Button>
+      ) : (
+        <span className="text-xs text-(--text-faint)">—</span>
+      )}
       <Menu
         testId="book-row-menu"
         width="w-52"
@@ -499,6 +503,7 @@ export function BookList({
               book.outputs.assemblies > 0 ? `${book.outputs.assemblies} M4B` : null,
               book.outputs.pdfs > 0 ? `${book.outputs.pdfs} PDF` : null,
               book.outputs.epubs > 0 ? `${book.outputs.epubs} EPUB` : null,
+              book.outputs.syncedEpubs > 0 ? `${book.outputs.syncedEpubs} Synced EPUB` : null,
             ].filter(Boolean);
 
             return (

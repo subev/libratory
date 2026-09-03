@@ -154,7 +154,7 @@ export const booksRouter = router({
 
     const documentAgg = (await db.execute(sql`
       SELECT book_id, format, count(*)::int AS count FROM documents GROUP BY book_id, format
-    `)) as unknown as Array<{ book_id: string; format: "pdf" | "epub"; count: number }>;
+    `)) as unknown as Array<{ book_id: string; format: "pdf" | "epub" | "epub-sync"; count: number }>;
 
     const lastLogAgg = (await db.execute(sql`
       SELECT book_id, max(created_at) AS last FROM book_logs GROUP BY book_id
@@ -230,6 +230,7 @@ export const booksRouter = router({
           assemblies: assembliesBy.get(book.id)?.[0]?.count ?? 0,
           pdfs: documentRows.find((d) => d.format === "pdf")?.count ?? 0,
           epubs: documentRows.find((d) => d.format === "epub")?.count ?? 0,
+          syncedEpubs: documentRows.find((d) => d.format === "epub-sync")?.count ?? 0,
         },
         lastActivityAt,
       };

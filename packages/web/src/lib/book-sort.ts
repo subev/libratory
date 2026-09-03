@@ -10,7 +10,7 @@ export const BOOK_SORT_VALUE: Record<BookSortKey, (b: BookRow) => string | numbe
   title: (b) => b.title.toLowerCase(),
   chapters: (b) => b.chapterCount,
   langs: (b) => b.languages.length,
-  outputs: (b) => b.outputs.assemblies + b.outputs.pdfs + b.outputs.epubs,
+  outputs: (b) => b.outputs.assemblies + b.outputs.pdfs + b.outputs.epubs + b.outputs.syncedEpubs,
   size: (b) => b.sizeBytes,
   lastActivity: (b) => new Date(b.lastActivityAt).getTime(),
 };
