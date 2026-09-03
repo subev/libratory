@@ -12,6 +12,8 @@ export {
   Gear as IconSettings,
   User as IconProfile,
   DotsSixVertical as IconDragHandle,
+  DotsThree as IconMore,
+  LockSimple as IconLocked,
   ArrowsOutSimple as IconExpand,
   Sparkle as IconAi,
   DownloadSimple as IconDownload,

@@ -3,8 +3,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router";
 import { trpc } from "../trpc.ts";
 import { ModelBundleNotice, useModelBundle } from "../components/ModelBundleNotice.tsx";
 import { ChapterTable } from "../components/ChapterTable.tsx";
-import { SYNTH_BUSY, variantLabel } from "../lib/chapters.ts";
-import { Breadcrumbs } from "../components/Breadcrumbs.tsx";
+import { SYNTH_BUSY } from "../lib/chapters.ts";
 import { SynthesizeModal, type SynthSettings } from "../components/SynthesizeModal.tsx";
 import { StructureModal } from "../components/StructureModal.tsx";
 import { VariantModal } from "../components/VariantModal.tsx";
@@ -12,26 +11,18 @@ import { BookFilesSection } from "../components/BookFilesSection.tsx";
 import { AudioOutputsSection } from "../components/AudioOutputsSection.tsx";
 import { DocumentOutputsSection } from "../components/DocumentOutputsSection.tsx";
 import { LogDock } from "../components/LogDock.tsx";
-import { EditableTitle } from "../components/EditableTitle.tsx";
-import { DiskUsageButton } from "../components/DiskUsageButton.tsx";
+import { DiskUsageModal, useDiskUsageTotal } from "../components/DiskUsage.tsx";
 import { ChapterAiModal, type AiScope } from "../components/ChapterAiModal.tsx";
 import { NotesSection } from "../components/NotesSection.tsx";
-import { PillToggle } from "../components/PillToggle.tsx";
 import { Button } from "../components/Button.tsx";
-import { Section } from "../components/Section.tsx";
+import { BookShell, TabPanel } from "../components/book/BookShell.tsx";
+import { StageTabs } from "../components/book/StageTabs.tsx";
+import { BookHeader } from "../components/book/BookHeader.tsx";
+import { BookDetailsModal } from "../components/book/BookDetailsModal.tsx";
 import { loadBookSort, sortBooks } from "../lib/book-sort.ts";
-import { formatBytes, pendingExportLabel, pendingExportSummary } from "../lib/format.ts";
-import { getVoiceLabel, languageLabel } from "../lib/voices.ts";
-import {
-  IconArrowLeft,
-  IconArrowRight,
-  IconBook,
-  IconChat,
-  IconStructure,
-  IconTranslate,
-  IconVolume,
-  IconDocument,
-} from "../components/icons.tsx";
+import { formatBytes, formatDuration, pendingExportLabel, pendingExportSummary } from "../lib/format.ts";
+import { getVoiceLabel } from "../lib/voices.ts";
+import { IconStructure, IconVolume, IconDocument } from "../components/icons.tsx";
 
 // A worker killed mid-run (restart, network drop) leaves digestJob stuck on "running"; treat a
 // stale heartbeat as interrupted, mirroring the server's resumeDigest guard.
@@ -179,6 +170,8 @@ export function BookDetail() {
   const [showTranslation, setShowTranslation] = useState(false);
   const [showSynthesize, setShowSynthesize] = useState(false);
   const [createTab, setCreateTab] = useState<"audio" | "document">("audio");
+  const [showDetails, setShowDetails] = useState(false);
+  const [showDiskUsage, setShowDiskUsage] = useState(false);
   const [askScope, setAskScope] = useState<AiScope | null>(null);
   const setActiveVariant = (key: string | null) => {
     setSearchParams((prev) => {
@@ -191,6 +184,9 @@ export function BookDetail() {
   // The request belongs to the lane it was made in, so switching lanes withdraws it
   const [titlesRequestedFor, setTitlesRequestedFor] = useState<string | null | undefined>(undefined);
   const titlesRequested = titlesRequestedFor === activeVariant;
+
+  const { data: notes = [] } = trpc.notes.list.useQuery({ bookId: id! }, { enabled: !!id });
+  const diskTotal = useDiskUsageTotal(id!);
 
   const { data: variantLanes = [] } = trpc.variants.list.useQuery(
     { bookId: id! },
@@ -433,714 +429,733 @@ export function BookDetail() {
 
   const langSuffix = activeVariant ? ` · ${activeLabel}` : "";
 
+  const fileCount = book.files?.length ?? 0;
+  const totalDurationMs = viewChapters.reduce((sum, c) => sum + (c.durationMs ?? 0), 0);
+  const headMeta = [
+    fileCount > 0 ? `${fileCount} file${fileCount === 1 ? "" : "s"}` : null,
+    `${book.chapters.length} chapter${book.chapters.length === 1 ? "" : "s"}`,
+    totalDurationMs > 0 ? formatDuration(totalDurationMs) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  // Locked only while there is nothing to show. Extracting a fourth file into a book that already
+  // has chapters must not take the table away — that is a multi-file book's normal working state.
+  const stagesLocked = book.chapters.length === 0 && (book.status === "extracting" || hasActiveFiles);
+  const hasNotes = notes.length > 0 || !!book.noteJob;
+  // ?chapter= is read inside ChapterTable and is how a chat citation and the reader's Back link open
+  // a chapter. Landing on any other tab would make both of them silently do nothing.
+  const tab = searchParams.has("chapter")
+    ? "chapters"
+    : stagesLocked
+      ? "files"
+      : (searchParams.get("tab") ?? (book.chapters.length === 0 ? "files" : "chapters"));
+  const setTab = (next: string) =>
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.set("tab", next);
+        return params;
+      },
+      { replace: true },
+    );
+
+  const extractingFiles = book.files?.filter((f) => f.status === "extracting").length ?? 0;
+  const synthesizingCount = viewChapters.filter((c) => SYNTH_BUSY.includes(c.status)).length;
+  const chaptersWithAudio = viewChapters.filter((c) => c.audioPath).length;
+  const outputCount = bookAssemblies.filter((a) => (a.language ?? null) === activeVariant).length +
+    bookDocuments.filter((d) => (d.language ?? null) === activeVariant).length;
+
+  const deleteAudioAction = {
+    count: audioDataCount,
+    size: audioDataSize,
+    disabled: audioDataCount === 0 || hasActiveChapters || deleteAudioMutation.isPending || deleteVariantAudioMutation.isPending,
+    title:
+      audioDataCount === 0
+        ? "No selected chapters have synthesized audio on disk"
+        : hasActiveChapters
+          ? "Wait for active chapters to finish"
+          : `Delete the synthesized${activeVariant ? ` ${activeLabel}` : ""} audio files and WAV chunks of the selected chapters (${audioDataSize}) — text is kept, re-synthesize anytime`,
+    onDelete: () => {
+      if (
+        confirm(
+          `Delete the synthesized${activeVariant ? ` ${activeLabel}` : ""} audio files and WAV chunks of ${audioDataCount} selected chapter(s), freeing ${audioDataSize}? ${activeVariant ? "Variant text" : "Chapters and text"} are kept — you can re-synthesize anytime.`,
+        )
+      ) {
+        if (activeVariant) {
+          deleteVariantAudioMutation.mutate({ bookId: book.id, key: activeVariant });
+        } else {
+          deleteAudioMutation.mutate({ bookId: book.id });
+        }
+      }
+    },
+  };
+
+  const startRefusal =
+    setAutoSynthesizeMutation.error ??
+    reExtractSelectedMutation.error ??
+    retryMutation.error ??
+    redetectMutation.error ??
+    setAllFilesSelectedMutation.error ??
+    setFileSelectedBatchMutation.error;
+
   return (
-    <div className="min-h-screen bg-(--bg-page)">
-      <div className="max-w-6xl mx-auto px-4 py-8 pb-20">
-        <div className="flex items-center justify-between mb-4">
-          <Breadcrumbs
-            items={[
-              { to: "/", label: "Home" },
-              ...(book.folderPath ?? []).map((f) => ({ to: `/folders/${f.id}`, label: f.name })),
-            ]}
-          />
-          <div className="flex items-center gap-2" data-testid="book-nav">
-            <Button
-              variant="primary"
-              soft
-              size="sm"
-              onClick={() => prevBook && navigate(`/books/${prevBook.id}`)}
-              disabled={!prevBook}
-              title={prevBook ? `Previous book: "${prevBook.title}" — press [` : "This is the first book in the list"}
-              data-testid="prev-book"
+    <BookShell
+      header={
+        <BookHeader
+          bookId={book.id}
+          title={book.title}
+          headMeta={headMeta}
+          crumbs={[
+            { to: "/", label: "Home" },
+            ...(book.folderPath ?? []).map((f) => ({ to: `/folders/${f.id}`, label: f.name })),
+          ]}
+          searchIndex={orderedBooks.find((b) => b.id === book.id)?.searchIndex}
+          hasChapters={book.chapters.length > 0}
+          onRename={(title) => renameMutation.mutate({ id: book.id, title })}
+          prevBook={prevBook ?? null}
+          nextBook={nextBook ?? null}
+          position={bookIndex >= 0 ? { index: bookIndex + 1, total: orderedBooks.length, sortKey: bookSort.key } : null}
+          onNavigate={(target) => navigate(`/books/${target}`)}
+          canRead={hasChapterAudio || hasChapterPages}
+          readTitle={
+            !(hasChapterAudio || hasChapterPages)
+              ? "No chapter is on a page yet — extract chapters to read this book on its own print"
+              : hasChapterAudio
+                ? "Follow the narration on the PDF page, and tap a sentence to jump there"
+                : "Read the book's own pages — synthesize a chapter to follow the narration across them"
+          }
+          onAsk={() => setAskScope({ kind: "book-raw", bookId: book.id, bookTitle: book.title })}
+          lanes={variantLanes}
+          activeVariant={activeVariant}
+          bookLanguage={book.language ?? null}
+          chapterCount={book.chapters.length}
+          onSwitchVariant={setActiveVariant}
+          onAddVariant={() => setShowTranslation(true)}
+          addVariantDisabled={book.chapters.length === 0}
+          addVariantTitle={
+            book.chapters.length === 0
+              ? "Extract chapters first"
+              : "Translate or rewrite chapters (ELI5, summary, custom prompts) and review side by side"
+          }
+          onExtract={() => setExtractOpen(true)}
+          extractDisabled={book.kind !== "pdf"}
+          extractTitle={
+            book.kind !== "pdf"
+              ? "Synthetic book — its chapters were not extracted from a file"
+              : "Choose what to re-read and with which settings"
+          }
+          onDetails={() => setShowDetails(true)}
+          onDiskUsage={() => setShowDiskUsage(true)}
+          diskTotal={diskTotal}
+          deleteAudio={deleteAudioAction}
+          onDeleteBook={() => {
+            if (confirm("Delete this book and all its audio?")) deleteMutation.mutate({ id: book.id });
+          }}
+        />
+      }
+      tabs={
+        <StageTabs
+          value={tab}
+          onChange={setTab}
+          hint={tab === "chapters" ? `${chaptersWithAudio} of ${book.chapters.length} chapters have audio` : undefined}
+          tabs={[
+            {
+              id: "files",
+              step: 1,
+              label: "Source files",
+              count: fileCount || undefined,
+              title: "The files this book was built from, in reading order",
+              badge: extractingFiles > 0 ? { text: `extracting ${extractingFiles}`, tone: "extracting" as const } : null,
+            },
+            {
+              id: "chapters",
+              step: 2,
+              label: "Chapters",
+              count: stagesLocked ? "—" : book.chapters.length,
+              locked: stagesLocked,
+              title: stagesLocked ? "Locked — extract chapters from a source file first" : "Every chapter, its audio and its text",
+              badge: synthesizingCount > 0 ? { text: `${synthesizingCount} synthesizing`, tone: "synthesizing" as const } : null,
+            },
+            {
+              id: "outputs",
+              step: 3,
+              label: "Outputs",
+              count: stagesLocked ? "—" : outputCount,
+              locked: stagesLocked,
+              title: stagesLocked ? "Locked — no chapters yet, so nothing can be built" : "Finished audiobooks and documents",
+              badge:
+                isAssembling || book.assembleQueued
+                  ? { text: "assembling", tone: "assembling" as const }
+                  : viewPendingExports.length > 0
+                    ? { text: viewPendingExports.map(pendingExportSummary).join(" · "), tone: "assembling" as const }
+                    : null,
+            },
+            ...(hasNotes
+              ? [
+                  {
+                    id: "notes",
+                    label: "Notes",
+                    count: notes.length,
+                    trailing: true,
+                    title: "AI answers saved about this book",
+                    badge:
+                      book.noteJob?.status === "queued" || book.noteJob?.status === "running"
+                        ? { text: "answering", tone: "synthesizing" as const }
+                        : null,
+                  },
+                ]
+              : []),
+          ]}
+        />
+      }
+      banner={
+        activeVariant ? (
+          <div
+            className="flex items-center gap-2 px-4 py-1.5 bg-(--accent-subtle) border-b border-(--border) text-xs"
+            data-testid="translation-view-banner"
+          >
+            <span className="font-bold text-(--accent-text)">
+              {activeLabel} {activeKind === "translation" ? "translation" : "rewrite"} view
+            </span>
+            <span className="text-(--text-secondary) truncate">
+              chapters, audio and outputs below are this version
+              {translationsRunning ? (activeKind === "translation" ? " — translation in progress..." : " — rewrite in progress...") : ""}
+            </span>
+            <div className="flex-1" />
+            {missingTitleCount > 0 && (
+              <button
+                onClick={() => translateTitlesMutation.mutate({ bookId: book.id, key: activeVariant })}
+                disabled={translateTitlesMutation.isPending || titlesRequested}
+                title={`Translate the ${missingTitleCount} chapter title${missingTitleCount === 1 ? "" : "s"} still shown in the original language`}
+                className="text-xs font-semibold text-(--accent-text) hover:underline shrink-0 disabled:opacity-50 disabled:no-underline"
+                data-testid="translate-titles"
               >
-              <IconArrowLeft className="h-4 w-4" />
-              Prev
-            </Button>
-            {bookIndex >= 0 && (
-              <span className="text-xs text-(--text-faint) tabular-nums" title={`Position in the home list's current sort (${bookSort.key})`}>
-                {bookIndex + 1} of {orderedBooks.length}
-              </span>
+                {titlesRequested ? `Translating titles (${missingTitleCount} left)...` : `Translate titles (${missingTitleCount})`}
+              </button>
             )}
-            <Button
-              variant="primary"
-              soft
-              size="sm"
-              onClick={() => nextBook && navigate(`/books/${nextBook.id}`)}
-              disabled={!nextBook}
-              title={nextBook ? `Next book: "${nextBook.title}" — press ]` : "This is the last book in the list"}
-              data-testid="next-book"
-              >
-              Next
-              <IconArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 mb-6">
-          <div className="min-w-0">
-             <EditableTitle
-               title={book.title}
-               onRename={(title) => renameMutation.mutate({ id: book.id, title })}
-             />
-             <p className="text-sm text-(--text-muted) mt-1 flex items-center gap-2">
-               <EditableTitle
-                 title={book.author ?? ""}
-                 placeholder="Add an author"
-                 className="text-sm text-(--text-muted)"
-                 hint="Who wrote it — travels with the book when it is exported"
-                 onRename={(author) => updateSettingsMutation.mutate({ id: book.id, author })}
-               />
-               ·
-               {book.language ? (
-                 <span title="The language this book is written in — change it in Extract...">
-                   {languageLabel(book.language)}
-                 </span>
-               ) : (
-                 <span className="text-(--text-faint)" title="Set it in Extract... to get matching voices offered first">
-                   Language not set
-                 </span>
-               )}
-               {book.skipSynthesis && <span>· Reader mode</span>}
-             </p>
-           </div>
-          <div className="shrink-0 pt-1 flex items-center gap-2">
-            <Button
-              variant="secondary"
-              to={`/books/${book.id}/read`}
-              disabled={!(hasChapterAudio || hasChapterPages)}
-              title={
-                !(hasChapterAudio || hasChapterPages)
-                  ? "No chapter is on a page yet — extract chapters to read this book on its own print"
-                  : hasChapterAudio
-                    ? "Follow the narration on the PDF page, and tap a sentence to jump there"
-                    : "Read the book's own pages — synthesize a chapter to follow the narration across them"
-              }
-              data-testid="book-read-link"
+            <button
+              onClick={() => setActiveVariant(null)}
+              className="text-xs font-semibold text-(--accent-text) hover:underline shrink-0"
             >
-              <IconBook className="h-4 w-4" />
-              Open reader
-            </Button>
-            <Button
-              variant="secondary"
-              to={`/chat?bookId=${book.id}`}
-              title="Chat about this book — searches its text and translations, cites pages"
-              data-testid="book-chat-link"
-            >
-              <IconChat className="h-4 w-4" />
-              Chat
-            </Button>
-            <DiskUsageButton bookId={book.id} />
+              Back to original
+            </button>
           </div>
-        </div>
-
-        {/* Starting an extraction can be refused before any job exists — no files selected, or
-            chapters mid-synthesis — and none of these mutations renders its own error. */}
-        {(() => {
-          const refusal =
-            setAutoSynthesizeMutation.error ??
-            reExtractSelectedMutation.error ??
-            retryMutation.error ??
-            redetectMutation.error ??
-            setAllFilesSelectedMutation.error ??
-            setFileSelectedBatchMutation.error;
-          return refusal ? (
-            <div className="bg-(--danger-bg) border border-(--danger) rounded-lg p-3 mb-4" data-testid="extract-start-error">
-              <p className="text-sm text-(--danger-text)">Could not start: {refusal.message}</p>
+        ) : null
+      }
+      dock={
+        <LogDock
+          bookId={book.id}
+          isProcessing={isProcessing || translationsRunning}
+          files={book.files?.map((f) => ({ index: f.index, filename: f.filename }))}
+        />
+      }
+    >
+      {(startRefusal || book.error) && (
+        <div className="px-4 pt-4 space-y-2">
+          {startRefusal && (
+            <div className="bg-(--danger-bg) border border-(--danger) rounded-lg p-3" data-testid="extract-start-error">
+              <p className="text-sm text-(--danger-text)">Could not start: {startRefusal.message}</p>
             </div>
-          ) : null;
-        })()}
+          )}
+          {/* "All N file(s) failed extraction" only counts what the rows below already say, and says
+              it louder than the reason. */}
+          {book.error && !/^All \d+ file\(s\) failed extraction$/.test(book.error) && (
+            <div className="bg-(--danger-bg) border border-(--danger) rounded-lg p-3">
+              <p className="text-sm text-(--danger-text) font-mono">{book.error}</p>
+            </div>
+          )}
+        </div>
+      )}
 
-        {/* "All 1 file(s) failed extraction" only counts what the rows below already say, and says
-            it louder than the reason. Matching that one sentence rather than "some file failed":
-            "No chapters detected in any file" is also set by the extract worker, and assembly,
-            re-detection and export write here too — none of them has a row to appear in. */}
-        {book.error && !/^All \d+ file\(s\) failed extraction$/.test(book.error) && (
-          <div className="bg-(--danger-bg) border border-(--danger) rounded-lg p-3 mb-4">
-            <p className="text-sm text-(--danger-text) font-mono">{book.error}</p>
-          </div>
-        )}
-
-        {/* STAGE 1: Input — source files & extraction */}
-        {book.kind === "pdf" ? (
-          <BookFilesSection
-            files={book.files ?? []}
-            chapters={book.chapters}
-            bookId={book.id}
-            isProcessing={isProcessing}
-            forceOcr={book.forceOcr}
-            llmChapterDetection={book.llmChapterDetection}
-            chapterModel={book.chapterModel ?? null}
-            language={book.language ?? null}
-            onUpdateExtractionSettings={(settings) => updateSettingsMutation.mutate({ id: book.id, ...settings })}
-            onSetSelected={(fid, selected) => setFileSelectedMutation.mutate({ id: fid, selected })}
-            onSetAllSelected={(selected) => setAllFilesSelectedMutation.mutateAsync({ bookId: book.id, selected })}
-            onSetSelectedBatch={(ids, selected) => setFileSelectedBatchMutation.mutateAsync({ ids, selected })}
-            onRemove={(fid) => removeFileMutation.mutate({ id: fid })}
-            voiceLabel={getVoiceLabel(book.voice)}
-            extractOpen={extractOpen}
-            onExtractOpenChange={setExtractOpen}
-            onStartExtraction={async (scope, autoSynthesize) => {
-              for (const m of [setAutoSynthesizeMutation, reExtractSelectedMutation, retryMutation, redetectMutation]) m.reset();
-              try {
-                // Starting with the previous follow-on setting is worse than not starting: it decides
-                // whether hours of synthesis begin on their own when this finishes.
-                await setAutoSynthesizeMutation.mutateAsync({ id: book.id, autoSynthesize });
-              } catch {
-                return; // The banner is already showing it
-              }
-              if (scope === "selected") reExtractSelectedMutation.mutate({ bookId: book.id });
-              else if (scope === "book") retryMutation.mutate({ id: book.id });
-              else redetectMutation.mutate({ id: book.id });
-            }}
-            onCancelExtraction={() => {
-              if (confirm("Stop the running extraction? Files already extracted are kept.")) {
-                cancelMutation.mutate({ id: book.id });
-              }
-            }}
-            onCancel={(fid) => cancelFileMutation.mutate({ id: fid })}
-            onFilesAdded={invalidate}
-          />
-        ) : (
-          <Section stripe="input" className="mb-6 flex items-baseline gap-2">
-            <span className="text-xs font-medium text-(--warning-text) uppercase tracking-wider">1 · Input</span>
+      <TabPanel active={tab === "files"}>
+        <div className="p-4">
+          {book.kind === "pdf" ? (
+            <BookFilesSection
+              files={book.files ?? []}
+              chapters={book.chapters}
+              bookId={book.id}
+              isProcessing={isProcessing}
+              forceOcr={book.forceOcr}
+              llmChapterDetection={book.llmChapterDetection}
+              chapterModel={book.chapterModel ?? null}
+              language={book.language ?? null}
+              onUpdateExtractionSettings={(settings) => updateSettingsMutation.mutate({ id: book.id, ...settings })}
+              onSetSelected={(fid, selected) => setFileSelectedMutation.mutate({ id: fid, selected })}
+              onSetAllSelected={(selected) => setAllFilesSelectedMutation.mutateAsync({ bookId: book.id, selected })}
+              onSetSelectedBatch={(ids, selected) => setFileSelectedBatchMutation.mutateAsync({ ids, selected })}
+              onRemove={(fid) => removeFileMutation.mutate({ id: fid })}
+              voiceLabel={getVoiceLabel(book.voice)}
+              extractOpen={extractOpen}
+              onExtractOpenChange={setExtractOpen}
+              onStartExtraction={async (scope, autoSynthesize) => {
+                for (const m of [setAutoSynthesizeMutation, reExtractSelectedMutation, retryMutation, redetectMutation]) m.reset();
+                try {
+                  // Starting with the previous follow-on setting is worse than not starting: it decides
+                  // whether hours of synthesis begin on their own when this finishes.
+                  await setAutoSynthesizeMutation.mutateAsync({ id: book.id, autoSynthesize });
+                } catch {
+                  return; // The banner is already showing it
+                }
+                if (scope === "selected") reExtractSelectedMutation.mutate({ bookId: book.id });
+                else if (scope === "book") retryMutation.mutate({ id: book.id });
+                else redetectMutation.mutate({ id: book.id });
+              }}
+              onCancelExtraction={() => {
+                if (confirm("Stop the running extraction? Files already extracted are kept.")) {
+                  cancelMutation.mutate({ id: book.id });
+                }
+              }}
+              onCancel={(fid) => cancelFileMutation.mutate({ id: fid })}
+              onFilesAdded={invalidate}
+            />
+          ) : (
             <p className="text-sm text-(--text-muted)" data-testid="synthetic-no-input">
               {book.kind === "digest"
                 ? "Chapters were written from other books in your library — a digest has no source files to upload or extract."
                 : "Chapters arrived through the API — this book has no source files to upload or extract."}
             </p>
-          </Section>
-        )}
+          )}
 
-        {/* STAGE 2: Work — chapter structure, text, translation */}
-        <Section stripe="work" className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-(--text-secondary)">
-                <span className="text-xs font-medium text-(--accent-text) uppercase tracking-wider mr-2">2 · Work</span>
-                Chapters
-              </h2>
-              {book.chapterDetection && (
-                <span
-                  className="text-xs px-2 py-0.5 rounded-full bg-(--bg-subtle) text-(--text-muted)"
-                  title={{
-                    "llm": "Boundaries picked by AI from the table of contents",
-                    "numbered-headings": "Numbered chapter headings (Chapter N) found in the document",
-                    "heading-levels": "Split at the most plausible heading level",
-                    "word-split": "No usable headings — split every ~5000 words",
-                    "manual": "Boundaries chosen by hand in the structure view",
-                  }[book.chapterDetection]}
-                >
-                  {{
-                    "llm": "LLM · ToC-matched",
-                    "numbered-headings": "Chapter numbering",
-                    "heading-levels": "Heading heuristic",
-                    "word-split": "Word-count split",
-                    "manual": "Manual boundaries",
-                  }[book.chapterDetection]}
-                </span>
-              )}
-            </div>
-            {book.chapters.length > 0 && (
-              <span className="text-sm text-(--text-muted)">
-                {selectedCount} of {book.chapters.length} selected
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 mb-3 flex-wrap">
-            <Button
-              variant="secondary"
-              onClick={() => setShowStructure(true)}
-              disabled={book.kind !== "pdf"}
-              title={book.kind !== "pdf" ? "Synthetic book — no PDF structure to edit" : "Review every detected heading and edit chapter boundaries by hand"}
-              data-testid="open-structure"
-            >
-              <IconStructure className="w-4 h-4 text-(--accent-text)" />
-              Structure
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setShowTranslation(true)}
-              disabled={book.chapters.length === 0}
-              title={book.chapters.length === 0 ? "Extract chapters first" : "Translate or rewrite chapters (ELI5, summary, custom prompts) and review side by side"}
-              data-testid="open-translation"
-            >
-              <IconTranslate className="w-4 h-4 text-(--accent-text)" />
-              Translate / Transform
-            </Button>
-
-            {/* Variant view switcher */}
-            {variantLanes.length > 0 && (
-              <div className="flex items-center gap-2 ml-auto" data-testid="language-switcher">
-                <PillToggle
-                  selected={!activeVariant}
-                  onClick={() => setActiveVariant(null)}
-                  title={
-                    book.language
-                      ? `The book's own text (${book.language.toUpperCase()}) — change the language in Re-extract...`
-                      : "The book's own text — set its language in Re-extract... to get matching voices"
-                  }
-                >
-                  Original
-                  {book.language && (
-                    <span className={`ml-1.5 ${!activeVariant ? "text-(--on-accent)/70" : "text-(--text-faint)"}`}>
-                      {book.language.toUpperCase()}
-                    </span>
+          {book.chapters.length === 0 && (
+            <div className="mt-4">
+              {isSynthetic ? (
+                <div className="rounded-lg border border-(--border) bg-(--bg-subtle) p-4 space-y-3" data-testid="digest-block">
+                  {digestLive ? (
+                    <div className="flex items-center gap-2 text-sm text-(--text-secondary)">
+                      <span className="w-2 h-2 rounded-full bg-(--accent) animate-[pulse-dot_1.15s_ease-in-out_infinite]" />
+                      Generating digest — {book.digestJob?.progress ? `${book.digestJob.progress} books` : "starting"}... chapters appear as summaries finish.
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm text-(--text-secondary)">
+                        {digestFailed ? `Digest failed: ${book.digestJob?.error ?? "unknown error"}` : "No chapters were generated."}
+                      </p>
+                      <Button
+                        variant="secondary"
+                        onClick={() => resumeDigestMutation.mutate({ id: book.id })}
+                        disabled={resumeDigestMutation.isPending}
+                        title="Re-run the digest — books that already have a summary chapter are skipped"
+                        data-testid="resume-digest"
+                      >
+                        {resumeDigestMutation.isPending ? "Queuing..." : "Resume digest"}
+                      </Button>
+                      {resumeDigestMutation.error && <p className="text-(--danger-text) text-sm">{resumeDigestMutation.error.message}</p>}
+                    </>
                   )}
-                </PillToggle>
-                {variantLanes.map((l) => (
-                  <PillToggle
-                    key={l.key}
-                    selected={activeVariant === l.key}
-                    onClick={() => setActiveVariant(l.key)}
-                    title={`${l.done} of ${book.chapters.length} chapters ${l.kind === "translation" ? "translated" : "rewritten"}`}
-                  >
-                    {variantLabel(l)} ({l.done}/{book.chapters.length})
-                  </PillToggle>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {activeVariant && (
-            <div
-              className="flex items-center gap-2 mb-3 px-4 py-2.5 rounded-lg bg-(--accent-subtle) border border-(--accent) text-sm text-(--text-primary)"
-              data-testid="translation-view-banner"
-            >
-              <span className="font-semibold">{activeLabel} {activeKind === "translation" ? "translation" : "rewrite"} view</span>
-              <span className="text-(--text-secondary)">
-                — text, audio, and assemblies below are the {activeLabel} version. Select chapters to generate or synthesize them in bulk.
-                {translationsRunning ? (activeKind === "translation" ? " Translation in progress..." : " Rewrite in progress...") : ""}
-              </span>
-              <div className="flex-1" />
-              {missingTitleCount > 0 ? (
-                <button
-                  onClick={() => translateTitlesMutation.mutate({ bookId: book.id, key: activeVariant })}
-                  disabled={translateTitlesMutation.isPending || titlesRequested}
-                  title={`Translate the ${missingTitleCount} chapter title${missingTitleCount === 1 ? "" : "s"} still shown in the original language`}
-                  className="text-xs font-medium text-(--accent-text) hover:underline shrink-0 disabled:opacity-50 disabled:no-underline"
-                  data-testid="translate-titles"
-                >
-                  {titlesRequested ? `Translating titles (${missingTitleCount} left)...` : `Translate titles (${missingTitleCount})`}
-                </button>
-              ) : null}
-              <button
-                onClick={() => setActiveVariant(null)}
-                className="text-xs font-medium text-(--accent-text) hover:underline shrink-0"
-              >
-                Back to original
-              </button>
-            </div>
-          )}
-
-          {/* Chapter work toolbar — acts on the selected chapters */}
-          {book.chapters.length > 0 && (
-            <div className="flex gap-3 mb-3 flex-wrap">
-              <Button
-                variant="primary"
-                onClick={() => setShowSynthesize(true)}
-                disabled={selectedSynthesizable === 0}
-                title={
-                  selectedSynthesizable === 0
-                    ? (activeVariant ? `No selected chapters have ${activeLabel} text ready or underway` : "No selected chapters are ready for synthesis")
-                    : "Pick voice and speed, then synthesize the selected chapters"
-                }
-                data-testid="open-synthesize"
-              >
-                Synthesize selected ({selectedSynthesizable}){langSuffix}...
-              </Button>
-              {(hasActiveChapters || translationAudioQueued) && (
-                <Button
-                  variant="secondary"
-                  onClick={() =>
-                    activeVariant
-                      ? stopAudioMutation.mutate({ bookId: book.id, key: activeVariant })
-                      : cancelMutation.mutate({ id: book.id })
-                  }
-                  disabled={cancelMutation.isPending || stopAudioMutation.isPending}
-                  title="Stop the running synthesis — finished chapters keep their audio, the rest resume later"
-                  data-testid="cancel-processing"
-                >
-                  Cancel processing
-                </Button>
-              )}
-              <Button
-                variant="secondary"
-                onClick={() => processSelectedVariantsMutation.mutate({ bookId: book.id, key: activeVariant! })}
-                disabled={!activeVariant || selectedTranslatable === 0 || processSelectedVariantsMutation.isPending}
-                title={
-                  !activeVariant ? "Open a variant view to run it on the selected chapters" :
-                  selectedTranslatable === 0 ? "No selected chapters need this — finished ones are skipped" :
-                  activeKind === "translation"
-                    ? `Translate the selected chapters to ${activeLabel} (finished ones are skipped, stopped ones resume)`
-                    : `Rewrite the selected chapters as ${activeLabel} (finished ones are skipped, stopped ones resume)`
-                }
-                data-testid="translate-selected"
-              >
-                {activeKind === "translation" ? "Translate" : "Rewrite"} selected ({selectedTranslatable}){langSuffix}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => cleanupSelectedMutation.mutate({ bookId: book.id })}
-                disabled={!!activeVariant || selectedCleanable === 0 || cleanupSelectedMutation.isPending}
-                title={
-                  activeVariant ? "Switch to the Original view — cleanup runs on the original text" :
-                  selectedCleanable === 0 ? "No selected chapters need cleanup — already-cleaned and running ones are skipped" :
-                  "Ask AI to strip OCR artifacts from the selected chapters without altering the prose (cleaned ones are skipped)"
-                }
-                data-testid="cleanup-selected"
-              >
-                Cleanup selected ({selectedCleanable})
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  const selected = book.chapters.filter((c) => c.selected).map((c) => ({ id: c.id, title: c.title }));
-                  setAskScope(
-                    selected.length > 0 && !activeVariant
-                      ? { kind: "chapters", bookId: book.id, chapters: selected }
-                      : { kind: "book-raw", bookId: book.id, bookTitle: book.title, chapters: selected },
-                  );
-                }}
-                disabled={book.rawTextTotalWords === 0 && (selectedCount === 0 || !!activeVariant)}
-                title={
-                  book.rawTextTotalWords === 0 && selectedCount === 0
-                    ? "No raw text or chapters to ask about"
-                    : "Summarize, question, or run any prompt — switch between selected chapters and the whole book inside"
-                }
-                data-testid="ask-ai-selected"
-              >
-                Ask AI
-              </Button>
-              <Button
-                variant="danger"
-                onClick={() => {
-                  if (confirm(`Delete ${selectedCount} selected chapter(s) and their audio?`)) {
-                    deleteChaptersMutation.mutate({ bookId: book.id });
-                  }
-                }}
-                disabled={selectedCount === 0 || hasActiveChapters || !!activeVariant || deleteChaptersMutation.isPending}
-                title={
-                  activeVariant ? "Switch to the Original view to delete chapters" :
-                  selectedCount === 0 ? "No chapters selected" :
-                  hasActiveChapters ? "Wait for active chapters to finish" :
-                  "Delete selected chapters and their audio"
-                }
-              >
-                Delete selected ({selectedCount})
-              </Button>
-            </div>
-          )}
-
-          {book.chapters.length === 0 ? (
-            isSynthetic ? (
-              <div className="rounded-lg border border-(--border) bg-(--bg-subtle) p-4 space-y-3" data-testid="digest-block">
-                {digestLive ? (
-                  <div className="flex items-center gap-2 text-sm text-(--text-secondary)">
-                    <span className="w-2 h-2 rounded-full bg-(--accent) animate-pulse" />
-                    Generating digest — {book.digestJob?.progress ? `${book.digestJob.progress} books` : "starting"}... chapters appear as summaries finish.
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-sm text-(--text-secondary)">
-                      {digestFailed
-                        ? `Digest failed: ${book.digestJob?.error ?? "unknown error"}`
-                        : "No chapters were generated."}
-                    </p>
+                </div>
+              ) : book.status === "extracting" || hasActiveFiles ? (
+                <p className="text-(--text-muted) text-sm">Extracting chapters from PDF...</p>
+              ) : (
+                <div className="rounded-lg border border-(--border) bg-(--bg-subtle) p-4 space-y-3" data-testid="raw-book-block">
+                  <p className="text-sm text-(--text-secondary)">
+                    {hasRawText
+                      ? `Raw text extracted — ${book.rawTextTotalWords.toLocaleString()} words across ${book.files?.length ?? 0} file${(book.files?.length ?? 0) === 1 ? "" : "s"}. Ask AI about the whole book right away, or extract chapters to structure, translate, and listen.`
+                      : "No chapters extracted yet, and no raw text is available — the PDF may be scanned or encrypted."}
+                  </p>
+                  <div className="flex gap-3 flex-wrap">
+                    <Button
+                      variant="primary"
+                      onClick={() => setExtractOpen(true)}
+                      disabled={!extractionReady}
+                      title={
+                        extractionReady
+                          ? "Choose what to read and with which settings, then start — Marker takes minutes per book"
+                          : "Full extraction needs the Marker models — download them below"
+                      }
+                      data-testid="extract-chapters"
+                    >
+                      Extract chapters...
+                    </Button>
                     <Button
                       variant="secondary"
-                      onClick={() => resumeDigestMutation.mutate({ id: book.id })}
-                      disabled={resumeDigestMutation.isPending}
-                      title="Re-run the digest — books that already have a summary chapter are skipped"
-                      data-testid="resume-digest"
+                      onClick={() => setAskScope({ kind: "book-raw", bookId: book.id, bookTitle: book.title })}
+                      disabled={!hasRawText}
+                      title={
+                        hasRawText
+                          ? "Summarize, question, or run any prompt against the whole book's raw text"
+                          : "No raw text — the PDF may be scanned; run Extract chapters with Force OCR instead"
+                      }
+                      data-testid="ask-ai-book"
                     >
-                      {resumeDigestMutation.isPending ? "Queuing..." : "Resume digest"}
+                      Ask AI (whole book)
                     </Button>
-                    {resumeDigestMutation.error && (
-                      <p className="text-(--danger-text) text-sm">{resumeDigestMutation.error.message}</p>
-                    )}
-                  </>
-                )}
-              </div>
-            ) : book.status === "extracting" || hasActiveFiles ? (
-              <p className="text-(--text-muted) text-sm">Extracting chapters from PDF...</p>
-            ) : (
-              <div className="rounded-lg border border-(--border) bg-(--bg-subtle) p-4 space-y-3" data-testid="raw-book-block">
-                <p className="text-sm text-(--text-secondary)">
-                  {hasRawText
-                    ? `Raw text extracted — ${book.rawTextTotalWords.toLocaleString()} words across ${book.files?.length ?? 0} file${(book.files?.length ?? 0) === 1 ? "" : "s"}. Ask AI about the whole book right away, or extract chapters to structure, translate, and listen.`
-                    : "No chapters extracted yet, and no raw text is available — the PDF may be scanned or encrypted."}
-                </p>
-                <div className="flex gap-3 flex-wrap">
-                  <Button
-                    variant="primary"
-                    onClick={() => setExtractOpen(true)}
-                    disabled={!extractionReady}
-                    title={extractionReady
-                      ? "Choose what to read and with which settings, then start — Marker takes minutes per book"
-                      : "Full extraction needs the Marker models — download them below"}
-                    data-testid="extract-chapters"
-                  >
-                    Extract chapters...
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => setAskScope({ kind: "book-raw", bookId: book.id, bookTitle: book.title })}
-                    disabled={!hasRawText}
-                    title={
-                      hasRawText
-                        ? "Summarize, question, or run any prompt against the whole book's raw text"
-                        : "No raw text — the PDF may be scanned; run Extract chapters with Force OCR instead"
-                    }
-                    data-testid="ask-ai-book"
-                  >
-                    Ask AI (whole book)
-                  </Button>
-                </div>
-                <ModelBundleNotice id="extraction" verb="Extracting chapters" />
-              </div>
-            )
-          ) : (
-            <>
-            {isSynthetic && digestLive && (
-              <div className="flex items-center gap-2 text-sm text-(--text-muted) mb-2" data-testid="digest-progress">
-                <span className="w-2 h-2 rounded-full bg-(--accent) animate-pulse" />
-                Generating digest — {book.digestJob?.progress ? `${book.digestJob.progress} books` : "starting"}...
-              </div>
-            )}
-            {isSynthetic && (digestFailed || digestIncomplete) && (
-              <div className="flex items-center gap-3 text-sm mb-2" data-testid="digest-partial-failed">
-                <span className="text-(--danger-text)">
-                  {digestFailed
-                    ? `Digest incomplete: ${book.digestJob?.error ?? "some sources failed"}`
-                    : `Digest interrupted — ${book.chapters.length} of ${digestTotal} books summarized`}
-                </span>
-                <button
-                  onClick={() => resumeDigestMutation.mutate({ id: book.id })}
-                  disabled={resumeDigestMutation.isPending}
-                  title="Re-run the digest — books that already have a summary chapter are skipped"
-                  className="text-(--accent-text) hover:underline font-medium disabled:opacity-50"
-                >
-                  Resume
-                </button>
-              </div>
-            )}
-            <ChapterTable
-          language={book.language ?? null}
-              bookId={book.id}
-              chapters={viewChapters}
-              files={book.files?.map((f) => ({ id: f.id, index: f.index, filename: f.filename }))}
-              onQueue={(cid, resume) =>
-                activeVariant
-                  ? queueAudioMutation.mutate({ chapterId: cid, key: activeVariant, resume })
-                  : queueMutation.mutate({ id: cid, resume })
-              }
-              onRename={activeVariant ? undefined : (cid, title) => renameChapterMutation.mutate({ id: cid, title })}
-              onReorder={activeVariant ? undefined : (chapterIds) => reorderChaptersMutation.mutate({ bookId: book.id, chapterIds })}
-              onSetSelected={(cid, selected) => setSelectedMutation.mutate({ id: cid, selected })}
-              onSetAllSelected={(selected) => setAllSelectedMutation.mutate({ bookId: book.id, selected })}
-              onSetSelectedBatch={(ids, selected) => setSelectedBatchMutation.mutate({ ids, selected })}
-              variant={activeLane ?? (activeVariant ? { key: activeVariant, kind: "translation" as const, label: null } : null)}
-              variants={variantLanes.map((l) => ({ key: l.key, label: l.label, kind: l.kind }))}
-              onSwitchVariant={setActiveVariant}
-              synth={synth}
-            />
-            </>
-          )}
-
-          {/* Create outputs from the selected chapters */}
-          {book.chapters.length > 0 && (
-            <div className="mt-4">
-              <div className="inline-flex rounded-lg bg-(--bg-subtle) border border-(--border) p-1 gap-1">
-                {/* button-ok: a tab in a segmented control — picking which panel shows, not an action */}
-                <button
-                  onClick={() => setCreateTab("audio")}
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    createTab === "audio"
-                      ? "bg-(--bg-card) shadow-sm text-(--accent-text)"
-                      : "text-(--text-muted) hover:text-(--text-secondary)"
-                  }`}
-                  data-testid="create-tab-audio"
-                >
-                  <IconVolume className="w-4 h-4" />
-                  Create audio
-                  {(hasActiveChapters || translationAudioQueued) && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-(--accent) animate-pulse" title="Synthesis in progress" />
-                  )}
-                </button>
-                {/* button-ok: a tab in a segmented control — picking which panel shows, not an action */}
-                <button
-                  onClick={() => setCreateTab("document")}
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    createTab === "document"
-                      ? "bg-(--bg-card) shadow-sm text-(--accent-text)"
-                      : "text-(--text-muted) hover:text-(--text-secondary)"
-                  }`}
-                  data-testid="create-tab-document"
-                >
-                  <IconDocument className="w-4 h-4" />
-                  Create document
-                  {viewPendingExports.length > 0 && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-(--accent) animate-pulse" title="Export in progress" />
-                  )}
-                </button>
-              </div>
-              {selectedInFlight > 0 && (
-                <div className="pt-3 flex items-center gap-2 flex-wrap" data-testid="output-timing">
-                  <span className="text-xs text-(--text-muted)">
-                    {selectedInFlight} of {selectedCount} selected chapter{selectedCount === 1 ? "" : "s"} still synthesizing —
-                  </span>
-                  <div className="inline-flex rounded-lg bg-(--bg-subtle) border border-(--border) p-0.5 gap-0.5">
-                    {/* button-ok: one side of a segmented choice, not an action — the build runs from the button below */}
-                    <button
-                      onClick={() => setWaitForAll(false)}
-                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                        waitForAll ? "text-(--text-muted) hover:text-(--text-secondary)" : "bg-(--bg-card) shadow-sm text-(--text-primary)"
-                      }`}
-                      title="Build straight away from the chapters that already have audio"
-                      data-testid="output-timing-now"
-                    >
-                      Ready now ({selectedWithAudio})
-                    </button>
-                    {/* button-ok: one side of a segmented choice, not an action — the build runs from the button below */}
-                    <button
-                      onClick={() => setWaitForAll(true)}
-                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                        waitForAll ? "bg-(--bg-card) shadow-sm text-(--text-primary)" : "text-(--text-muted) hover:text-(--text-secondary)"
-                      }`}
-                      title="Queue the job now — it runs by itself once no chapter is still synthesizing"
-                      data-testid="output-timing-wait"
-                    >
-                      When all {selectedCount} finish
-                    </button>
                   </div>
+                  <ModelBundleNotice id="extraction" verb="Extracting chapters" />
                 </div>
               )}
-              <div className={`pt-3 space-y-3 ${createTab === "audio" ? "" : "hidden"}`}>
-                <div className="flex items-center gap-2 flex-wrap">
+            </div>
+          )}
+        </div>
+      </TabPanel>
+
+      <TabPanel active={tab === "chapters"}>
+        <div className="p-4">
+          {book.chapters.length === 0 ? (
+            <p className="text-sm text-(--text-muted)">No chapters yet — extract them from the source files.</p>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowStructure(true)}
+                  disabled={book.kind !== "pdf"}
+                  title={
+                    book.kind !== "pdf"
+                      ? "Synthetic book — no PDF structure to edit"
+                      : "Review every detected heading and edit chapter boundaries by hand"
+                  }
+                  data-testid="open-structure"
+                >
+                  <IconStructure className="w-4 h-4 text-(--accent-text)" />
+                  Structure
+                </Button>
+                {book.chapterDetection && (
+                  <span
+                    className="text-xs px-2 py-0.5 rounded-full bg-(--bg-subtle) text-(--text-muted)"
+                    title={
+                      {
+                        llm: "Boundaries picked by AI from the table of contents",
+                        "numbered-headings": "Numbered chapter headings (Chapter N) found in the document",
+                        "heading-levels": "Split at the most plausible heading level",
+                        "word-split": "No usable headings — split every ~5000 words",
+                        manual: "Boundaries chosen by hand in the structure view",
+                      }[book.chapterDetection]
+                    }
+                  >
+                    {
+                      {
+                        llm: "LLM · ToC-matched",
+                        "numbered-headings": "Chapter numbering",
+                        "heading-levels": "Heading heuristic",
+                        "word-split": "Word-count split",
+                        manual: "Manual boundaries",
+                      }[book.chapterDetection]
+                    }
+                  </span>
+                )}
+                <div className="flex-1" />
+                <span className="text-sm text-(--text-muted)">
+                  {selectedCount} of {book.chapters.length} selected
+                </span>
+              </div>
+
+              <div className="flex gap-3 mb-3 flex-wrap">
                 <Button
                   variant="primary"
-                  onClick={() =>
-                    activeVariant
-                      ? assembleVariantMutation.mutate({ bookId: book.id, key: activeVariant, waitForAll: deferOutputs })
-                      : assembleMutation.mutate({ id: book.id, waitForAll: deferOutputs })
-                  }
-                  disabled={!canAssemble || assembleMutation.isPending || assembleVariantMutation.isPending}
+                  onClick={() => setShowSynthesize(true)}
+                  disabled={selectedSynthesizable === 0}
                   title={
-                    selectedCount === 0 ? "No chapters selected" :
-                    deferOutputs ? `Queue the assembly now — it runs once the ${selectedInFlight} chapter(s) still synthesizing are finished` :
-                    !allSelectedDone ? "All selected chapters must be done with audio" :
-                    isAssembling ? "Assembly already in progress" :
-                    undefined
+                    selectedSynthesizable === 0
+                      ? activeVariant
+                        ? `No selected chapters have ${activeLabel} text ready or underway`
+                        : "No selected chapters are ready for synthesis"
+                      : "Pick voice and speed, then synthesize the selected chapters"
                   }
-                  data-testid="assemble-button"
+                  data-testid="open-synthesize"
                 >
-                  {book.outputPath ? "Re-assemble" : "Assemble"}{deferOutputs ? " when ready" : " selected"} ({deferOutputs ? selectedCount : selectedWithAudio}){langSuffix}
+                  Synthesize selected ({selectedSynthesizable}){langSuffix}...
+                </Button>
+                {(hasActiveChapters || translationAudioQueued) && (
+                  <Button
+                    variant="secondary"
+                    onClick={() =>
+                      activeVariant ? stopAudioMutation.mutate({ bookId: book.id, key: activeVariant }) : cancelMutation.mutate({ id: book.id })
+                    }
+                    disabled={cancelMutation.isPending || stopAudioMutation.isPending}
+                    title="Stop the running synthesis — finished chapters keep their audio, the rest resume later"
+                    data-testid="cancel-processing"
+                  >
+                    Cancel processing
+                  </Button>
+                )}
+                <Button
+                  variant="secondary"
+                  onClick={() => processSelectedVariantsMutation.mutate({ bookId: book.id, key: activeVariant! })}
+                  disabled={!activeVariant || selectedTranslatable === 0 || processSelectedVariantsMutation.isPending}
+                  title={
+                    !activeVariant
+                      ? "Open a variant view to run it on the selected chapters"
+                      : selectedTranslatable === 0
+                        ? "No selected chapters need this — finished ones are skipped"
+                        : activeKind === "translation"
+                          ? `Translate the selected chapters to ${activeLabel} (finished ones are skipped, stopped ones resume)`
+                          : `Rewrite the selected chapters as ${activeLabel} (finished ones are skipped, stopped ones resume)`
+                  }
+                  data-testid="translate-selected"
+                >
+                  {activeKind === "translation" ? "Translate" : "Rewrite"} selected ({selectedTranslatable}){langSuffix}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => cleanupSelectedMutation.mutate({ bookId: book.id })}
+                  disabled={!!activeVariant || selectedCleanable === 0 || cleanupSelectedMutation.isPending}
+                  title={
+                    activeVariant
+                      ? "Switch to the Original view — cleanup runs on the original text"
+                      : selectedCleanable === 0
+                        ? "No selected chapters need cleanup — already-cleaned and running ones are skipped"
+                        : "Ask AI to strip OCR artifacts from the selected chapters without altering the prose (cleaned ones are skipped)"
+                  }
+                  data-testid="cleanup-selected"
+                >
+                  Cleanup selected ({selectedCleanable})
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    const selected = book.chapters.filter((c) => c.selected).map((c) => ({ id: c.id, title: c.title }));
+                    setAskScope(
+                      selected.length > 0 && !activeVariant
+                        ? { kind: "chapters", bookId: book.id, chapters: selected }
+                        : { kind: "book-raw", bookId: book.id, bookTitle: book.title, chapters: selected },
+                    );
+                  }}
+                  disabled={book.rawTextTotalWords === 0 && (selectedCount === 0 || !!activeVariant)}
+                  title={
+                    book.rawTextTotalWords === 0 && selectedCount === 0
+                      ? "No raw text or chapters to ask about"
+                      : "Summarize, question, or run any prompt — switch between selected chapters and the whole book inside"
+                  }
+                  data-testid="ask-ai-selected"
+                >
+                  Ask AI
                 </Button>
                 <Button
                   variant="danger"
-                  soft
                   onClick={() => {
-                    if (confirm(`Delete the synthesized${activeVariant ? ` ${activeLabel}` : ""} audio files and WAV chunks of ${audioDataCount} selected chapter(s), freeing ${audioDataSize}? ${activeVariant ? "Variant text" : "Chapters and text"} are kept — you can re-synthesize anytime.`)) {
-                      if (activeVariant) {
-                        deleteVariantAudioMutation.mutate({ bookId: book.id, key: activeVariant });
-                      } else {
-                        deleteAudioMutation.mutate({ bookId: book.id });
-                      }
+                    if (confirm(`Delete ${selectedCount} selected chapter(s) and their audio?`)) {
+                      deleteChaptersMutation.mutate({ bookId: book.id });
                     }
                   }}
-                  disabled={audioDataCount === 0 || hasActiveChapters || deleteAudioMutation.isPending || deleteVariantAudioMutation.isPending}
+                  disabled={selectedCount === 0 || hasActiveChapters || !!activeVariant || deleteChaptersMutation.isPending}
                   title={
-                    audioDataCount === 0 ? "No selected chapters have synthesized audio on disk" :
-                    hasActiveChapters ? "Wait for active chapters to finish" :
-                    `Delete the synthesized${activeVariant ? ` ${activeLabel}` : ""} audio files and WAV chunks of the selected chapters (${audioDataSize}) — text is kept, re-synthesize anytime`
+                    activeVariant
+                      ? "Switch to the Original view to delete chapters"
+                      : selectedCount === 0
+                        ? "No chapters selected"
+                        : hasActiveChapters
+                          ? "Wait for active chapters to finish"
+                          : "Delete selected chapters and their audio"
                   }
-                  data-testid="delete-audio-selected"
                 >
-                  Delete chapter audio ({audioDataCount}{selectedAudioSize && selectedAudioSize.bytes > 0 ? ` · ${audioDataSize}` : ""}){langSuffix}
+                  Delete selected ({selectedCount})
                 </Button>
-                </div>
               </div>
-              <div className={`pt-3 ${createTab === "document" ? "" : "hidden"}`}>
-                <div className="flex items-start gap-2 flex-wrap">
-                  <Button
-                    variant="secondary"
-                    onClick={() => exportDocumentMutation.mutate({ id: book.id, language: activeVariant ?? undefined, format: "pdf" })}
-                    disabled={!canExportDocument || !!pendingExportFor("pdf")?.running}
-                    title={exportTooltip("pdf")}
-                    data-testid="export-pdf"
+
+              {isSynthetic && digestLive && (
+                <div className="flex items-center gap-2 text-sm text-(--text-muted) mb-2" data-testid="digest-progress">
+                  <span className="w-2 h-2 rounded-full bg-(--accent) animate-[pulse-dot_1.15s_ease-in-out_infinite]" />
+                  Generating digest — {book.digestJob?.progress ? `${book.digestJob.progress} books` : "starting"}...
+                </div>
+              )}
+              {isSynthetic && (digestFailed || digestIncomplete) && (
+                <div className="flex items-center gap-3 text-sm mb-2" data-testid="digest-partial-failed">
+                  <span className="text-(--danger-text)">
+                    {digestFailed
+                      ? `Digest incomplete: ${book.digestJob?.error ?? "some sources failed"}`
+                      : `Digest interrupted — ${book.chapters.length} of ${digestTotal} books summarized`}
+                  </span>
+                  <button
+                    onClick={() => resumeDigestMutation.mutate({ id: book.id })}
+                    disabled={resumeDigestMutation.isPending}
+                    title="Re-run the digest — books that already have a summary chapter are skipped"
+                    className="text-(--accent-text) hover:underline font-medium disabled:opacity-50"
                   >
-                    Export PDF ({selectedExportable}){langSuffix}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => exportDocumentMutation.mutate({ id: book.id, language: activeVariant ?? undefined, format: "epub" })}
-                    disabled={!canExportDocument || !!pendingExportFor("epub")?.running}
-                    title={exportTooltip("epub")}
-                    data-testid="export-epub"
+                    Resume
+                  </button>
+                </div>
+              )}
+
+              <ChapterTable
+                language={book.language ?? null}
+                bookId={book.id}
+                chapters={viewChapters}
+                files={book.files?.map((f) => ({ id: f.id, index: f.index, filename: f.filename }))}
+                onQueue={(cid, resume) =>
+                  activeVariant
+                    ? queueAudioMutation.mutate({ chapterId: cid, key: activeVariant, resume })
+                    : queueMutation.mutate({ id: cid, resume })
+                }
+                onRename={activeVariant ? undefined : (cid, title) => renameChapterMutation.mutate({ id: cid, title })}
+                onReorder={activeVariant ? undefined : (chapterIds) => reorderChaptersMutation.mutate({ bookId: book.id, chapterIds })}
+                onSetSelected={(cid, selected) => setSelectedMutation.mutate({ id: cid, selected })}
+                onSetAllSelected={(selected) => setAllSelectedMutation.mutate({ bookId: book.id, selected })}
+                onSetSelectedBatch={(ids, selected) => setSelectedBatchMutation.mutate({ ids, selected })}
+                variant={activeLane ?? (activeVariant ? { key: activeVariant, kind: "translation" as const, label: null } : null)}
+                variants={variantLanes.map((l) => ({ key: l.key, label: l.label, kind: l.kind }))}
+                onSwitchVariant={setActiveVariant}
+                synth={synth}
+              />
+
+              {/* Create outputs from the selected chapters — folded into one Export modal next */}
+              <div className="mt-4">
+                <div className="inline-flex rounded-lg bg-(--bg-subtle) border border-(--border) p-1 gap-1">
+                  {/* button-ok: a tab in a segmented control — picking which panel shows, not an action */}
+                  <button
+                    onClick={() => setCreateTab("audio")}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      createTab === "audio" ? "bg-(--bg-card) shadow-sm text-(--accent-text)" : "text-(--text-muted) hover:text-(--text-secondary)"
+                    }`}
+                    data-testid="create-tab-audio"
                   >
-                    Export EPUB ({selectedExportable}){langSuffix}
-                  </Button>
-                  {!rendererReady && (
-                    <Button
-                      variant="secondary"
-                      onClick={() => installRenderer.mutate()}
-                      disabled={installRenderer.isPending}
-                      title="Vivliostyle renders these two formats and brings its own browser, once"
-                      data-testid="install-renderer"
-                    >
-                      {installRenderer.isPending ? "Downloading renderer…" : "Download page renderer (345 MB)"}
-                    </Button>
-                  )}
-                  <div className="ml-1 flex flex-col gap-1.5 border-l border-(--border) pl-3">
-                    <Button
-                      variant="secondary"
-                      onClick={() => exportDocumentMutation.mutate({
-                        id: book.id,
-                        language: activeVariant ?? undefined,
-                        format: "epub-sync",
-                        copyToDropDir: !!exportConfig?.readaloudDropDir && copyToImport,
-                        waitForAll: deferOutputs,
-                      })}
-                      disabled={!canExportSync || !!pendingExportFor("epub-sync")?.running}
-                      title={syncExportTooltip}
-                      data-testid="export-epub-sync"
-                    >
-                      Export synced EPUB{deferOutputs ? " when ready" : ""} ({deferOutputs ? selectedCount : selectedSyncExportable}){langSuffix}
-                    </Button>
-                    {exportConfig?.readaloudDropDir && (
-                      <label
-                        className="flex w-fit items-center gap-1.5 text-xs text-(--text-muted) cursor-pointer hover:text-(--text-secondary)"
-                        title={`Copies the synced EPUB to ${exportConfig.readaloudDropDir} so Storyteller picks it up automatically (READALOUD_DROP_DIR in .env)`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={copyToImport}
-                          onChange={(e) => setCopyToImport(e.target.checked)}
-                          className="rounded"
-                          data-testid="copy-to-import"
-                        />
-                        Copy to Storyteller import folder
-                      </label>
+                    <IconVolume className="w-4 h-4" />
+                    Create audio
+                    {(hasActiveChapters || translationAudioQueued) && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-(--accent) animate-pulse" title="Synthesis in progress" />
                     )}
-                  </div>
-                  {viewPendingExports.length > 0 && (
-                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-(--step-output)" data-testid="export-pending-inline">
-                      <span className="w-2 h-2 rounded-full bg-(--accent) animate-pulse" />
-                      {viewPendingExports.map(pendingExportSummary).join(" · ")}...
+                  </button>
+                  {/* button-ok: a tab in a segmented control — picking which panel shows, not an action */}
+                  <button
+                    onClick={() => setCreateTab("document")}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      createTab === "document" ? "bg-(--bg-card) shadow-sm text-(--accent-text)" : "text-(--text-muted) hover:text-(--text-secondary)"
+                    }`}
+                    data-testid="create-tab-document"
+                  >
+                    <IconDocument className="w-4 h-4" />
+                    Create document
+                    {viewPendingExports.length > 0 && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-(--accent) animate-pulse" title="Export in progress" />
+                    )}
+                  </button>
+                </div>
+                {selectedInFlight > 0 && (
+                  <div className="pt-3 flex items-center gap-2 flex-wrap" data-testid="output-timing">
+                    <span className="text-xs text-(--text-muted)">
+                      {selectedInFlight} of {selectedCount} selected chapter{selectedCount === 1 ? "" : "s"} still synthesizing —
                     </span>
-                  )}
+                    <div className="inline-flex rounded-lg bg-(--bg-subtle) border border-(--border) p-0.5 gap-0.5">
+                      {/* button-ok: one side of a segmented choice, not an action — the build runs from the button below */}
+                      <button
+                        onClick={() => setWaitForAll(false)}
+                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                          waitForAll ? "text-(--text-muted) hover:text-(--text-secondary)" : "bg-(--bg-card) shadow-sm text-(--text-primary)"
+                        }`}
+                        title="Build straight away from the chapters that already have audio"
+                        data-testid="output-timing-now"
+                      >
+                        Ready now ({selectedWithAudio})
+                      </button>
+                      {/* button-ok: one side of a segmented choice, not an action — the build runs from the button below */}
+                      <button
+                        onClick={() => setWaitForAll(true)}
+                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                          waitForAll ? "bg-(--bg-card) shadow-sm text-(--text-primary)" : "text-(--text-muted) hover:text-(--text-secondary)"
+                        }`}
+                        title="Queue the job now — it runs by itself once no chapter is still synthesizing"
+                        data-testid="output-timing-wait"
+                      >
+                        When all {selectedCount} finish
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <div className={`pt-3 space-y-3 ${createTab === "audio" ? "" : "hidden"}`}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      variant="primary"
+                      onClick={() =>
+                        activeVariant
+                          ? assembleVariantMutation.mutate({ bookId: book.id, key: activeVariant, waitForAll: deferOutputs })
+                          : assembleMutation.mutate({ id: book.id, waitForAll: deferOutputs })
+                      }
+                      disabled={!canAssemble || assembleMutation.isPending || assembleVariantMutation.isPending}
+                      title={
+                        selectedCount === 0
+                          ? "No chapters selected"
+                          : deferOutputs
+                            ? `Queue the assembly now — it runs once the ${selectedInFlight} chapter(s) still synthesizing are finished`
+                            : !allSelectedDone
+                              ? "All selected chapters must be done with audio"
+                              : isAssembling
+                                ? "Assembly already in progress"
+                                : undefined
+                      }
+                      data-testid="assemble-button"
+                    >
+                      {book.outputPath ? "Re-assemble" : "Assemble"}
+                      {deferOutputs ? " when ready" : " selected"} ({deferOutputs ? selectedCount : selectedWithAudio})
+                      {langSuffix}
+                    </Button>
+                  </div>
+                </div>
+                <div className={`pt-3 ${createTab === "document" ? "" : "hidden"}`}>
+                  <div className="flex items-start gap-2 flex-wrap">
+                    <Button
+                      variant="secondary"
+                      onClick={() => exportDocumentMutation.mutate({ id: book.id, language: activeVariant ?? undefined, format: "pdf" })}
+                      disabled={!canExportDocument || !!pendingExportFor("pdf")?.running}
+                      title={exportTooltip("pdf")}
+                      data-testid="export-pdf"
+                    >
+                      Export PDF ({selectedExportable}){langSuffix}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => exportDocumentMutation.mutate({ id: book.id, language: activeVariant ?? undefined, format: "epub" })}
+                      disabled={!canExportDocument || !!pendingExportFor("epub")?.running}
+                      title={exportTooltip("epub")}
+                      data-testid="export-epub"
+                    >
+                      Export EPUB ({selectedExportable}){langSuffix}
+                    </Button>
+                    {!rendererReady && (
+                      <Button
+                        variant="secondary"
+                        onClick={() => installRenderer.mutate()}
+                        disabled={installRenderer.isPending}
+                        title="Vivliostyle renders these two formats and brings its own browser, once"
+                        data-testid="install-renderer"
+                      >
+                        {installRenderer.isPending ? "Downloading renderer…" : "Download page renderer (345 MB)"}
+                      </Button>
+                    )}
+                    <div className="ml-1 flex flex-col gap-1.5 border-l border-(--border) pl-3">
+                      <Button
+                        variant="secondary"
+                        onClick={() =>
+                          exportDocumentMutation.mutate({
+                            id: book.id,
+                            language: activeVariant ?? undefined,
+                            format: "epub-sync",
+                            copyToDropDir: !!exportConfig?.readaloudDropDir && copyToImport,
+                            waitForAll: deferOutputs,
+                          })
+                        }
+                        disabled={!canExportSync || !!pendingExportFor("epub-sync")?.running}
+                        title={syncExportTooltip}
+                        data-testid="export-epub-sync"
+                      >
+                        Export synced EPUB{deferOutputs ? " when ready" : ""} ({deferOutputs ? selectedCount : selectedSyncExportable})
+                        {langSuffix}
+                      </Button>
+                      {exportConfig?.readaloudDropDir && (
+                        <label
+                          className="flex w-fit items-center gap-1.5 text-xs text-(--text-muted) cursor-pointer hover:text-(--text-secondary)"
+                          title={`Copies the synced EPUB to ${exportConfig.readaloudDropDir} so Storyteller picks it up automatically (READALOUD_DROP_DIR in .env)`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={copyToImport}
+                            onChange={(e) => setCopyToImport(e.target.checked)}
+                            className="rounded"
+                            data-testid="copy-to-import"
+                          />
+                          Copy to Storyteller import folder
+                        </label>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            </>
           )}
-        </Section>
+        </div>
+      </TabPanel>
 
-        <NotesSection bookId={book.id} noteJob={book.noteJob ?? null} />
-
-        {/* STAGE 3: produced outputs, scoped to the active language view */}
-        <div className="space-y-6 mb-6">
+      <TabPanel active={tab === "outputs"}>
+        <div className="p-4 space-y-6">
           <AudioOutputsSection
             assemblies={bookAssemblies.filter((a) => (a.language ?? null) === activeVariant)}
             latestOutputPath={activeVariant ? null : book.outputPath}
@@ -1154,80 +1169,80 @@ export function BookDetail() {
             isDeleting={deleteDocumentMutation.isPending}
           />
         </div>
+      </TabPanel>
 
-        {/* Danger zone */}
-        <Section stripe="danger">
-          <h3 className="text-sm font-medium text-(--text-muted) uppercase tracking-wider mb-3">Danger zone</h3>
-          <Button
-            variant="danger"
-            onClick={() => {
-              if (confirm("Delete this book and all its audio?")) {
-                deleteMutation.mutate({ id: book.id });
-              }
-            }}
-            disabled={deleteMutation.isPending}
-          >
-            Delete book
-          </Button>
-        </Section>
+      <TabPanel active={tab === "notes"}>
+        <div className="p-4">
+          <NotesSection bookId={book.id} noteJob={book.noteJob ?? null} />
+        </div>
+      </TabPanel>
 
-        <LogDock
-          bookId={book.id}
-          isProcessing={isProcessing || translationsRunning}
-          files={book.files?.map((f) => ({ index: f.index, filename: f.filename }))}
+      {showDetails && (
+        <BookDetailsModal
+          author={book.author ?? null}
+          language={book.language ?? null}
+          onSave={(patch) => updateSettingsMutation.mutate({ id: book.id, ...patch })}
+          onClose={() => setShowDetails(false)}
         />
+      )}
 
-        {showStructure && (
-          <StructureModal
-            bookId={book.id}
-            isProcessing={isProcessing}
-            chapterProposal={book.chapterProposal ?? null}
-            chapterModel={book.chapterModel ?? null}
-            files={book.files?.map((f) => ({ id: f.id, index: f.index, filename: f.filename }))}
-            onClose={() => setShowStructure(false)}
-            onChanged={invalidate}
-          />
-        )}
+      {showDiskUsage && <DiskUsageModal bookId={book.id} onClose={() => setShowDiskUsage(false)} />}
 
-        {askScope && <ChapterAiModal scope={askScope} onClose={() => setAskScope(null)} />}
+      {showStructure && (
+        <StructureModal
+          bookId={book.id}
+          isProcessing={isProcessing}
+          chapterProposal={book.chapterProposal ?? null}
+          chapterModel={book.chapterModel ?? null}
+          files={book.files?.map((f) => ({ id: f.id, index: f.index, filename: f.filename }))}
+          onClose={() => setShowStructure(false)}
+          onChanged={invalidate}
+        />
+      )}
 
-        {showSynthesize && (
-          <SynthesizeModal
-            bookLanguage={book.language ?? null}
-            count={selectedSynthesizable}
-            language={activeLabel}
-            {...synth}
-            canStart={canProcess && !processSelectedMutation.isPending && !processSelectedAudioMutation.isPending}
-            disabledReason={
-              selectedSynthesizable === 0 ? (activeVariant ? `No selected chapters have ${activeLabel} text ready or underway` : "No selected chapters are ready for synthesis") :
-              !activeVariant && hasActiveChapters ? "Wait for active chapters to finish" :
-              isAssembling ? "Wait for assembly to finish" :
-              undefined
+      {askScope && <ChapterAiModal scope={askScope} onClose={() => setAskScope(null)} />}
+
+      {showSynthesize && (
+        <SynthesizeModal
+          bookLanguage={book.language ?? null}
+          count={selectedSynthesizable}
+          language={activeLabel}
+          {...synth}
+          canStart={canProcess && !processSelectedMutation.isPending && !processSelectedAudioMutation.isPending}
+          disabledReason={
+            selectedSynthesizable === 0
+              ? activeVariant
+                ? `No selected chapters have ${activeLabel} text ready or underway`
+                : "No selected chapters are ready for synthesis"
+              : !activeVariant && hasActiveChapters
+                ? "Wait for active chapters to finish"
+                : isAssembling
+                  ? "Wait for assembly to finish"
+                  : undefined
+          }
+          onStart={() => {
+            if (activeVariant) {
+              processSelectedAudioMutation.mutate({ bookId: book.id, key: activeVariant });
+            } else {
+              processSelectedMutation.mutate({ id: book.id });
             }
-            onStart={() => {
-              if (activeVariant) {
-                processSelectedAudioMutation.mutate({ bookId: book.id, key: activeVariant });
-              } else {
-                processSelectedMutation.mutate({ id: book.id });
-              }
-              setShowSynthesize(false);
-            }}
-            onClose={() => setShowSynthesize(false)}
-          />
-        )}
+            setShowSynthesize(false);
+          }}
+          onClose={() => setShowSynthesize(false)}
+        />
+      )}
 
-        {showTranslation && (
-          <VariantModal
-            bookId={book.id}
-            chapters={book.chapters.map((c) => ({ id: c.id, index: c.index, title: c.title }))}
-            initialKey={activeVariant ?? book.translationLanguage ?? null}
-            onClose={() => {
-              setShowTranslation(false);
-              invalidateVariants();
-            }}
-          />
-        )}
-      </div>
-    </div>
+      {showTranslation && (
+        <VariantModal
+          bookId={book.id}
+          chapters={book.chapters.map((c) => ({ id: c.id, index: c.index, title: c.title }))}
+          initialKey={activeVariant ?? book.translationLanguage ?? null}
+          onClose={() => {
+            setShowTranslation(false);
+            invalidateVariants();
+          }}
+        />
+      )}
+    </BookShell>
   );
 }

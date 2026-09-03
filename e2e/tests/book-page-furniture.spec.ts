@@ -18,6 +18,8 @@ test("the book page keeps the PDF, disk usage, and action log at hand", async ({
   await preview.getByTitle("Close").click();
   await expect(preview).not.toBeVisible();
 
+  // Disk usage moved into the book menu, so its number stops competing with the page's actions
+  await page.getByTestId("book-menu-trigger").click();
   await page.getByTestId("disk-usage").click();
   const disk = page.getByTestId("disk-usage-modal");
   await expect(disk).toBeVisible();

@@ -12,7 +12,9 @@ test("UC4: a rewrite variant streams in and keeps its params; the original stays
 
   await page.goto("/");
   await page.getByRole("link", { name: "Variant Factory" }).click();
-  await page.getByRole("button", { name: "Translate / Transform" }).click();
+  // Creating a variant is now the last item of the version picker that switches between them
+  await page.getByTestId("variant-menu-trigger").click();
+  await page.getByTestId("open-translation").click();
 
   const modal = page.getByTestId("translation-modal");
   await modal.getByTestId("translation-language").selectOption("preset:eli5");

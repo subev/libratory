@@ -14,12 +14,14 @@ test("UC2: Ask AI streams the answer, saves a note, and the note becomes a chapt
   await modal.getByTitle("Close").click();
   await expect(modal).not.toBeVisible();
 
+  await page.getByTestId("stage-tab-notes").click();
   const note = page.getByTestId("note-row").first();
   await note.getByRole("button", { name: "What is this book about?" }).click();
   await expect(note.getByTestId("note-result")).toContainText(FAKE_REPLY);
 
   await note.getByTestId("note-to-chapter").click();
   await expect(page.getByTestId("note-chapter-added")).toBeVisible();
+  await page.getByTestId("stage-tab-chapters").click();
   await expect(page.getByTestId("chapter-row")).toHaveCount(1);
 });
 

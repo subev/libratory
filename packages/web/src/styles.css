@@ -313,6 +313,13 @@ body {
   outline-offset: 2px;
 }
 
+/* Tailwind's animate-pulse floors at 50% opacity over 2s, and on a 6px status dot that reads as
+   static rather than live. A dot that says "working" has to actually go out. */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.28; }
+}
+
 @keyframes slide-indeterminate {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(400%); }
