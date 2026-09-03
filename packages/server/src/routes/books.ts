@@ -220,7 +220,9 @@ export const booksRouter = router({
         // The reader's gate, both halves, asked the way the book page asks it: a chapter keeps its
         // audio file while it re-synthesizes or after a cancel, so a `done` count is the wrong test
         hasPages: chapterCounts.reduce((sum, r) => sum + r.with_pages, 0) > 0,
-        hasAudio: chapterCounts.reduce((sum, r) => sum + r.with_audio, 0) > 0,
+        // The count, not just the flag: the row's badge was showing the `done` tally beside a Read
+        // link gated on this one, so a book re-synthesizing said "2 audio" and offered the reader.
+        chaptersWithAudioFiles: chapterCounts.reduce((sum, r) => sum + r.with_audio, 0),
         activity,
         failures,
         // Cancellations are deliberate — only real failures get the red badge (mirrors hard_failed)

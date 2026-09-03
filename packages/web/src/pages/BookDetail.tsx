@@ -416,12 +416,17 @@ export function BookDetail() {
   const viewPendingExports = pendingExports.filter((e) => (e.language ?? null) === activeVariant);
   const pendingExportFor = (format: "pdf" | "epub" | "epub-sync") => viewPendingExports.find((e) => e.format === format);
   const rendererReady = renderer?.installed !== false;
-  const canExportDocument = selectedExportable > 0 && !isAssembling && !exportDocumentMutation.isPending && rendererReady;
+  // Deferring is what makes a text export possible while a lane is still translating; without the
+  // escape the cards were disabled exactly when the wait existed to be used, and the server would
+  // have honoured it — exportDocument skips its "no chapters" throw whenever something is waited on.
+  const deferText = waitForAll && selectedTextInFlight > 0;
+  const canExportDocument = (selectedExportable > 0 || deferText) && !isAssembling && !exportDocumentMutation.isPending && rendererReady;
   const canExportSync = (selectedSyncExportable > 0 || deferOutputs) && !isAssembling && !exportDocumentMutation.isPending;
   const exportTooltip = (format: "pdf" | "epub") =>
     !rendererReady ? "PDF and EPUB need a page renderer — download it once, below"
       : pendingExportFor(format)?.running ? `${format.toUpperCase()} export is rendering`
       : pendingExportFor(format) ? `${format.toUpperCase()} export ${pendingExportLabel(pendingExportFor(format)!)} — click again to replace it`
+      : deferText ? "Queue the export now — it runs once the translations still running are finished"
       : selectedExportable === 0
       ? (activeVariant ? `No selected chapters have finished ${activeLabel} text` : "No chapters selected")
       : isAssembling ? "Wait for the current assembly to finish"

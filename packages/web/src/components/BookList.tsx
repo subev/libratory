@@ -218,7 +218,7 @@ function BookRowActions({
   // The reader opens on audio or on pages — the same gate the book page applies, which is why
   // books.list carries these two at all: a reader-mode book has no audio and is still readable.
   // Absent rather than disabled: a book with neither has no reader to open, so there is no target.
-  const canRead = book.hasAudio || book.hasPages;
+  const canRead = book.chaptersWithAudioFiles > 0 || book.hasPages;
 
   return (
     <div className="flex items-center justify-end gap-1">
@@ -571,9 +571,9 @@ export function BookList({
                 </td>
                 <td className="px-4 py-3 text-right">
                   <span className="text-sm tabular-nums text-(--text-secondary)">{book.chapterCount}</span>
-                  {book.chaptersWithAudio > 0 && (
-                    <span className="block text-[11px] text-(--text-faint) tabular-nums" title={`${book.chaptersWithAudio} chapters have audio`}>
-                      {book.chaptersWithAudio} audio
+                  {book.chaptersWithAudioFiles > 0 && (
+                    <span className="block text-[11px] text-(--text-faint) tabular-nums" title={`${book.chaptersWithAudioFiles} chapters have an audio file`}>
+                      {book.chaptersWithAudioFiles} audio
                     </span>
                   )}
                 </td>
@@ -713,6 +713,17 @@ export function BookList({
             title: totalSelected === 0
               ? "Select books or folders to move with the checkboxes"
               : "Move the selection into a folder — or drag rows onto a folder",
+          },
+          {
+            id: "clear-selection",
+            label: "Clear",
+            onClick: clearSelection,
+            disabled: totalSelected === 0,
+            // The selection deliberately survives a filter, so a filter can hide part of it — and
+            // the header checkbox only reaches the rows under it. Without this there is no way to
+            // put down books you can no longer see, and Delete still counts them.
+            title: totalSelected === 0 ? "Nothing selected" : `Deselect all ${totalSelected}, including any a filter is hiding`,
+            pinned: true,
           },
           {
             id: "delete-selected-books",

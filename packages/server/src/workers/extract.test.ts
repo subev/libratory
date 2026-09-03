@@ -25,7 +25,7 @@ vi.mock("../db.ts", async () => {
 });
 
 import { extract } from "./extract.ts";
-import { extractPdf } from "../lib/marker.ts";
+import { extractPdf, ExtractAbortedError } from "../lib/marker.ts";
 
 const mockExtractPdf = vi.mocked(extractPdf);
 
@@ -234,5 +234,27 @@ describe("extract worker", () => {
     const book = row(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.status).toBe("failed");
     expect(book.error).toContain("All 2 file(s) failed");
+  });
+
+  // Cancelling the only file used to take the all-failed path, which sets books.status to "failed"
+  // with a message that does not start with "Cancelled" — a red badge and a permanent "needs
+  // attention" for something the user chose to stop.
+  it("does not fail the book when its only file was cancelled", async () => {
+    const db = getDb();
+    const bookId = crypto.randomUUID();
+    const addJob = vi.fn();
+
+    await db.insert(books).values({ id: bookId, title: "Stopped", filename: "a.pdf", pdfPath: "/tmp/a.pdf" });
+    await db.insert(bookFiles).values([{ bookId, index: 0, filename: "a.pdf", pdfPath: "/tmp/a.pdf" }]);
+
+    mockExtractPdf.mockRejectedValue(new ExtractAbortedError());
+
+    await expect(extract({ bookId }, { addJob } as any)).resolves.toBeUndefined();
+
+    const book = row(await db.select().from(books).where(eq(books.id, bookId)));
+    expect(book.status).not.toBe("failed");
+    const file = row(await db.select().from(bookFiles).where(eq(bookFiles.bookId, bookId)));
+    expect(file.status).toBe("suspended");
+    expect(file.error).toBeNull();
   });
 });

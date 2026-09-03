@@ -183,8 +183,12 @@ function ChapterModalBody({
   // still shows this chapter's words. It decides whether Pages is *offered*, not what is shown —
   // it used to decide both, and a chapter with no clean text had no way to reach its own prose
   // except the Edit box, which is a strange thing to open in order to read.
-  const canShowPages = !isVariant && hasPages && printHoldsText(readerChapter);
-  const modes = viewModes(chapter, canShowPages);
+  // Answered from the chapter row, not the manifest: hasPages comes from readerChapter, which
+  // arrives a beat later, so using it made the strip reselect itself under the cursor after every
+  // open. The row already knows its page range. printHoldsText still needs the document and is
+  // assumed true until it answers; it saying no is the one case where the strip changes.
+  const pagesOffered = !isVariant && chapter.pageStart != null && (readerChapter ? printHoldsText(readerChapter) : true);
+  const modes = viewModes(chapter, pagesOffered);
   const viewMode: ViewMode = picked && modes.includes(picked) ? picked : modes[0]!;
   const marksPages = viewMode === "pages";
   // Marking needs a playhead finer than timeupdate's, and a cue to scroll to — on the print or in

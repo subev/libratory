@@ -35,6 +35,7 @@ export function Menu({
     if (!armed) return;
     document.removeEventListener("click", armed.click, { capture: true });
     document.removeEventListener("pointercancel", armed.cancel, { capture: true });
+    window.removeEventListener("blur", armed.cancel);
     swallowRef.current = null;
   }, []);
   useEffect(() => clearSwallow, [clearSwallow]);
@@ -59,6 +60,9 @@ export function Menu({
       swallowRef.current = { click, cancel };
       document.addEventListener("click", click, { capture: true, once: true });
       document.addEventListener("pointercancel", cancel, { capture: true, once: true });
+      // Holding the button, switching away and releasing outside produces neither a click nor a
+      // pointercancel, and the swallow would sit armed until it ate somebody else's click.
+      window.addEventListener("blur", cancel, { once: true });
     }
     document.addEventListener("pointerdown", onPointerDown, true);
     return () => document.removeEventListener("pointerdown", onPointerDown, true);

@@ -3,8 +3,11 @@ import type { ChapterRow, VariantRef } from "../components/ChapterTable.tsx";
 // A chapter whose audio is on its way — it can be cancelled, but not queued or re-synthesized
 export const SYNTH_BUSY = ["pending", "normalizing", "synthesizing"];
 
-// The same for its text, which only a variant lane can be waiting on: the original's text is written
-// by extraction, long before anything can ask to export it
+// The same for its text, which only a variant lane can be *waited on* for: the original's text is
+// written by extraction, long before anything can ask to export it. Not quite an invariant — an AI
+// cleanup rewrites customText, which is what a document export ships — but neither side waits on
+// that today, so an export started mid-cleanup ships the pre-cleanup text on purpose rather than
+// by oversight.
 export const TEXT_BUSY = ["translating", "rewriting"];
 
 export function variantLabel(variant: { key: string; label: string | null }): string {

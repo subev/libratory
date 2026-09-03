@@ -42,7 +42,10 @@ export async function extract(payload: ExtractPayload, { addJob }: { addJob: Wor
         clearExtractAbort(bookId);
       }
     } else {
-      await extractMultipleFiles(book, files, log, addJob);
+      // A run where every file was stopped by hand produced no chapters, which the check below
+      // would report as "No chapters detected in any file" — a failure, for something deliberate.
+      const { cancelled } = await extractMultipleFiles(book, files, log, addJob);
+      if (cancelled) return;
     }
 
     // Count total chapters
@@ -148,6 +151,7 @@ async function extractMultipleFiles(
 
   let filesSucceeded = 0;
   let filesFailed = 0;
+  let filesCancelled = 0;
 
   for (const file of files) {
     // Skip already-done files (append support) and raw-only files (extraction not requested)
@@ -199,7 +203,11 @@ async function extractMultipleFiles(
       if (err instanceof ExtractAbortedError) {
         await fileLog(`Extraction of "${file.filename}" cancelled`);
         await db.update(bookFiles).set({ status: "suspended", error: null }).where(eq(bookFiles.id, file.id));
-        filesFailed++;
+        // Counted apart from the failures: cancelling the only file used to make the run throw
+        // "All 1 file(s) failed extraction", which set the book to failed with a message that does
+        // not start with "Cancelled" — a red badge and a permanent "needs attention" for a
+        // deliberate stop, which is the one thing a cancel must never leave behind.
+        filesCancelled++;
         continue;
       }
       const message = err instanceof Error ? err.message : String(err);
@@ -215,7 +223,14 @@ async function extractMultipleFiles(
     throw new Error(`All ${filesFailed} file(s) failed extraction`);
   }
 
+  if (filesSucceeded === 0 && filesCancelled > 0) {
+    await log(`Cancelled — ${filesCancelled} file(s) stopped, nothing extracted`);
+    return { cancelled: true };
+  }
+
   if (filesFailed > 0) {
     await log(`Warning: ${filesFailed} file(s) failed, ${filesSucceeded} succeeded`);
   }
+
+  return { cancelled: false };
 }
