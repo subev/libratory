@@ -36,6 +36,7 @@ export function ExportModal({
   scopeSummary: string;
   timing: {
     inFlight: number;
+    verb: "synthesizing" | "translating";
     readyCount: number;
     totalCount: number;
     waitForAll: boolean;
@@ -115,7 +116,7 @@ export function ExportModal({
         {timing && timing.inFlight > 0 && (
           <div className="rounded-lg border border-(--border) bg-(--badge-synthesizing-bg) p-3" data-testid="output-timing">
             <p className="text-xs font-bold text-(--badge-synthesizing-text) mb-2">
-              {timing.inFlight} of {timing.totalCount} selected chapters are still synthesizing
+              {timing.inFlight} of {timing.totalCount} selected chapters are still {timing.verb}
             </p>
             <label className="flex items-center gap-2 text-xs text-(--text-primary) cursor-pointer">
               <input type="radio" checked={!timing.waitForAll} onChange={() => timing.onChange(false)} data-testid="output-timing-now" />

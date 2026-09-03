@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router";
 import { trpc } from "../trpc.ts";
 import { ModelBundleNotice, useModelBundle } from "../components/ModelBundleNotice.tsx";
 import { ChapterTable } from "../components/ChapterTable.tsx";
-import { SYNTH_BUSY, variantLabel } from "../lib/chapters.ts";
+import { SYNTH_BUSY, TEXT_BUSY, variantLabel } from "../lib/chapters.ts";
 import { SynthesizeModal, type SynthSettings } from "../components/SynthesizeModal.tsx";
 import { StructureModal } from "../components/StructureModal.tsx";
 import { VariantModal } from "../components/VariantModal.tsx";
@@ -371,6 +371,13 @@ export function BookDetail() {
   // Outputs that need audio can be queued behind the chapters still producing it
   const selectedInFlight = viewChapters.filter((c) => c.selected && SYNTH_BUSY.includes(c.status)).length;
   const deferOutputs = waitForAll && selectedInFlight > 0;
+  // PDF and EPUB need text, not audio, and the server agrees: inFlightInputs answers 0 for text on
+  // the original lane, because extraction already wrote it. Only a lane still translating can wait.
+  const selectedTextInFlight = activeVariant
+    ? viewChapters.filter((c) => c.selected && TEXT_BUSY.includes(c.status)).length
+    : 0;
+  const needsAudio = (format: ExportFormatId) => format === "m4b" || format === "epub-sync";
+  const inFlightFor = (format: ExportFormatId) => (needsAudio(format) ? selectedInFlight : selectedTextInFlight);
   const canAssemble = (allSelectedDone || deferOutputs) && !isAssembling;
   // Language-view audio queueing is idempotent server-side, so running chapters don't block it
   const canProcess = selectedSynthesizable > 0 && !isAssembling && (!!activeVariant || !hasActiveChapters);
@@ -665,7 +672,7 @@ export function BookDetail() {
         id: book.id,
         language: activeVariant ?? undefined,
         format: pickedExport,
-        waitForAll: deferOutputs,
+        waitForAll: waitForAll && inFlightFor(pickedExport) > 0,
         ...(pickedExport === "epub-sync"
           ? { copyToDropDir: !!exportConfig?.readaloudDropDir && copyToImport }
           : {}),
@@ -1130,11 +1137,14 @@ export function BookDetail() {
         </div>
       </TabPanel>
 
-      <TabPanel id="notes" active={tab === "notes"}>
-        <div className="p-4">
-          <NotesSection bookId={book.id} noteJob={book.noteJob ?? null} />
-        </div>
-      </TabPanel>
+      {/* Only with the tab: the panel names it as its label, and hasNotes is what puts it in the row */}
+      {hasNotes && (
+        <TabPanel id="notes" active={tab === "notes"}>
+          <div className="p-4">
+            <NotesSection bookId={book.id} noteJob={book.noteJob ?? null} />
+          </div>
+        </TabPanel>
+      )}
 
       {exportOpen && (
         <ExportModal
@@ -1147,7 +1157,8 @@ export function BookDetail() {
               : `${selectedCount} of ${book.chapters.length} chapters — narrow it in the Chapters tab`
           }
           timing={{
-            inFlight: selectedInFlight,
+            inFlight: inFlightFor(pickedExport),
+            verb: needsAudio(pickedExport) ? "synthesizing" : "translating",
             readyCount:
               pickedExport === "m4b" ? selectedWithAudio : pickedExport === "epub-sync" ? selectedSyncExportable : selectedExportable,
             totalCount: selectedCount,

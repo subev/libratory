@@ -29,10 +29,12 @@ export function Menu({
 
   // Held in a ref, not in the effect below: closing the menu re-runs that effect, and a swallow
   // registered inside it would be torn down by its own cleanup before the click it exists to eat.
-  const swallowRef = useRef<((e: MouseEvent) => void) | null>(null);
+  const swallowRef = useRef<{ click: (e: MouseEvent) => void; cancel: () => void } | null>(null);
   const clearSwallow = useCallback(() => {
-    if (!swallowRef.current) return;
-    document.removeEventListener("click", swallowRef.current, { capture: true });
+    const armed = swallowRef.current;
+    if (!armed) return;
+    document.removeEventListener("click", armed.click, { capture: true });
+    document.removeEventListener("pointercancel", armed.cancel, { capture: true });
     swallowRef.current = null;
   }, []);
   useEffect(() => clearSwallow, [clearSwallow]);
@@ -45,22 +47,21 @@ export function Menu({
       // The click this pointerdown becomes is still on its way to whatever is underneath — a Modal's
       // scrim, or the next button along. One dismissal is one dismissal.
       clearSwallow();
-      const swallow = (click: MouseEvent) => {
-        click.stopPropagation();
-        click.preventDefault();
+      // Only a primary press becomes a click: a middle or right button never does, and a touch that
+      // turns into a scroll cancels instead. An armed swallow left over from one eats somebody else's.
+      if (e.button !== 0) return;
+      const click = (ev: MouseEvent) => {
+        ev.stopPropagation();
+        ev.preventDefault();
         clearSwallow();
       };
-      swallowRef.current = swallow;
-      document.addEventListener("click", swallow, { capture: true, once: true });
+      const cancel = () => clearSwallow();
+      swallowRef.current = { click, cancel };
+      document.addEventListener("click", click, { capture: true, once: true });
+      document.addEventListener("pointercancel", cancel, { capture: true, once: true });
     }
-    // A right-click or a touch drag is a pointerdown that never becomes a click, and an armed
-    // swallow left over from one would eat somebody else's.
     document.addEventListener("pointerdown", onPointerDown, true);
-    document.addEventListener("contextmenu", clearSwallow, true);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown, true);
-      document.removeEventListener("contextmenu", clearSwallow, true);
-    };
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
   }, [open, clearSwallow]);
 
   return (

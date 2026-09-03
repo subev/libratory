@@ -27,6 +27,14 @@ nothing behind them yet. None of them blocked the branch; all of them are cheap 
   assembly and document. The web package has no bridge to the desktop shell, so there is nothing to
   call.
 
+## Known exception to the portal rule
+
+`voice-picker/VoiceLibraryModal.tsx` hand-rolls `fixed inset-0 z-[70]` instead of going through
+`Modal`, so it gets neither the body portal nor the escape stack. `ChapterTable` renders it (as
+`SynthesizeModal`) inside the Chapters panel, so it is one tab-switch away from the bug the portal
+cures — it is unreachable today only because the chapter modal's scrim covers the tab bar. Route it
+through `Modal` when someone next touches the voice picker.
+
 ## Deliberately not built
 
 - **"Manage versions…"** — the artboard's variant menu ends with it, but renaming and deleting a lane
