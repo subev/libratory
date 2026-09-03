@@ -77,10 +77,7 @@ function AssemblyRowItem({
 }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
-  const [ms, setMs] = useState(0);
   const [failed, setFailed] = useState(false);
-  const { trayCompact } = useShellLayout();
-  useAudioTime(audioRef, playing, setMs);
 
   // Loading a resource resets playbackRate to defaultPlaybackRate, so both have to be set
   useEffect(() => {
@@ -91,18 +88,11 @@ function AssemblyRowItem({
   }, [speed]);
 
   const filename = assembly.outputPath.split("/").pop();
-  const started = playing || ms > 0;
   const toggle = () => {
     const audio = audioRef.current;
     if (!audio) return;
     setFailed(false);
     void (audio.paused ? audio.play().catch(() => setFailed(true)) : audio.pause());
-  };
-  const seek = (to: number) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    audio.currentTime = to / 1000;
-    setMs(to);
   };
 
   return (
@@ -131,26 +121,16 @@ function AssemblyRowItem({
           >
             Will not play
           </span>
-        ) : started ? (
-          <span className="flex items-center gap-2 shrink-0" data-testid="assembly-transport">
-            <span className="text-xs tabular-nums text-(--text-secondary)">{formatDuration(ms)}</span>
-            {/* Narrow, the scrub would take the filename's last legible inch */}
-            {!trayCompact && (
-              <Scrub atMs={ms} totalMs={assembly.durationMs} onSeek={seek} label={`Position in ${filename}`} />
-            )}
-            <span className="text-xs tabular-nums text-(--text-faint)">−{formatDuration(Math.max(0, assembly.durationMs - ms))}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length] ?? 1)}
-              title="Playback speed"
-              className="tabular-nums"
-              data-testid="assembly-speed"
-            >
-              {speed}x
-            </Button>
-          </span>
-        ) : undefined
+        ) : (
+          <AssemblyTransport
+            audioRef={audioRef}
+            playing={playing}
+            totalMs={assembly.durationMs}
+            label={`Position in ${filename}`}
+            speed={speed}
+            onSpeed={onSpeed}
+          />
+        )
       }
       badge={
         isLatest ? (
@@ -169,8 +149,6 @@ function AssemblyRowItem({
             src={`/audio/assembly/${assembly.id}`}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
-            // The position stays where the file ended: resetting it would unmount the transport out
-            // from under whoever was scrubbing towards the end.
             onEnded={() => setPlaying(false)}
             onError={() => setFailed(true)}
           />
@@ -202,6 +180,57 @@ function AssemblyRowItem({
         </>
       }
     />
+  );
+}
+
+// Its own state, so the playhead's ticks re-render the transport and not the whole row
+function AssemblyTransport({
+  audioRef,
+  playing,
+  totalMs,
+  label,
+  speed,
+  onSpeed,
+}: {
+  audioRef: React.RefObject<HTMLAudioElement | null>;
+  playing: boolean;
+  totalMs: number;
+  label: string;
+  speed: number;
+  onSpeed: (rate: number) => void;
+}) {
+  const [ms, setMs] = useState(0);
+  const { trayCompact } = useShellLayout();
+  useAudioTime(audioRef, playing, setMs);
+
+  // The position stays where the file ended, so reaching the end does not pull the transport out
+  // from under whoever was scrubbing towards it
+  if (!playing && ms === 0) return null;
+
+  const seek = (to: number) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = to / 1000;
+    setMs(to);
+  };
+
+  return (
+    <span className="flex items-center gap-2 shrink-0" data-testid="assembly-transport">
+      <span className="text-xs tabular-nums text-(--text-secondary)">{formatDuration(ms)}</span>
+      {/* Narrow, the scrub would take the filename's last legible inch */}
+      {!trayCompact && <Scrub atMs={ms} totalMs={totalMs} onSeek={seek} label={label} />}
+      <span className="text-xs tabular-nums text-(--text-faint)">−{formatDuration(Math.max(0, totalMs - ms))}</span>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => onSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length] ?? 1)}
+        title="Playback speed"
+        className="tabular-nums"
+        data-testid="assembly-speed"
+      >
+        {speed}x
+      </Button>
+    </span>
   );
 }
 

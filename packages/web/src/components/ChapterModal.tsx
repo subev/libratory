@@ -15,7 +15,7 @@ import { fetchCues, fetchManifest, printHoldsText, UNMAPPED, type ReaderCues, ty
 import { useFollowCue, type FollowBand } from "../lib/cue-follow.ts";
 import { useAudioTime } from "../lib/use-audio-time.ts";
 import { usePlayPauseKey } from "../lib/play-pause-key.ts";
-import { SPEEDS, loadSpeed, saveSpeed } from "../lib/playback-speed.ts";
+import { SPEEDS, loadSpeed, saveSpeed, subscribeSpeed } from "../lib/playback-speed.ts";
 import { readingLang } from "../lib/reading-lang.ts";
 import { formatDuration } from "../lib/format.ts";
 import { cueMark, locateSpans, type TextMark, type TextSpan } from "../lib/text-cues.ts";
@@ -107,6 +107,7 @@ function ChapterModalBody({
   const hasNext = chapterIndex < chapters.length - 1;
 
   const [speed, setSpeed] = useState(loadSpeed);
+  useEffect(() => subscribeSpeed(setSpeed), []);
   const [manifest, setManifest] = useState<ReaderManifest | null>(null);
   const playerRef = useRef<{ seek: (ms: number) => void; toggle: () => boolean } | null>(null);
   const [editText, setEditText] = useState("");

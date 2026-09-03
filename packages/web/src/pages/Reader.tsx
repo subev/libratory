@@ -13,7 +13,7 @@ import { useFollowCue, type FollowBand } from "../lib/cue-follow.ts";
 import { useAudioTime } from "../lib/use-audio-time.ts";
 import { usePlayPauseKey } from "../lib/play-pause-key.ts";
 import { useElementWidth } from "../lib/use-element-width.ts";
-import { SPEEDS, loadSpeed, saveSpeed } from "../lib/playback-speed.ts";
+import { SPEEDS, loadSpeed, saveSpeed, subscribeSpeed } from "../lib/playback-speed.ts";
 
 // The band a cue may start in without the page moving: clear of the sticky bar, clear of the fold
 const READER_BAND: FollowBand = { top: 120, bottom: 140, landing: 0.3 };
@@ -64,6 +64,7 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
   const [error, setError] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(loadSpeed);
+  useEffect(() => subscribeSpeed(setSpeed), []);
   const [chosenView, setChosenView] = useState<View>("column");
   const [width, setWidth] = useState<(typeof WIDTHS)[number]["id"]>("full");
   const [debug, setDebug] = useState({ rects: false, layout: false });
