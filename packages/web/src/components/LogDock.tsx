@@ -33,7 +33,10 @@ export function LogDock({ bookId, isProcessing, files }: { bookId: string; isPro
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open]);
 
-  if (logs.length === 0 && !isProcessing) return null;
+  // The bar is a flex child of the book shell now, not a fixed overlay: two pinned bars cannot both
+  // own the bottom of the window. It keeps its height when there is nothing to say, because
+  // appearing and disappearing would shift the scroll pane by 36px whenever a job starts.
+  const idle = logs.length === 0 && !isProcessing;
 
   const lastEntry = logs[logs.length - 1];
   const filteredLogs = fileFilter
@@ -45,8 +48,9 @@ export function LogDock({ bookId, isProcessing, files }: { bookId: string; isPro
       <button
         onClick={() => setOpen(true)}
         data-testid="log-dock"
-        className="fixed bottom-0 inset-x-0 z-[60] flex items-center gap-3 px-4 h-9 bg-(--bg-terminal) text-left font-mono text-xs text-(--terminal-text) border-t border-(--terminal-border) hover:bg-(--bg-terminal-hover) cursor-pointer"
-        title="Open logs"
+        disabled={idle}
+        className="w-full flex items-center gap-3 px-4 h-9 bg-(--bg-terminal) text-left font-mono text-xs text-(--terminal-text) border-t border-(--terminal-border) enabled:hover:bg-(--bg-terminal-hover) enabled:cursor-pointer"
+        title={idle ? "Nothing has happened on this book yet" : "Open logs"}
       >
         <span className="flex items-center gap-1.5 shrink-0 text-(--terminal-dim) font-sans font-medium">
           <span className={`w-2 h-2 rounded-full ${isProcessing ? "bg-(--success) animate-pulse" : "bg-(--terminal-dim)"}`} />

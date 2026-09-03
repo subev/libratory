@@ -12,6 +12,9 @@ export function useElementWidth(): { measure: (node: HTMLElement | null) => void
     observer.current?.disconnect();
     observer.current = null;
     if (!node) return;
+    // Seeded before the observer fires, or the first painted frame is the narrowest layout and
+    // every column and label pops in a frame later.
+    setWidth(node.getBoundingClientRect().width);
     const next = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (entry) setWidth(entry.contentRect.width);

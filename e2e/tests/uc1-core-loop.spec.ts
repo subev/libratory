@@ -27,7 +27,7 @@ test.describe("synthesize and assemble", { tag: "@slow" }, () => {
     await page.goto("/");
     await page.getByRole("link", { name: "Audio Finale" }).click();
 
-    await page.getByTestId("open-synthesize").click();
+    await page.getByTestId("tray-synthesize").click();
     await expect(page.getByTestId("synthesize-modal")).toBeVisible();
     await page.getByTestId("synthesize-start").click();
 
@@ -36,7 +36,10 @@ test.describe("synthesize and assemble", { tag: "@slow" }, () => {
     const playButtons = page.locator('[data-testid="chapter-play"]:not([disabled])');
     await expect(playButtons).toHaveCount(2, { timeout: 2 * 60_000 });
 
-    await page.getByTestId("assemble-button").click();
+    // Assembling is one format among four in the export modal now, not a button of its own
+    await page.getByTestId("open-export").click();
+    await page.getByTestId("export-format-m4b").click();
+    await page.getByTestId("export-confirm").click();
     const assembly = page.getByTestId("assembly-row").first();
     await expect(assembly).toBeVisible({ timeout: 60_000 });
 

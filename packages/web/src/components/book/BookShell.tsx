@@ -34,9 +34,9 @@ export function BookShell({
         <div className="shrink-0">{header}</div>
         <div className="shrink-0">{tabs}</div>
         {banner ? <div className="shrink-0">{banner}</div> : null}
-        {/* overscroll-contain because the body no longer scrolls: without it a modal's overscroll
-            chains into whichever tab is behind it, which is what useBodyScrollLock used to catch. */}
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">{children}</div>
+        {/* Each tab owns its scrolling: Chapters pins its filter bar and scrolls only the table,
+            the rest scroll whole. The shell just gives them the height that is left. */}
+        <div className="flex-1 min-h-0 flex flex-col">{children}</div>
         {tray ? <div className="shrink-0">{tray}</div> : null}
         {dock ? <div className="shrink-0">{dock}</div> : null}
       </div>
@@ -46,9 +46,27 @@ export function BookShell({
 
 // Inactive tabs stay mounted: ChapterTable holds nine filter states, the shift-range anchor and the
 // floating player's chapter, and unmounting it clears every one of them and stops the audio.
-export function TabPanel({ active, children }: { active: boolean; children: ReactNode }) {
+// overscroll-contain because the body no longer scrolls — without it a modal's overscroll chains
+// into whichever tab is behind it, which is what useBodyScrollLock used to catch.
+export function TabPanel({
+  active,
+  scroll = true,
+  children,
+}: {
+  active: boolean;
+  /** Off for a tab that pins part of itself and scrolls the rest. */
+  scroll?: boolean;
+  children: ReactNode;
+}) {
   return (
-    <div hidden={!active} className="h-full">
+    // The class does the hiding, not the attribute: a display utility beats [hidden]'s UA
+    // display:none, so "flex flex-col" on an inactive panel would leave it on screen.
+    <div
+      hidden={!active}
+      className={
+        !active ? "hidden" : `flex-1 min-h-0 ${scroll ? "overflow-y-auto overscroll-contain" : "flex flex-col"}`
+      }
+    >
       {children}
     </div>
   );

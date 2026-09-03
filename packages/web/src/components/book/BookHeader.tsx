@@ -52,6 +52,8 @@ export function BookHeader({
   canRead,
   readTitle,
   onAsk,
+  askDisabled,
+  askTitle,
   lanes,
   activeVariant,
   bookLanguage,
@@ -84,6 +86,8 @@ export function BookHeader({
   canRead: boolean;
   readTitle: string;
   onAsk: () => void;
+  askDisabled: boolean;
+  askTitle: string;
   lanes: VariantLane[];
   activeVariant: string | null;
   bookLanguage: string | null;
@@ -152,7 +156,7 @@ export function BookHeader({
 
       <ChatLink bookId={bookId} state={indexState(searchIndex, hasChapters)} showLabel={layout.showLabels} />
 
-      <Button variant="secondary" size="sm" onClick={onAsk} title="Ask AI about this book — one call, the whole text goes to the model" data-testid="book-ask-ai">
+      <Button variant="secondary" size="sm" onClick={onAsk} disabled={askDisabled} title={askTitle} data-testid="book-ask-ai">
         <IconAi className="h-4 w-4" />
         {layout.showLabels && "Ask AI"}
       </Button>

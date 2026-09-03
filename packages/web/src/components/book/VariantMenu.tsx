@@ -29,9 +29,12 @@ export function VariantMenu({
 }) {
   const layout = useShellLayout();
   const activeLane = active ? lanes.find((l) => l.key === active) ?? null : null;
+  // A ?variant= deep link renders before variants.list resolves, and falling back to "Original"
+  // there would contradict the banner underneath saying otherwise.
+  const activeName = activeLane ? variantLabel(activeLane) : active;
   const originalName = bookLanguage ? `Original · ${bookLanguage.toUpperCase()}` : "Original";
-  const currentName = activeLane ? variantLabel(activeLane) : originalName;
-  const shortName = activeLane ? (activeLane.label ?? activeLane.key).slice(0, 2).toUpperCase() : (bookLanguage ?? "EN").toUpperCase();
+  const currentName = activeName ?? originalName;
+  const shortName = active ? (activeLane?.label ?? active).slice(0, 2).toUpperCase() : (bookLanguage ?? "EN").toUpperCase();
 
   return (
     <Menu
@@ -75,7 +78,7 @@ export function VariantMenu({
               <LaneRow
                 key={lane.key}
                 name={variantLabel(lane)}
-                detail={`${lane.done} of ${lane.total} ${lane.kind === "translation" ? "translated" : "rewritten"}`}
+                detail={`${lane.done} of ${chapterCount} ${lane.kind === "translation" ? "translated" : "rewritten"}`}
                 selected={active === lane.key}
                 onClick={() => {
                   onSwitch(lane.key);

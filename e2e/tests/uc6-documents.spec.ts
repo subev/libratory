@@ -16,13 +16,20 @@ test.describe("document export", { tag: "@slow" }, () => {
     await page.goto("/");
     await page.getByRole("link", { name: "Paper Trail" }).click();
 
-    await page.getByTestId("create-tab-document").click();
     const rows = page.getByTestId("document-row");
 
-    // Exports are serialized per book server-side — run them one after the other
-    await page.getByTestId("export-pdf").click();
+    // Exports are serialized per book server-side — run them one after the other. One modal with one
+    // CTA is what makes that safe: the old UI only disabled the format you had clicked.
+    const exportAs = async (format: "pdf" | "epub") => {
+      await page.getByTestId("stage-tab-chapters").click();
+      await page.getByTestId("open-export").click();
+      await page.getByTestId(`export-format-${format}`).click();
+      await page.getByTestId("export-confirm").click();
+    };
+
+    await exportAs("pdf");
     await expect(rows.filter({ hasText: "PDF" })).toHaveCount(1, { timeout: 2 * 60_000 });
-    await page.getByTestId("export-epub").click();
+    await exportAs("epub");
     await expect(rows).toHaveCount(2, { timeout: 60_000 });
     await expect(rows.filter({ hasText: "PDF" })).toHaveCount(1);
     await expect(rows.filter({ hasText: "EPUB" })).toHaveCount(1);

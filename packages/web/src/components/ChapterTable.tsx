@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams } from "react-router";
 import { Button } from "./Button.tsx";
+import { PillToggle } from "./PillToggle.tsx";
+import { Menu } from "./Menu.tsx";
+import { useShellLayout } from "./book/BookShell.tsx";
 import { StatusBadge } from "./StatusBadge.tsx";
 import { ChapterModal } from "./ChapterModal.tsx";
 import { chapterAudioDownload, chapterAudioUrl, SYNTH_BUSY, variantLabel } from "../lib/chapters.ts";
@@ -10,7 +13,6 @@ import { SynthesizeModal, type SynthSettings } from "./SynthesizeModal.tsx";
 import {
   IconAi,
   IconBook,
-  IconChevronRight,
   IconClose,
   IconContinue,
   IconDownload,
@@ -129,7 +131,7 @@ export function ChapterTable({
   const audioRef = useRef<HTMLAudioElement>(null);
 
   // Filter state
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [quickFilter, setQuickFilter] = useState<"all" | "noaudio" | "flight" | "attention">("all");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [statusOperator, setStatusOperator] = useState<"is" | "is_not">("is");
@@ -145,7 +147,17 @@ export function ChapterTable({
   const isMultiFile = files && files.length > 1;
 
   // Cheap enough to redo per render — there is no React Compiler here (esbuild JSX, no Babel pass)
+  const matchesQuick = (ch: ChapterRow) => {
+    if (quickFilter === "noaudio") return !ch.audioPath;
+    if (quickFilter === "flight") return SYNTH_BUSY.includes(ch.status);
+    // Failures only. "suspended" is what a deliberate cancel produces and what a note added as a
+    // chapter is born as — neither is something the reader needs nagging about.
+    if (quickFilter === "attention") return ch.status === "failed";
+    return true;
+  };
+
   const filteredChapters = chapters.filter((ch) => {
+    if (!matchesQuick(ch)) return false;
     if (search && !ch.title.toLowerCase().includes(search.toLowerCase())) return false;
     if (statusFilter) {
       if (statusOperator === "is" && ch.status !== statusFilter) return false;
@@ -166,7 +178,23 @@ export function ChapterTable({
 
   const isFiltered = filteredChapters.length !== chapters.length;
   const canDrag = onReorder && !isFiltered;
-  const activeFilterCount = [search, statusFilter, wordCountMin, wordCountMax, durationMin, durationMax, sourceFileFilter].filter(Boolean).length;
+  const activeFilterCount = [
+    search,
+    statusFilter,
+    wordCountMin,
+    wordCountMax,
+    durationMin,
+    durationMax,
+    sourceFileFilter,
+    quickFilter === "all" ? "" : quickFilter,
+  ].filter(Boolean).length;
+  const quickCounts = {
+    all: chapters.length,
+    noaudio: chapters.filter((c) => !c.audioPath).length,
+    flight: chapters.filter((c) => SYNTH_BUSY.includes(c.status)).length,
+    attention: chapters.filter((c) => c.status === "failed").length,
+  };
+  const layout = useShellLayout();
 
   // Checkbox state based on visible (filtered) chapters
   const visibleSelectedCount = filteredChapters.filter((c) => c.selected).length;
@@ -188,6 +216,7 @@ export function ChapterTable({
   }
 
   function clearFilters() {
+    setQuickFilter("all");
     setSearch("");
     setStatusFilter("");
     setStatusOperator("is");
@@ -229,168 +258,216 @@ export function ChapterTable({
   }, [playingChapterId]);
 
   return (
-    <>
-      {/* Filter toggle + panel */}
-      <div className="mb-3">
-        <div className="flex items-center gap-2 mb-2">
-          <button
-            onClick={() => setFiltersOpen((v) => !v)}
-            className="flex items-center gap-1.5 text-sm font-medium text-(--text-tertiary) hover:text-(--text-primary)"
+    <div className="flex flex-col min-h-0 flex-1">
+      {/* Quick filters, a title search, and the rest behind a popover — a closed disclosure hid
+          whether anything was filtered at all, which is worse in a popover than it was inline. */}
+      <div className="flex items-center gap-2 mb-3 flex-wrap shrink-0">
+        <PillToggle selected={quickFilter === "all"} onClick={() => setQuickFilter("all")} testId="chapter-filter-all">
+          All {quickCounts.all}
+        </PillToggle>
+        <PillToggle
+          selected={quickFilter === "noaudio"}
+          onClick={() => setQuickFilter("noaudio")}
+          title="Chapters with no audio yet"
+          testId="chapter-filter-noaudio"
+        >
+          Needs audio {quickCounts.noaudio}
+        </PillToggle>
+        {layout.showLabels && (
+          <PillToggle
+            selected={quickFilter === "flight"}
+            onClick={() => setQuickFilter("flight")}
+            title="Queued, normalizing or synthesizing right now"
+            testId="chapter-filter-flight"
           >
-            <IconChevronRight className={`h-3 w-3 transition-transform ${filtersOpen ? "rotate-90" : ""}`} />
-            Filter
-            {activeFilterCount > 0 && !filtersOpen ? (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-(--accent-subtle) text-(--accent-text)">
-                {activeFilterCount}
-              </span>
-            ) : null}
-          </button>
-          {activeFilterCount > 0 ? (
+            In flight {quickCounts.flight}
+          </PillToggle>
+        )}
+        <PillToggle
+          selected={quickFilter === "attention"}
+          onClick={() => setQuickFilter("attention")}
+          title="Failed chapters — a cancelled one is not a failure"
+          testId="chapter-filter-attention"
+        >
+          Needs attention {quickCounts.attention}
+        </PillToggle>
+
+        <div className="w-px h-4 bg-(--border)" />
+
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Filter titles…"
+          aria-label="Filter chapter titles"
+          className={`${layout.showLabels ? "w-42" : "w-27"} px-2.5 py-1 text-xs border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary)`}
+          data-testid="chapter-search"
+        />
+
+        <Menu
+          align="left"
+          width={layout.filterColumns === 2 ? "w-128" : "w-80"}
+          testId="chapter-filters"
+          trigger={({ open, toggle }) => (
+            // button-ok: a disclosure for the filter panel, skinned to sit with the pills beside it
             <button
-              onClick={clearFilters}
-              className="text-xs text-(--text-faint) hover:text-(--text-tertiary)"
+              type="button"
+              onClick={toggle}
+              aria-expanded={open}
+              className={`flex items-center gap-1.5 h-6.5 px-2.5 rounded-md border text-xs font-semibold ${
+                activeFilterCount > 0
+                  ? "bg-(--accent-subtle) border-(--accent) text-(--accent-text)"
+                  : "border-(--border-input) text-(--text-secondary) hover:bg-(--bg-subtle)"
+              }`}
+              data-testid="chapter-filters-trigger"
             >
-              Clear
-            </button>
-          ) : null}
-        </div>
-
-        {filtersOpen ? (
-          <div className="bg-(--bg-card) border border-(--border) rounded-lg p-4 mb-3">
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-              <label className="flex items-center gap-3">
-                <span className="text-xs font-medium text-(--text-muted) w-16 shrink-0">Search</span>
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Filter by title..."
-                  className="w-full px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary)"
-                />
-              </label>
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-medium text-(--text-muted) w-16 shrink-0">Status</span>
-                <div className="flex items-center gap-2 flex-1">
-                  <select
-                    value={statusOperator}
-                    onChange={(e) => setStatusOperator(e.target.value as "is" | "is_not")}
-                    className="px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary)"
-                  >
-                    <option value="is">is</option>
-                    <option value="is_not">is not</option>
-                  </select>
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="flex-1 px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary)"
-                  >
-                    <option value="">All</option>
-                    {STATUSES.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-medium text-(--text-muted) w-16 shrink-0">Words</span>
-                <div className="flex items-center gap-2 flex-1">
-                  <input
-                    type="number"
-                    value={wordCountMin}
-                    onChange={(e) => setWordCountMin(e.target.value)}
-                    placeholder="min"
-                    min={0}
-                    className="w-full px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) tabular-nums"
-                  />
-                  <span className="text-(--text-faint) text-xs">–</span>
-                  <input
-                    type="number"
-                    value={wordCountMax}
-                    onChange={(e) => setWordCountMax(e.target.value)}
-                    placeholder="max"
-                    min={0}
-                    className="w-full px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) tabular-nums"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-medium text-(--text-muted) w-16 shrink-0">Duration</span>
-                <div className="flex items-center gap-2 flex-1">
-                  <input
-                    type="number"
-                    value={durationMin}
-                    onChange={(e) => setDurationMin(e.target.value)}
-                    placeholder="min"
-                    min={0}
-                    className="w-full px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) tabular-nums"
-                  />
-                  <span className="text-(--text-faint) text-xs">–</span>
-                  <input
-                    type="number"
-                    value={durationMax}
-                    onChange={(e) => setDurationMax(e.target.value)}
-                    placeholder="max"
-                    min={0}
-                    className="w-full px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) tabular-nums"
-                  />
-                  <select
-                    value={durationUnit}
-                    onChange={(e) => setDurationUnit(e.target.value as "sec" | "min")}
-                    className="px-1.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) shrink-0"
-                  >
-                    <option value="sec">sec</option>
-                    <option value="min">min</option>
-                  </select>
-                </div>
-              </div>
-              {isMultiFile && (
-                <label className="flex items-center gap-3">
-                  <span className="text-xs font-medium text-(--text-muted) w-16 shrink-0">Source</span>
-                  <select
-                    value={sourceFileFilter}
-                    onChange={(e) => setSourceFileFilter(e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary)"
-                  >
-                    <option value="">All files</option>
-                    {files!.map((f) => (
-                      <option key={f.index} value={String(f.index)}>
-                        {f.index + 1}. {f.filename}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="px-1.5 rounded-full text-[10px] font-bold bg-(--accent) text-(--on-accent)">{activeFilterCount}</span>
               )}
+            </button>
+          )}
+        >
+          {(close) => (
+            <div className="p-2">
+              <div className={`grid gap-x-6 gap-y-3 ${layout.filterColumns === 2 ? "grid-cols-2" : "grid-cols-1"}`}>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) w-16 shrink-0">Status</span>
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <select
+                      value={statusOperator}
+                      onChange={(e) => setStatusOperator(e.target.value as "is" | "is_not")}
+                      className="px-1.5 py-1 text-xs border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary)"
+                    >
+                      <option value="is">is</option>
+                      <option value="is_not">is not</option>
+                    </select>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="flex-1 min-w-0 px-1.5 py-1 text-xs border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary)"
+                    >
+                      <option value="">All</option>
+                      {STATUSES.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {isMultiFile && (
+                  <label className="flex items-center gap-3">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) w-16 shrink-0">Source</span>
+                    <select
+                      value={sourceFileFilter}
+                      onChange={(e) => setSourceFileFilter(e.target.value)}
+                      className="flex-1 min-w-0 px-1.5 py-1 text-xs border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary)"
+                    >
+                      <option value="">All files</option>
+                      {files!.map((f) => (
+                        <option key={f.index} value={String(f.index)}>
+                          {f.index + 1}. {f.filename}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) w-16 shrink-0">Words</span>
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <input
+                      type="number"
+                      value={wordCountMin}
+                      onChange={(e) => setWordCountMin(e.target.value)}
+                      placeholder="min"
+                      min={0}
+                      className="w-full min-w-0 px-2 py-1 text-xs border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) tabular-nums"
+                    />
+                    <span className="text-(--text-faint) text-xs">–</span>
+                    <input
+                      type="number"
+                      value={wordCountMax}
+                      onChange={(e) => setWordCountMax(e.target.value)}
+                      placeholder="max"
+                      min={0}
+                      className="w-full min-w-0 px-2 py-1 text-xs border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) tabular-nums"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) w-16 shrink-0">Length</span>
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <input
+                      type="number"
+                      value={durationMin}
+                      onChange={(e) => setDurationMin(e.target.value)}
+                      placeholder="min"
+                      min={0}
+                      className="w-full min-w-0 px-2 py-1 text-xs border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) tabular-nums"
+                    />
+                    <span className="text-(--text-faint) text-xs">–</span>
+                    <input
+                      type="number"
+                      value={durationMax}
+                      onChange={(e) => setDurationMax(e.target.value)}
+                      placeholder="max"
+                      min={0}
+                      className="w-full min-w-0 px-2 py-1 text-xs border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) tabular-nums"
+                    />
+                    <select
+                      value={durationUnit}
+                      onChange={(e) => setDurationUnit(e.target.value as "sec" | "min")}
+                      className="px-1 py-1 text-xs border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) shrink-0"
+                    >
+                      <option value="sec">sec</option>
+                      <option value="min">min</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-(--border)">
+                <span className="text-xs text-(--text-faint)">
+                  {filteredChapters.length} of {chapters.length} chapters match
+                </span>
+                <div className="flex-1" />
+                <Button variant="secondary" size="sm" onClick={clearFilters} data-testid="chapter-filters-clear">
+                  Clear all
+                </Button>
+                <Button variant="primary" size="sm" onClick={close}>
+                  Done
+                </Button>
+              </div>
             </div>
-          </div>
-        ) : null}
+          )}
+        </Menu>
 
-        {/* Filter summary + bulk actions */}
-        {isFiltered ? (
-          <div className="flex items-center justify-between text-xs text-(--text-muted) mb-2">
-            <span>
-              Showing {filteredChapters.length} of {chapters.length} chapters
+        <div className="flex-1" />
+
+        {isFiltered && (
+          <span className="flex items-center gap-3 text-xs">
+            <span className="text-(--text-muted)">
+              Showing {filteredChapters.length} of {chapters.length}
             </span>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => onSetSelectedBatch(filteredChapters.map((c) => c.id), true)}
-                className="text-(--accent-text) hover:text-(--accent-text-hover) font-medium"
-              >
-                Select filtered
-              </button>
-              <button
-                onClick={() => onSetSelectedBatch(filteredChapters.map((c) => c.id), false)}
-                className="text-(--text-muted) hover:text-(--text-secondary) font-medium"
-              >
-                Deselect filtered
-              </button>
-            </div>
-          </div>
-        ) : null}
+            <button
+              onClick={() => onSetSelectedBatch(filteredChapters.map((c) => c.id), true)}
+              className="text-(--accent-text) hover:text-(--accent-text-hover) font-medium"
+            >
+              Select filtered
+            </button>
+            <button
+              onClick={() => onSetSelectedBatch(filteredChapters.map((c) => c.id), false)}
+              className="text-(--text-muted) hover:text-(--text-secondary) font-medium"
+            >
+              Deselect
+            </button>
+          </span>
+        )}
       </div>
 
-      {/* Table — capped height so long books don't push the output controls off-screen */}
-      <div className="overflow-x-auto overflow-y-auto max-h-[70vh] rounded-lg border border-(--border)">
-        <table className="w-full min-w-[56rem] divide-y divide-(--divide)">
+
+      {/* The table is the scroller and thead sticks to it, so the filters above stay put. No
+          overflow-x: the width contract drops columns instead of sliding them sideways. */}
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain rounded-lg border border-(--border)">
+        <table className="w-full divide-y divide-(--divide)">
           {/* The card colour under the tint: --bg-subtle is a 4% wash in dark mode, and rows scrolling
               under a translucent header read as a rendering fault */}
           <thead className="bg-(--bg-card) sticky top-0 z-10">
@@ -407,12 +484,16 @@ export function ChapterTable({
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">#</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Title</th>
-              {isMultiFile && (
+              {isMultiFile && layout.showHeadMeta && (
                 <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Source</th>
               )}
               <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider w-40">Status</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-(--text-muted) uppercase tracking-wider">Words</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-(--text-muted) uppercase tracking-wider">Duration</th>
+              {layout.showWords && (
+                <th className="px-4 py-3 text-right text-xs font-medium text-(--text-muted) uppercase tracking-wider">Words</th>
+              )}
+              {layout.showDuration && (
+                <th className="px-4 py-3 text-right text-xs font-medium text-(--text-muted) uppercase tracking-wider">Duration</th>
+              )}
               <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
@@ -520,7 +601,7 @@ export function ChapterTable({
                           source <IconExternal className="h-3 w-3" />
                         </a>
                       ) : null}
-                      {chapter.pageStart ? (
+                      {chapter.pageStart && layout.showPages ? (
                         sourceFile ? (
                           <button
                             onClick={() =>
@@ -539,7 +620,7 @@ export function ChapterTable({
                       ) : null}
                     </div>
                   </td>
-                  {isMultiFile && (
+                  {isMultiFile && layout.showHeadMeta && (
                     <td className="px-4 py-3 text-xs text-(--text-muted) truncate max-w-32" title={files!.find((f) => f.index === chapter.sourceFileIndex)?.filename}>
                       {files!.find((f) => f.index === chapter.sourceFileIndex)?.filename ?? "\u2014"}
                     </td>
@@ -547,12 +628,16 @@ export function ChapterTable({
                   <td className="px-4 py-3">
                     <ChapterStatusCell chapter={chapter} cleanup={variant ? null : chapter.cleanup ?? null} />
                   </td>
-                  <td className="px-4 py-3 text-sm text-(--text-tertiary) text-right tabular-nums">
-                    {chapter.wordCount.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-(--text-tertiary) text-right tabular-nums">
-                    {chapter.durationMs ? formatDuration(chapter.durationMs) : "\u2014"}
-                  </td>
+                  {layout.showWords && (
+                    <td className="px-4 py-3 text-sm text-(--text-tertiary) text-right tabular-nums">
+                      {chapter.wordCount.toLocaleString()}
+                    </td>
+                  )}
+                  {layout.showDuration && (
+                    <td className="px-4 py-3 text-sm text-(--text-tertiary) text-right tabular-nums">
+                      {chapter.durationMs ? formatDuration(chapter.durationMs) : "\u2014"}
+                    </td>
+                  )}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <Button
@@ -759,7 +844,7 @@ export function ChapterTable({
           onClose={() => setSynthesizeChapterId(null)}
         />
       ) : null}
-    </>
+    </div>
   );
 }
 

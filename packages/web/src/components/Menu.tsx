@@ -27,26 +27,35 @@ export function Menu({
   const close = useCallback(() => setOpen(false), []);
   useTopmostEscape(close, open);
 
+  // Held in a ref, not in the effect below: closing the menu re-runs that effect, and a swallow
+  // registered inside it would be torn down by its own cleanup before the click it exists to eat.
+  const swallowRef = useRef<((e: MouseEvent) => void) | null>(null);
+  const clearSwallow = useCallback(() => {
+    if (!swallowRef.current) return;
+    document.removeEventListener("click", swallowRef.current, { capture: true });
+    swallowRef.current = null;
+  }, []);
+  useEffect(() => clearSwallow, [clearSwallow]);
+
   useEffect(() => {
     if (!open) return;
-    let swallow: ((e: MouseEvent) => void) | null = null;
     function onPointerDown(e: PointerEvent) {
       if (root.current?.contains(e.target as Node)) return;
       setOpen(false);
-      // The click this pointerdown becomes is still on its way to whatever is underneath. One
-      // dismissal is one dismissal, so it does not also press the button it landed on.
-      swallow = (click) => {
+      // The click this pointerdown becomes is still on its way to whatever is underneath — a Modal's
+      // scrim, or the next button along. One dismissal is one dismissal.
+      clearSwallow();
+      const swallow = (click: MouseEvent) => {
         click.stopPropagation();
         click.preventDefault();
+        clearSwallow();
       };
+      swallowRef.current = swallow;
       document.addEventListener("click", swallow, { capture: true, once: true });
     }
     document.addEventListener("pointerdown", onPointerDown, true);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown, true);
-      if (swallow) document.removeEventListener("click", swallow, { capture: true });
-    };
-  }, [open]);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [open, clearSwallow]);
 
   return (
     <div ref={root} className="relative">
