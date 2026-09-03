@@ -53,8 +53,14 @@ export function Menu({
       swallowRef.current = swallow;
       document.addEventListener("click", swallow, { capture: true, once: true });
     }
+    // A right-click or a touch drag is a pointerdown that never becomes a click, and an armed
+    // swallow left over from one would eat somebody else's.
     document.addEventListener("pointerdown", onPointerDown, true);
-    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("contextmenu", clearSwallow, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("contextmenu", clearSwallow, true);
+    };
   }, [open, clearSwallow]);
 
   return (

@@ -452,7 +452,9 @@ export function BookDetail() {
   const requestedTab = searchParams.get("tab");
   // Clamped to a tab that is actually rendered: deleting the last note takes the Notes tab away
   // while ?tab=notes is still in the URL, and an unmatched value leaves every panel hidden.
-  const tab = searchParams.has("chapter")
+  const deepLinkedChapter = searchParams.get("chapter");
+  const chapterDeepLinkResolves = !!deepLinkedChapter && book.chapters.some((c) => c.id === deepLinkedChapter);
+  const tab = chapterDeepLinkResolves
     ? "chapters"
     : stagesLocked
       ? "files"
@@ -663,8 +665,9 @@ export function BookDetail() {
         id: book.id,
         language: activeVariant ?? undefined,
         format: pickedExport,
+        waitForAll: deferOutputs,
         ...(pickedExport === "epub-sync"
-          ? { copyToDropDir: !!exportConfig?.readaloudDropDir && copyToImport, waitForAll: deferOutputs }
+          ? { copyToDropDir: !!exportConfig?.readaloudDropDir && copyToImport }
           : {}),
       });
     }
@@ -725,7 +728,14 @@ export function BookDetail() {
               ? "Extract chapters first"
               : "Translate or rewrite chapters (ELI5, summary, custom prompts) and review side by side"
           }
-          onExtract={() => setExtractOpen(true)}
+          onExtract={() => {
+            // ExtractModal is rendered by BookFilesSection, and an inactive TabPanel is display:none
+            // — which suppresses fixed descendants, so opening it from another tab showed nothing.
+            // Switching first is also the honest thing: the modal's own copy talks about the file
+            // list, and its "selected files" scope is a selection you cannot see from here.
+            setTab("files");
+            setExtractOpen(true);
+          }}
           extractDisabled={book.kind !== "pdf"}
           extractTitle={
             book.kind !== "pdf"
@@ -1137,7 +1147,8 @@ export function BookDetail() {
           }
           timing={{
             inFlight: selectedInFlight,
-            readyCount: pickedExport === "m4b" ? selectedWithAudio : selectedSyncExportable,
+            readyCount:
+              pickedExport === "m4b" ? selectedWithAudio : pickedExport === "epub-sync" ? selectedSyncExportable : selectedExportable,
             totalCount: selectedCount,
             waitForAll,
             onChange: setWaitForAll,

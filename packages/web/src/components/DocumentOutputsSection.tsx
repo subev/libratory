@@ -72,6 +72,7 @@ export function DocumentOutputsSection({
                   variant="icon"
                   size="sm"
                   href={`/download/document/${doc.id}`}
+                  download={filename}
                   aria-label={`Download ${filename}`}
                   title="Download"
                   data-testid="document-download"

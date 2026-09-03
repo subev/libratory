@@ -127,7 +127,7 @@ test.describe("read along on the page", { tag: "@slow" }, () => {
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("chapter-modal")).toBeHidden();
 
-    await page.getByTestId("open-synthesize").click();
+    await page.getByTestId("tray-synthesize").click();
     await page.getByTestId("synthesize-start").click();
     // Every chapter, not just the first to finish: the reader opens on one of them. Enabled, not
     // merely present — the play button renders disabled from the start, so a bare count is true

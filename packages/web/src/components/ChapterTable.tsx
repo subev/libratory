@@ -273,7 +273,9 @@ export function ChapterTable({
         >
           Needs audio {quickCounts.noaudio}
         </PillToggle>
-        {layout.showLabels && (
+        {/* Not width-gated like the rest of the chrome: hiding the chip that is doing the
+            filtering would leave the table filtered with the reason off screen. */}
+        {(
           <PillToggle
             selected={quickFilter === "flight"}
             onClick={() => setQuickFilter("flight")}
@@ -762,7 +764,9 @@ export function ChapterTable({
       </div>
 
       {playingChapter ? (
-        <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-50 w-[min(72rem,calc(100vw-2rem))] bg-(--bg-card) border border-(--border) rounded-lg px-4 py-3 flex items-center gap-4 shadow-lg">
+        // Was fixed at bottom-12, an offset tuned to clear a log dock that is no longer fixed. It
+        // sits in the flow above the tray now, so nothing has to know anybody else's height.
+        <div className="shrink-0 mt-2 bg-(--bg-card) border border-(--border) rounded-lg px-4 py-2 flex items-center gap-4 shadow-lg">
           <button
             onClick={() => handlePlay(playingChapter.id)}
             className="text-(--accent-text) hover:text-(--accent-text-hover) w-8 h-8 flex items-center justify-center shrink-0"

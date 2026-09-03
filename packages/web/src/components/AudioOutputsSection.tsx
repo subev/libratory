@@ -64,6 +64,7 @@ export function AudioOutputsSection({
                   variant="icon"
                   size="sm"
                   href={`/download/assembly/${assembly.id}`}
+                  download={filename}
                   aria-label={`Download ${filename}`}
                   title="Download"
                   data-testid="assembly-download"
