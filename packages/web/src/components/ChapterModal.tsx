@@ -76,7 +76,7 @@ const UNTOUCHED_UI: ModalUi = {
   pdfPage: null,
 };
 
-type ViewMode = "read" | "source" | "compare" | "blocks";
+type ViewMode = "pages" | "text" | "source" | "compare" | "blocks";
 
 // The open index is held across list changes — a filter or a delete can leave it past the end
 export function ChapterModal(props: ChapterModalProps) {
@@ -180,11 +180,13 @@ function ChapterModalBody({
 
   const canMark = readerChapter?.mode === "page" && cues !== null;
   // A variant is another text entirely; for the original, the document says whether the print
-  // still shows this chapter's words
-  const showPages = !isVariant && hasPages && printHoldsText(readerChapter);
-  const modes = viewModes(chapter);
-  const viewMode: ViewMode = picked && modes.includes(picked) ? picked : "read";
-  const marksPages = viewMode === "read" && showPages;
+  // still shows this chapter's words. It decides whether Pages is *offered*, not what is shown —
+  // it used to decide both, and a chapter with no clean text had no way to reach its own prose
+  // except the Edit box, which is a strange thing to open in order to read.
+  const canShowPages = !isVariant && hasPages && printHoldsText(readerChapter);
+  const modes = viewModes(chapter, canShowPages);
+  const viewMode: ViewMode = picked && modes.includes(picked) ? picked : modes[0]!;
+  const marksPages = viewMode === "pages";
   // Marking needs a playhead finer than timeupdate's, and a cue to scroll to — on the print or in
   // the prose, whichever the open view is showing
   const follows = cues !== null && viewMode !== "blocks";
@@ -406,7 +408,7 @@ function ChapterModalBody({
   const cueLive = mark !== null && ms > 0;
   // The chunk offsets index the spoken text, which is what Read renders when it is not the print
   const chunkRanges =
-    fullChapter && viewMode === "read" && !showPages
+    fullChapter && viewMode === "text"
       ? fullChapter.chunkPreviews.flatMap((p) =>
           typeof p.start === "number" && typeof p.end === "number"
             ? [{ start: p.start, end: p.end, url: p.url }]
@@ -1146,8 +1148,10 @@ function Divider() {
 }
 
 // Without a normalized or edited text, the extracted text is the spoken one — Read already shows it
-function viewModes(chapter: ChapterRow): ViewMode[] {
-  const modes: ViewMode[] = ["read"];
+// Pages first when there are any: it is the chapter as it was printed, and the closest thing to
+// "the book". Text is always offered — every chapter has words, even one nobody has cleaned.
+function viewModes(chapter: ChapterRow, canShowPages: boolean): ViewMode[] {
+  const modes: ViewMode[] = canShowPages ? ["pages", "text"] : ["text"];
   if (chapter.hasCleanText || chapter.hasCustomText) modes.push("source", "compare");
   if (chapter.hasSourceBlocks) modes.push("blocks");
   return modes;
@@ -1280,7 +1284,7 @@ function TextPreview({
       onSelectChunk={onSelectChunk}
       hoveredChunkUrl={hoveredChunkUrl}
       onHoverChunk={onHoverChunk}
-      className={viewMode === "read" && edited ? textClass + " border-(--border-custom-text) bg-(--bg-custom-text)" : textClass}
+      className={viewMode === "text" && edited ? textClass + " border-(--border-custom-text) bg-(--bg-custom-text)" : textClass}
       lang={lang}
     />
   );

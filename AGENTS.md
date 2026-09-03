@@ -595,11 +595,14 @@ packages/web/src/
     SynthesizeModal.tsx Voice/speed picker + start button — behind the toolbar's Synthesize action
                         for the selection, and behind every single-chapter re-synthesize (row icon
                         and chapter modal), which is where a chapter's voice is chosen
-    ChapterModal.tsx    Chapter detail modal: view tabs (Read is the book's own pages while they
-                        still hold the chapter's text, else the spoken text; Source is the extracted
-                        text, Compare puts the two side by side, Blocks is the extraction diagnostic),
-                        text editing, per-chapter actions. Every text pane marks the narrated
-                        sentence and word (lib/text-cues.ts locates the cues in it)
+    ChapterModal.tsx    Chapter detail modal: view tabs — Pages is the book's own scan, offered only
+                        while the print still holds this chapter's words (never on a variant); Text is
+                        the spoken prose and is always offered; Source is the extracted text, Compare
+                        puts the two side by side, Blocks is the extraction diagnostic. Pages/Text
+                        used to be one "Read" tab that chose for you, which left a chapter with no
+                        clean text reachable only through the Edit box. Also text editing and the
+                        per-chapter actions. Every text pane marks the narrated sentence and word
+                        (lib/text-cues.ts locates the cues in it)
     ChapterAiModal.tsx  Ask-AI prompt modal per chapter/book (presets, model pick)
     StructureModal.tsx  Heading-outline structure view, manual boundaries, LLM proposals
     VariantModal.tsx    Variant start/progress modal: language + rewrite-preset + custom-prompt targets, live side-by-side view
