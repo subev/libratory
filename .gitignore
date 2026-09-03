@@ -1,6 +1,9 @@
 node_modules/
 dist/
 .env
+# Any sibling of it too: a .env.backup holding live keys is one `git add -A` from a public repo
+.env.*
+!.env.example
 .venv/
 .venv-pocket/
 data/

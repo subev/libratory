@@ -159,6 +159,12 @@ deliberate: a moving cue is a playhead, not a mark the reader made. Every immers
 tracks the voice in its own brand colour. Yellow is the convention for *user-created* highlights —
 if this app ever grows those, they should be yellow and visibly distinct from the cue.
 
+The chapter modal's text pane is two paints and no more: `--accent`/18 for the chunk in play and
+`--accent`/35 for the sentence being spoken. It used `--bg-selected` for the first, which is the
+*table-row* selection token — orange at 10% over `--bg-card`. On `--bg-reading`, a warm cream, warm
+sat on warm and the band all but vanished. The `--cue-*` tokens are not the fix either: they are
+theme-fixed for the white PDF paper below.
+
 The overlay ladder over a PDF page (`CueOverlay`) is one hue at four strengths — linked chunk, seek
 ring, active sentence, active word — painted with `mix-blend-multiply`, because pdf.js renders white
 paper in **both** themes. Anything drawn on that layer must read against white; theme-varying tokens
@@ -292,8 +298,11 @@ each a state someone designed, all seven booleans under test.
 
 `Section.tsx` and the `--step-input` / `--step-work` / `--step-output` ramp are **gone**. The stripe
 was "the one place colour still encodes a sequence", and the numbered tab chips do that job now — the
-sequence is the tab row, so a card carrying a coloured edge would be saying it twice. A produced-file row is `book/ResourceRow.tsx` (tile, title, subtitle, badge, actions), shared by
-assemblies and documents — source files stay a table because they carry a shift-range selection.
+sequence is the tab row, so a card carrying a coloured edge would be saying it twice. A produced-file row is `book/ResourceRow.tsx` (tile, title, subtitle, trailing, badge, actions), shared by
+assemblies and documents — source files stay a table because they carry a shift-range selection. On an
+assembly the tile *is* the transport: a play/pause circle over a hidden `<audio>`, with elapsed, a
+scrub and the speed chip in `trailing` once it is playing. A native `<audio controls>` there brought
+its own chrome and pushed the row's actions to the far edge.
 
 Two other container roles are already confined to a single component or file and do **not** need
 extracting — say so before "consolidating" them:

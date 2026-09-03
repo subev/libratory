@@ -23,6 +23,9 @@ nothing behind them yet. None of them blocked the branch; all of them are cheap 
   today's confirmation is client-only and lost on remount.
 - **A drop zone on the Source files tab.** `BookFilesSection` has an `AddFilesButton` with a hidden
   input; `UploadZone` is Home-only.
+- **`Reveal in Finder` on an output row.** The artboard puts it between Download and Delete on every
+  assembly and document. The web package has no bridge to the desktop shell, so there is nothing to
+  call.
 
 ## Deliberately not built
 

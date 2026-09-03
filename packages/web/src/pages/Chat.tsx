@@ -93,8 +93,16 @@ export function Chat() {
     <div className="min-h-screen bg-(--bg-page)">
       <div className="max-w-3xl mx-auto px-6 py-6 flex flex-col min-h-screen">
         <div className="flex items-center gap-3 mb-4">
-          <Link to="/" className="inline-flex items-center gap-1 text-(--text-faint) hover:text-(--text-secondary) text-sm"><IconArrowLeft className="h-4 w-4" />Library</Link>
-          <h1 className="text-xl font-bold text-(--text-primary)">Library chat</h1>
+          <Link
+            to={bookId ? `/books/${bookId}` : "/"}
+            className="inline-flex items-center gap-1 max-w-64 text-(--text-faint) hover:text-(--text-secondary) text-sm"
+            title={bookId ? `Back to ${scopedBook?.title ?? "the book"}` : "Back to the library"}
+            data-testid="chat-back"
+          >
+            <IconArrowLeft className="h-4 w-4 shrink-0" />
+            <span className="truncate">{bookId ? (scopedBook?.title ?? "Back") : "Library"}</span>
+          </Link>
+          <h1 className="text-xl font-bold text-(--text-primary) shrink-0">Library chat</h1>
           <div className="ml-auto flex items-center gap-2">
             {messages.length > 0 && (
               <Button

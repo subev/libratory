@@ -1327,15 +1327,15 @@ function ChunkedText({
 
   // Sort by start and drop overlaps so segments tile the text cleanly.
   const ordered = [...chunkRanges].sort((a, b) => a.start - b.start);
+  // One band at a time: the pointer takes it while it is over the text, otherwise the selection
+  // holds it — unless the cue is running, which is the coarsest marker yielding to the sentence.
+  const bandUrl = hoveredChunkUrl ?? (cueLive ? null : selectedChunkUrl);
   const parts: ReactNode[] = [];
   let pos = 0;
   ordered.forEach((range, i) => {
     if (range.start < pos) return;
     if (range.start > pos) parts.push(marked(text, pos, range.start, mark, `gap-${i}`));
     const isSelected = range.url === selectedChunkUrl;
-    // The chunk band is the coarsest marker, so it yields to the sentence and word while those follow
-    const showsSelected = isSelected && !cueLive;
-    const isHovered = !showsSelected && range.url === hoveredChunkUrl;
     parts.push(
       <span
         key={`${range.url}-${i}`}
@@ -1343,7 +1343,7 @@ function ChunkedText({
         onClick={() => onSelectChunk(range.url)}
         onMouseEnter={() => onHoverChunk(range.url)}
         onMouseLeave={() => onHoverChunk(null)}
-        className={`cursor-pointer rounded-sm transition-colors ${ showsSelected ? "bg-(--bg-selected) text-(--text-primary)" : isHovered ? "bg-(--accent-subtle) text-(--text-primary)" : "" }`}
+        className={`cursor-pointer rounded-sm transition-colors ${range.url === bandUrl ? "bg-(--accent)/18" : ""}`}
       >
         {marked(text, range.start, range.end, mark, `chunk-${i}`)}
       </span>,
