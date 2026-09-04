@@ -31,7 +31,6 @@ export function ResourceRow({
   /** A transport, or anything else that belongs on the row's own line rather than under the title. */
   trailing?: ReactNode;
   badge?: ReactNode;
-  /** How much disk the row's file takes, right-aligned in its own column so the digits line up. */
   size?: ReactNode;
   actions?: ReactNode;
   testId?: string;

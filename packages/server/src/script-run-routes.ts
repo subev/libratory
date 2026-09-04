@@ -4,6 +4,7 @@ import path from "node:path";
 import { z } from "zod";
 import { env } from "./env.ts";
 import { scriptPath } from "./lib/paths.ts";
+import { bunEnv } from "./lib/bun-runtime.ts";
 
 const ymdSchema = z.string().regex(/^\d{4}-?\d{2}-?\d{2}$/);
 const paramsSchema = z.object({
@@ -43,11 +44,6 @@ function ymdToMs(ymd: string): number {
 }
 
 const HN_SCRIPT = scriptPath("hn-top10.mjs");
-
-// In the desktop app process.execPath is the compiled server binary, so spawning it with a script
-// path re-runs the server instead of the script; BUN_BE_BUN makes that binary behave as the bun
-// CLI, and node ignores it.
-const scriptEnv = { ...process.env, BUN_BE_BUN: "1" };
 
 let running = false;
 
@@ -90,7 +86,7 @@ export function registerScriptRunRoutes(fastify: FastifyInstance) {
       ...(params.folder ? ["--folder", params.folder] : []),
       ...(params.profile ? ["--profile", params.profile] : []),
     ];
-    const child = spawn(process.execPath, args, { cwd: path.dirname(HN_SCRIPT), env: scriptEnv });
+    const child = spawn(process.execPath, args, { cwd: path.dirname(HN_SCRIPT), env: bunEnv });
 
     let closed = false;
     const forward = (chunk: Buffer) => {
@@ -133,7 +129,7 @@ export function registerScriptRunRoutes(fastify: FastifyInstance) {
       "--list", "--json",
       ...selectionArgs(parsed.data),
     ];
-    const child = spawn(process.execPath, args, { cwd: path.dirname(HN_SCRIPT), env: scriptEnv });
+    const child = spawn(process.execPath, args, { cwd: path.dirname(HN_SCRIPT), env: bunEnv });
     let out = "";
     let err = "";
     child.stdout.on("data", (chunk: Buffer) => { out += chunk.toString(); });

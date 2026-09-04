@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { formatBytes, formatOutputDate, formatDuration, formatTotalBytes } from "../lib/format.ts";
+import { filesSummary, formatOutputDate, formatDuration, formatSize } from "../lib/format.ts";
 import { SPEEDS, loadSpeed, saveSpeed, subscribeSpeed } from "../lib/playback-speed.ts";
 import { useAudioTime } from "../lib/use-audio-time.ts";
 import { Button } from "./Button.tsx";
@@ -37,7 +37,7 @@ export function AudioOutputsSection({
   return (
     <ResourceGroup
       title="Audio"
-      count={assemblies.length === 0 ? "nothing assembled yet" : `${assemblies.length} file${assemblies.length === 1 ? "" : "s"} · ${formatTotalBytes(assemblies)}`}
+      count={assemblies.length === 0 ? "nothing assembled yet" : filesSummary(assemblies)}
     >
       {assemblies.map((assembly) => (
         <AssemblyRowItem
@@ -138,7 +138,7 @@ function AssemblyRowItem({
           <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-(--success-bg) text-(--success-text)">latest</span>
         ) : undefined
       }
-      size={assembly.sizeBytes === null ? undefined : formatBytes(assembly.sizeBytes)}
+      size={formatSize(assembly.sizeBytes)}
       actions={
         <>
           {/* No type attribute: assemblies are m4b since 2026-08-19 but older ones are mp3, and a

@@ -1,12 +1,14 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 
 import { env } from "../env.ts";
+import type { ChapterDocument } from "./document-html.ts";
+import { bunEnv } from "./bun-runtime.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -15,43 +17,58 @@ const execFileAsync = promisify(execFile);
 // dependency the repo resolves — see vivliostyle.test.ts.
 export const CLI_VERSION = "11.1.0";
 
-// process.execPath is that compiled binary, which re-runs the server unless BUN_BE_BUN makes it
-// behave as the bun CLI; node ignores the variable.
-const bunEnv = { ...process.env, BUN_BE_BUN: "1" };
-
 const INSTALLED_BIN = path.join(env.VIVLIOSTYLE_DIR, "node_modules", "@vivliostyle", "cli", "dist", "cli.js");
 
+// Two homes, one question: the CLI a checkout resolves from node_modules, or the one the packaged
+// app installed for itself. The answer cannot change without going through installCli, so it is
+// worth caching — renderer.status asks on every poll of a running install.
+let cachedBin: string | null = null;
+
+function cliBin(): string | null {
+  if (cachedBin) return cachedBin;
+  cachedBin = bundledCliBin() ?? installedCliBin();
+  return cachedBin;
+}
+
 function bundledCliBin(): string | null {
+  const pkgPath = resolveBundledPkg();
+  const bin = readJson<{ bin?: Record<string, string> }>(pkgPath)?.bin?.vivliostyle;
+  return pkgPath && bin ? path.join(path.dirname(pkgPath), bin) : null;
+}
+
+function resolveBundledPkg(): string | null {
   try {
-    const require = createRequire(import.meta.url);
-    const pkgPath = require.resolve("@vivliostyle/cli/package.json");
-    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { bin: Record<string, string> };
-    const bin = pkg.bin.vivliostyle;
-    return bin ? path.join(path.dirname(pkgPath), bin) : null;
+    return createRequire(import.meta.url).resolve("@vivliostyle/cli/package.json");
+  } catch {
+    return null;
+  }
+}
+
+// By version, because a CLI_VERSION bump has to reach installs that already hold an older copy —
+// and by the bin as well, because an install killed midway leaves the package.json without it.
+function installedCliBin(): string | null {
+  const pkgPath = path.join(env.VIVLIOSTYLE_DIR, "node_modules", "@vivliostyle", "cli", "package.json");
+  const version = readJson<{ version?: string }>(pkgPath)?.version;
+  return version === CLI_VERSION && existsSync(INSTALLED_BIN) ? INSTALLED_BIN : null;
+}
+
+function readJson<T>(filePath: string | null): T | null {
+  if (!filePath) return null;
+  try {
+    return JSON.parse(readFileSync(filePath, "utf-8")) as T;
   } catch {
     return null;
   }
 }
 
 function resolveCliBin(): string {
-  const bin = bundledCliBin() ?? (installedCliVersion() === CLI_VERSION ? INSTALLED_BIN : null);
+  const bin = cliBin();
   if (!bin) throw new Error("The page renderer is not installed yet — download it from the export panel");
   return bin;
 }
 
-// By version, not by existence: a CLI_VERSION bump has to reach the installs that already have an
-// older copy, and nothing else would ever ask them to fetch it.
-function installedCliVersion(): string | null {
-  try {
-    const pkgPath = path.join(env.VIVLIOSTYLE_DIR, "node_modules", "@vivliostyle", "cli", "package.json");
-    return (JSON.parse(readFileSync(pkgPath, "utf-8")) as { version?: string }).version ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export function cliInstalled(): boolean {
-  return bundledCliBin() !== null || installedCliVersion() === CLI_VERSION;
+  return cliBin() !== null;
 }
 
 // `bun install` rather than a 233 MB addition to the DMG: the CLI carries a native canvas, a
@@ -69,6 +86,7 @@ export async function installCli(): Promise<void> {
     "utf-8",
   );
   await execFileAsync(process.execPath, ["install"], { cwd: env.VIVLIOSTYLE_DIR, env: bunEnv, timeout: 15 * 60_000, maxBuffer: 16 * 1024 * 1024 });
+  cachedBin = null;
   if (!cliInstalled()) throw new Error("Installing the page renderer left no vivliostyle CLI behind");
 }
 
@@ -134,20 +152,24 @@ export async function buildDocument(htmlPath: string, outputPath: string): Promi
   await runCli([htmlPath, "-o", outputPath]);
 }
 
-export type Publication = {
-  title: string;
-  language: string;
-  entries: { path: string; title: string }[];
-};
-
 // One entry per chapter is what makes an EPUB reader show chapters: Vivliostyle writes one spine
-// item per entry and, with toc, the nav document that a single-file export never had.
-export async function buildPublication(workspaceDir: string, publication: Publication, outputPath: string): Promise<void> {
-  const { title, language, entries } = publication;
-  // .mjs, because the config lands wherever the data directory is: a .js there is ESM under the
+// item per entry, and toc the nav document a single-file export never had.
+export async function buildChapterEpub(
+  workspaceDir: string,
+  book: { title: string; language: string; documents: ChapterDocument[] },
+  outputPath: string,
+): Promise<void> {
+  await Promise.all(book.documents.map((doc) => writeFile(path.join(workspaceDir, doc.filename), doc.html, "utf-8")));
+  const config = {
+    // The CLI rejects a blank title, and a book can be renamed to nothing but spaces
+    title: book.title.trim() || "Untitled",
+    language: book.language,
+    toc: true,
+    entry: book.documents.map((doc) => ({ path: doc.filename, title: doc.title })),
+  };
+  // .mjs, because the workspace lands wherever the data directory is: a .js there is ESM under the
   // server package's own type:module and CommonJS under the packaged app's data directory.
-  const config = `export default ${JSON.stringify({ title, language, toc: true, entry: entries }, null, 2)};\n`;
-  await writeFile(path.join(workspaceDir, "vivliostyle.config.mjs"), config, "utf-8");
+  await writeFile(path.join(workspaceDir, "vivliostyle.config.mjs"), `export default ${JSON.stringify(config, null, 2)};\n`, "utf-8");
   // Entry paths resolve against the working directory rather than the config's own location.
   await runCli(["-c", "vivliostyle.config.mjs", "-o", outputPath], workspaceDir);
 }
@@ -164,8 +186,7 @@ async function runCli(args: string[], cwd?: string): Promise<void> {
       maxBuffer: 16 * 1024 * 1024,
     });
   } catch (err) {
-    // The CLI reports its errors on stdout, so reading stderr alone left every failure as a bare
-    // "Command failed" with nothing to act on.
+    // The CLI reports its errors on stdout, so stderr alone leaves nothing to act on
     const { stdout, stderr } = err as { stdout?: string; stderr?: string };
     const output = [stdout, stderr].map((s) => s?.trim()).filter(Boolean).join("\n");
     const message = err instanceof Error ? err.message : String(err);

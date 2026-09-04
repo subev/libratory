@@ -23,65 +23,57 @@ export function titleRepeatsAsFirstLine(originalTitle: string, originalText: str
 }
 
 export function renderDocumentHtml({ bookTitle, chapters }: RenderDocumentHtmlOptions): string {
-  const language = inferDocumentLanguage(chapters);
-  const tocEntries: string[] = [];
-  const sections: string[] = [];
+  const tocEntries = chapters.map((ch) => `<li><a href="#ch-${ch.index}">${escapeHtml(chapterTitle(ch))}</a></li>`);
+  const sections = chapters.map((ch) => chapterSection(ch, `ch-${ch.index}`));
 
-  for (const ch of chapters) {
-    const id = `ch-${ch.index}`;
-    const title = ch.title.trim() || `Chapter ${ch.index + 1}`;
-    const dropFirstBlock = titleRepeatsAsFirstLine(ch.originalTitle, ch.originalText);
-    tocEntries.push(`<li><a href="#${id}">${escapeHtml(title)}</a></li>`);
-    sections.push(
-      `<section class="chapter" id="${id}">\n<h1>${escapeHtml(title)}</h1>\n${renderChapterBody(ch.text, dropFirstBlock)}\n</section>`,
-    );
-  }
+  return page({
+    language: inferDocumentLanguage(chapters),
+    title: bookTitle,
+    css: PRINT_CSS,
+    body: `<div class="cover"><h1>${escapeHtml(bookTitle)}</h1></div>
+<nav class="toc" role="doc-toc"><h1>Contents</h1><ol>
+${tocEntries.join("\n")}
+</ol></nav>
+${sections.join("\n")}`,
+  });
+}
 
+function chapterTitle(ch: DocumentChapter): string {
+  return ch.title.trim() || `Chapter ${ch.index + 1}`;
+}
+
+function chapterSection(ch: DocumentChapter, id?: string): string {
+  const body = renderChapterBody(ch.text, titleRepeatsAsFirstLine(ch.originalTitle, ch.originalText));
+  return `<section class="chapter"${id ? ` id="${id}"` : ""}>\n<h1>${escapeHtml(chapterTitle(ch))}</h1>\n${body}\n</section>`;
+}
+
+function page({ language, title, css, body }: { language: string; title: string; css: string; body: string }): string {
   return `<!doctype html>
 <html lang="${language}">
 <head>
 <meta charset="utf-8">
-<title>${escapeHtml(bookTitle)}</title>
-<style>${PRINT_CSS}</style>
+<title>${escapeHtml(title)}</title>
+<style>${css}</style>
 </head>
 <body>
-<div class="cover"><h1>${escapeHtml(bookTitle)}</h1></div>
-<nav class="toc" role="doc-toc"><h1>Contents</h1><ol>
-${tocEntries.join("\n")}
-</ol></nav>
-${sections.join("\n")}
+${body}
 </body>
 </html>`;
 }
 
 export type ChapterDocument = { filename: string; title: string; html: string };
 
-// One file per chapter, because Vivliostyle turns one entry into one spine item: the whole book as
-// a single document exported as an EPUB whose only chapter was the book, with no navigation at all.
-export function renderChapterDocuments({ chapters }: RenderDocumentHtmlOptions): ChapterDocument[] {
+// Vivliostyle turns one entry into one spine item, so an EPUB arrives as one file per chapter.
+export function renderChapterDocuments(chapters: DocumentChapter[]): { language: string; documents: ChapterDocument[] } {
   const language = inferDocumentLanguage(chapters);
-  return chapters.map((ch, position) => {
-    const title = ch.title.trim() || `Chapter ${ch.index + 1}`;
-    const dropFirstBlock = titleRepeatsAsFirstLine(ch.originalTitle, ch.originalText);
-    return {
+  return {
+    language,
+    documents: chapters.map((ch, position) => ({
       filename: `chapter-${String(position + 1).padStart(4, "0")}.html`,
-      title,
-      html: `<!doctype html>
-<html lang="${language}">
-<head>
-<meta charset="utf-8">
-<title>${escapeHtml(title)}</title>
-<style>${REFLOW_CSS}</style>
-</head>
-<body>
-<section class="chapter">
-<h1>${escapeHtml(title)}</h1>
-${renderChapterBody(ch.text, dropFirstBlock)}
-</section>
-</body>
-</html>`,
-    };
-  });
+      title: chapterTitle(ch),
+      html: page({ language, title: chapterTitle(ch), css: REFLOW_CSS, body: chapterSection(ch) }),
+    })),
+  };
 }
 
 // Translated text keeps light markdown from the source (headings, bold, italic);
@@ -133,6 +125,9 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
+const BODY_CSS = `p { margin: 0; text-indent: 1.3em; text-align: justify; hyphens: auto; }
+h1 + p, h2 + p, h3 + p { text-indent: 0; }`;
+
 const PRINT_CSS = `
 @page {
   size: A5;
@@ -160,16 +155,15 @@ section.chapter { break-before: page; }
 section.chapter h1 { font-size: 14pt; margin: 0 0 1.2em; string-set: chapter-title content(); }
 section.chapter h2 { font-size: 12pt; }
 section.chapter h3 { font-size: 10.5pt; }
-p { margin: 0; text-indent: 1.3em; text-align: justify; hyphens: auto; orphans: 2; widows: 2; }
-h1 + p, h2 + p, h3 + p { text-indent: 0; }
+${BODY_CSS}
+p { orphans: 2; widows: 2; }
 `;
 
 // An EPUB reader paginates for itself, so the print sheet's @page rules and dot leaders have
-// nothing to act on here; what survives is the typography.
+// nothing to act on here.
 const REFLOW_CSS = `
 h1 { font-size: 1.4em; margin: 0 0 1.2em; }
 h2 { font-size: 1.2em; }
 h3 { font-size: 1.05em; }
-p { margin: 0; text-indent: 1.3em; text-align: justify; hyphens: auto; }
-h1 + p, h2 + p, h3 + p { text-indent: 0; }
+${BODY_CSS}
 `;

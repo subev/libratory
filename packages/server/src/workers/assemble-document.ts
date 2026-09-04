@@ -1,8 +1,8 @@
 import { db } from "../db.ts";
 import { chapters, books, documents, chapterVariants } from "../schema.ts";
 import { eq, asc, and } from "drizzle-orm";
-import { inferDocumentLanguage, renderChapterDocuments, renderDocumentHtml, type DocumentChapter } from "../lib/document-html.ts";
-import { buildDocument, buildPublication } from "../lib/vivliostyle.ts";
+import { renderChapterDocuments, renderDocumentHtml, type DocumentChapter } from "../lib/document-html.ts";
+import { buildChapterEpub, buildDocument } from "../lib/vivliostyle.ts";
 import { bookOutputDir, bookTmpDir } from "../lib/paths.ts";
 import { appendLog } from "../lib/log.ts";
 import { languageSlug, translationChunkPreviewDir } from "./synthesize-translation.ts";
@@ -132,26 +132,21 @@ export async function assembleDocument(
     const outputPath = path.join(outDir, `${sanitizeFilename(book.title)}${suffix}_${timestamp}.${format}`);
 
     await log(`Rendering ${format.toUpperCase()} with Vivliostyle (${docChapters.length} chapters)`);
-    if (format === "epub") {
-      const workDir = path.join(tmpDir, `epub${suffix}_${timestamp}`);
-      await mkdir(workDir, { recursive: true });
-      const chapterDocs = renderChapterDocuments({ bookTitle: book.title, chapters: docChapters });
-      for (const doc of chapterDocs) await writeFile(path.join(workDir, doc.filename), doc.html, "utf-8");
-      await buildPublication(
-        workDir,
-        {
-          title: book.title,
-          language: inferDocumentLanguage(docChapters),
-          entries: chapterDocs.map((doc) => ({ path: doc.filename, title: doc.title })),
-        },
-        outputPath,
-      );
-      await rm(workDir, { recursive: true, force: true });
-    } else {
-      const htmlPath = path.join(tmpDir, `document${suffix}_${timestamp}.html`);
-      await writeFile(htmlPath, renderDocumentHtml({ bookTitle: book.title, chapters: docChapters }), "utf-8");
-      await buildDocument(htmlPath, outputPath);
-      await unlink(htmlPath).catch(() => {});
+    // One scratch directory per run, removed whether the build succeeds or not: a failed export
+    // used to leave its input behind, once per attempt, until the book itself was deleted.
+    const workDir = path.join(tmpDir, `${format}${suffix}_${timestamp}`);
+    await mkdir(workDir, { recursive: true });
+    try {
+      if (format === "epub") {
+        const { language: documentLanguage, documents: chapterDocs } = renderChapterDocuments(docChapters);
+        await buildChapterEpub(workDir, { title: book.title, language: documentLanguage, documents: chapterDocs }, outputPath);
+      } else {
+        const htmlPath = path.join(workDir, "document.html");
+        await writeFile(htmlPath, renderDocumentHtml({ bookTitle: book.title, chapters: docChapters }), "utf-8");
+        await buildDocument(htmlPath, outputPath);
+      }
+    } finally {
+      await rm(workDir, { recursive: true, force: true }).catch(() => {});
     }
 
     await db.insert(documents).values({

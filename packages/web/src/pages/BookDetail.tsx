@@ -39,8 +39,7 @@ export function BookDetail() {
   const utils = trpc.useUtils();
   // Above the `!book` early return below: hooks after it run only once the book loads, and a
   // render that calls a different number of hooks than the last one takes the page down.
-  // An install started in another tab, or before a reload, is still running: poll while it is, so
-  // the button says so instead of offering a download that is already half done.
+  // Poll while an install started elsewhere — another tab, or before a reload — is still running
   const { data: renderer } = trpc.renderer.status.useQuery(undefined, {
     staleTime: Infinity,
     refetchInterval: (query) => (query.state.data?.installing ? 3000 : false),

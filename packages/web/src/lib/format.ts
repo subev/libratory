@@ -51,9 +51,14 @@ export function formatBytes(bytes: number): string {
   return `${value >= 100 ? Math.round(value) : value.toFixed(1)} ${unit}`;
 }
 
-// A row whose file is missing contributes nothing rather than making the group total unreadable.
-export function formatTotalBytes(rows: { sizeBytes: number | null }[]): string {
-  return formatBytes(rows.reduce((sum, row) => sum + (row.sizeBytes ?? 0), 0));
+export function formatSize(bytes: number | null): string | undefined {
+  return bytes === null ? undefined : formatBytes(bytes);
+}
+
+// A row whose file is missing contributes nothing rather than making the total unreadable.
+export function filesSummary(rows: { sizeBytes: number | null }[]): string {
+  const total = formatBytes(rows.reduce((sum, row) => sum + (row.sizeBytes ?? 0), 0));
+  return `${rows.length} file${rows.length === 1 ? "" : "s"} · ${total}`;
 }
 
 export function formatRelativeTime(date: string | Date): string {
