@@ -1,4 +1,4 @@
-import { formatOutputDate, documentFormatLabel, pendingExportSummary, type DocumentFormat } from "../lib/format.ts";
+import { formatBytes, formatOutputDate, formatTotalBytes, documentFormatLabel, pendingExportSummary, type DocumentFormat } from "../lib/format.ts";
 import { Button } from "./Button.tsx";
 import { IconBook, IconDelete, IconDocument, IconDownload } from "./icons.tsx";
 import { ResourceGroup, ResourceRow } from "./book/ResourceRow.tsx";
@@ -10,6 +10,7 @@ export type DocumentRow = {
   outputPath: string;
   chapterCount: number;
   chapterSummary: string;
+  sizeBytes: number | null;
   createdAt: string | Date;
 };
 
@@ -44,7 +45,7 @@ export function DocumentOutputsSection({
         ) : documents.length === 0 ? (
           "nothing exported yet"
         ) : (
-          `${documents.length} file${documents.length === 1 ? "" : "s"}`
+          `${documents.length} file${documents.length === 1 ? "" : "s"} · ${formatTotalBytes(documents)}`
         )
       }
     >
@@ -67,6 +68,7 @@ export function DocumentOutputsSection({
                 · {formatOutputDate(doc.createdAt)}
               </>
             }
+            size={doc.sizeBytes === null ? undefined : formatBytes(doc.sizeBytes)}
             actions={
               <>
                 <Button

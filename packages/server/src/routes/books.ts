@@ -14,7 +14,7 @@ import { parseTtsVoice } from "../lib/tts.ts";
 import { collectBlocksFromMarkerOutput, sliceChaptersAtIndices, type ExtractedChapter } from "../lib/marker.ts";
 import { listMarkerSources } from "../lib/marker-sources.ts";
 import { abortExtract } from "../lib/extract-registry.ts";
-import { measureBookDiskUsage, measureDirs, removeDirs, bookTotalSizeCached } from "../lib/disk-usage.ts";
+import { measureBookDiskUsage, measureDirs, removeDirs, bookTotalSizeCached, fileSize } from "../lib/disk-usage.ts";
 import { chapterChunkPreviewDir } from "../lib/chunk-previews.ts";
 import { translationChunkPreviewDir } from "../workers/synthesize-translation.ts";
 import { insertSuspendedChapters, resetChaptersKeepingInserted } from "../lib/insert-chapters.ts";
@@ -102,6 +102,10 @@ async function cleanableChunkDirs(bookId: string): Promise<string[]> {
     ...doneChapters.map((c) => chapterChunkPreviewDir(bookId, c.index)),
     ...doneTranslations.map((t) => translationChunkPreviewDir(bookId, t.language, t.index)),
   ];
+}
+
+async function withFileSizes<T extends { outputPath: string }>(rows: T[]): Promise<(T & { sizeBytes: number | null })[]> {
+  return Promise.all(rows.map(async (row) => ({ ...row, sizeBytes: await fileSize(row.outputPath) })));
 }
 
 export const booksRouter = router({
@@ -1126,11 +1130,12 @@ export const booksRouter = router({
   documents: publicProcedure
     .input(z.object({ bookId: z.string().uuid() }))
     .query(async ({ input }) => {
-      return db
+      const rows = await db
         .select()
         .from(documents)
         .where(eq(documents.bookId, input.bookId))
         .orderBy(desc(documents.createdAt));
+      return withFileSizes(rows);
     }),
 
   deleteDocument: publicProcedure
@@ -1260,11 +1265,12 @@ export const booksRouter = router({
   assemblies: publicProcedure
     .input(z.object({ bookId: z.string().uuid() }))
     .query(async ({ input }) => {
-      return db
+      const rows = await db
         .select()
         .from(assemblies)
         .where(eq(assemblies.bookId, input.bookId))
         .orderBy(desc(assemblies.createdAt));
+      return withFileSizes(rows);
     }),
 
   deleteAssembly: publicProcedure

@@ -51,6 +51,11 @@ export function formatBytes(bytes: number): string {
   return `${value >= 100 ? Math.round(value) : value.toFixed(1)} ${unit}`;
 }
 
+// A row whose file is missing contributes nothing rather than making the group total unreadable.
+export function formatTotalBytes(rows: { sizeBytes: number | null }[]): string {
+  return formatBytes(rows.reduce((sum, row) => sum + (row.sizeBytes ?? 0), 0));
+}
+
 export function formatRelativeTime(date: string | Date): string {
   const diffMs = Date.now() - new Date(date).getTime();
   const minutes = Math.floor(diffMs / 60_000);

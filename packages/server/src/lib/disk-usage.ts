@@ -32,6 +32,12 @@ async function walk(dir: string, onFile: (filePath: string, size: number) => voi
   }
 }
 
+// null, not 0: a row whose file is gone reads differently from one that is genuinely empty.
+export async function fileSize(filePath: string): Promise<number | null> {
+  const s = await stat(filePath).catch(() => null);
+  return s?.isFile() ? s.size : null;
+}
+
 export async function dirSize(dir: string): Promise<number> {
   let total = 0;
   await walk(dir, (_p, size) => {
