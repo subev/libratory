@@ -44,6 +44,11 @@ function ymdToMs(ymd: string): number {
 
 const HN_SCRIPT = scriptPath("hn-top10.mjs");
 
+// In the desktop app process.execPath is the compiled server binary, so spawning it with a script
+// path re-runs the server instead of the script; BUN_BE_BUN makes that binary behave as the bun
+// CLI, and node ignores it.
+const scriptEnv = { ...process.env, BUN_BE_BUN: "1" };
+
 let running = false;
 
 // Runs scripts/hn-top10.mjs as a subprocess and streams its output as SSE so the
@@ -85,7 +90,7 @@ export function registerScriptRunRoutes(fastify: FastifyInstance) {
       ...(params.folder ? ["--folder", params.folder] : []),
       ...(params.profile ? ["--profile", params.profile] : []),
     ];
-    const child = spawn(process.execPath, args, { cwd: path.dirname(HN_SCRIPT), env: process.env });
+    const child = spawn(process.execPath, args, { cwd: path.dirname(HN_SCRIPT), env: scriptEnv });
 
     let closed = false;
     const forward = (chunk: Buffer) => {
@@ -128,7 +133,7 @@ export function registerScriptRunRoutes(fastify: FastifyInstance) {
       "--list", "--json",
       ...selectionArgs(parsed.data),
     ];
-    const child = spawn(process.execPath, args, { cwd: path.dirname(HN_SCRIPT), env: process.env });
+    const child = spawn(process.execPath, args, { cwd: path.dirname(HN_SCRIPT), env: scriptEnv });
     let out = "";
     let err = "";
     child.stdout.on("data", (chunk: Buffer) => { out += chunk.toString(); });
