@@ -54,6 +54,36 @@ ${sections.join("\n")}
 </html>`;
 }
 
+export type ChapterDocument = { filename: string; title: string; html: string };
+
+// One file per chapter, because Vivliostyle turns one entry into one spine item: the whole book as
+// a single document exported as an EPUB whose only chapter was the book, with no navigation at all.
+export function renderChapterDocuments({ chapters }: RenderDocumentHtmlOptions): ChapterDocument[] {
+  const language = inferDocumentLanguage(chapters);
+  return chapters.map((ch, position) => {
+    const title = ch.title.trim() || `Chapter ${ch.index + 1}`;
+    const dropFirstBlock = titleRepeatsAsFirstLine(ch.originalTitle, ch.originalText);
+    return {
+      filename: `chapter-${String(position + 1).padStart(4, "0")}.html`,
+      title,
+      html: `<!doctype html>
+<html lang="${language}">
+<head>
+<meta charset="utf-8">
+<title>${escapeHtml(title)}</title>
+<style>${REFLOW_CSS}</style>
+</head>
+<body>
+<section class="chapter">
+<h1>${escapeHtml(title)}</h1>
+${renderChapterBody(ch.text, dropFirstBlock)}
+</section>
+</body>
+</html>`,
+    };
+  });
+}
+
 // Translated text keeps light markdown from the source (headings, bold, italic);
 // render those faithfully instead of showing the raw markers.
 function renderChapterBody(text: string, dropFirstBlock: boolean): string {
@@ -85,7 +115,7 @@ function normalizeForComparison(value: string): string {
   return value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
-function inferDocumentLanguage(chapters: DocumentChapter[]): string {
+export function inferDocumentLanguage(chapters: DocumentChapter[]): string {
   const sample = chapters.map((ch) => ch.text.slice(0, 2000)).join(" ");
   const cyrillic = sample.match(/[Ѐ-ӿ]/g)?.length ?? 0;
   const latin = sample.match(/[A-Za-z]/g)?.length ?? 0;
@@ -131,5 +161,15 @@ section.chapter h1 { font-size: 14pt; margin: 0 0 1.2em; string-set: chapter-tit
 section.chapter h2 { font-size: 12pt; }
 section.chapter h3 { font-size: 10.5pt; }
 p { margin: 0; text-indent: 1.3em; text-align: justify; hyphens: auto; orphans: 2; widows: 2; }
+h1 + p, h2 + p, h3 + p { text-indent: 0; }
+`;
+
+// An EPUB reader paginates for itself, so the print sheet's @page rules and dot leaders have
+// nothing to act on here; what survives is the typography.
+const REFLOW_CSS = `
+h1 { font-size: 1.4em; margin: 0 0 1.2em; }
+h2 { font-size: 1.2em; }
+h3 { font-size: 1.05em; }
+p { margin: 0; text-indent: 1.3em; text-align: justify; hyphens: auto; }
 h1 + p, h2 + p, h3 + p { text-indent: 0; }
 `;

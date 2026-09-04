@@ -1,8 +1,8 @@
 import { db } from "../db.ts";
 import { chapters, books, documents, chapterVariants } from "../schema.ts";
 import { eq, asc, and } from "drizzle-orm";
-import { renderDocumentHtml, type DocumentChapter } from "../lib/document-html.ts";
-import { buildDocument } from "../lib/vivliostyle.ts";
+import { inferDocumentLanguage, renderChapterDocuments, renderDocumentHtml, type DocumentChapter } from "../lib/document-html.ts";
+import { buildDocument, buildPublication } from "../lib/vivliostyle.ts";
 import { bookOutputDir, bookTmpDir } from "../lib/paths.ts";
 import { appendLog } from "../lib/log.ts";
 import { languageSlug, translationChunkPreviewDir } from "./synthesize-translation.ts";
@@ -122,8 +122,6 @@ export async function assembleDocument(
 
     await log(`${docChapters.length} of ${selectedCount} selected chapter${selectedCount !== 1 ? "s" : ""} have text`);
 
-    const html = renderDocumentHtml({ bookTitle: book.title, chapters: docChapters });
-
     const outDir = bookOutputDir(bookId);
     const tmpDir = bookTmpDir(bookId);
     await mkdir(outDir, { recursive: true });
@@ -131,13 +129,30 @@ export async function assembleDocument(
 
     const timestamp = formatTimestamp(new Date());
     const suffix = language ? `_${languageSlug(language)}` : "";
-    const htmlPath = path.join(tmpDir, `document${suffix}_${timestamp}.html`);
     const outputPath = path.join(outDir, `${sanitizeFilename(book.title)}${suffix}_${timestamp}.${format}`);
 
-    await writeFile(htmlPath, html, "utf-8");
     await log(`Rendering ${format.toUpperCase()} with Vivliostyle (${docChapters.length} chapters)`);
-    await buildDocument(htmlPath, outputPath);
-    await unlink(htmlPath).catch(() => {});
+    if (format === "epub") {
+      const workDir = path.join(tmpDir, `epub${suffix}_${timestamp}`);
+      await mkdir(workDir, { recursive: true });
+      const chapterDocs = renderChapterDocuments({ bookTitle: book.title, chapters: docChapters });
+      for (const doc of chapterDocs) await writeFile(path.join(workDir, doc.filename), doc.html, "utf-8");
+      await buildPublication(
+        workDir,
+        {
+          title: book.title,
+          language: inferDocumentLanguage(docChapters),
+          entries: chapterDocs.map((doc) => ({ path: doc.filename, title: doc.title })),
+        },
+        outputPath,
+      );
+      await rm(workDir, { recursive: true, force: true });
+    } else {
+      const htmlPath = path.join(tmpDir, `document${suffix}_${timestamp}.html`);
+      await writeFile(htmlPath, renderDocumentHtml({ bookTitle: book.title, chapters: docChapters }), "utf-8");
+      await buildDocument(htmlPath, outputPath);
+      await unlink(htmlPath).catch(() => {});
+    }
 
     await db.insert(documents).values({
       bookId,

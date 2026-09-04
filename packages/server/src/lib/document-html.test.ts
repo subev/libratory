@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { renderDocumentHtml, titleRepeatsAsFirstLine } from "./document-html.ts";
+import { renderChapterDocuments, renderDocumentHtml, titleRepeatsAsFirstLine } from "./document-html.ts";
 
 describe("titleRepeatsAsFirstLine", () => {
   it("matches when the first line equals the title modulo punctuation and case", () => {
@@ -125,5 +125,49 @@ describe("renderDocumentHtml", () => {
     });
 
     expect(html).toMatch(/<h1>Chapter 5<\/h1>/);
+  });
+});
+
+describe("renderChapterDocuments", () => {
+  const chapter = (overrides: Partial<Parameters<typeof renderDocumentHtml>[0]["chapters"][0]> = {}) => ({
+    index: 0,
+    title: "Chapter One",
+    text: "First paragraph.\n\nSecond paragraph.",
+    originalTitle: "Chapter One",
+    originalText: "Body starts differently.",
+    ...overrides,
+  });
+
+  // One entry per file is what Vivliostyle turns into one spine item each; a single document came
+  // out of the CLI as an EPUB with one chapter and no navigation.
+  it("gives every chapter its own file and title", () => {
+    const docs = renderChapterDocuments({
+      bookTitle: "My Book",
+      chapters: [chapter(), chapter({ index: 1, title: "Chapter Two", text: "More text." })],
+    });
+
+    expect(docs.map((doc) => doc.filename)).toEqual(["chapter-0001.html", "chapter-0002.html"]);
+    expect(docs.map((doc) => doc.title)).toEqual(["Chapter One", "Chapter Two"]);
+    expect(docs[0]!.html).toMatch(/<h1>Chapter One<\/h1>/);
+    expect(docs[0]!.html).toMatch(/<p>First paragraph\.<\/p>/);
+    expect(docs[0]!.html).not.toMatch(/More text/);
+    expect(docs[1]!.html).toMatch(/<p>More text\.<\/p>/);
+  });
+
+  it("titles an untitled chapter by its number, and drops a title that repeats as the first line", () => {
+    const docs = renderChapterDocuments({
+      bookTitle: "My Book",
+      chapters: [chapter({
+        index: 4,
+        title: "   ",
+        text: "Chapter Five\n\nActual body text.",
+        originalTitle: "Chapter Five",
+        originalText: "Chapter Five\n\nActual body text.",
+      })],
+    });
+
+    expect(docs[0]!.title).toBe("Chapter 5");
+    expect(docs[0]!.html).toMatch(/<p>Actual body text\.<\/p>/);
+    expect(docs[0]!.html).not.toMatch(/<p>Chapter Five<\/p>/);
   });
 });

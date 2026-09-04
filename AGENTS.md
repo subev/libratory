@@ -360,7 +360,7 @@ Every upload extracts raw text with `pdftotext` in seconds (stored per file in `
 
 6. **synthesizeTranslation** (`workers/synthesize-translation.ts`, tts pool) — TTS for a finished variant (audio state on the `chapter_translations` row, per-variant-slug output dir + chunk previews + sync map). Voice/speed resolve from `books.variantVoices[key]`, falling back to the book's; the Synthesize modal on a variant tab edits the lane, not the book. Like the original lane, it never queues an assembly of its own.
 
-7. **assembleDocument** (`workers/assemble-document.ts`, assembly pool) — Renders selected chapters to `pdf`/`epub` via Vivliostyle CLI, or builds the `epub-sync` read-along EPUB from chapter audio + sync maps (`lib/readaloud-epub.ts`); records a `documents` row; optionally copies epub-sync output to `READALOUD_DROP_DIR`.
+7. **assembleDocument** (`workers/assemble-document.ts`, assembly pool) — Renders selected chapters to `pdf` (one HTML document) or `epub` (one HTML file per chapter plus a generated `vivliostyle.config.mjs`, so readers get one spine item per chapter and a real nav document) via Vivliostyle CLI, or builds the `epub-sync` read-along EPUB from chapter audio + sync maps (`lib/readaloud-epub.ts`); records a `documents` row; optionally copies epub-sync output to `READALOUD_DROP_DIR`.
 
 8. **propose / redetect** (`workers/propose.ts`, `redetect.ts`, extraction pool) — LLM chapter-boundary proposals (structure modal) and full chapter re-detection without re-running marker.
 

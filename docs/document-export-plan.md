@@ -20,8 +20,12 @@ in the original view the `customText ?? cleanText ?? rawText` source text.
   normalize-compare `chapters.title` vs first line of source); drops the first block
   of the rendered body. Fired on 17/19 chapters of the test book.
 - **Renderer** (`lib/vivliostyle.ts`): `@vivliostyle/cli` (server dep) invoked as a
-  subprocess via its resolved bin, `--log-level silent --timeout 1800`. First run
-  downloads a Chromium into the Vivliostyle cache (one-time, then offline).
+  subprocess via its resolved bin, `--log-level info --timeout 1800` (the CLI prints
+  its errors on stdout, so a quieter level leaves a failure as a bare "Command
+  failed"). First run downloads a Chromium into the Vivliostyle cache (one-time, then
+  offline). PDF renders the one-document HTML; EPUB goes through `buildPublication`,
+  which writes one file per chapter plus a generated `vivliostyle.config.mjs` — one
+  entry becomes one spine item, and `toc: true` writes the nav document.
 - **Routes**: `books.exportDocument` / `books.documents` / `books.deleteDocument`
   tRPC; `GET /download/document/:id` with correct MIME types.
 - **UI**: emerald "Export PDF/EPUB (n)" buttons next to "Assemble selected" (disabled
@@ -35,8 +39,6 @@ in the original view the `customText ?? cleanText ?? rawText` source text.
 
 ## Leftovers / parked
 
-- EPUB build warns "No table of contents document was found" — output opens fine, but
-  wiring Vivliostyle's `toc` option would give EPUB readers a real nav doc.
 - Original-view export of garbled-OCR Cyrillic is faithful-but-garbled by design;
   Cyrillic hyphenation quality unjudged on clean source material.
 - `sanitizeFilename` strips non-ASCII, so Cyrillic titles produce near-empty

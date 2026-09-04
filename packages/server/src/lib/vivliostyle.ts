@@ -117,18 +117,44 @@ export async function installRenderer(): Promise<void> {
 }
 
 export async function buildDocument(htmlPath: string, outputPath: string): Promise<void> {
+  await runCli([htmlPath, "-o", outputPath]);
+}
+
+export type Publication = {
+  title: string;
+  language: string;
+  entries: { path: string; title: string }[];
+};
+
+// One entry per chapter is what makes an EPUB reader show chapters: Vivliostyle writes one spine
+// item per entry and, with toc, the nav document that a single-file export never had.
+export async function buildPublication(workspaceDir: string, publication: Publication, outputPath: string): Promise<void> {
+  const { title, language, entries } = publication;
+  // .mjs, because the config lands wherever the data directory is: a .js there is ESM under the
+  // server package's own type:module and CommonJS under the packaged app's data directory.
+  const config = `export default ${JSON.stringify({ title, language, toc: true, entry: entries }, null, 2)};\n`;
+  await writeFile(path.join(workspaceDir, "vivliostyle.config.mjs"), config, "utf-8");
+  // Entry paths resolve against the working directory rather than the config's own location.
+  await runCli(["-c", "vivliostyle.config.mjs", "-o", outputPath], workspaceDir);
+}
+
+async function runCli(args: string[], cwd?: string): Promise<void> {
   const bin = resolveCliBin();
   const browser = await systemBrowser();
   const browserArgs = browser ? ["--executable-browser", browser] : [];
   try {
-    await execFileAsync(process.execPath, [bin, "build", htmlPath, "-o", outputPath, ...browserArgs, "--log-level", "silent", "--timeout", "1800"], {
+    await execFileAsync(process.execPath, [bin, "build", ...args, ...browserArgs, "--log-level", "info", "--timeout", "1800"], {
+      cwd,
       env: bunEnv,
       timeout: 30 * 60_000,
       maxBuffer: 16 * 1024 * 1024,
     });
   } catch (err) {
-    const stderr = (err as { stderr?: string }).stderr?.trim();
+    // The CLI reports its errors on stdout, so reading stderr alone left every failure as a bare
+    // "Command failed" with nothing to act on.
+    const { stdout, stderr } = err as { stdout?: string; stderr?: string };
+    const output = [stdout, stderr].map((s) => s?.trim()).filter(Boolean).join("\n");
     const message = err instanceof Error ? err.message : String(err);
-    throw new Error(stderr ? `${message}\n${stderr.slice(-2000)}` : message, { cause: err });
+    throw new Error(output ? `${message}\n${output.slice(-2000)}` : message, { cause: err });
   }
 }
