@@ -418,6 +418,7 @@ export function BookDetail() {
     ? book.chapters.filter((c) => c.selected && translationByChapter.get(c.id)?.audioStatus === "done").length
     : selectedWithAudio;
   const viewPendingExports = pendingExports.filter((e) => (e.language ?? null) === activeVariant);
+  const viewDocuments = bookDocuments.filter((d) => (d.language ?? null) === activeVariant);
   const pendingExportFor = (format: "pdf" | "epub" | "epub-sync") => viewPendingExports.find((e) => e.format === format);
   const rendererReady = renderer?.installed !== false;
   const installing = installRenderer.isPending || renderer?.installing === true;
@@ -1138,6 +1139,13 @@ export function BookDetail() {
               </Button>
             </div>
           )}
+          <DocumentOutputsSection
+            kind="synced"
+            documents={viewDocuments}
+            pending={viewPendingExports}
+            onDelete={(did) => deleteDocumentMutation.mutate({ id: did })}
+            isDeleting={deleteDocumentMutation.isPending}
+          />
           <AudioOutputsSection
             assemblies={bookAssemblies.filter((a) => (a.language ?? null) === activeVariant)}
             latestOutputPath={activeVariant ? null : book.outputPath}
@@ -1145,7 +1153,8 @@ export function BookDetail() {
             isDeleting={deleteAssemblyMutation.isPending}
           />
           <DocumentOutputsSection
-            documents={bookDocuments.filter((d) => (d.language ?? null) === activeVariant)}
+            kind="text"
+            documents={viewDocuments}
             pending={viewPendingExports}
             onDelete={(did) => deleteDocumentMutation.mutate({ id: did })}
             isDeleting={deleteDocumentMutation.isPending}

@@ -4,7 +4,7 @@ import { SPEEDS, loadSpeed, saveSpeed, subscribeSpeed } from "../lib/playback-sp
 import { useAudioTime } from "../lib/use-audio-time.ts";
 import { Button } from "./Button.tsx";
 import { IconDelete, IconDownload, IconPause, IconPlay } from "./icons.tsx";
-import { ResourceGroup, ResourceRow } from "./book/ResourceRow.tsx";
+import { FormatTag, ResourceGroup, ResourceRow } from "./book/ResourceRow.tsx";
 import { useShellLayout } from "./book/BookShell.tsx";
 
 export type AssemblyRow = {
@@ -36,7 +36,8 @@ export function AudioOutputsSection({
 
   return (
     <ResourceGroup
-      title="Audio"
+      title="Audio only"
+      description="Plain narration with chapter marks — plays in any audiobook app, in the car, or on a watch. BookPlayer is a good free one."
       count={assemblies.length === 0 ? "nothing assembled yet" : filesSummary(assemblies)}
     >
       {assemblies.map((assembly) => (
@@ -104,6 +105,7 @@ function AssemblyRowItem({
       iconLabel={playing ? `Pause ${filename}` : `Play ${filename}`}
       icon={playing ? <IconPause weight="fill" className="h-3.5 w-3.5" /> : <IconPlay className="h-3.5 w-3.5" />}
       title={filename}
+      tag={<FormatTag>{(filename?.split(".").pop() ?? "").toUpperCase()}</FormatTag>}
       subtitle={
         <>
           {formatDuration(assembly.durationMs)} ·{" "}

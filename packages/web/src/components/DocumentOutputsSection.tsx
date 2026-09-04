@@ -1,7 +1,7 @@
-import { filesSummary, formatOutputDate, formatSize, documentFormatLabel, pendingExportSummary, type DocumentFormat } from "../lib/format.ts";
+import { filesSummary, formatOutputDate, formatSize, pendingExportSummary, type DocumentFormat } from "../lib/format.ts";
 import { Button } from "./Button.tsx";
 import { IconBook, IconDelete, IconDocument, IconDownload } from "./icons.tsx";
-import { ResourceGroup, ResourceRow } from "./book/ResourceRow.tsx";
+import { FormatTag, ResourceGroup, ResourceRow } from "./book/ResourceRow.tsx";
 import { ActivityDot } from "./book/StageTabs.tsx";
 
 export type DocumentRow = {
@@ -22,12 +22,54 @@ export type PendingExport = {
   copyToDropDir: boolean;
 };
 
+// Split by what the file is for rather than by extension: a synced EPUB and a plain one share a
+// format and almost nothing else, and the read-along belongs beside the audio it carries.
+const GROUPS = {
+  synced: {
+    title: "Audio + text",
+    description: "Both formats in one file — the narration and the text locked together, so the words highlight as they are read.",
+  },
+  text: {
+    title: "Text only",
+    description: "No audio — small, and opens in any EPUB reader: Apple Books, Kobo, Kindle, Calibre.",
+  },
+} as const;
+
 export function DocumentOutputsSection({
+  kind,
   documents,
   pending,
   onDelete,
   isDeleting,
 }: {
+  kind: keyof typeof GROUPS;
+  documents: DocumentRow[];
+  pending: PendingExport[];
+  onDelete: (id: string) => void;
+  isDeleting: boolean;
+}) {
+  const belongs = (format: DocumentFormat) => (format === "epub-sync") === (kind === "synced");
+  return (
+    <DocumentGroup
+      {...GROUPS[kind]}
+      documents={documents.filter((doc) => belongs(doc.format))}
+      pending={pending.filter((p) => belongs(p.format))}
+      onDelete={onDelete}
+      isDeleting={isDeleting}
+    />
+  );
+}
+
+function DocumentGroup({
+  title,
+  description,
+  documents,
+  pending,
+  onDelete,
+  isDeleting,
+}: {
+  title: string;
+  description: string;
   documents: DocumentRow[];
   pending: PendingExport[];
   onDelete: (id: string) => void;
@@ -35,7 +77,8 @@ export function DocumentOutputsSection({
 }) {
   return (
     <ResourceGroup
-      title="Documents"
+      title={title}
+      description={description}
       count={
         pending.length > 0 ? (
           <span className="inline-flex items-center gap-1.5 font-medium text-(--accent-text)" data-testid="export-pending">
@@ -59,9 +102,9 @@ export function DocumentOutputsSection({
             tone={readAlong ? "accent" : "muted"}
             icon={readAlong ? <IconBook className="h-3.5 w-3.5" /> : <IconDocument className="h-3.5 w-3.5" />}
             title={filename}
+            tag={<FormatTag>{doc.format === "pdf" ? "PDF" : "EPUB"}</FormatTag>}
             subtitle={
               <>
-                {documentFormatLabel(doc.format)} ·{" "}
                 <span title={doc.chapterSummary}>
                   {doc.chapterCount} chapter{doc.chapterCount === 1 ? "" : "s"}
                 </span>{" "}

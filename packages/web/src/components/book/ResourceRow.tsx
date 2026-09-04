@@ -18,6 +18,7 @@ export function ResourceRow({
   onIconClick,
   iconLabel,
   title,
+  tag,
   subtitle,
   trailing,
   badge,
@@ -27,6 +28,8 @@ export function ResourceRow({
 }: Tile & {
   icon: ReactNode;
   title: ReactNode;
+  /** What the file is, in a word — the row says EPUB rather than spelling it into the subtitle. */
+  tag?: ReactNode;
   subtitle: ReactNode;
   /** A transport, or anything else that belongs on the row's own line rather than under the title. */
   trailing?: ReactNode;
@@ -66,7 +69,10 @@ export function ResourceRow({
         </span>
       )}
       <span className="flex-1 min-w-0">
-        <span className="block text-sm font-semibold text-(--text-primary) truncate">{title}</span>
+        <span className="flex items-center gap-1.5 min-w-0">
+          <span className="min-w-0 text-sm font-semibold text-(--text-primary) truncate">{title}</span>
+          {tag}
+        </span>
         <span className="block mt-0.5 text-xs text-(--text-muted) truncate">{subtitle}</span>
       </span>
       {trailing}
@@ -81,26 +87,38 @@ export function ResourceRow({
   );
 }
 
+export function FormatTag({ children }: { children: ReactNode }) {
+  return (
+    <span className="shrink-0 px-1.5 py-px rounded border border-(--border) text-[9.5px] font-bold tracking-wider text-(--text-muted)">
+      {children}
+    </span>
+  );
+}
+
 export function ResourceGroup({
   title,
   count,
+  description,
   action,
   children,
 }: {
   title: string;
   count: ReactNode;
+  /** What this kind of file is good for — the groups differ by use, not by extension. */
+  description?: ReactNode;
   action?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section>
-      <div className="flex items-baseline gap-2 mb-2">
+      <div className="flex items-baseline gap-2">
         <h2 className="font-(family-name:--stack-display) text-base font-semibold text-(--text-primary)">{title}</h2>
         <span className="text-xs text-(--text-muted)">{count}</span>
         <div className="flex-1" />
         {action}
       </div>
-      <ul className="flex flex-col gap-1.5">{children}</ul>
+      {description && <p className="mt-1 max-w-[64ch] text-[11.5px] text-(--text-muted) text-pretty">{description}</p>}
+      <ul className="flex flex-col gap-1.5 mt-2">{children}</ul>
     </section>
   );
 }
