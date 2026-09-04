@@ -37,12 +37,16 @@ const GROUPS = {
 
 export function DocumentOutputsSection({
   kind,
+  bookId,
+  canRead,
   documents,
   pending,
   onDelete,
   isDeleting,
 }: {
   kind: keyof typeof GROUPS;
+  bookId: string;
+  canRead: boolean;
   documents: DocumentRow[];
   pending: PendingExport[];
   onDelete: (id: string) => void;
@@ -52,6 +56,8 @@ export function DocumentOutputsSection({
   return (
     <DocumentGroup
       {...GROUPS[kind]}
+      bookId={bookId}
+      canRead={canRead}
       documents={documents.filter((doc) => belongs(doc.format))}
       pending={pending.filter((p) => belongs(p.format))}
       onDelete={onDelete}
@@ -63,6 +69,8 @@ export function DocumentOutputsSection({
 function DocumentGroup({
   title,
   description,
+  bookId,
+  canRead,
   documents,
   pending,
   onDelete,
@@ -70,6 +78,8 @@ function DocumentGroup({
 }: {
   title: string;
   description: string;
+  bookId: string;
+  canRead: boolean;
   documents: DocumentRow[];
   pending: PendingExport[];
   onDelete: (id: string) => void;
@@ -114,6 +124,20 @@ function DocumentGroup({
             size={formatSize(doc.sizeBytes)}
             actions={
               <>
+                {readAlong && (
+                  // The same read-along, without the round trip through a download and an import
+                  <Button
+                    variant="icon"
+                    size="sm"
+                    to={`/books/${bookId}/read`}
+                    disabled={!canRead}
+                    title={canRead ? "Read" : "No chapter has audio or a page to read from"}
+                    aria-label="Read"
+                    data-testid="document-read"
+                  >
+                    <IconBook className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button
                   variant="icon"
                   size="sm"

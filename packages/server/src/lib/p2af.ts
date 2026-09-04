@@ -43,6 +43,9 @@ export async function buildP2afLayer(
   const cues: P2afLayer["cues"] = [];
 
   for (const entry of manifest.chapters) {
+    // The text lives in the EPUB layer beside this one; a second copy for the reader would be the
+    // whole book again, so the container's chapters point at no text document.
+    entry.text = null;
     const file = exported.get(entry.id);
     const chapter = byId.get(entry.id);
     const doc = file && chapter ? await buildCues(chapter) : null;

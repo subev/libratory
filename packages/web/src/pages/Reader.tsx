@@ -28,7 +28,7 @@ const WIDTHS = [
 const VIEWS = [
   { id: "column", label: "Column", hint: "Pages cropped to their columns — the real type, minus the margins" },
   { id: "page", label: "Page", hint: "The whole page, for figures and tables" },
-  { id: "text", label: "Text", hint: "The spoken text reflowed at your own size" },
+  { id: "text", label: "Text", hint: "The chapter's text reflowed at your own size" },
 ] as const;
 
 type View = (typeof VIEWS)[number]["id"];
@@ -110,6 +110,23 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
   const [played, setPlayed] = useState<{ chapterId: string | null; ms: number }>({ chapterId: null, ms: 0 });
   const ms = played.chapterId === chapterId ? played.ms : 0;
   const setMs = useCallback((at: number) => setPlayed({ chapterId, ms: at }), [chapterId]);
+
+  // A chapter nobody has narrated has no cues to reflow, and used to leave text view empty while
+  // its pages sat right there in the other two. The text is its own small document, fetched only
+  // when it is what the reader is about to show.
+  const textUrl = view === "text" && (!cueUrl || cueError) ? chapter?.text ?? null : null;
+  const [loadedText, setLoadedText] = useState<{ url: string; text: string } | null>(null);
+  const chapterText = loadedText && loadedText.url === textUrl ? loadedText.text : null;
+
+  useEffect(() => {
+    if (!textUrl) return;
+    let live = true;
+    source
+      .text(textUrl)
+      .then((next) => { if (live) setLoadedText({ url: textUrl, text: next.text }); })
+      .catch(() => { if (live) setLoadedText(null); });
+    return () => { live = false; };
+  }, [source, textUrl]);
 
   useEffect(() => {
     if (!cueUrl) return;
@@ -316,7 +333,11 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
           data-testid="reader-text-mode"
         >
           {UNMAPPED[chapter.why ?? "unmapped"]}{" "}
-          {hasPages ? "Its pages are below, with nothing marked on them." : "It reads as text rather than on the page."}
+          {view === "text"
+            ? "Its text is below, with nothing marked in it."
+            : hasPages
+              ? "Its pages are below, with nothing marked on them."
+              : "It reads as text rather than on the page."}
         </p>
       )}
 
@@ -348,7 +369,7 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
 
       <div ref={measurePages} className="mx-auto flex flex-col gap-4" style={maxWidth ? { maxWidth } : { maxWidth: "48rem" }}>
         {view === "text" ? (
-          <CueTranscript cues={cues} ms={ms} onSeek={seek} />
+          <CueTranscript cues={cues} text={chapterText} ms={ms} onSeek={seek} />
         ) : (
           <CuePages
             manifest={manifest}

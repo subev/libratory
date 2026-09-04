@@ -1141,6 +1141,8 @@ export function BookDetail() {
           )}
           <DocumentOutputsSection
             kind="synced"
+            bookId={book.id}
+            canRead={hasChapterAudio || hasChapterPages}
             documents={viewDocuments}
             pending={viewPendingExports}
             onDelete={(did) => deleteDocumentMutation.mutate({ id: did })}
@@ -1154,6 +1156,8 @@ export function BookDetail() {
           />
           <DocumentOutputsSection
             kind="text"
+            bookId={book.id}
+            canRead={hasChapterAudio || hasChapterPages}
             documents={viewDocuments}
             pending={viewPendingExports}
             onDelete={(did) => deleteDocumentMutation.mutate({ id: did })}

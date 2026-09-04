@@ -1,4 +1,4 @@
-import { fetchCues, fetchManifest, type ReaderCues, type ReaderManifest } from "./reader-doc.ts";
+import { fetchCues, fetchManifest, fetchText, type ReaderCues, type ReaderManifest, type ReaderText } from "./reader-doc.ts";
 import { Zip } from "./zip.ts";
 
 // The reader consumes two documents and never knew where they came from; this is the seam that
@@ -7,6 +7,7 @@ import { Zip } from "./zip.ts";
 export type DocumentSource = {
   manifest(): Promise<ReaderManifest>;
   cues(url: string): Promise<ReaderCues>;
+  text(url: string): Promise<ReaderText>;
   // Where the bytes for a URL in the manifest actually are, for <audio> and pdf.js
   resolve(url: string | null | undefined): string | undefined;
   close(): void;
@@ -16,6 +17,7 @@ export function httpSource(bookId: string): DocumentSource {
   return {
     manifest: () => fetchManifest(bookId),
     cues: (url) => fetchCues(url),
+    text: (url) => fetchText(url),
     resolve: (url) => url ?? undefined,
     close: () => {},
   };
@@ -57,6 +59,7 @@ export async function containerSource(file: Blob): Promise<DocumentSource> {
   return {
     manifest: async () => manifest,
     cues: (url) => zip.json<ReaderCues>(at(url)),
+    text: (url) => zip.json<ReaderText>(at(url)),
     resolve: (url) => (url ? urls.get(url) : undefined),
     close: () => zip.close(),
   };

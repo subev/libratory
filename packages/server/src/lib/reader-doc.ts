@@ -18,6 +18,7 @@ import {
   type ReaderCues,
   type ReaderManifest,
   type ReaderPage,
+  type ReaderText,
 } from "./reader-format.ts";
 
 // The reader reads these documents, never the database — every gap in them shows up here first
@@ -93,6 +94,7 @@ export async function buildManifest(book: Book): Promise<ReaderManifest> {
         title: chapter.title,
         audio: chapter.audioPath ? `/audio/chapter/${chapter.id}` : null,
         cues: chapter.audioPath ? `/read/chapter/${chapter.id}/cues.json` : null,
+        text: chapterText(chapter) ? `/read/chapter/${chapter.id}/text.json` : null,
         durationMs: chapter.durationMs,
         pageStart: chapter.pageStart === null ? null : offset + chapter.pageStart - 1,
         pageEnd: chapter.pageEnd === null ? null : offset + chapter.pageEnd - 1,
@@ -168,6 +170,16 @@ async function resolveRects(chapter: Chapter, cues: Cue[]): Promise<ResolvedRect
     );
     return { rects, words };
   });
+}
+
+// What the rest of the app renders and narrates, in the same order of preference
+function chapterText(chapter: Chapter): string {
+  return (chapter.customText ?? chapter.cleanText ?? chapter.rawText ?? "").trim();
+}
+
+export function buildText(chapter: Chapter): ReaderText | null {
+  const text = chapterText(chapter);
+  return text ? { format: READER_FORMAT, text } : null;
 }
 
 export async function buildCues(chapter: Chapter): Promise<ReaderCues | null> {

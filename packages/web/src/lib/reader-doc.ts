@@ -7,6 +7,7 @@ export type {
   ReaderCues,
   ReaderManifest,
   ReaderPage,
+  ReaderText,
   ReaderUnmapped,
   Rect,
 } from "../../../server/src/lib/reader-format.ts";
@@ -17,6 +18,7 @@ import type {
   ReaderCues,
   ReaderManifest,
   ReaderPage,
+  ReaderText,
   Rect,
 } from "../../../server/src/lib/reader-format.ts";
 
@@ -25,6 +27,10 @@ export async function fetchManifest(bookId: string): Promise<ReaderManifest> {
 }
 
 export async function fetchCues(url: string): Promise<ReaderCues> {
+  return fetchJson(url);
+}
+
+export async function fetchText(url: string): Promise<ReaderText> {
   return fetchJson(url);
 }
 

@@ -6,6 +6,7 @@ import { cueIndexAt, wordIndexAt, type ReaderCue, type ReaderCues } from "../../
 // second document — and it works for chapters that never map onto a page at all.
 export function CueTranscript({
   cues,
+  text = null,
   ms,
   onSeek,
   hoverChunk = null,
@@ -14,6 +15,8 @@ export function CueTranscript({
   empty = "No narration to read along with yet.",
 }: {
   cues: ReaderCues | null;
+  /** The chapter's own text, for a chapter with no narration to read along with. */
+  text?: string | null;
   ms: number;
   onSeek: (ms: number) => void;
   // The chunk lit from elsewhere — a chunk button being hovered — and the reverse report
@@ -23,7 +26,16 @@ export function CueTranscript({
   empty?: string;
 }) {
   const [hoverCue, setHoverCue] = useState(-1);
-  if (!cues) return <p className="text-sm text-(--text-muted)">{empty}</p>;
+  if (!cues) {
+    if (!text) return <p className="text-sm text-(--text-muted)">{empty}</p>;
+    return (
+      <article className={className} data-testid="reader-text-view">
+        {text.split(/\n\s*\n/).filter((block) => block.trim()).map((block, i) => (
+          <p key={i} className="mb-4 last:mb-0 whitespace-pre-wrap">{block.trim()}</p>
+        ))}
+      </article>
+    );
+  }
 
   const activeIndex = cueIndexAt(cues.cues, ms);
   const activeCue = activeIndex >= 0 ? cues.cues[activeIndex] : undefined;
