@@ -29,3 +29,4 @@ docker-compose.override.yml
 
 # wrangler local state (get/)
 .wrangler/
+/vivliostyle/

@@ -654,7 +654,7 @@ export function BookDetail() {
             title="Vivliostyle renders PDF and EPUB and brings its own browser, once"
             data-testid="install-renderer"
           >
-            {installRenderer.isPending ? "Downloading renderer…" : "Download page renderer (345 MB)"}
+            {installRenderer.isPending ? "Downloading renderer…" : "Download page renderer (~600 MB)"}
           </Button>
         </div>
       ) : undefined,

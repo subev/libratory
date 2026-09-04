@@ -1,9 +1,9 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { rendererInstalled } from "./vivliostyle.ts";
+import { CLI_VERSION, rendererInstalled } from "./vivliostyle.ts";
 
 const dirs: string[] = [];
 afterAll(async () => {
@@ -48,5 +48,16 @@ describe("rendererInstalled", () => {
     await mkdir(path.dirname(exe), { recursive: true });
     await writeFile(exe, "");
     expect(await rendererInstalled(dir)).toBe(true);
+  });
+});
+
+// The desktop app installs the CLI by version rather than resolving it from a node_modules it does
+// not have, so the pinned version and the dependency are two spellings of one thing.
+describe("CLI_VERSION", () => {
+  it("is the version this repo depends on", async () => {
+    const pkg = JSON.parse(await readFile(path.resolve(import.meta.dirname, "../../package.json"), "utf-8")) as {
+      dependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies["@vivliostyle/cli"]).toBe(`^${CLI_VERSION}`);
   });
 });

@@ -1,20 +1,61 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
-import { mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { existsSync, readFileSync } from "node:fs";
+import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 
+import { env } from "../env.ts";
+
 const execFileAsync = promisify(execFile);
 
+// The desktop app is one compiled binary with no node_modules beside it, so the CLI is installed
+// into VIVLIOSTYLE_DIR at the same moment the renderer is downloaded. Kept in step with the
+// dependency the repo resolves — see vivliostyle.test.ts.
+export const CLI_VERSION = "11.1.0";
+
+// process.execPath is that compiled binary, which re-runs the server unless BUN_BE_BUN makes it
+// behave as the bun CLI; node ignores the variable.
+const bunEnv = { ...process.env, BUN_BE_BUN: "1" };
+
+const INSTALLED_BIN = path.join(env.VIVLIOSTYLE_DIR, "node_modules", "@vivliostyle", "cli", "dist", "cli.js");
+
+function bundledCliBin(): string | null {
+  try {
+    const require = createRequire(import.meta.url);
+    const pkgPath = require.resolve("@vivliostyle/cli/package.json");
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { bin: Record<string, string> };
+    const bin = pkg.bin.vivliostyle;
+    return bin ? path.join(path.dirname(pkgPath), bin) : null;
+  } catch {
+    return null;
+  }
+}
+
 function resolveCliBin(): string {
-  const require = createRequire(import.meta.url);
-  const pkgPath = require.resolve("@vivliostyle/cli/package.json");
-  const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { bin: Record<string, string> };
-  const bin = pkg.bin.vivliostyle;
-  if (!bin) throw new Error("@vivliostyle/cli exposes no vivliostyle binary");
-  return path.join(path.dirname(pkgPath), bin);
+  const bin = bundledCliBin() ?? (existsSync(INSTALLED_BIN) ? INSTALLED_BIN : null);
+  if (!bin) throw new Error("The page renderer is not installed yet — download it from the export panel");
+  return bin;
+}
+
+export function cliInstalled(): boolean {
+  return bundledCliBin() !== null || existsSync(INSTALLED_BIN);
+}
+
+// `bun install` rather than a 233 MB addition to the DMG: the CLI carries a native canvas, a
+// wasm PDF library and 500-odd packages, and it is useless without the browser downloaded here
+// anyway.
+export async function installCli(): Promise<void> {
+  if (cliInstalled()) return;
+  await mkdir(env.VIVLIOSTYLE_DIR, { recursive: true });
+  await writeFile(
+    path.join(env.VIVLIOSTYLE_DIR, "package.json"),
+    JSON.stringify({ name: "libratory-vivliostyle", private: true, dependencies: { "@vivliostyle/cli": CLI_VERSION } }, null, 2),
+    "utf-8",
+  );
+  await execFileAsync(process.execPath, ["install"], { cwd: env.VIVLIOSTYLE_DIR, env: bunEnv, timeout: 15 * 60_000, maxBuffer: 16 * 1024 * 1024 });
+  if (!cliInstalled()) throw new Error("Installing the page renderer left no vivliostyle CLI behind");
 }
 
 // Vivliostyle fetches its own browser on first use, into this cache. Knowing whether it is there
@@ -56,9 +97,15 @@ export async function rendererInstalled(dir = BROWSER_CACHE): Promise<boolean> {
   return false;
 }
 
+// Both halves have to be there before an export can run: the CLI itself and a browser to render in.
+export async function rendererReady(): Promise<boolean> {
+  return cliInstalled() && ((await systemBrowser()) !== null || await rendererInstalled());
+}
+
 // Rendering one paragraph is the only way to make the CLI fetch its browser: there is no install
 // subcommand, and the download happens solely as a side effect of a build.
 export async function installRenderer(): Promise<void> {
+  await installCli();
   const dir = await mkdtemp(path.join(tmpdir(), "vivliostyle-install-"));
   try {
     const htmlPath = path.join(dir, "probe.html");
@@ -75,6 +122,7 @@ export async function buildDocument(htmlPath: string, outputPath: string): Promi
   const browserArgs = browser ? ["--executable-browser", browser] : [];
   try {
     await execFileAsync(process.execPath, [bin, "build", htmlPath, "-o", outputPath, ...browserArgs, "--log-level", "silent", "--timeout", "1800"], {
+      env: bunEnv,
       timeout: 30 * 60_000,
       maxBuffer: 16 * 1024 * 1024,
     });

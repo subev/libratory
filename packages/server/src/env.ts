@@ -28,6 +28,8 @@ const envSchema = z.object({
   WEB_DIR: z.string().default(path.join(repoRoot, "packages", "web", "dist")),
   MIGRATIONS_DIR: z.string().default(path.join(repoRoot, "packages", "server", "drizzle")),
   POCKET_ENV_PATH: z.string().default(path.join(repoRoot, ".venv-pocket", "bin")),
+  // Where the vivliostyle CLI is installed when the server has no node_modules of its own.
+  VIVLIOSTYLE_DIR: z.string().default(path.join(repoRoot, "vivliostyle")),
   DEEPSEEK_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
