@@ -390,6 +390,16 @@ export async function defaultModelKey(): Promise<string | undefined> {
   return (models.find((m) => m.key === "flash") ?? models[0])?.key;
 }
 
+// What a request will actually run on, and the Settings pick it had to step around. A stopped
+// LM Studio falls through to a cloud model silently, which is a bill and a different result.
+export async function modelChoice(key?: string): Promise<{ key: string | null; label: string; steppedOver?: string }> {
+  const wanted = key || (await defaultModelKey()) || null;
+  const def = wanted ? (await allModels()).find((m) => m.key === wanted) : undefined;
+  const chosen = env.DEFAULT_LLM_MODEL;
+  const steppedOver = !key && chosen && chosen !== wanted ? chosen : undefined;
+  return { key: wanted, label: def?.label ?? wanted ?? "no model", ...(steppedOver ? { steppedOver } : {}) };
+}
+
 // Must match the `name` given to createOpenAICompatible in resolveLlm — the AI SDK
 // spreads providerOptions[name] into the request body only under that exact key.
 // Dots are stripped because the SDK truncates the name at the first "." when matching,

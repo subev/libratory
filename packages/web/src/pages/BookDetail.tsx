@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router";
 import { trpc } from "../trpc.ts";
+import { useActiveLlmModel, useModelFallback } from "../lib/use-llm-models.ts";
 import { ModelBundleNotice, useModelBundle } from "../components/ModelBundleNotice.tsx";
 import { ChapterTable } from "../components/ChapterTable.tsx";
 import { SYNTH_BUSY, TEXT_BUSY, variantLabel } from "../lib/chapters.ts";
@@ -40,6 +41,8 @@ export function BookDetail() {
   // Above the `!book` early return below: hooks after it run only once the book loads, and a
   // render that calls a different number of hooks than the last one takes the page down.
   // Poll while an install started elsewhere — another tab, or before a reload — is still running
+  const modelFallback = useModelFallback();
+  const cleanupModel = useActiveLlmModel("");
   const { data: renderer } = trpc.renderer.status.useQuery(undefined, {
     staleTime: Infinity,
     refetchInterval: (query) => (query.state.data?.installing ? 3000 : false),
@@ -419,6 +422,13 @@ export function BookDetail() {
     : selectedWithAudio;
   const viewPendingExports = pendingExports.filter((e) => (e.language ?? null) === activeVariant);
   const viewDocuments = bookDocuments.filter((d) => (d.language ?? null) === activeVariant);
+  // Cleanup takes no model pick, so the button is the only place to say what will run it — and
+  // whether that is the model Settings asks for
+  const cleanupModelNote = modelFallback
+    ? ` — ${modelFallback.chosen} is not running, so this uses ${modelFallback.using?.label ?? "the automatic choice"}`
+    : cleanupModel
+      ? ` — runs on ${cleanupModel.label}`
+      : "";
   const pendingExportFor = (format: "pdf" | "epub" | "epub-sync") => viewPendingExports.find((e) => e.format === format);
   const rendererReady = renderer?.installed !== false;
   const installing = installRenderer.isPending || renderer?.installing === true;
@@ -569,7 +579,7 @@ export function BookDetail() {
         ? "Switch to the original view — cleanup runs on the original text"
         : selectedCleanable === 0
           ? "No selected chapters need cleanup — already-cleaned and running ones are skipped"
-          : "Ask AI to strip OCR artifacts from the selected chapters without altering the prose",
+          : `Ask AI to strip OCR artifacts from the selected chapters without altering the prose${cleanupModelNote}`,
     },
     {
       id: "ask-ai",

@@ -3,6 +3,7 @@ import { chapters, type ChapterCleanup } from "../schema.ts";
 import { and, eq, sql } from "drizzle-orm";
 import { splitIntoChunks } from "../lib/transform.ts";
 import { cleanupChunk } from "../lib/cleanup.ts";
+import { modelChoice } from "../lib/llm.ts";
 import { describeError } from "../lib/errors.ts";
 import { appendLog } from "../lib/log.ts";
 import { randomUUID } from "node:crypto";
@@ -55,7 +56,14 @@ export async function cleanup(payload: CleanupPayload) {
     if (!source) throw new Error("Chapter has no text");
 
     const chunks = splitIntoChunks(source);
-    await chLog(`Cleaning "${chapter.title}" (${chunks.length} chunks)`);
+    const model = await modelChoice();
+    if (model.steppedOver) {
+      await chLog(`Default model ${model.steppedOver} is not available — cleaning with ${model.label} instead`);
+    }
+    await chLog(`Cleaning "${chapter.title}" (${chunks.length} chunks) with ${model.label}`);
+    // Written before the first chunk: a chapter that shows no progress for the minutes one takes
+    // reads as stuck, which is how a working run got reported as a broken feature.
+    await db.update(chapters).set({ cleanup: state({ progress: `0/${chunks.length}`, model: model.label }) }).where(owned);
 
     // Cleaned chunks accumulate in memory and land in customText in one final
     // write — an interrupted run must never leave a truncated chapter behind.
@@ -65,7 +73,7 @@ export async function cleanup(payload: CleanupPayload) {
 
       const updated = await db
         .update(chapters)
-        .set({ cleanup: state({ progress: `${i + 1}/${chunks.length}` }) })
+        .set({ cleanup: state({ progress: `${i + 1}/${chunks.length}`, model: model.label }) })
         .where(owned)
         .returning({ id: chapters.id });
       if (updated.length === 0) {
@@ -79,7 +87,7 @@ export async function cleanup(payload: CleanupPayload) {
 
     const finished = await db
       .update(chapters)
-      .set({ customText: result, cleanup: state({ status: "done", progress: `${chunks.length}/${chunks.length}` }) })
+      .set({ customText: result, cleanup: state({ status: "done", progress: `${chunks.length}/${chunks.length}`, model: model.label }) })
       .where(owned)
       .returning({ id: chapters.id });
     if (finished.length === 0) {

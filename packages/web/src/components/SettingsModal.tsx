@@ -171,7 +171,9 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             </p>
             {chosenMissing && (
               <p className="mt-1 text-xs text-(--warning-text)" data-testid="settings-default-model-warning">
-                Not available right now — requests fall back to the automatic choice until it is.
+                Not available right now — requests run on{" "}
+                {models.find((m) => m.key === defaultModel?.resolved)?.label ?? "the automatic choice"} until it is,
+                which may be a paid API rather than the local model you picked.
               </p>
             )}
             {setDefaultMutation.error && (

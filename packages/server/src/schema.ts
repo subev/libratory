@@ -32,6 +32,8 @@ export type ChapterProposal = {
 export type ChapterCleanup = {
   status: "pending" | "cleaning" | "done" | "failed" | "suspended";
   progress?: string;
+  // Which model did the work — a run can land on a different one than Settings asks for
+  model?: string;
   error?: string;
   runToken?: string;
   createdAt: string;

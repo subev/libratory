@@ -12,6 +12,10 @@ vi.mock("../lib/log.ts", () => ({
   appendLog: vi.fn(async () => {}),
 }));
 
+vi.mock("../lib/llm.ts", () => ({
+  modelChoice: vi.fn(async () => ({ key: "flash", label: "V4 Flash" })),
+}));
+
 vi.mock("../db.ts", async () => {
   const { getDb } = await import("../../test/setup.ts");
   return { get db() { return getDb(); } };
@@ -65,6 +69,25 @@ describe("cleanup worker", () => {
     expect(row.customText?.split("\n\n")).toHaveLength(total);
     expect(row.rawText).toBe(SOURCE);
     expect(mockCleanupChunk).toHaveBeenCalledTimes(total);
+  });
+
+  // The first chunk can take minutes, and a status cell with no numbers in it reads as stuck
+  it("records the model and a zero progress before the first chunk returns", async () => {
+    const db = getDb();
+    const { bookId, chapterId } = await insertFixture(db);
+    const total = splitIntoChunks(SOURCE).length;
+    const seen: (string | undefined)[] = [];
+    mockCleanupChunk.mockImplementation(async () => {
+      const row = firstRow(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
+      seen.push(row.cleanup?.progress);
+      return "CLEAN";
+    });
+
+    await cleanup({ chapterId, bookId });
+
+    expect(seen[0]).toBe(`0/${total}`);
+    const row = firstRow(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
+    expect(row.cleanup?.model).toBe("V4 Flash");
   });
 
   it("cleans from customText when present", async () => {

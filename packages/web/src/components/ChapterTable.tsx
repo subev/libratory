@@ -47,7 +47,7 @@ export type ChapterRow = {
   // Translation view: rows without a finished translation can't be synthesized (but can be selected for bulk translation)
   synthesizable?: boolean;
   audioUrl?: string;
-  cleanup?: { status: "pending" | "cleaning" | "done" | "failed" | "suspended"; progress?: string; error?: string } | null;
+  cleanup?: { status: "pending" | "cleaning" | "done" | "failed" | "suspended"; progress?: string; model?: string; error?: string; createdAt?: string } | null;
 };
 
 export type VariantRef = {
@@ -853,6 +853,11 @@ export function ChapterTable({
   );
 }
 
+// A chunk can take minutes, so the only honest sign of life is the clock
+function elapsedSince(iso: string): string {
+  return formatDuration(Math.max(0, Date.now() - new Date(iso).getTime()));
+}
+
 function ChapterStatusCell({ chapter, cleanup }: { chapter: ChapterRow; cleanup: ChapterRow["cleanup"] }) {
   let main;
   if ((chapter.status === "synthesizing" || chapter.status === "translating") && chapter.progress) {
@@ -899,6 +904,9 @@ function ChapterStatusCell({ chapter, cleanup }: { chapter: ChapterRow; cleanup:
             {cleanup?.progress ? (
               <span className="text-[10px] text-(--text-muted) tabular-nums">{cleanup.progress}</span>
             ) : null}
+            <span className="text-[10px] text-(--text-muted) truncate" title={cleanup?.model ? `Cleaning with ${cleanup.model}` : undefined}>
+              {[cleanup?.model, cleanup?.createdAt ? elapsedSince(cleanup.createdAt) : null].filter(Boolean).join(" · ")}
+            </span>
           </div>
           <div className="w-full bg-(--bg-page) rounded-full h-1">
             <div
