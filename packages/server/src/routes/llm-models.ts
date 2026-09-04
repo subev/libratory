@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { router, publicProcedure } from "../trpc.ts";
-import { availableModels, defaultModelKey, llmStatus, modelKeySchema, setDefaultModelKey } from "../lib/llm.ts";
+import { availableModels, llmStatus, modelChoice, modelKeySchema, setDefaultModelKey } from "../lib/llm.ts";
 import { startLocalServer } from "../lib/llm-server-control.ts";
 import { env } from "../env.ts";
 
@@ -18,12 +18,13 @@ export const llmModelsRouter = router({
 
   status: publicProcedure.query(() => llmStatus()),
 
-  // chosen: what the user picked in Settings (null = automatic); resolved: what a request
-  // with no explicit model will actually use right now — the pickers preselect this.
-  getDefault: publicProcedure.query(async () => ({
-    chosen: env.DEFAULT_LLM_MODEL ?? null,
-    resolved: (await defaultModelKey()) ?? null,
-  })),
+  // chosen: what the user picked in Settings (null = automatic). The rest is what a request with
+  // no explicit model actually runs on — the pickers preselect it, and `steppedOver` names the
+  // pick that was unavailable, which only the server can label since `list` omits it.
+  getDefault: publicProcedure.query(async () => {
+    const { key, label, steppedOver } = await modelChoice();
+    return { chosen: env.DEFAULT_LLM_MODEL ?? null, resolved: key, resolvedLabel: label, steppedOver: steppedOver ?? null };
+  }),
 
   setDefault: publicProcedure
     .input(z.object({ key: modelKeySchema.nullable() }))

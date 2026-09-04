@@ -1,5 +1,10 @@
 export type DocumentFormat = "pdf" | "epub" | "epub-sync";
 
+// What the row's chip says: the file's own extension, which is what a reader will look for
+export function formatTag(filename: string | undefined): string {
+  return filename?.split(".").pop()?.toUpperCase() ?? "";
+}
+
 export function documentFormatLabel(format: DocumentFormat): string {
   return format === "epub-sync" ? "Synced EPUB" : format.toUpperCase();
 }

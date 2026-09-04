@@ -4,6 +4,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { splitIntoChunks } from "../lib/transform.ts";
 import { cleanupChunk } from "../lib/cleanup.ts";
 import { modelChoice } from "../lib/llm.ts";
+import { chapterText } from "../lib/chapter-text.ts";
 import { describeError } from "../lib/errors.ts";
 import { appendLog } from "../lib/log.ts";
 import { randomUUID } from "node:crypto";
@@ -28,11 +29,15 @@ export async function cleanup(payload: CleanupPayload) {
   // The token fences out any older run still writing to this chapter's cleanup state
   const runToken = randomUUID();
   const startedAt = new Date().toISOString();
+  // Filled in once the model is resolved, then stamped on every write — including the failure,
+  // which otherwise loses which model it was that failed
+  let model: string | undefined;
   const state = (patch: Partial<ChapterCleanup>): ChapterCleanup => ({
     status: "cleaning",
     runToken,
     createdAt: startedAt,
     updatedAt: new Date().toISOString(),
+    ...(model ? { model } : {}),
     ...patch,
   });
 
@@ -52,18 +57,19 @@ export async function cleanup(payload: CleanupPayload) {
   );
 
   try {
-    const source = chapter.customText ?? chapter.cleanText ?? chapter.rawText;
+    const source = chapterText(chapter);
     if (!source) throw new Error("Chapter has no text");
 
     const chunks = splitIntoChunks(source);
-    const model = await modelChoice();
-    if (model.steppedOver) {
-      await chLog(`Default model ${model.steppedOver} is not available — cleaning with ${model.label} instead`);
+    const done = (n: number) => `${n}/${chunks.length}`;
+    const choice = await modelChoice();
+    model = choice.label;
+    if (choice.steppedOver) {
+      await chLog(`Default model ${choice.steppedOver} is not available — cleaning with ${model} instead`);
     }
-    await chLog(`Cleaning "${chapter.title}" (${chunks.length} chunks) with ${model.label}`);
-    // Written before the first chunk: a chapter that shows no progress for the minutes one takes
-    // reads as stuck, which is how a working run got reported as a broken feature.
-    await db.update(chapters).set({ cleanup: state({ progress: `0/${chunks.length}`, model: model.label }) }).where(owned);
+    await chLog(`Cleaning "${chapter.title}" (${chunks.length} chunks) with ${model}`);
+    // Before the first chunk: one chunk can take minutes, and a run with no count reads as stuck
+    await db.update(chapters).set({ cleanup: state({ progress: done(0) }) }).where(owned);
 
     // Cleaned chunks accumulate in memory and land in customText in one final
     // write — an interrupted run must never leave a truncated chapter behind.
@@ -73,7 +79,7 @@ export async function cleanup(payload: CleanupPayload) {
 
       const updated = await db
         .update(chapters)
-        .set({ cleanup: state({ progress: `${i + 1}/${chunks.length}`, model: model.label }) })
+        .set({ cleanup: state({ progress: done(i + 1) }) })
         .where(owned)
         .returning({ id: chapters.id });
       if (updated.length === 0) {
@@ -87,7 +93,7 @@ export async function cleanup(payload: CleanupPayload) {
 
     const finished = await db
       .update(chapters)
-      .set({ customText: result, cleanup: state({ status: "done", progress: `${chunks.length}/${chunks.length}`, model: model.label }) })
+      .set({ customText: result, cleanup: state({ status: "done", progress: done(chunks.length) }) })
       .where(owned)
       .returning({ id: chapters.id });
     if (finished.length === 0) {

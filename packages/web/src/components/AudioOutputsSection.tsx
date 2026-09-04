@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { filesSummary, formatOutputDate, formatDuration, formatSize } from "../lib/format.ts";
+import { filesSummary, formatOutputDate, formatDuration, formatSize, formatTag } from "../lib/format.ts";
 import { SPEEDS, loadSpeed, saveSpeed, subscribeSpeed } from "../lib/playback-speed.ts";
 import { useAudioTime } from "../lib/use-audio-time.ts";
 import { Button } from "./Button.tsx";
@@ -105,7 +105,7 @@ function AssemblyRowItem({
       iconLabel={playing ? `Pause ${filename}` : `Play ${filename}`}
       icon={playing ? <IconPause weight="fill" className="h-3.5 w-3.5" /> : <IconPlay className="h-3.5 w-3.5" />}
       title={filename}
-      tag={<FormatTag>{(filename?.split(".").pop() ?? "").toUpperCase()}</FormatTag>}
+      tag={<FormatTag>{formatTag(filename)}</FormatTag>}
       subtitle={
         <>
           {formatDuration(assembly.durationMs)} ·{" "}

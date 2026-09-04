@@ -24,7 +24,8 @@ export type ReaderChapter = {
   audio: string | null;
   // null when the chapter has no narration: a container cannot carry a path to a missing file
   cues: string | null;
-  // The chapter's own text, for reading a chapter no narration has been made for yet
+  // The chapter's own text, for reading a chapter no narration has been made for yet. Only a
+  // served manifest carries one: a container's text is the EPUB layer beside it, not a copy here.
   text: string | null;
   durationMs: number | null;
   pageStart: number | null;

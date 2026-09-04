@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router";
 import { trpc } from "../trpc.ts";
-import { useActiveLlmModel, useModelFallback } from "../lib/use-llm-models.ts";
+import { useRunModel } from "../lib/use-llm-models.ts";
 import { ModelBundleNotice, useModelBundle } from "../components/ModelBundleNotice.tsx";
 import { ChapterTable } from "../components/ChapterTable.tsx";
 import { SYNTH_BUSY, TEXT_BUSY, variantLabel } from "../lib/chapters.ts";
@@ -40,9 +40,8 @@ export function BookDetail() {
   const utils = trpc.useUtils();
   // Above the `!book` early return below: hooks after it run only once the book loads, and a
   // render that calls a different number of hooks than the last one takes the page down.
+  const runModel = useRunModel();
   // Poll while an install started elsewhere — another tab, or before a reload — is still running
-  const modelFallback = useModelFallback();
-  const cleanupModel = useActiveLlmModel("");
   const { data: renderer } = trpc.renderer.status.useQuery(undefined, {
     staleTime: Infinity,
     refetchInterval: (query) => (query.state.data?.installing ? 3000 : false),
@@ -405,6 +404,12 @@ export function BookDetail() {
         return !t || t.status === "failed" || t.status === "suspended";
       }).length
     : 0;
+  const canRead = hasChapterAudio || hasChapterPages;
+  const readTitle = !canRead
+    ? "No chapter is on a page yet — extract chapters to read this book on its own print"
+    : hasChapterAudio
+      ? "Follow the narration on the PDF page, and tap a sentence to jump there"
+      : "Read the book's own pages — synthesize a chapter to follow the narration across them";
   const selectedCleanable = activeVariant
     ? 0
     : book.chapters.filter((c) => {
@@ -422,13 +427,12 @@ export function BookDetail() {
     : selectedWithAudio;
   const viewPendingExports = pendingExports.filter((e) => (e.language ?? null) === activeVariant);
   const viewDocuments = bookDocuments.filter((d) => (d.language ?? null) === activeVariant);
-  // Cleanup takes no model pick, so the button is the only place to say what will run it — and
-  // whether that is the model Settings asks for
-  const cleanupModelNote = modelFallback
-    ? ` — ${modelFallback.chosen} is not running, so this uses ${modelFallback.using?.label ?? "the automatic choice"}`
-    : cleanupModel
-      ? ` — runs on ${cleanupModel.label}`
-      : "";
+  // Cleanup takes no model pick, so the button is the only place to say what will run it
+  const cleanupModelNote = !runModel.label
+    ? ""
+    : runModel.steppedOver
+      ? ` — ${runModel.steppedOver} is not running, so this uses ${runModel.label}`
+      : ` — runs on ${runModel.label}`;
   const pendingExportFor = (format: "pdf" | "epub" | "epub-sync") => viewPendingExports.find((e) => e.format === format);
   const rendererReady = renderer?.installed !== false;
   const installing = installRenderer.isPending || renderer?.installing === true;
@@ -729,14 +733,8 @@ export function BookDetail() {
           nextBook={nextBook ?? null}
           position={bookIndex >= 0 ? { index: bookIndex + 1, total: orderedBooks.length, sortKey: bookSort.key } : null}
           onNavigate={(target) => navigate(`/books/${target}`)}
-          canRead={hasChapterAudio || hasChapterPages}
-          readTitle={
-            !(hasChapterAudio || hasChapterPages)
-              ? "No chapter is on a page yet — extract chapters to read this book on its own print"
-              : hasChapterAudio
-                ? "Follow the narration on the PDF page, and tap a sentence to jump there"
-                : "Read the book's own pages — synthesize a chapter to follow the narration across them"
-          }
+          canRead={canRead}
+          readTitle={readTitle}
           onAsk={() => setAskScope({ kind: "book-raw", bookId: book.id, bookTitle: book.title })}
           askDisabled={!hasRawText}
           askTitle={
@@ -1151,8 +1149,7 @@ export function BookDetail() {
           )}
           <DocumentOutputsSection
             kind="synced"
-            bookId={book.id}
-            canRead={hasChapterAudio || hasChapterPages}
+            read={{ bookId: book.id, can: canRead, title: readTitle }}
             documents={viewDocuments}
             pending={viewPendingExports}
             onDelete={(did) => deleteDocumentMutation.mutate({ id: did })}
@@ -1166,8 +1163,6 @@ export function BookDetail() {
           />
           <DocumentOutputsSection
             kind="text"
-            bookId={book.id}
-            canRead={hasChapterAudio || hasChapterPages}
             documents={viewDocuments}
             pending={viewPendingExports}
             onDelete={(did) => deleteDocumentMutation.mutate({ id: did })}

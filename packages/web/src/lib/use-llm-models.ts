@@ -12,18 +12,16 @@ export function useLlmModels(): LlmModel[] {
 // is available, otherwise the automatic one. `pending` matters: this query and llmModels.list are
 // separate round trips, and a picker that read a not-yet-arrived default as "there isn't one" fell
 // back to the first model and then had no reason to move.
-export function useDefaultModelKey(): { key: string | null; chosen: string | null; pending: boolean } {
+export function useDefaultModelKey(): { key: string | null; pending: boolean } {
   const { data, isPending } = trpc.llmModels.getDefault.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
-  return { key: data?.resolved ?? null, chosen: data?.chosen ?? null, pending: isPending };
+  return { key: data?.resolved ?? null, pending: isPending };
 }
 
-// The Settings pick is not what runs when its server is down; every caller that spends money or
-// minutes on the automatic choice should be able to say so.
-export function useModelFallback(): { chosen: string; using: LlmModel | undefined } | null {
-  const models = useLlmModels();
-  const { key, chosen } = useDefaultModelKey();
-  if (!chosen || !key || chosen === key) return null;
-  return { chosen, using: models.find((m) => m.key === key) };
+// What a request with no explicit pick runs on, and the Settings pick it stepped over when that
+// model's server is down — the rule itself lives on the server, in modelChoice.
+export function useRunModel(enabled = true): { label: string | null; steppedOver: string | null } {
+  const { data } = trpc.llmModels.getDefault.useQuery(undefined, { staleTime: 5 * 60 * 1000, enabled });
+  return { label: data?.resolvedLabel ?? null, steppedOver: data?.steppedOver ?? null };
 }
 
 export function useActiveLlmModel(key: string): LlmModel | undefined {

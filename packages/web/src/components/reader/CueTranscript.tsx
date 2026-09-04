@@ -2,21 +2,20 @@ import { useState } from "react";
 
 import { cueIndexAt, wordIndexAt, type ReaderCue, type ReaderCues } from "../../lib/reader-doc.ts";
 
+const READING_PANE = "mx-auto w-full max-w-prose rounded-lg bg-(--bg-reading) p-7 font-reading text-lg leading-relaxed text-(--text-primary)";
+
 // The cue list is the chapter's spoken text in order, so reading along with it needs no
 // second document — and it works for chapters that never map onto a page at all.
 export function CueTranscript({
   cues,
-  text = null,
   ms,
   onSeek,
   hoverChunk = null,
   onHoverCue,
-  className = "mx-auto w-full max-w-prose rounded-lg bg-(--bg-reading) p-7 font-reading text-lg leading-relaxed text-(--text-primary)",
+  className = READING_PANE,
   empty = "No narration to read along with yet.",
 }: {
   cues: ReaderCues | null;
-  /** The chapter's own text, for a chapter with no narration to read along with. */
-  text?: string | null;
   ms: number;
   onSeek: (ms: number) => void;
   // The chunk lit from elsewhere — a chunk button being hovered — and the reverse report
@@ -26,16 +25,7 @@ export function CueTranscript({
   empty?: string;
 }) {
   const [hoverCue, setHoverCue] = useState(-1);
-  if (!cues) {
-    if (!text) return <p className="text-sm text-(--text-muted)">{empty}</p>;
-    return (
-      <article className={className} data-testid="reader-text-view">
-        {text.split(/\n\s*\n/).filter((block) => block.trim()).map((block, i) => (
-          <p key={i} className="mb-4 last:mb-0 whitespace-pre-wrap">{block.trim()}</p>
-        ))}
-      </article>
-    );
-  }
+  if (!cues) return <p className="text-sm text-(--text-muted)">{empty}</p>;
 
   const activeIndex = cueIndexAt(cues.cues, ms);
   const activeCue = activeIndex >= 0 ? cues.cues[activeIndex] : undefined;
@@ -89,5 +79,16 @@ export function CueText({ cue, word }: { cue: ReaderCue; word: number }) {
       <mark className="bg-(--accent)/60" data-testid="reader-word">{spoken}</mark>
       {cue.s.slice(start + spoken.length)}
     </>
+  );
+}
+
+// The same reading pane for a chapter with no narration: same styles, nothing to mark
+export function TextBody({ text, className = READING_PANE }: { text: string; className?: string }) {
+  return (
+    <article className={className} data-testid="reader-text-view">
+      {text.split(/\n\s*\n/).map((block) => block.trim()).filter(Boolean).map((block, i) => (
+        <p key={i} className="mb-4 last:mb-0 whitespace-pre-wrap">{block}</p>
+      ))}
+    </article>
   );
 }

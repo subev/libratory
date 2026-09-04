@@ -10,6 +10,7 @@ import { listMarkerSources, type MarkerSource } from "./marker-sources.ts";
 import { languageCode } from "./readaloud-epub.ts";
 import { ensureSourceGeometry, medianBodyPt, pageLayout, type GeometryPage } from "./page-geometry.ts";
 import { readSyncMap, type SyncWord } from "./sync-map.ts";
+import { chapterText } from "./chapter-text.ts";
 import type { SourceBlock } from "./marker.ts";
 import {
   READER_FORMAT,
@@ -94,7 +95,7 @@ export async function buildManifest(book: Book): Promise<ReaderManifest> {
         title: chapter.title,
         audio: chapter.audioPath ? `/audio/chapter/${chapter.id}` : null,
         cues: chapter.audioPath ? `/read/chapter/${chapter.id}/cues.json` : null,
-        text: chapterText(chapter) ? `/read/chapter/${chapter.id}/text.json` : null,
+        text: chapterText(chapter).trim() ? `/read/chapter/${chapter.id}/text.json` : null,
         durationMs: chapter.durationMs,
         pageStart: chapter.pageStart === null ? null : offset + chapter.pageStart - 1,
         pageEnd: chapter.pageEnd === null ? null : offset + chapter.pageEnd - 1,
@@ -172,13 +173,8 @@ async function resolveRects(chapter: Chapter, cues: Cue[]): Promise<ResolvedRect
   });
 }
 
-// What the rest of the app renders and narrates, in the same order of preference
-function chapterText(chapter: Chapter): string {
-  return (chapter.customText ?? chapter.cleanText ?? chapter.rawText ?? "").trim();
-}
-
 export function buildText(chapter: Chapter): ReaderText | null {
-  const text = chapterText(chapter);
+  const text = chapterText(chapter).trim();
   return text ? { format: READER_FORMAT, text } : null;
 }
 

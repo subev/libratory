@@ -380,8 +380,8 @@ export function setDefaultModelKey(key: string | null): void {
   env.DEFAULT_LLM_MODEL = key ?? undefined;
 }
 
-export async function defaultModelKey(): Promise<string | undefined> {
-  const models = await availableModels();
+export async function defaultModelKey(known?: LlmModelDef[]): Promise<string | undefined> {
+  const models = known ? known.filter(isAvailable) : await availableModels();
   // The user's pick (Settings → Default AI model) wins while its model is actually available;
   // a stopped Ollama or a removed key falls through to the automatic choice rather than erroring.
   if (env.DEFAULT_LLM_MODEL && models.some((m) => m.key === env.DEFAULT_LLM_MODEL)) {
@@ -393,11 +393,12 @@ export async function defaultModelKey(): Promise<string | undefined> {
 // What a request will actually run on, and the Settings pick it had to step around. A stopped
 // LM Studio falls through to a cloud model silently, which is a bill and a different result.
 export async function modelChoice(key?: string): Promise<{ key: string | null; label: string; steppedOver?: string }> {
-  const wanted = key || (await defaultModelKey()) || null;
-  const def = wanted ? (await allModels()).find((m) => m.key === wanted) : undefined;
+  const models = await allModels();
+  const wanted = key || (await defaultModelKey(models)) || null;
+  const label = (of: string) => models.find((m) => m.key === of)?.label ?? of;
   const chosen = env.DEFAULT_LLM_MODEL;
-  const steppedOver = !key && chosen && chosen !== wanted ? chosen : undefined;
-  return { key: wanted, label: def?.label ?? wanted ?? "no model", ...(steppedOver ? { steppedOver } : {}) };
+  const steppedOver = !key && chosen && chosen !== wanted ? label(chosen) : undefined;
+  return { key: wanted, label: wanted ? label(wanted) : "no model", ...(steppedOver ? { steppedOver } : {}) };
 }
 
 // Must match the `name` given to createOpenAICompatible in resolveLlm — the AI SDK

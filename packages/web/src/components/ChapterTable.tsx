@@ -47,7 +47,7 @@ export type ChapterRow = {
   // Translation view: rows without a finished translation can't be synthesized (but can be selected for bulk translation)
   synthesizable?: boolean;
   audioUrl?: string;
-  cleanup?: { status: "pending" | "cleaning" | "done" | "failed" | "suspended"; progress?: string; model?: string; error?: string; createdAt?: string } | null;
+  cleanup?: { status: "pending" | "cleaning" | "done" | "failed" | "suspended"; progress?: string; model?: string; error?: string; createdAt: string } | null;
 };
 
 export type VariantRef = {
@@ -853,9 +853,15 @@ export function ChapterTable({
   );
 }
 
-// A chunk can take minutes, so the only honest sign of life is the clock
-function elapsedSince(iso: string): string {
-  return formatDuration(Math.max(0, Date.now() - new Date(iso).getTime()));
+// Its own timer, because nothing in the polled row changes between chunks — a render-time reading
+// would sit frozen for exactly the minutes it exists to cover.
+function ElapsedSince({ iso }: { iso: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <>{formatDuration(Math.max(0, now - new Date(iso).getTime()))}</>;
 }
 
 function ChapterStatusCell({ chapter, cleanup }: { chapter: ChapterRow; cleanup: ChapterRow["cleanup"] }) {
@@ -890,9 +896,9 @@ function ChapterStatusCell({ chapter, cleanup }: { chapter: ChapterRow; cleanup:
   }
 
   const cleaningActive = cleanup?.status === "cleaning" || cleanup?.status === "pending";
-  if (!cleaningActive && cleanup?.status !== "failed") return main;
+  if (!cleanup || (!cleaningActive && cleanup.status !== "failed")) return main;
 
-  const [current = 0, total = 0] = (cleanup?.progress ?? "").split("/").map(Number);
+  const [current = 0, total = 0] = (cleanup.progress ?? "").split("/").map(Number);
   const percent = total > 0 ? (current / total) * 100 : 0;
   return (
     <div className="space-y-1" data-testid="chapter-cleanup-status">
@@ -901,11 +907,13 @@ function ChapterStatusCell({ chapter, cleanup }: { chapter: ChapterRow; cleanup:
         <>
           <div className="flex items-center gap-2">
             <StatusBadge status="cleaning" />
-            {cleanup?.progress ? (
+            {cleanup.progress ? (
               <span className="text-[10px] text-(--text-muted) tabular-nums">{cleanup.progress}</span>
             ) : null}
-            <span className="text-[10px] text-(--text-muted) truncate" title={cleanup?.model ? `Cleaning with ${cleanup.model}` : undefined}>
-              {[cleanup?.model, cleanup?.createdAt ? elapsedSince(cleanup.createdAt) : null].filter(Boolean).join(" · ")}
+            <span className="text-[10px] text-(--text-muted) truncate" title={cleanup.model ? `Cleaning with ${cleanup.model}` : undefined}>
+              {cleanup.model ? `${cleanup.model} · ` : ""}
+              {/* Only the row actually running one ticks: a batch marks every selected chapter pending at once */}
+              {cleanup.status === "cleaning" ? <ElapsedSince iso={cleanup.createdAt} /> : "queued"}
             </span>
           </div>
           <div className="w-full bg-(--bg-page) rounded-full h-1">
@@ -916,7 +924,7 @@ function ChapterStatusCell({ chapter, cleanup }: { chapter: ChapterRow; cleanup:
           </div>
         </>
       ) : (
-        <span className="text-[10px] text-(--danger-text)" title={cleanup?.error ?? undefined}>
+        <span className="text-[10px] text-(--danger-text)" title={cleanup.error ?? undefined}>
           cleanup failed
         </span>
       )}

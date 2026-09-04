@@ -4,7 +4,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 import { IconArrowLeft, IconPause, IconPlay } from "../components/icons.tsx";
 import { Button } from "../components/Button.tsx";
 import { SegmentedControl } from "../components/SegmentedControl.tsx";
-import { CueTranscript } from "../components/reader/CueTranscript.tsx";
+import { CueTranscript, TextBody } from "../components/reader/CueTranscript.tsx";
 import { CuePages } from "../components/reader/CuePages.tsx";
 import { bodyFit, chapterPages, UNMAPPED, type ReaderCues, type ReaderManifest } from "../lib/reader-doc.ts";
 import { httpSource, type DocumentSource } from "../lib/reader-source.ts";
@@ -32,6 +32,25 @@ const VIEWS = [
 ] as const;
 
 type View = (typeof VIEWS)[number]["id"];
+
+// One document per URL, remembered by the URL it came from: a chapter change reads as empty during
+// render rather than through an effect, and coming back to a view whose document is already in hand
+// refetches nothing.
+function useReaderDoc<T>(url: string | null, load: (url: string) => Promise<T>) {
+  const [loaded, setLoaded] = useState<{ url: string; data: T | null; error: string | null } | null>(null);
+
+  useEffect(() => {
+    if (!url || loaded?.url === url) return;
+    let live = true;
+    load(url)
+      .then((data) => { if (live) setLoaded({ url, data, error: null }); })
+      // A chapter's own failure, not the reader's — the picker has to stay usable
+      .catch((err: Error) => { if (live) setLoaded({ url, data: null, error: err.message }); });
+    return () => { live = false; };
+  }, [url, load, loaded?.url]);
+
+  return loaded?.url === url ? { data: loaded.data, error: loaded.error } : { data: null, error: null };
+}
 
 const GRANULARITY_HINT: Record<ReaderCues["granularity"], string> = {
   word: "Every word is timed by the engine that spoke it",
@@ -103,41 +122,16 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
   // or measured for, so a chapter change reads as empty during render rather than through an
   // effect that would show the last chapter's highlight for a frame.
   const cueUrl = chapterAudio && chapter?.cues ? chapter.cues : null;
-  const [loaded, setLoaded] = useState<{ url: string; cues: ReaderCues | null; error: string | null } | null>(null);
-  const cues = loaded && loaded.url === cueUrl ? loaded.cues : null;
-  const cueError = loaded && loaded.url === cueUrl ? loaded.error : null;
+  const { data: cues, error: cueError } = useReaderDoc(cueUrl, source.cues);
 
   const [played, setPlayed] = useState<{ chapterId: string | null; ms: number }>({ chapterId: null, ms: 0 });
   const ms = played.chapterId === chapterId ? played.ms : 0;
   const setMs = useCallback((at: number) => setPlayed({ chapterId, ms: at }), [chapterId]);
 
-  // A chapter nobody has narrated has no cues to reflow, and used to leave text view empty while
-  // its pages sat right there in the other two. The text is its own small document, fetched only
-  // when it is what the reader is about to show.
+  // A chapter nobody has narrated has no cues to reflow; its text is its own small document,
+  // fetched only when text view is what will show it.
   const textUrl = view === "text" && (!cueUrl || cueError) ? chapter?.text ?? null : null;
-  const [loadedText, setLoadedText] = useState<{ url: string; text: string } | null>(null);
-  const chapterText = loadedText && loadedText.url === textUrl ? loadedText.text : null;
-
-  useEffect(() => {
-    if (!textUrl) return;
-    let live = true;
-    source
-      .text(textUrl)
-      .then((next) => { if (live) setLoadedText({ url: textUrl, text: next.text }); })
-      .catch(() => { if (live) setLoadedText(null); });
-    return () => { live = false; };
-  }, [source, textUrl]);
-
-  useEffect(() => {
-    if (!cueUrl) return;
-    let live = true;
-    source
-      .cues(cueUrl)
-      .then((next) => { if (live) setLoaded({ url: cueUrl, cues: next, error: null }); })
-      // A chapter's own failure, not the reader's — the picker has to stay usable
-      .catch((err: Error) => { if (live) setLoaded({ url: cueUrl, cues: null, error: err.message }); });
-    return () => { live = false; };
-  }, [source, cueUrl]);
+  const chapterText = useReaderDoc(textUrl, source.text).data?.text ?? null;
 
   // The reader holds no database row by design, so a chapter narrated while it is open can only be
   // noticed by asking the manifest again — while there is something to wait for, and someone looking
@@ -333,7 +327,7 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
           data-testid="reader-text-mode"
         >
           {UNMAPPED[chapter.why ?? "unmapped"]}{" "}
-          {view === "text"
+          {view === "text" && chapter.text
             ? "Its text is below, with nothing marked in it."
             : hasPages
               ? "Its pages are below, with nothing marked on them."
@@ -369,7 +363,7 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
 
       <div ref={measurePages} className="mx-auto flex flex-col gap-4" style={maxWidth ? { maxWidth } : { maxWidth: "48rem" }}>
         {view === "text" ? (
-          <CueTranscript cues={cues} text={chapterText} ms={ms} onSeek={seek} />
+          !cues && chapterText ? <TextBody text={chapterText} /> : <CueTranscript cues={cues} ms={ms} onSeek={seek} />
         ) : (
           <CuePages
             manifest={manifest}

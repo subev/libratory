@@ -153,7 +153,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               data-testid="settings-default-model-select"
             >
               <option value="">Automatic — V4 Flash when configured, else the first available model</option>
-              {chosenMissing && <option value={chosenDefault}>{chosenDefault} (not available right now)</option>}
+              {chosenMissing && <option value={chosenDefault}>{defaultModel?.steppedOver ?? chosenDefault} (not available right now)</option>}
               {[...new Set(models.map((m) => m.source))].map((source) => (
                 <optgroup key={source} label={source}>
                   {models
@@ -171,9 +171,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             </p>
             {chosenMissing && (
               <p className="mt-1 text-xs text-(--warning-text)" data-testid="settings-default-model-warning">
-                Not available right now — requests run on{" "}
-                {models.find((m) => m.key === defaultModel?.resolved)?.label ?? "the automatic choice"} until it is,
-                which may be a paid API rather than the local model you picked.
+                Not available right now — requests run on {defaultModel?.resolvedLabel ?? "the automatic choice"} until
+                it is, which may be a paid API rather than the model you picked.
               </p>
             )}
             {setDefaultMutation.error && (
