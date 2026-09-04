@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { createRequire } from "node:module";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
@@ -34,13 +34,24 @@ function bundledCliBin(): string | null {
 }
 
 function resolveCliBin(): string {
-  const bin = bundledCliBin() ?? (existsSync(INSTALLED_BIN) ? INSTALLED_BIN : null);
+  const bin = bundledCliBin() ?? (installedCliVersion() === CLI_VERSION ? INSTALLED_BIN : null);
   if (!bin) throw new Error("The page renderer is not installed yet — download it from the export panel");
   return bin;
 }
 
+// By version, not by existence: a CLI_VERSION bump has to reach the installs that already have an
+// older copy, and nothing else would ever ask them to fetch it.
+function installedCliVersion(): string | null {
+  try {
+    const pkgPath = path.join(env.VIVLIOSTYLE_DIR, "node_modules", "@vivliostyle", "cli", "package.json");
+    return (JSON.parse(readFileSync(pkgPath, "utf-8")) as { version?: string }).version ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function cliInstalled(): boolean {
-  return bundledCliBin() !== null || existsSync(INSTALLED_BIN);
+  return bundledCliBin() !== null || installedCliVersion() === CLI_VERSION;
 }
 
 // `bun install` rather than a 233 MB addition to the DMG: the CLI carries a native canvas, a
@@ -48,6 +59,9 @@ export function cliInstalled(): boolean {
 // anyway.
 export async function installCli(): Promise<void> {
   if (cliInstalled()) return;
+  // Only the packaged binary can install it: `bun install` here is process.execPath re-entered as
+  // the bun CLI, and under node that spelling means nothing.
+  if (!process.versions.bun) throw new Error("No @vivliostyle/cli in this checkout — install the server's dependencies");
   await mkdir(env.VIVLIOSTYLE_DIR, { recursive: true });
   await writeFile(
     path.join(env.VIVLIOSTYLE_DIR, "package.json"),

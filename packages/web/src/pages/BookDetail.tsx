@@ -39,7 +39,12 @@ export function BookDetail() {
   const utils = trpc.useUtils();
   // Above the `!book` early return below: hooks after it run only once the book loads, and a
   // render that calls a different number of hooks than the last one takes the page down.
-  const { data: renderer } = trpc.renderer.status.useQuery(undefined, { staleTime: Infinity });
+  // An install started in another tab, or before a reload, is still running: poll while it is, so
+  // the button says so instead of offering a download that is already half done.
+  const { data: renderer } = trpc.renderer.status.useQuery(undefined, {
+    staleTime: Infinity,
+    refetchInterval: (query) => (query.state.data?.installing ? 3000 : false),
+  });
   const { ready: extractionReady } = useModelBundle("extraction");
   const installRenderer = trpc.renderer.install.useMutation({ onSuccess: () => void utils.renderer.status.invalidate() });
   const [searchParams, setSearchParams] = useSearchParams();
@@ -416,6 +421,7 @@ export function BookDetail() {
   const viewPendingExports = pendingExports.filter((e) => (e.language ?? null) === activeVariant);
   const pendingExportFor = (format: "pdf" | "epub" | "epub-sync") => viewPendingExports.find((e) => e.format === format);
   const rendererReady = renderer?.installed !== false;
+  const installing = installRenderer.isPending || renderer?.installing === true;
   // Deferring is what makes a text export possible while a lane is still translating; without the
   // escape the cards were disabled exactly when the wait existed to be used, and the server would
   // have honoured it — exportDocument skips its "no chapters" throw whenever something is waited on.
@@ -650,11 +656,11 @@ export function BookDetail() {
             variant="secondary"
             size="sm"
             onClick={() => installRenderer.mutate()}
-            disabled={installRenderer.isPending}
+            disabled={installing}
             title="Vivliostyle renders PDF and EPUB and brings its own browser, once"
             data-testid="install-renderer"
           >
-            {installRenderer.isPending ? "Downloading renderer…" : "Download page renderer (~600 MB)"}
+            {installing ? "Downloading renderer…" : "Download page renderer (~600 MB)"}
           </Button>
         </div>
       ) : undefined,
