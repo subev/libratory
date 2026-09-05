@@ -606,7 +606,7 @@ export const booksRouter = router({
         if (!file) unusable.push(sources.find((s) => s.id === id)!.title);
       }
       if (unusable.length > 0) {
-        throw new Error(`No text available for: ${unusable.map((t) => `"${t}"`).join(", ")} — extract them (with Force OCR if scanned) first`);
+        throw new Error(`No text available for: ${unusable.map((t) => `"${t}"`).join(", ")} — extract them (as “Scanned PDF — needs OCR” if they are scans) first`);
       }
 
       const now = new Date().toISOString();

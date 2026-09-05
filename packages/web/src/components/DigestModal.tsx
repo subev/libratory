@@ -104,7 +104,7 @@ export function DigestModal({
             <p className="text-sm text-(--warning-text)">
               No text available for {unusable.length} book{unusable.length === 1 ? "" : "s"}:{" "}
               {unusable.map((b) => `"${b.title}"`).join(", ")} — the digest would fail. Extract them first
-              (with Force OCR if scanned), or leave them out.
+              (as “Scanned PDF — needs OCR” if they are scans), or leave them out.
             </p>
             <Button
               variant="warning"

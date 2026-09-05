@@ -52,10 +52,15 @@ function useReaderDoc<T>(url: string | null, load: (url: string) => Promise<T>) 
   return loaded?.url === url ? { data: loaded.data, error: loaded.error } : { data: null, error: null };
 }
 
-const GRANULARITY_HINT: Record<ReaderCues["granularity"], string> = {
+// What the reader is showing, which is not always what the engine timed: a page with no text layer
+// can only be marked a paragraph at a time, however finely the voice was measured.
+type Grain = ReaderCues["granularity"] | "paragraph";
+
+const GRANULARITY_HINT: Record<Grain, string> = {
   word: "Every word is timed by the engine that spoke it",
   sentence: "Sentence timings where the engine reported words, whole chunks elsewhere",
   chunk: "This audio predates word timings — a highlight covers a whole synthesis chunk",
+  paragraph: "No text layer on these pages",
 };
 
 // Below this the book's own type is too small at the chosen width, and the reader says so
@@ -213,6 +218,11 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
   const maxWidth = WIDTHS.find((w) => w.id === width)!.px;
   const hasPages = pages.length > 0;
 
+  // Only a chapter the print is supposed to mark says anything about the print: one whose text was
+  // edited or written has its own banner, and no rects for a reason of its own.
+  const unmarkedPrint = chapter.mode === "page" && view !== "text" && cues?.marks === "paragraph";
+  const grain: Grain | null = unmarkedPrint ? "paragraph" : (cues?.granularity ?? null);
+
   return (
     <ReaderShell bookId={id} chapterId={chapter.id} title={manifest.book.title}>
       <div className="sticky top-0 z-10 -mx-4 mb-4 border-b border-(--border) bg-(--bg-page)/95 px-4 py-2 backdrop-blur">
@@ -283,13 +293,13 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
           />
 
           <div className="ml-auto flex items-center gap-3 text-xs text-(--text-muted)">
-            {cues && (
+            {grain && (
               <span
                 className="rounded bg-(--bg-subtle) px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide"
-                title={GRANULARITY_HINT[cues.granularity]}
+                title={GRANULARITY_HINT[grain]}
                 data-testid="reader-granularity"
               >
-                {cues.granularity}
+                {grain}
               </span>
             )}
             {fit && view !== "text" && (
@@ -332,6 +342,13 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
             : hasPages
               ? "Its pages are below, with nothing marked on them."
               : "It reads as text rather than on the page."}
+        </p>
+      )}
+
+      {unmarkedPrint && (
+        <p className={NOTE_BANNER} data-testid="reader-unmarked-print">
+          These pages carry no text layer, so the narration can't be lined up with them word by word —
+          the highlight covers a whole paragraph. Text view marks every word.
         </p>
       )}
 

@@ -472,7 +472,7 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
 
             <Option
               label="Scanned PDF — needs OCR"
-              hint="The pages are images; any text layer the file carries is discarded. Saved on the book, so later extractions use it too."
+              hint="The pages are images; any text layer the file carries is discarded. Pages that have none can't be lined up with the voice word by word, so read-along marks a paragraph at a time. Saved on the book, so later extractions use it too."
               title="Also covers a phone photo printed to PDF, where the only selectable text is the print header."
               checked={forceOcr}
               onChange={setForceOcr}

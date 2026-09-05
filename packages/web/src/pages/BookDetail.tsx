@@ -27,6 +27,10 @@ import { formatBytes, formatDuration, pendingExportLabel, pendingExportSummary }
 import { getVoiceLabel } from "../lib/voices.ts";
 import { IconStructure } from "../components/icons.tsx";
 
+// Named once because it names a control, and the control has been renamed twice
+const NO_RAW_TEXT =
+  "No raw text — the PDF may be scanned; run Extract chapters with “Scanned PDF — needs OCR” instead";
+
 // A worker killed mid-run (restart, network drop) leaves digestJob stuck on "running"; treat a
 // stale heartbeat as interrupted, mirroring the server's resumeDigest guard.
 function digestJobLive(digestJob: { status: string; updatedAt: string } | null | undefined): boolean {
@@ -740,7 +744,7 @@ export function BookDetail() {
           askTitle={
             hasRawText
               ? "Ask AI about this book — one call, the whole text goes to the model"
-              : "No raw text — the PDF may be scanned; run Extract chapters with Force OCR instead"
+              : NO_RAW_TEXT
           }
           lanes={variantLanes}
           activeVariant={activeVariant}
@@ -1020,7 +1024,7 @@ export function BookDetail() {
                       title={
                         hasRawText
                           ? "Summarize, question, or run any prompt against the whole book's raw text"
-                          : "No raw text — the PDF may be scanned; run Extract chapters with Force OCR instead"
+                          : NO_RAW_TEXT
                       }
                       data-testid="ask-ai-book"
                     >

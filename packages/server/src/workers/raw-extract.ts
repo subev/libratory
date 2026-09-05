@@ -42,7 +42,7 @@ export async function rawExtract(payload: RawExtractPayload, { addJob }: { addJo
       // Blaming the PDF for bytes that are not there sends the reader looking for the wrong fault
       await appendLog(bookId, `"${file.filename}" is missing from disk — remove it from the book`, file.index);
     } else {
-      await appendLog(bookId, `Raw text unavailable for "${file.filename}" — PDF may be scanned or encrypted`, file.index);
+      await appendLog(bookId, `Raw text unavailable for "${file.filename}" — PDF may be scanned or encrypted. Extract it as "Scanned PDF — needs OCR"; pages with no text layer read along a paragraph at a time rather than word by word`, file.index);
     }
   }
 

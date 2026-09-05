@@ -611,7 +611,7 @@ export function BookList({
                     {noText && (
                       <span
                         className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-(--warning-bg) text-(--warning-text)"
-                        title="No text extracted — the PDF is likely scanned. Open the book and extract with Force OCR. Without text it can't be used in digests or Ask AI."
+                        title="No text extracted — the PDF is likely scanned. Open the book and extract with “Scanned PDF — needs OCR”. Without text it can't be used in digests or Ask AI."
                         data-testid="no-text-pill"
                       >
                         no text

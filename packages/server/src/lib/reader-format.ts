@@ -53,6 +53,15 @@ export type ReaderCue = {
   wr?: CueRect[][];
 };
 
-export type ReaderCues = { format: string; totalMs: number; granularity: CueGranularity; cues: ReaderCue[] };
+// `marks` is what the print can carry, which is not what the engine timed: pages with no text layer
+// give the aligner no lines to slice, so every cue falls back to the paragraph it sits in. Absent
+// means markable — what every container written before the field already assumed.
+export type ReaderCues = {
+  format: string;
+  totalMs: number;
+  granularity: CueGranularity;
+  marks?: "word" | "paragraph";
+  cues: ReaderCue[];
+};
 
 export type ReaderText = { format: string; text: string };

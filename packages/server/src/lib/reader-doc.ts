@@ -126,10 +126,22 @@ async function pageOffsets(sources: MarkerSource[]): Promise<Map<number | null, 
   return offsets;
 }
 
-type ResolvedRects = { rects: CueRect[]; words: CueRect[][] | null };
+// Read off the pages themselves rather than off the rects that came back: a chapter whose engine
+// never timed a word has no word rects to count, and its print is no less markable for it.
+export function printMarks(
+  pages: GeometryPage[],
+  chapter: Pick<Chapter, "pageStart" | "pageEnd">,
+): ReaderCues["marks"] {
+  const first = chapter.pageStart ?? 1;
+  const last = chapter.pageEnd ?? first;
+  return pages.slice(first - 1, last).some((page) => page.lines.length > 0) ? "word" : "paragraph";
+}
 
-async function resolveRects(chapter: Chapter, cues: Cue[]): Promise<ResolvedRects[]> {
-  const empty = cues.map(() => ({ rects: [], words: null }));
+type ResolvedRects = { rects: CueRect[]; words: CueRect[][] | null };
+type Resolved = { perCue: ResolvedRects[]; marks: ReaderCues["marks"] };
+
+async function resolveRects(chapter: Chapter, cues: Cue[]): Promise<Resolved> {
+  const empty: Resolved = { perCue: cues.map(() => ({ rects: [], words: null })), marks: "word" };
   if (chapterMode(chapter).mode === "text" || !chapter.cleanText) return empty;
 
   const [book] = await db.select().from(books).where(eq(books.id, chapter.bookId));
@@ -155,8 +167,9 @@ async function resolveRects(chapter: Chapter, cues: Cue[]): Promise<ResolvedRect
   };
 
   const ranges = locateChunks(cleanText, cues.map((cue) => cue.text));
+  const marks = printMarks(geometry?.pages ?? [], chapter);
 
-  return cues.map((cue, i) => {
+  const perCue = cues.map((cue, i) => {
     const range = ranges[i];
     if (!range) return { rects: [], words: null };
 
@@ -171,6 +184,8 @@ async function resolveRects(chapter: Chapter, cues: Cue[]): Promise<ResolvedRect
     );
     return { rects, words };
   });
+
+  return { perCue, marks };
 }
 
 export function buildText(chapter: Chapter): ReaderText | null {
@@ -190,8 +205,9 @@ export async function buildCues(chapter: Chapter): Promise<ReaderCues | null> {
     format: READER_FORMAT,
     totalMs: map.totalMs,
     granularity,
+    marks: resolved.marks,
     cues: cues.map((cue, i) => {
-      const cueRects = resolved[i];
+      const cueRects = resolved.perCue[i];
       return {
         t: [cue.startMs, cue.endMs] as [number, number],
         s: cue.text,
