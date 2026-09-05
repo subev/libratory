@@ -62,6 +62,7 @@ anything it recognises, and say something useful about anything it does not.
   "format": "p2af/1",
   "totalMs": 2706000,
   "granularity": "word",
+  "marks": "word",
   "cues": [
     { "t": [0, 4210],
       "s": "Such a study would indeed be of great interest.",
@@ -110,6 +111,25 @@ Kokoro reports word timings during synthesis. Engines chunked a sentence at a ti
 ~20–24 s per chunk by design and stays at `chunk`, as does any audio synthesized before word
 timings existed.
 
+### `marks`
+
+Says what the *print* can carry, which is not the same question:
+
+| value | meaning |
+| --- | --- |
+| `word` | the pages have a text layer, so a cue's words can be marked where they sit |
+| `paragraph` | the pages carry no text layer; every cue falls back to the block it sits in, and `wr` is empty throughout |
+
+Absent means nobody could measure it, which a reader should read as markable — containers written
+before the field carry no answer, and neither does a chapter whose page geometry failed to build
+or which never landed on a page. Saying nothing is deliberate: the alternative is telling someone
+their book has no text layer on the strength of a missing file.
+
+The two fields are independent, and a reader that conflates them will say the wrong thing. A scan
+narrated by Kokoro is `granularity: "word"` with `marks: "paragraph"` — the voice is measured to
+the word and the page cannot show it. The reverse is just as common: a born-digital book narrated
+by the Bulgarian MLX narrator is `chunk` and `word`.
+
 ## How the rectangles are produced
 
 1. `chapters.text_map` records where each source block starts and ends inside `cleanText`,
@@ -119,6 +139,10 @@ timings existed.
 3. `scripts/page_geometry.py` extracts, per page, the line boxes and one x edge per character
    straight from pdfium via `pdftext` — no model, about four seconds for a 300-page book, and it
    works on books extracted long ago. Cached beside the extraction output as `geometry.json`.
+   A line's box is the reported one grown to the ink its characters actually cover: pdfium's
+   per-character box runs baseline to ascender in some fonts, which would leave every descender
+   hanging outside its own highlight. Only the height grows — the x edges stay the advances a
+   character range is measured along.
 4. `lib/cue-rects.ts` finds the block's lines geometrically, looks the cue's characters up in
    them — both sides reduced to letters and digits, so markdown stripping and hyphen joins can't
    defeat the match — and turns the result into rects.

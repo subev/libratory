@@ -74,8 +74,8 @@ It is not a Libratory engine today.
 | Case | What the reader does |
 | --- | --- |
 | Digital PDF | Character-exact rects: a sentence starting mid-line starts exactly there |
-| Scanned page with an OCR text layer | The same — the layer is what is read, not the image |
-| Scanned page with **no** text layer | The sentence gets its paragraph's box; words get nothing rather than a box covering the paragraph |
+| Scanned page with an OCR text layer | The layer is what is read, not the image — and it sits wherever whoever OCR'd the book put it. Measured on one 1962 scan whose font is not even embedded: every line's box starts 2pt below the ink and descenders fall 4pt outside it. Nothing detects this, and `marks` reports `word` because a text layer is present |
+| Scanned page with **no** text layer | The sentence gets its paragraph's box; words get nothing rather than a box covering the paragraph. `marks` is `paragraph` and the reader says so rather than advertising word highlighting it cannot deliver |
 | Two-column page | Columns are detected and cropped to; rects follow the reading order |
 | Drop cap | Its oversized glyph sits below the row it opens, so a word or two near it can read as out of order — about 0.1% of placements |
 | Cue spanning a page break | Rects on both pages; following along scrolls to the first |
