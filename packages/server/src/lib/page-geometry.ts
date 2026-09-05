@@ -3,6 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 
 import { env } from "../env.ts";
+import { describeError } from "./errors.ts";
 import type { MarkerSource } from "./marker-sources.ts";
 
 const GEOMETRY_SCRIPT = scriptPath("page_geometry.py");
@@ -28,8 +29,13 @@ export type GeometryPage = {
   lines: GeometryLine[];
 };
 
-// Splits pdftext lines that merged two printed rows; older sidecars are regenerated
-export type SourceGeometry = { version: 3; pages: GeometryPage[] };
+// 3 split pdftext lines that merged two printed rows; 4 grows a line box down to the ink so
+// descenders sit inside it. An older sidecar is still served — its boxes are short, not wrong —
+// while a current one is written behind it, so nobody waits out a re-extraction to read a page.
+const CURRENT_VERSION = 4;
+const OLDEST_USABLE_VERSION = 3;
+
+export type SourceGeometry = { version: number; pages: GeometryPage[] };
 
 export type PageLayout = { content: Rect; columns: Rect[] };
 
@@ -51,15 +57,27 @@ const running = new Map<string, Promise<void>>();
 export async function ensureSourceGeometry(source: MarkerSource): Promise<SourceGeometry | null> {
   const target = geometryPath(source);
   const existing = await readGeometry(target);
-  if (existing) return existing;
+  if (existing) {
+    if (existing.version < CURRENT_VERSION) {
+      void regenerate(source, target).catch((error: unknown) => {
+        console.error(`Page geometry for ${source.filename}: ${describeError(error)}`);
+      });
+    }
+    return existing;
+  }
 
+  await regenerate(source, target);
+  return readGeometry(target);
+}
+
+// One run per sidecar however many readers ask for it at once
+function regenerate(source: MarkerSource, target: string): Promise<void> {
   let run = running.get(target);
   if (!run) {
     run = generate(source.pdfPath, target).finally(() => running.delete(target));
     running.set(target, run);
   }
-  await run;
-  return readGeometry(target);
+  return run;
 }
 
 // A sidecar runs to 14 MB on a 700-page book, and every reader request wants one. Parsing that
@@ -75,7 +93,7 @@ async function readGeometry(target: string): Promise<SourceGeometry | null> {
     if (cached?.mtimeMs === mtimeMs) return cached.geometry;
 
     const geometry = JSON.parse(await readFile(target, "utf-8")) as SourceGeometry;
-    if (geometry?.version !== 3 || !Array.isArray(geometry.pages)) return null;
+    if (!(geometry?.version >= OLDEST_USABLE_VERSION) || !Array.isArray(geometry.pages)) return null;
     parsed.set(target, { mtimeMs, geometry });
     return geometry;
   } catch {

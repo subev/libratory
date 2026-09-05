@@ -39,6 +39,28 @@ def split_rows(chars, line_width):
     return rows
 
 
+def ink_boxes(pdf_page, page):
+    """Top and bottom of each character's ink, in the frame pdftext reports its own boxes in.
+
+    pdfium's per-character box runs baseline to ascender in some fonts, which leaves every
+    descender outside the line and a highlight that clips p, y and g. A rotated page is left
+    alone rather than turned a second way from the one pdftext already turned it."""
+    if page["rotation"] != 0:
+        return {}
+
+    y_bottom = page["bbox"][1]
+    height = page["height"]
+    textpage = pdf_page.get_textpage()
+
+    boxes = {}
+    for i in range(textpage.count_chars()):
+        x0, y0, x1, y1 = textpage.get_charbox(i)
+        if x0 == x1 or y0 == y1:
+            continue
+        boxes[i] = (height - (max(y0, y1) - y_bottom), height - (min(y0, y1) - y_bottom))
+    return boxes
+
+
 def row_geometry(chars):
     """Row box, text, and one x edge per character — an exact rect for any character range."""
     text = "".join(char["char"] for char in chars)
@@ -53,7 +75,7 @@ def row_geometry(chars):
     return {"b": rounded(box), "t": text, "xs": edges}
 
 
-def line_geometry(line):
+def line_geometry(line, ink):
     chars = [char for span in line["spans"] for char in (span.get("chars") or [])]
     while chars and chars[-1]["char"] in "\r\n":
         chars.pop()
@@ -61,6 +83,14 @@ def line_geometry(line):
     if not chars:
         text = "".join(span["text"] for span in line["spans"]).rstrip("\r\n")
         return [{"b": rounded(line["bbox"]), "t": text}] if text else []
+
+    # Only the height grows to the ink; the x edges are advances, which is what a character range
+    # is measured along, and what splitting a merged row reads.
+    for char in chars:
+        reach = ink.get(char["char_idx"])
+        if reach:
+            x0, y0, x1, y1 = char["bbox"]
+            char["bbox"] = [x0, min(y0, reach[0]), x1, max(y1, reach[1])]
 
     width = line["bbox"][2] - line["bbox"][0]
     return [row_geometry(row) for row in split_rows(chars, width) if row]
@@ -87,10 +117,11 @@ def main():
         # PDF boxes are origin bottom-left; report the crop offset in the top-left frame
         offset = [round(crop[0] - media[0], 1), round(media[3] - crop[3], 1)]
 
+        ink = ink_boxes(pdf_page, page)
         lines = []
         for block in page["blocks"]:
             for line in block["lines"]:
-                lines.extend(line_geometry(line))
+                lines.extend(line_geometry(line, ink))
 
         out.append({
             "i": index,
@@ -103,7 +134,7 @@ def main():
 
     doc.close()
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-    payload = json.dumps({"version": 3, "pages": out}, ensure_ascii=False)
+    payload = json.dumps({"version": 4, "pages": out}, ensure_ascii=False)
     payload = SURROGATE.sub(lambda m: f"\\u{ord(m.group()):04x}", payload)
     partial = args.out + ".partial"
     with open(partial, "w", encoding="utf-8") as f:
