@@ -12,7 +12,6 @@ node_modules
 # packages/server keeps its whole library there, and COPY . . would bake it into the image.
 data
 **/data
-storyteller
 .env
 .models-missing
 e2e/test-results

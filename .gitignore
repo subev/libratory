@@ -12,8 +12,6 @@ data/
 .DS_Store
 __pycache__/
 .claude/
-storyteller/STORYTELLER_SECRET_KEY.txt
-storyteller/ADMIN_CREDENTIALS.txt
 
 *.mov
 
