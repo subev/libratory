@@ -58,8 +58,11 @@ export async function ensureSourceGeometry(source: MarkerSource): Promise<Source
   const target = geometryPath(source);
   const existing = await readGeometry(target);
   if (existing) {
-    if (existing.version < CURRENT_VERSION) {
+    // An upgrade that cannot succeed — the source PDF moved, the Python environment is gone — must
+    // not be attempted again on every request. The old sidecar still reads, so nothing else says stop.
+    if (existing.version < CURRENT_VERSION && !unupgradable.has(target)) {
       void regenerate(source, target).catch((error: unknown) => {
+        unupgradable.add(target);
         console.error(`Page geometry for ${source.filename}: ${describeError(error)}`);
       });
     }
@@ -69,6 +72,8 @@ export async function ensureSourceGeometry(source: MarkerSource): Promise<Source
   await regenerate(source, target);
   return readGeometry(target);
 }
+
+const unupgradable = new Set<string>();
 
 // One run per sidecar however many readers ask for it at once
 function regenerate(source: MarkerSource, target: string): Promise<void> {

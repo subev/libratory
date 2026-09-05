@@ -128,20 +128,26 @@ async function pageOffsets(sources: MarkerSource[]): Promise<Map<number | null, 
 
 // Read off the pages themselves rather than off the rects that came back: a chapter whose engine
 // never timed a word has no word rects to count, and its print is no less markable for it.
+//
+// Not knowing is not the same as knowing there is nothing to mark. Geometry that failed to build,
+// and a chapter that never landed on a page, both leave nothing to read — and the reader states
+// this to someone as a fact about their book, so it says nothing rather than the wrong thing.
 export function printMarks(
-  pages: GeometryPage[],
+  pages: GeometryPage[] | null,
   chapter: Pick<Chapter, "pageStart" | "pageEnd">,
 ): ReaderCues["marks"] {
-  const first = chapter.pageStart ?? 1;
-  const last = chapter.pageEnd ?? first;
-  return pages.slice(first - 1, last).some((page) => page.lines.length > 0) ? "word" : "paragraph";
+  if (!pages || chapter.pageStart === null) return undefined;
+  const last = chapter.pageEnd ?? chapter.pageStart;
+  return pages.slice(chapter.pageStart - 1, last).some((page) => page.lines.length > 0)
+    ? "word"
+    : "paragraph";
 }
 
 type ResolvedRects = { rects: CueRect[]; words: CueRect[][] | null };
 type Resolved = { perCue: ResolvedRects[]; marks: ReaderCues["marks"] };
 
 async function resolveRects(chapter: Chapter, cues: Cue[]): Promise<Resolved> {
-  const empty: Resolved = { perCue: cues.map(() => ({ rects: [], words: null })), marks: "word" };
+  const empty: Resolved = { perCue: cues.map(() => ({ rects: [], words: null })), marks: undefined };
   if (chapterMode(chapter).mode === "text" || !chapter.cleanText) return empty;
 
   const [book] = await db.select().from(books).where(eq(books.id, chapter.bookId));
@@ -167,7 +173,7 @@ async function resolveRects(chapter: Chapter, cues: Cue[]): Promise<Resolved> {
   };
 
   const ranges = locateChunks(cleanText, cues.map((cue) => cue.text));
-  const marks = printMarks(geometry?.pages ?? [], chapter);
+  const marks = printMarks(geometry?.pages ?? null, chapter);
 
   const perCue = cues.map((cue, i) => {
     const range = ranges[i];

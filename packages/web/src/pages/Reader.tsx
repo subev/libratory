@@ -348,7 +348,9 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
       {unmarkedPrint && (
         <p className={NOTE_BANNER} data-testid="reader-unmarked-print">
           These pages carry no text layer, so the narration can't be lined up with them word by word —
-          the highlight covers a whole paragraph. Text view marks every word.
+          the highlight covers a whole paragraph.
+          {/* Only the engines that timed words can offer the reader a better view to switch to */}
+          {cues?.granularity === "word" && " Text view marks every word."}
         </p>
       )}
 

@@ -161,8 +161,7 @@ export function ExtractModal({
               Set this when the pages are images. Whatever text layer the file carries is discarded and the pages
               are read afresh — a phone photo printed to PDF brings its print headers along, and those are enough
               to look like text. Much slower; the original PDF is untouched. Pages with no text layer can't be
-              lined up with the voice word by word, so read-along marks a paragraph at a time; Text view still
-              marks every word.
+              lined up with the voice word by word, so read-along marks a paragraph at a time on the page.
             </span>
           </label>
 

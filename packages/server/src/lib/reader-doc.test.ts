@@ -66,4 +66,12 @@ describe("printMarks", () => {
   it("takes a chapter with no end for a single page", () => {
     expect(printMarks([printed(0), printed(4)], { pageStart: 2, pageEnd: null })).toBe("word");
   });
+
+  it("says nothing at all when the geometry never built", () => {
+    expect(printMarks(null, { pageStart: 1, pageEnd: 2 })).toBeUndefined();
+  });
+
+  it("says nothing about a chapter that never landed on a page", () => {
+    expect(printMarks([printed(0)], { pageStart: null, pageEnd: null })).toBeUndefined();
+  });
 });
