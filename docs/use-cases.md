@@ -72,7 +72,7 @@ in-scope books; digest book contains one suspended chapter per source with a sav
 ## UC6 — Documents out & read-along (video 4)
 
 1. Export selected chapters as PDF or EPUB — for the original or any variant lane.
-2. Synced EPUB: text + narration + timing map; in a media-overlay reader (Storyteller) each
+2. Synced EPUB: text + narration + timing map; in a media-overlay reader each
    sentence highlights as it is spoken.
 
 Assert: export job produces a document file; synced EPUB contains audio + a media-overlay

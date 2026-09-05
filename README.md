@@ -82,8 +82,6 @@ Library organization around it: nested folders with drag & drop, cross-folder se
 
 **Export** selected chapters as PDF or EPUB (Vivliostyle), or as a **synced EPUB** — EPUB 3 with Media Overlays: embedded audio plus sentence-level highlighted text, valid per epubcheck.
 
-**On an iPhone**: a self-hosted [Storyteller](https://storyteller-platform.dev/) companion (see `storyteller/`) auto-imports synced EPUBs, and the free Storyteller Reader app downloads them for fully offline listening with live text highlighting.
-
 </details>
 
 <details>
@@ -140,7 +138,7 @@ An Apple Silicon Mac, or a Linux machine (x86_64 or arm64, CPU is enough), or Wi
 
 - **Mac**: [Homebrew](https://brew.sh), then: `brew install ffmpeg poppler espeak-ng python@3.12 node pnpm` — for running from source, which spawns `ffmpeg` and `pdftotext` off your `PATH`. The packaged app carries its own copies and needs none of this.
 - **Linux (from source)**: `ffmpeg espeak-ng poppler-utils zip unzip python3.12 node pnpm` from your package manager — `pnpm run setup` names whatever is missing. Or skip all of it and run the Docker image.
-- Docker — [OrbStack](https://orbstack.dev/) or Docker Desktop on a Mac, Docker Engine on Linux (Postgres, and optionally Storyteller). The desktop app will require it too.
+- Docker — [OrbStack](https://orbstack.dev/) or Docker Desktop on a Mac, Docker Engine on Linux (Postgres). The desktop app will require it too.
 - Optional: an AI model for translation, rewrites, cleanup, digests, Ask AI, chat, and LLM chapter detection — [Ollama](https://ollama.com) or LM Studio running locally (auto-discovered, fully offline), or a [DeepSeek](https://platform.deepseek.com/) / OpenAI / Anthropic / Gemini API key.
 - Optional: a [Cartesia](https://cartesia.ai) or [ElevenLabs](https://elevenlabs.io) API key for their cloud voices.
 - Optional: a [HuggingFace](https://huggingface.co) account for Pocket TTS **voice cloning** — accept the terms at [kyutai/pocket-tts](https://huggingface.co/kyutai/pocket-tts) and put a read token in `HF_TOKEN`. The 26 built-in Pocket TTS voices need no account and no token.
@@ -173,19 +171,6 @@ Nothing in the image is Linux-specific, so the same two commands are also the Wi
 The port is published on **127.0.0.1 deliberately**: there is no login, so anyone who can reach it can read and delete everything. Postgres is bound the same way, and for the same reason — its password is the default `libratory`. To serve your LAN, replace the mapping in a `docker-compose.override.yml` (`ports: !override ["3034:3034"]` — Compose *appends* a plain `ports` entry, and the second binding then fails on the port the first already holds) — and know who is on that network — or front it with a reverse proxy or Tailscale.
 
 The server tells browsers apart from strangers by matching their `Origin` against the Host they asked for. Reaching it by address — `http://192.168.1.50:3034`, `http://100.x.y.z:3034` — needs no configuration. Reaching it by *name* does: set `TRUSTED_HOSTS=library.example.com` (comma-separated, `host:port` when it is not the default port), because a name that vouches for itself is exactly what a DNS-rebinding page sends. A reverse proxy must also forward the original `Host` header (nginx: `proxy_set_header Host $host;` — Caddy already does), or every browser POST looks foreign and gets rejected.
-
-</details>
-
-<details>
-<summary><b>Optional: Storyteller companion (read-along on a phone)</b></summary>
-
-```bash
-cd storyteller
-openssl rand -base64 32 > STORYTELLER_SECRET_KEY.txt
-docker compose up -d          # web UI + API on http://localhost:8001
-```
-
-Create the admin account at `http://localhost:8001`, then set `READALOUD_DROP_DIR=<repo>/storyteller/data/import` in `.env` — the "Copy to Storyteller import folder" checkbox on synced-EPUB exports will drop files there and Storyteller auto-imports them. Install the free **Storyteller Reader** iOS/Android app and point it at your Mac's LAN address on port 8001.
 
 </details>
 
@@ -267,7 +252,7 @@ During synthesis the server keeps a text↔audio timing map (`chNNN.sync.json`) 
 
 ### Project structure
 
-pnpm monorepo: `packages/server` (Fastify + tRPC + Graphile Worker + Drizzle/Postgres, port 3034) and `packages/web` (React 19 + Vite + Tailwind v4 + react-router 7, port 3033). Python TTS/extraction scripts live in `scripts/`; the optional Storyteller companion in `storyteller/`; `get/` is the small Cloudflare Pages project behind the download link.
+pnpm monorepo: `packages/server` (Fastify + tRPC + Graphile Worker + Drizzle/Postgres, port 3034) and `packages/web` (React 19 + Vite + Tailwind v4 + react-router 7, port 3033). Python TTS/extraction scripts live in `scripts/`; `get/` is the small Cloudflare Pages project behind the download link.
 
 **The detailed, maintained map of files, tables, routes, and pipeline internals is in [AGENTS.md](AGENTS.md)** — this README stays intentionally high-level.
 

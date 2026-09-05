@@ -13,12 +13,10 @@ export function pendingExportLabel(pending: { running: boolean; waiting: boolean
   return pending.waiting ? "waiting for chapters" : pending.running ? "rendering" : "queued";
 }
 
-// A queued export carries its own copy setting, which the checkbox no longer speaks for
 export function pendingExportSummary(
-  pending: { format: DocumentFormat; running: boolean; waiting: boolean; copyToDropDir: boolean },
+  pending: { format: DocumentFormat; running: boolean; waiting: boolean },
 ): string {
-  const copy = pending.format === "epub-sync" && pending.copyToDropDir ? " + copy to import folder" : "";
-  return `${documentFormatLabel(pending.format)} ${pendingExportLabel(pending)}${copy}`;
+  return `${documentFormatLabel(pending.format)} ${pendingExportLabel(pending)}`;
 }
 
 export function formatOutputDate(date: string | Date): string {

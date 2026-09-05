@@ -158,8 +158,6 @@ export function BookDetail() {
     },
   });
   const deleteDocumentMutation = trpc.books.deleteDocument.useMutation({ onSuccess: invalidate });
-  const { data: exportConfig } = trpc.books.exportConfig.useQuery();
-  const [copyToImport, setCopyToImport] = useState(true);
   const [waitForAll, setWaitForAll] = useState(true);
 
   // Chapter mutations
@@ -458,13 +456,13 @@ export function BookDetail() {
   const pendingSync = pendingExportFor("epub-sync");
   const syncExportTooltip =
     pendingSync?.running ? "Synced EPUB export is rendering"
-      : pendingSync ? `Synced EPUB export ${pendingExportLabel(pendingSync)}${pendingSync.copyToDropDir ? ", will copy to the import folder" : ", will NOT copy to the import folder"} — click again to replace it with the settings above`
+      : pendingSync ? `Synced EPUB export ${pendingExportLabel(pendingSync)} — click again to replace it with the settings above`
       : deferOutputs
       ? `Queue the export now — it runs once the ${selectedInFlight} chapter(s) still synthesizing are finished`
       : selectedSyncExportable === 0
       ? `No selected chapters have finished${activeVariant ? ` ${activeLabel}` : ""} audio`
       : isAssembling ? "Wait for the current assembly to finish"
-      : "EPUB with read-along narration — audio plus highlighted text, for Storyteller and other readers that support EPUB media overlays";
+      : "EPUB with read-along narration — audio plus highlighted text, for readers that support EPUB media overlays";
 
   const langSuffix = activeVariant ? ` · ${activeLabel}` : "";
 
@@ -702,9 +700,6 @@ export function BookDetail() {
         language: activeVariant ?? undefined,
         format: pickedExport,
         waitForAll: waitForAll && inFlightFor(pickedExport) > 0,
-        ...(pickedExport === "epub-sync"
-          ? { copyToDropDir: !!exportConfig?.readaloudDropDir && copyToImport }
-          : {}),
       });
     }
     setExportOpen(false);
@@ -1203,11 +1198,6 @@ export function BookDetail() {
             waitForAll,
             onChange: setWaitForAll,
           }}
-          dropDir={
-            exportConfig?.readaloudDropDir
-              ? { path: exportConfig.readaloudDropDir, checked: copyToImport, onChange: setCopyToImport }
-              : null
-          }
           busy={exportDocumentMutation.isPending || assembleMutation.isPending || assembleVariantMutation.isPending}
           onConfirm={runExport}
           onClose={() => setExportOpen(false)}

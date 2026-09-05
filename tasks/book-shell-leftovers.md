@@ -17,8 +17,6 @@ nothing behind them yet. None of them blocked the branch; all of them are cheap 
 - **Per-lane duration in the variant menu** (`71 chapters · 18h 42m`). `variants.list` returns
   `{key, kind, label, total, done}` — no duration, and no per-lane *running* flag, so the design's
   working dot cannot be drawn either.
-- **An `in the reader` badge on a synced EPUB.** `copyToDropDir` lives in the job payload and survives
-  only as a log line; nothing durable records that a document was copied to the drop dir.
 - **`Added as chapter 72`.** `notes` has no back-reference to the chapter `notes.toChapter` creates;
   today's confirmation is client-only and lost on remount.
 - **A drop zone on the Source files tab.** `BookFilesSection` has an `AddFilesButton` with a hidden

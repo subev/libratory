@@ -25,7 +25,6 @@ export function ExportModal({
   onChange,
   scopeSummary,
   timing,
-  dropDir,
   busy,
   onConfirm,
   onClose,
@@ -42,7 +41,6 @@ export function ExportModal({
     waitForAll: boolean;
     onChange: (waitForAll: boolean) => void;
   };
-  dropDir: { path: string; checked: boolean; onChange: (next: boolean) => void } | null;
   busy: boolean;
   onConfirm: () => void;
   onClose: () => void;
@@ -127,16 +125,6 @@ export function ExportModal({
               Queue it — it runs by itself once all {timing.totalCount} finish
             </label>
           </div>
-        )}
-
-        {dropDir && value === "epub-sync" && (
-          <label
-            className="flex items-center gap-2 text-xs text-(--text-muted) cursor-pointer hover:text-(--text-secondary)"
-            title={`Copies the synced EPUB to ${dropDir.path} so Storyteller picks it up automatically (READALOUD_DROP_DIR in .env)`}
-          >
-            <input type="checkbox" checked={dropDir.checked} onChange={(e) => dropDir.onChange(e.target.checked)} className="rounded" data-testid="copy-to-import" />
-            Copy to Storyteller import folder
-          </label>
         )}
       </div>
 

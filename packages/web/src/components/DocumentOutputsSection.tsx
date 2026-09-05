@@ -19,7 +19,6 @@ export type PendingExport = {
   language: string | null;
   running: boolean;
   waiting: boolean;
-  copyToDropDir: boolean;
 };
 
 // Split by what the file is for rather than by extension: a synced EPUB and a plain one share a

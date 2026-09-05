@@ -1012,17 +1012,11 @@ export const booksRouter = router({
       return reloadBook(input.id);
     }),
 
-  // Lets the client show where "copy to import folder" would land; null = not configured
-  exportConfig: publicProcedure.query(() => ({
-    readaloudDropDir: env.READALOUD_DROP_DIR ?? null,
-  })),
-
   exportDocument: publicProcedure
     .input(z.object({
       id: z.string().uuid(),
       language: z.string().min(1).optional(),
       format: z.enum(["pdf", "epub", "epub-sync"]),
-      copyToDropDir: z.boolean().optional(),
       waitForAll: z.boolean().optional(),
     }))
     .mutation(async ({ input }) => {
@@ -1099,7 +1093,6 @@ export const booksRouter = router({
           bookId: input.id,
           language: input.language,
           format: input.format,
-          copyToDropDir: input.copyToDropDir,
           waitForAll: input.waitForAll,
         },
         { maxAttempts: 1, jobKey: documentJobKey(input.id, input.format, input.language), jobKeyMode: "replace" },
@@ -1112,8 +1105,7 @@ export const booksRouter = router({
     .query(async ({ input }) => {
       const rows = (await db.execute(sql`
         SELECT j.payload->>'format' AS format, j.payload->>'language' AS language,
-               j.locked_at IS NOT NULL AS running, j.run_at > now() AS waiting,
-               COALESCE((j.payload->>'copyToDropDir')::boolean, false) AS copy_to_drop_dir
+               j.locked_at IS NOT NULL AS running, j.run_at > now() AS waiting
         FROM graphile_worker._private_jobs j
         JOIN graphile_worker._private_tasks t ON t.id = j.task_id
         WHERE t.identifier = 'assembleDocument' AND j.payload->>'bookId' = ${input.bookId}
@@ -1122,9 +1114,8 @@ export const booksRouter = router({
         language: string | null;
         running: boolean;
         waiting: boolean;
-        copy_to_drop_dir: boolean;
       }>;
-      return rows.map(({ copy_to_drop_dir, ...row }) => ({ ...row, copyToDropDir: copy_to_drop_dir }));
+      return rows;
     }),
 
   documents: publicProcedure

@@ -12,15 +12,13 @@ import { buildReadaloudEpub, type ReadaloudChapter } from "../lib/readaloud-epub
 import { buildP2afLayer } from "../lib/p2af.ts";
 import { deferUntilInputsSettle, documentJobKey } from "../lib/output-readiness.ts";
 import type { WorkerUtils } from "graphile-worker";
-import { mkdir, writeFile, unlink, rm, copyFile, readdir } from "node:fs/promises";
+import { mkdir, writeFile, rm } from "node:fs/promises";
 import path from "node:path";
-import { env } from "../env.ts";
 
 export type AssembleDocumentPayload = {
   bookId: string;
   language?: string;
   format: "pdf" | "epub" | "epub-sync";
-  copyToDropDir?: boolean;
   waitForAll?: boolean;
   waitingSince?: string;
 };
@@ -54,7 +52,7 @@ export async function assembleDocument(
     if (!book) throw new Error(`Book ${bookId} not found`);
 
     if (format === "epub-sync") {
-      await assembleReadaloud(bookId, book, language ?? null, payload.copyToDropDir ?? false, log);
+      await assembleReadaloud(bookId, book, language ?? null, log);
       await db.update(books).set({ status: "done", error: null, updatedAt: new Date() }).where(eq(books.id, bookId));
       await log("Synced EPUB export complete");
       return;
@@ -177,7 +175,6 @@ async function assembleReadaloud(
   bookId: string,
   book: typeof books.$inferSelect,
   language: string | null,
-  copyToDropDir: boolean,
   log: (msg: string) => Promise<void>,
 ) {
   type Candidate = { id: string; index: number; title: string; audioPath: string | null; durationMs: number | null; chunkDir: string };
@@ -296,27 +293,6 @@ async function assembleReadaloud(
     chapterSummary: buildChapterSummary(readaloudChapters.map((ch) => ch.index)),
     chapterIds: JSON.stringify(includedIds),
   });
-
-  if (copyToDropDir && env.READALOUD_DROP_DIR) {
-    try {
-      await mkdir(env.READALOUD_DROP_DIR, { recursive: true });
-      // Storyteller's watch folder skips the entire directory while it holds more than one
-      // read-along EPUB ("multiple epubs of the same kind"), so a re-export has to replace
-      // its predecessor rather than pile up beside it — otherwise nothing imports again.
-      const superseded = `${sanitizeFilename(book.title)}${suffix}_readaloud_`;
-      const keep = path.basename(outputPath);
-      for (const name of await readdir(env.READALOUD_DROP_DIR)) {
-        if (name !== keep && name.startsWith(superseded) && name.endsWith(".epub")) {
-          await unlink(path.join(env.READALOUD_DROP_DIR, name)).catch(() => {});
-          await log(`Removed superseded staged export ${name} from the import folder`);
-        }
-      }
-      await copyFile(outputPath, path.join(env.READALOUD_DROP_DIR, keep));
-      await log(`Copied synced EPUB to import folder (${env.READALOUD_DROP_DIR})`);
-    } catch (err) {
-      await log(`Could not copy to import folder: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
 }
 
 function sanitizeFilename(name: string): string {
