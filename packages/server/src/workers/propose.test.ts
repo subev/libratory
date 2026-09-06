@@ -88,8 +88,9 @@ describe("propose worker", () => {
     const bookId = await insertBook(db);
     await db.update(books).set({ translationLanguage: "English" }).where(eq(books.id, bookId));
     mockCollectBlocks.mockResolvedValue(blocks);
-    mockLlm.mockResolvedValue(
-      new Map([
+    const toc = [{ fileIndex: null, pages: [1], entries: [{ title: "Глава 1", page: 3, level: 0 }], chapterEntries: 1, offsets: "+7" }];
+    mockLlm.mockResolvedValue({
+      selected: new Map([
         [
           null,
           [
@@ -97,8 +98,9 @@ describe("propose worker", () => {
             { blockIndex: 2, title: null, titleTranslated: null },
           ],
         ],
-      ])
-    );
+      ]),
+      toc,
+    });
 
     await propose({ bookId, method: "llm" });
 
@@ -107,6 +109,7 @@ describe("propose worker", () => {
     const book = row(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.chapterProposal?.status).toBe("done");
     expect(book.chapterProposal?.detection).toBe("llm");
+    expect(book.chapterProposal?.toc).toEqual(toc);
     expect(book.chapterProposal?.boundaries).toEqual([
       { fileIndex: null, blockIndex: 0, title: "Глава 1", titleTranslated: "Chapter 1: One", page: 10 },
       { fileIndex: null, blockIndex: 2, title: "Chapter 3 Three", page: 30 },

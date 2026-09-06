@@ -1,5 +1,5 @@
 import { db } from "../db.ts";
-import { books, type ChapterProposal, type ChapterProposalBoundary } from "../schema.ts";
+import { books, type ChapterProposal, type ChapterProposalBoundary, type ChapterProposalToc } from "../schema.ts";
 import { eq } from "drizzle-orm";
 import { collectBlocksFromMarkerOutput, detectBoundaryIndices, type FlatBlock } from "../lib/marker.ts";
 import { detectChaptersWithLlm } from "../lib/toc-detect.ts";
@@ -24,6 +24,7 @@ export async function propose(payload: ProposePayload) {
     const sources = await listMarkerSources(book);
     const boundaries: ChapterProposalBoundary[] = [];
     let detection: ChapterProposal["detection"];
+    let toc: ChapterProposalToc[] = [];
 
     if (method === "llm") {
       const files: { fileIndex: number | null; blocks: FlatBlock[]; pdfPath?: string }[] = [];
@@ -34,14 +35,15 @@ export async function propose(payload: ProposePayload) {
           pdfPath: source.pdfPath,
         });
       }
-      const selected = await detectChaptersWithLlm(files, log, {
+      const llm = await detectChaptersWithLlm(files, log, {
         translateTo: book.translationLanguage ?? undefined,
         model: book.chapterModel ?? undefined,
       });
-      if (selected) {
+      if (llm) {
         detection = "llm";
+        toc = llm.toc;
         for (const { fileIndex, blocks } of files) {
-          for (const s of selected.get(fileIndex) ?? []) {
+          for (const s of llm.selected.get(fileIndex) ?? []) {
             const block = blocks[s.blockIndex];
             if (!block) continue;
             boundaries.push({
@@ -76,7 +78,7 @@ export async function propose(payload: ProposePayload) {
     await log(`Proposal ready: ${boundaries.length} chapter boundar${boundaries.length === 1 ? "y" : "ies"} (${method})`);
     await db
       .update(books)
-      .set({ chapterProposal: { status: "done", method, detection, boundaries, createdAt }, updatedAt: new Date() })
+      .set({ chapterProposal: { status: "done", method, detection, boundaries, createdAt, ...(toc.length > 0 ? { toc } : {}) }, updatedAt: new Date() })
       .where(eq(books.id, bookId));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

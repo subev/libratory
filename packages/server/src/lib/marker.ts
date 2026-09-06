@@ -7,6 +7,7 @@ import os from "node:os";
 import { env } from "../env.ts";
 import { describeError } from "./errors.ts";
 import { detectChaptersWithLlm } from "./toc-detect.ts";
+import { PREFACE_MIN_WORDS } from "./chapter-rules.ts";
 import { readCapabilities } from "./model-bundles.ts";
 
 const CONDA_BIN = env.CONDA_ENV_PATH;
@@ -287,7 +288,7 @@ export function sliceChaptersAtIndices(
   const prefaceBlocks = allBlocks.slice(0, sorted[0]);
   if (prefaceBlocks.length > 0) {
     const ch = chapterFromBlocks("Preface", prefaceBlocks);
-    if (ch.text.trim().split(/\s+/).length > 50) {
+    if (ch.text.trim().split(/\s+/).length > PREFACE_MIN_WORDS) {
       chapters.unshift(ch);
     }
   }
@@ -534,8 +535,8 @@ async function detectChaptersFromMarkerJsonPath(markerJsonPath: string, pdfPath:
 
   if (options.llmChapterDetection) {
     try {
-      const selected = await detectChaptersWithLlm([{ fileIndex: null, blocks: allBlocks, pdfPath }], log, { model: options.chapterModel });
-      const selections = selected?.get(null) ?? [];
+      const detection = await detectChaptersWithLlm([{ fileIndex: null, blocks: allBlocks, pdfPath }], log, { model: options.chapterModel });
+      const selections = detection?.selected.get(null) ?? [];
       if (selections.length >= 2) {
         const titles = new Map(selections.filter((s) => s.title).map((s) => [s.blockIndex, s.title!]));
         const chapters = sliceChaptersAtIndices(allBlocks, selections.map((s) => s.blockIndex), titles);

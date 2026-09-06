@@ -13,6 +13,7 @@ import { appendLog } from "../lib/log.ts";
 import { parseTtsVoice } from "../lib/tts.ts";
 import { collectBlocksFromMarkerOutput, sliceChaptersAtIndices, type ExtractedChapter } from "../lib/marker.ts";
 import { listMarkerSources } from "../lib/marker-sources.ts";
+import { cumulativeWords } from "../lib/toc-anchor.ts";
 import { abortExtract } from "../lib/extract-registry.ts";
 import { measureBookDiskUsage, measureDirs, removeDirs, bookTotalSizeCached, fileSize } from "../lib/disk-usage.ts";
 import { chapterChunkPreviewDir } from "../lib/chunk-previews.ts";
@@ -773,8 +774,8 @@ export const booksRouter = router({
             .map((c) => `${c.pageStart}|${c.title}`)
         );
 
+        const cum = cumulativeWords(allBlocks);
         const headings = [];
-        let cumWords = 0;
         for (const [i, b] of allBlocks.entries()) {
           if (b.included && b.type === "SectionHeader") {
             headings.push({
@@ -782,18 +783,17 @@ export const booksRouter = router({
               page: b.page,
               level: b.level ?? null,
               text: b.text,
-              wordsBefore: cumWords,
+              wordsBefore: cum.before[i] ?? 0,
               isChapterStart: currentStarts.has(`${b.page}|${b.text}`),
             });
           }
-          if (b.included) cumWords += b.text.split(/\s+/).filter(Boolean).length;
         }
 
         files.push({
           fileIndex: source.fileIndex,
           filename: source.filename,
           missing: false,
-          totalWords: cumWords,
+          totalWords: cum.total,
           totalPages: allBlocks.length > 0 ? Math.max(...allBlocks.map((b) => b.page)) : 0,
           headings,
         });

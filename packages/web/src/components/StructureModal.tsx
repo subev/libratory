@@ -4,15 +4,8 @@ import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
 import { Modal, ModalHeader } from "./Modal.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { Button } from "./Button.tsx";
-
-type ChapterProposal = {
-  status: "running" | "done" | "failed";
-  method: "llm" | "deterministic";
-  detection?: "llm" | "numbered-headings" | "heading-levels";
-  boundaries?: { fileIndex: number | null; blockIndex: number; title: string; titleTranslated?: string; page: number }[];
-  error?: string;
-  createdAt: string;
-};
+import type { ChapterProposal } from "../../../server/src/schema.ts";
+import { isLabelSized, oversizedIndices, PREFACE_MIN_WORDS } from "../../../server/src/lib/chapter-rules.ts";
 
 type StructureFile = {
   fileIndex: number | null;
@@ -32,6 +25,38 @@ type StructureFile = {
 
 function boundaryKey(fileIndex: number | null, blockIndex: number) {
   return `${fileIndex ?? "legacy"}:${blockIndex}`;
+}
+
+type PreviewChapter = {
+  key: string;
+  title: string;
+  translated: string | undefined;
+  pageStart: number;
+  pageEnd: number;
+  words: number;
+  anomaly?: "long" | "short";
+};
+
+function flagAnomalies(chapters: PreviewChapter[]): PreviewChapter[] {
+  const long = oversizedIndices(chapters.map((c) => c.words));
+  return chapters.map((c, i) => {
+    if (long.has(i)) return { ...c, anomaly: "long" };
+    if (c.key !== "preface" && isLabelSized(c.words, i, chapters.length)) return { ...c, anomaly: "short" };
+    return c;
+  });
+}
+
+function anomalyHint(ch: PreviewChapter): string | undefined {
+  if (ch.anomaly === "long") return "Much longer than the other chapters: a chapter heading inside it is probably unchecked";
+  if (ch.anomaly === "short") return `Only ${ch.words} words: probably a label, a part-title page, or a duplicate heading`;
+  return undefined;
+}
+
+function pageRange(pages: number[]) {
+  if (pages.length === 0) return "?";
+  const min = Math.min(...pages);
+  const max = Math.max(...pages);
+  return min === max ? `p.${min}` : `p.${min}–${max}`;
 }
 
 export function StructureModal({
@@ -170,15 +195,14 @@ export function StructureModal({
     return files?.find((f) => f.index === fileIndex) ?? (files?.length === 1 ? files[0] : undefined);
   }
 
-  // Mirrors the server's >50-word Preface threshold in sliceChaptersAtIndices
-  function previewFor(file: StructureFile) {
+  function previewFor(file: StructureFile): PreviewChapter[] {
     const chosen = file.headings.filter((h) => selected.has(boundaryKey(file.fileIndex, h.blockIndex)));
     if (chosen.length === 0) {
       return [
         { key: "full", title: "Full Text", translated: undefined, pageStart: 1, pageEnd: file.totalPages, words: file.totalWords },
       ];
     }
-    const chapters = chosen.map((h, i) => {
+    const chapters: PreviewChapter[] = chosen.map((h, i) => {
       const next = chosen[i + 1];
       const key = boundaryKey(file.fileIndex, h.blockIndex);
       return {
@@ -191,7 +215,7 @@ export function StructureModal({
       };
     });
     const firstChosen = chosen[0];
-    if (firstChosen && firstChosen.wordsBefore > 50) {
+    if (firstChosen && firstChosen.wordsBefore > PREFACE_MIN_WORDS) {
       chapters.unshift({
         key: "preface",
         title: "Preface",
@@ -201,7 +225,7 @@ export function StructureModal({
         words: firstChosen.wordsBefore,
       });
     }
-    return chapters;
+    return flagAnomalies(chapters);
   }
 
   const selectedCount = selected.size;
@@ -228,6 +252,17 @@ export function StructureModal({
                   Proposal ready: {chapterProposal.boundaries?.length ?? 0} boundaries
                   {chapterProposal.detection ? ` (${chapterProposal.detection})` : ""}
                 </span>
+                {chapterProposal.toc?.map((t) => (
+                  <span
+                    key={t.fileIndex ?? "legacy"}
+                    className="text-(--text-muted) truncate"
+                    title={t.entries.map((e) => `${"  ".repeat(e.level ?? 0)}${e.title}${e.page !== null ? ` · ${e.page}` : ""}`).join("\n")}
+                    data-testid="proposal-toc"
+                  >
+                    ToC on {pageRange(t.pages)}: {t.entries.length} entries, {t.chapterEntries} chapters
+                    {t.offsets ? `, page offset ${t.offsets}` : ""}
+                  </span>
+                ))}
                 <Button
                   variant="primary"
                   size="sm"
@@ -251,6 +286,7 @@ export function StructureModal({
               <>
               {allKeys.length > 0 ? (
                 <label className="flex items-center gap-2 px-2 py-1 mb-1 rounded cursor-pointer text-sm text-(--text-secondary) hover:bg-(--bg-subtle) select-none border-b border-(--border)">
+                  <span className="shrink-0 w-6" />
                   <input
                     ref={toggleAllRef}
                     type="checkbox"
@@ -262,7 +298,11 @@ export function StructureModal({
                   Select all ({allKeys.length})
                 </label>
               ) : null}
-              {structure?.files.map((file) => (
+              {structure?.files.map((file) => {
+                const chapterNumbers = new Map(
+                  previewFor(file).flatMap((ch, i) => (ch.key === "preface" || ch.key === "full" ? [] : [[ch.key, i + 1] as const]))
+                );
+                return (
                 <div key={file.fileIndex ?? "legacy"} className="mb-4">
                   {structure.files.length > 1 || file.missing ? (
                     <h3 className="text-xs font-medium text-(--text-muted) uppercase tracking-wider mb-2">
@@ -280,6 +320,12 @@ export function StructureModal({
                           selected.has(key) ? "bg-(--bg-selected)" : ""
                         }`}
                       >
+                        <span
+                          className="shrink-0 w-6 text-right text-xs font-mono tabular-nums text-(--accent-text)"
+                          data-testid={chapterNumbers.has(String(h.blockIndex)) ? "chapter-number" : undefined}
+                        >
+                          {chapterNumbers.has(String(h.blockIndex)) ? `${chapterNumbers.get(String(h.blockIndex))}.` : ""}
+                        </span>
                         <input
                           type="checkbox"
                           checked={selected.has(key)}
@@ -326,7 +372,8 @@ export function StructureModal({
                     <p className="text-sm text-(--text-muted)">No headings found in this file.</p>
                   ) : null}
                 </div>
-              ))}
+                );
+              })}
               </>
             )}
           </div>
@@ -343,7 +390,12 @@ export function StructureModal({
                     <p className="text-xs text-(--text-faint) mb-1 truncate">{file.filename}</p>
                   ) : null}
                   {previewFor(file).map((ch, i) => (
-                    <div key={ch.key} className="flex items-baseline gap-2 py-0.5 text-sm">
+                    <div
+                      key={ch.key}
+                      className={`flex items-baseline gap-2 py-0.5 px-1 -mx-1 rounded text-sm ${ch.anomaly ? "bg-(--warning-bg)" : ""}`}
+                      title={anomalyHint(ch)}
+                      data-testid={ch.anomaly ? "chapter-anomaly" : undefined}
+                    >
                       <span className="shrink-0 text-xs font-mono text-(--text-faint) w-6 text-right">{i + 1}.</span>
                       <span className="flex-1 min-w-0">
                         <span className="block truncate text-(--text-secondary)" title={ch.title}>
@@ -355,7 +407,7 @@ export function StructureModal({
                           </span>
                         ) : null}
                       </span>
-                      <span className="shrink-0 text-xs text-(--text-muted) tabular-nums">
+                      <span className={`shrink-0 text-xs tabular-nums ${ch.anomaly ? "text-(--warning-text) font-medium" : "text-(--text-muted)"}`}>
                         {pdfFile ? (
                           <button
                             onClick={() => setPdfPreview({ fileId: pdfFile.id, page: ch.pageStart, filename: pdfFile.filename })}

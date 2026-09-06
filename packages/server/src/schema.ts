@@ -20,11 +20,20 @@ export type ChapterProposalBoundary = {
   page: number;
 };
 
+export type ChapterProposalToc = {
+  fileIndex: number | null;
+  pages: number[];
+  entries: { title: string; page: number | null; level: number | null }[];
+  chapterEntries: number;
+  offsets: string | null;
+};
+
 export type ChapterProposal = {
   status: "running" | "done" | "failed";
   method: "llm" | "deterministic";
   detection?: "llm" | "numbered-headings" | "heading-levels";
   boundaries?: ChapterProposalBoundary[];
+  toc?: ChapterProposalToc[];
   error?: string;
   createdAt: string;
 };
