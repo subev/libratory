@@ -12,6 +12,10 @@
 
 ---
 
+![The narration following the printed page: the sentence being spoken is lit, and the word being said is marked inside it](docs/images/read-along.gif)
+
+<p align="center"><i>Frankenstein, narrated by Kokoro — the spoken sentence lit on the book's own page, the spoken word marked inside it.</i></p>
+
 Library and laboratory — which is what the name is and what the thing is: a workbench for the PDFs you already own.
 
 Take a book apart, clean up the OCR, translate or rewrite a chapter, pick a voice, and put it back together as a chapter-marked M4B audiobook — or as a read-along book where the narration is highlighted on the page it was printed on.
@@ -19,18 +23,6 @@ Take a book apart, clean up the OCR, translate or rewrite a chapter, pick a voic
 It runs on your own machine: an Apple Silicon Mac, a Linux box (x86_64 or arm64, CPU is enough), or a single Docker container on a headless server.
 
 **Offline-first, not offline-only.** Every narrator and every AI feature has a local option — the TTS engines run on your own GPU or CPU, and translation, rewrites, cleanup, digests and chat work against Ollama or LM Studio, auto-discovered with no configuration. The cloud is strictly opt-in: add an API key and you can use DeepSeek, OpenAI, Anthropic or Gemini for the AI features, or Cartesia and ElevenLabs for their voices. Add none and, once the models have been downloaded, none of your books or audio ever leaves the machine.
-
-## Intro videos
-
-Short standalone tours, narrated by the app's own synthesized voice — the script is a book inside the app, playing on the right while the demo runs on the left.
-
-| [![The core idea](https://img.youtube.com/vi/OKMiox3nxPY/hq720.jpg)](https://youtu.be/OKMiox3nxPY) | [![Smart features](https://img.youtube.com/vi/GhQW_Ma2qwI/hq720.jpg)](https://youtu.be/GhQW_Ma2qwI) |
-| :--: | :--: |
-| **[1 · The core idea](https://youtu.be/OKMiox3nxPY)**<br>PDF in, chapter-marked audiobook out | **[2 · Smart features](https://youtu.be/GhQW_Ma2qwI)**<br>Ask AI, chat with citations, translate & transform |
-| [![Scaling your library](https://img.youtube.com/vi/g9kX_cNFD6k/hq720.jpg)](https://youtu.be/g9kX_cNFD6k) | [![Documents and read-along](https://img.youtube.com/vi/os3-bJxDhsM/hq720.jpg)](https://youtu.be/os3-bJxDhsM) |
-| **[3 · Scaling your library](https://youtu.be/g9kX_cNFD6k)**<br>Instant indexing, library-wide chat, digests | **[4 · Documents and read-along](https://youtu.be/os3-bJxDhsM)**<br>PDF/EPUB export, synced read-along for your phone |
-| [![Extensions and the road ahead](https://img.youtube.com/vi/fmIiWdthnfg/hq720.jpg)](https://youtu.be/fmIiWdthnfg) | |
-| **[5 · Extensions and the road ahead](https://youtu.be/fmIiWdthnfg)**<br>The JSON API, scripted audiobooks, what's next | |
 
 ## What it does
 
@@ -42,9 +34,15 @@ Short standalone tours, narrated by the app's own synthesized voice — the scri
 - **Library chat** — search the *content* of every book and get answers with citations you can click into the PDF.
 - **Digest books** — pick N books, get one synthetic book with an AI summary chapter per source.
 - **Read along** — narration over the original PDF page, each sentence highlighted where it is printed.
-- **Export** — selected chapters as PDF, EPUB, or a synced EPUB that plays on your phone.
+- **Export** — selected chapters as PDF, EPUB, or a synced EPUB that carries its own audio, for any reader with Media Overlays.
 - **Library organization** — nested folders, drag & drop, cross-folder search, separate profiles per person.
 - **JSON API** — plain endpoints so scripts and other projects can create books straight to audio.
+
+![The library: a folder of classics, a book with 14 chapters and 14 narrated, its outputs and size](docs/images/library.png)
+
+![A book's chapters: page ranges, word counts, per-chapter durations and status, with synthesize, translate, cleanup and export across the selection](docs/images/chapters.png)
+
+Every book is a row you can open, and every chapter inside it is a row you can edit, re-synthesize, translate or exclude on its own.
 
 <details>
 <summary><b>Turning a book into audio, in detail</b></summary>
@@ -232,7 +230,7 @@ Upload → rawExtract (pdftotext, seconds, always)
        → assembleDocument → PDF / EPUB / synced EPUB
 ```
 
-Jobs run through [Graphile Worker](https://github.com/graphile/worker) in six pools (TTS, raw text, extraction, assembly, AI/translation, search indexing) with `maxAttempts: 1` — nothing retries silently; the user reviews failures and decides.
+Jobs run through [Graphile Worker](https://github.com/graphile/worker) in seven pools (TTS, raw text, extraction, prep, assembly, AI/translation, search indexing) with `maxAttempts: 1` — nothing retries silently; the user reviews failures and decides.
 
 <details>
 <summary><b>TTS engines and sync maps</b></summary>
@@ -360,76 +358,11 @@ It is signed with a Developer ID certificate and notarised by Apple, so the down
 
 </details>
 
-<details>
-<summary><b>Uninstall — and where the 27 GB actually lives</b></summary>
+**Uninstalling.** A full install with every model downloaded reaches about **27 GB**, and dragging `Libratory.app` to
+the Trash leaves roughly 26 GB of it behind — models, the Python runtime, and your library in its
+Postgres volume. [docs/uninstall.md](docs/uninstall.md) lists every path with its size, and gives
+three routes: remove the app but keep the library, remove everything, or take a backup instead.
 
-A full install with every model downloaded reaches about **27 GB**, and almost none of it is inside the app bundle — dragging `Libratory.app` to the Trash leaves roughly 26 GB behind. Everything the app installs is listed here so you can remove exactly as much as you mean to.
-
-| What | Where | Size here |
-| --- | --- | --- |
-| The app | `/Applications/Libratory.app` | 451 MB |
-| Python runtime, `uv`, staged scripts, config | `~/Library/Application Support/Libratory/` | 1.5 GB |
-| **Your library** — books, chapters, notes, embeddings | Docker volume `libratory_pgdata17` | 5.2 GB |
-| TTS and embedding models | `~/.cache/huggingface/hub/` (7 repos) | 9.7 GB |
-| Marker's OCR and layout models | `~/Library/Caches/datalab/` | 5.1 GB |
-| KugelAudio 4-bit quant | `~/.cache/libratory-models/` | 4.6 GB |
-| Window state and preferences | `~/Library/Caches/dev.libratory.app/`, `~/Library/Preferences/dev.libratory.app.plist` | 84 KB |
-
-Audio, uploads and exports live under `data/` inside the Application Support directory unless you pointed `dataDir` somewhere else — check `~/Library/Application Support/Libratory/config.json` before deleting anything, because that is where your finished audiobooks are.
-
-### Remove the app, keep the library
-
-Frees about 21 GB and leaves Postgres untouched, so a later reinstall finds every book where it was.
-
-```bash
-# stop the app, then its database container
-pkill -f "Libratory.app/Contents/MacOS" 2>/dev/null
-docker compose -f ~/Library/Application\ Support/Libratory/docker-compose.yml down
-
-rm -rf /Applications/Libratory.app
-rm -rf ~/Library/Application\ Support/Libratory/python \
-       ~/Library/Application\ Support/Libratory/uv
-rm -rf ~/.cache/libratory-models
-rm -rf ~/Library/Caches/datalab
-rm -rf ~/Library/Caches/dev.libratory.app
-rm -f  ~/Library/Preferences/dev.libratory.app.plist
-
-# models — only the seven repos this app downloaded, see the warning below
-cd ~/.cache/huggingface/hub && rm -rf \
-  models--hexgrad--Kokoro-82M \
-  models--BAAI--bge-m3 \
-  models--facebook--mms-tts-bul \
-  models--raditotev--bg-tts-v5-mlx \
-  models--kyutai--pocket-tts \
-  models--kyutai--pocket-tts-without-voice-cloning \
-  models--nineninesix--nemo-nano-codec-22khz-0.6kbps-12.5fps-MLX
-```
-
-> **`~/.cache/huggingface` is shared.** Every Python tool on your machine that touches Hugging Face uses it, so `rm -rf ~/.cache/huggingface` will also delete models that have nothing to do with this app. Remove the seven directories above and nothing else. `~/Library/Caches/datalab` belongs to marker and surya — keep it if you use those elsewhere.
-
-### Remove everything, including the library
-
-**This destroys your books, chapters, notes and embeddings permanently.** Export anything you want to keep first — assembled M4B files and EPUB exports already sit under `data/`, and copying that folder somewhere safe is enough to keep the audio even though the library metadata goes.
-
-```bash
-# everything from the section above, then:
-docker volume rm libratory_pgdata17
-rm -rf ~/Library/Application\ Support/Libratory
-```
-
-If you ever ran an older build, `docker volume ls | grep libratory` will show leftovers such as the pre-2026-08-08 `libratory_pgdata`; they are safe to remove once the current volume is gone.
-
-### Keep a backup instead of deleting
-
-A dump is a few seconds and about a tenth of the volume's size, so there is rarely a reason to delete the library outright rather than park it:
-
-```bash
-pg_dump "postgres://libratory:libratory@localhost:5433/libratory" -Fc -f ~/libratory-backup.dump
-```
-
-Restoring later needs a running container and `pg_restore -d … --no-owner ~/libratory-backup.dump`.
-
-</details>
 
 ## License
 
