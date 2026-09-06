@@ -16,9 +16,9 @@
 
 <p align="center"><i>Frankenstein, narrated by Kokoro — the spoken sentence lit on the book's own page, the spoken word marked inside it.</i></p>
 
-Library and laboratory — which is what the name is and what the thing is: a workbench for the PDFs you already own.
+The name is *library* plus *laboratory*, and that is what it is: a workbench for the PDFs you already own.
 
-Take a book apart, clean up the OCR, translate or rewrite a chapter, pick a voice, and put it back together as a chapter-marked M4B audiobook — or as a read-along book where the narration is highlighted on the page it was printed on.
+Take a book apart, clean up the OCR, translate or rewrite a chapter, pick a voice, and put it back together as an M4B audiobook — the format that carries real chapter markers, so players show the chapters — or as a read-along book where the narration is highlighted on the page it was printed on.
 
 It runs on your own machine: an Apple Silicon Mac, a Linux box (x86_64 or arm64, CPU is enough), or a single Docker container on a headless server.
 
@@ -26,15 +26,15 @@ It runs on your own machine: an Apple Silicon Mac, a Linux box (x86_64 or arm64,
 
 ## What it does
 
-- **PDF → audiobook** — chapter detection, per-chapter synthesis, one M4B with native chapter markers and cover.
-- **Instant uploads** — raw text in seconds; the slow OCR-capable extraction is opt-in.
-- **Per-chapter control** — edit, re-synthesize, exclude, queue, AI-clean the OCR, redraw chapter boundaries.
-- **Translate & rewrite** — per-chapter variants in any configured model, each with its own audio. The original is never overwritten.
+- **PDF → audiobook** — it finds the chapters, narrates each one, and gives you a single M4B with chapter markers and a cover.
+- **Instant uploads** — the text is out in seconds, so you can read, search and ask questions straight away. The slow, thorough pass that can also read scanned pages is optional.
+- **Per-chapter control** — edit, re-narrate, exclude or queue a chapter, have AI tidy up the mistakes scanning left behind, redraw where chapters start and end.
+- **Translate & rewrite** — a chapter at a time, in whichever AI model you have set up, each version with its own audio. The original is never overwritten.
 - **Ask AI & notes** — answers save as notes, and any note can become a chapter of the book.
 - **Library chat** — search the *content* of every book and get answers with citations you can click into the PDF.
-- **Digest books** — pick N books, get one synthetic book with an AI summary chapter per source.
+- **Digest books** — pick a few books, get one new book with an AI summary chapter per source.
 - **Read along** — narration over the original PDF page, each sentence highlighted where it is printed.
-- **Export** — selected chapters as PDF, EPUB, or a synced EPUB that carries its own audio, for any reader with Media Overlays.
+- **Export** — selected chapters as PDF, EPUB, or a synced EPUB: one file holding the text *and* the narration, so a reader that supports it can highlight along as it plays.
 - **Library organization** — nested folders, drag & drop, cross-folder search, separate profiles per person.
 - **JSON API** — plain endpoints so scripts and other projects can create books straight to audio.
 
@@ -47,9 +47,9 @@ Every book is a row you can open, and every chapter inside it is a row you can e
 <details>
 <summary><b>Turning a book into audio, in detail</b></summary>
 
-**Chapter detection** runs deterministic tiers first, with optional LLM TOC detection on top; boundaries can also be drawn by hand. Every upload gets instant `pdftotext` raw text, so a book is browsable in seconds — the slow Marker extraction (OCR-capable) is opt-in and can run later, or never.
+**Chapter detection** tries plain rules first — headings, numbering, the shape of the page — and can then read the book's own table of contents with an AI model if you turn that on. You can also draw the boundaries by hand. Every upload gets instant `pdftotext` raw text, so a book is browsable in seconds — the slow Marker extraction (OCR-capable) is opt-in and can run later, or never.
 
-**Per chapter** you can edit the text, re-synthesize, include or exclude it, suspend and queue it, and run AI cleanup over OCR artifacts. Chapter text falls back `customText ?? cleanText ?? rawText` at synthesis time. Assembly produces a single M4B with native chapter markers and a cover.
+**Per chapter** you can edit the text, re-synthesize, include or exclude it, suspend and queue it, and run AI cleanup over OCR artifacts. When it narrates, it reads your edited text if there is any, then the cleaned-up extraction, then the raw text — whichever exists first. Assembly produces a single M4B with native chapter markers and a cover.
 
 </details>
 
