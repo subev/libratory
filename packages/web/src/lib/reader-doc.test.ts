@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import { bodyFit, cueIndexAt, cuesOfChunk, wordIndexAt, type ReaderCue } from "./reader-doc.ts";
+import { bodyFit, cueIndexAt, cuesOfChunk, rectInCrop, wordIndexAt, type ReaderCue, type ReaderPage } from "./reader-doc.ts";
 
 const cue = (t: [number, number], c = 0, w?: [number, number, string][]): ReaderCue => ({ t, s: "x", c, ...(w ? { w } : {}) });
+
+describe("rectInCrop", () => {
+  const sheet = { i: 9, p: 10, src: 0, w: 842, h: 595, content: [82, 26, 707, 543], columns: [[82, 26, 315, 543], [493, 27, 296, 540]] } as unknown as ReaderPage;
+  const rightColumnRect: [number, number, number, number, number] = [9, 6602, 3000, 1970, 300];
+
+  it("keeps a cue only in the column crop that holds it", () => {
+    expect(rectInCrop(sheet, sheet.columns[1]!, rightColumnRect)).toBe(true);
+    expect(rectInCrop(sheet, sheet.columns[0]!, rightColumnRect)).toBe(false);
+    expect(rectInCrop(sheet, [0, 0, sheet.w, sheet.h], rightColumnRect)).toBe(true);
+  });
+});
 
 describe("bodyFit", () => {
   it("says nothing until the container has been measured", () => {

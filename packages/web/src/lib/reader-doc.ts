@@ -12,6 +12,7 @@ export type {
   Rect,
 } from "../../../server/src/lib/reader-format.ts";
 import type {
+  CueRect,
   ReaderChapter,
   ReaderUnmapped,
   ReaderCue,
@@ -77,6 +78,14 @@ export function cropStyle(page: ReaderPage, crop: Rect, x: number, y: number, wi
     width: `${(((width / 10_000) * page.w) / crop[2]) * 100}%`,
     height: `${(((height / 10_000) * page.h) / crop[3]) * 100}%`,
   };
+}
+
+// A sheet shown as two column crops must paint each cue in the crop that holds it, or the
+// follow-scroll unions the phantom copy in the other column and lands there
+export function rectInCrop(page: ReaderPage, crop: Rect, rect: CueRect): boolean {
+  const cx = ((rect[1] + rect[3] / 2) / 10_000) * page.w;
+  const cy = ((rect[2] + rect[4] / 2) / 10_000) * page.h;
+  return cx >= crop[0] && cx <= crop[0] + crop[2] && cy >= crop[1] && cy <= crop[1] + crop[3];
 }
 
 export function wholePage(page: ReaderPage): Rect {

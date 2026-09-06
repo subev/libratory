@@ -1,4 +1,4 @@
-import { cropStyle, type CueRect, type ReaderCue, type ReaderPage, type Rect } from "../../lib/reader-doc.ts";
+import { cropStyle, rectInCrop, type CueRect, type ReaderCue, type ReaderPage, type Rect } from "../../lib/reader-doc.ts";
 
 // The page under these is white paper in either theme, so they always multiply — screening
 // against white erases the band and leaves only the glyphs tinted
@@ -58,7 +58,7 @@ export function CueOverlay({
       {debug.rects &&
         cues.flatMap((other, i) =>
           (other.r ?? [])
-            .filter(([p]) => p === page.i)
+            .filter((rect) => rect[0] === page.i && rectInCrop(page, crop, rect))
             .map((rect, j) => (
               <div key={`${i}-${j}`} className="absolute border border-(--debug-cue)" style={style(rect[1], rect[2], rect[3], rect[4])} />
             )),
@@ -66,7 +66,7 @@ export function CueOverlay({
 
       {layers.map((layer) =>
         layer.rects
-          .filter(([p]) => p === page.i)
+          .filter((rect) => rect[0] === page.i && rectInCrop(page, crop, rect))
           .map((rect, i) => (
             <div
               key={`${layer.testId}-${i}`}
