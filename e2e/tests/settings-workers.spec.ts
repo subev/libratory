@@ -9,6 +9,9 @@ const POOL = "prep";
 
 test("settings: a worker concurrency change lands in .env and survives a reopen", async ({ page, request }) => {
   const snapshot = await fs.readFile(ENV_PATH, "utf8");
+  // Read rather than assume: this machine's .env may already carry a value for this pool,
+  // including one a killed earlier run of this very test left behind
+  let before = "";
 
   try {
     await page.goto("/");
@@ -17,20 +20,23 @@ test("settings: a worker concurrency change lands in .env and survives a reopen"
 
     const select = page.getByTestId(`settings-worker-select-${POOL}`);
     await expect(select).toBeEnabled();
-    await expect(select).toHaveValue("2");
-    await select.selectOption("4");
+    before = await select.inputValue();
+    const target = before === "4" ? "3" : "4";
+    await select.selectOption(target);
 
     await expect
       .poll(async () => await fs.readFile(ENV_PATH, "utf8"))
-      .toContain("WORKER_CONCURRENCY_PREP=4");
+      .toContain(`WORKER_CONCURRENCY_PREP=${target}`);
 
     await page.goto("/");
     await page.getByTestId("settings-gear").click();
-    await expect(page.getByTestId(`settings-worker-select-${POOL}`)).toHaveValue("4");
+    await expect(page.getByTestId(`settings-worker-select-${POOL}`)).toHaveValue(target);
   } finally {
     // The server keeps the value in memory and in its running pool, so put both back before
     // restoring the file the suite's other tests read
-    await trpcMutation(request, "workers.setConcurrency", { pool: POOL, concurrency: 2 }).catch(() => {});
+    if (before) {
+      await trpcMutation(request, "workers.setConcurrency", { pool: POOL, concurrency: Number(before) }).catch(() => {});
+    }
     if ((await fs.readFile(ENV_PATH, "utf8")) !== snapshot) await fs.writeFile(ENV_PATH, snapshot);
   }
 });

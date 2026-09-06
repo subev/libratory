@@ -97,10 +97,10 @@ const TASK_LISTS: { [N in PoolName]: Record<TasksOf<N>, TaskList[string]> } = {
   },
 };
 
-function runPool(name: PoolName): Promise<Runner> {
+function runPool(name: PoolName, concurrency: number): Promise<Runner> {
   return run({
     connectionString,
-    concurrency: poolConcurrency(poolByName(name)),
+    concurrency,
     noHandleSignals: false,
     taskList: TASK_LISTS[name] as TaskList,
     // We don't use graphile cron; an empty crontab stops the per-pool
@@ -148,10 +148,22 @@ export async function startWorker(): Promise<Runner[]> {
     console.error("[worker] Startup sweep failed:", err);
   }
   const started = await Promise.all(
-    POOL_META.map(async (pool) => [pool.name, await runPool(pool.name)] as const),
+    POOL_META.map(async (pool) => [pool.name, await runPool(pool.name, poolConcurrency(pool))] as const),
   );
   currentRunners = new Map(started);
   return started.map(([, runner]) => runner);
+}
+
+// One change at a time per pool. Two Settings windows both polling "idle" can otherwise pass the
+// check together, stop the same runner twice and start two — and the second, invisible to
+// currentRunners, would keep claiming jobs at the old concurrency, doubling the very number the
+// ceilings exist to hold down.
+const poolChanges = new Map<PoolName, Promise<unknown>>();
+
+function serialize<T>(name: PoolName, fn: () => Promise<T>): Promise<T> {
+  const queued = (poolChanges.get(name) ?? Promise.resolve()).then(fn, fn);
+  poolChanges.set(name, queued.catch(() => {}));
+  return queued;
 }
 
 // Replacing a runner is how a new concurrency takes effect. It is only safe on an idle pool —
@@ -164,22 +176,42 @@ export async function applyPoolConcurrency(name: PoolName, concurrency: number):
     throw new Error(`${pool.label} takes a number between 1 and ${pool.max}`);
   }
 
-  const running = (await runningJobsByPool())[name];
-  if (running > 0) {
-    throw new Error(
-      `${pool.label} has ${running} job${running === 1 ? "" : "s"} running. Changing this restarts the pool, which would kill them — wait for them to finish, or stop them first.`,
-    );
-  }
+  await serialize(name, async () => {
+    const running = (await runningJobsByPool())[name];
+    if (running > 0) {
+      throw new Error(
+        `${pool.label} has ${running} job${running === 1 ? "" : "s"} running. Changing this restarts the pool, which would kill them — wait for them to finish, or stop them first.`,
+      );
+    }
 
-  setPoolConcurrency(pool, concurrency);
-  const existing = currentRunners.get(name);
-  if (!existing) return;
-  await existing.stop();
-  currentRunners.set(name, await runPool(name));
-  console.log(`[worker] Pool ${name} restarted at concurrency ${concurrency}`);
+    const previous = poolConcurrency(pool);
+    const existing = currentRunners.get(name);
+    // Dropped before it is stopped: a stopped runner left in the map would be stopped again by
+    // the next attempt or by shutdown, and graphile throws on that rather than ignoring it.
+    currentRunners.delete(name);
+    if (existing) await existing.stop();
+
+    try {
+      currentRunners.set(name, await runPool(name, concurrency));
+    } catch (err) {
+      // The new number is the thing that failed, not the queue — put the pool back on the number
+      // that was working rather than leaving it silently processing nothing.
+      await runPool(name, previous).then(
+        (restored) => currentRunners.set(name, restored),
+        (e) => console.error(`[worker] Pool ${name} is down — restarting the app will bring it back:`, e),
+      );
+      throw err;
+    }
+
+    // Only once the pool is provably running on it, so a failed change cannot leave .env and
+    // Settings both reporting a number nothing is using.
+    setPoolConcurrency(pool, concurrency);
+    console.log(`[worker] Pool ${name} restarted at concurrency ${concurrency}`);
+  });
 }
 
 export async function stopWorker(): Promise<void> {
-  await Promise.all([...currentRunners.values()].map((runner) => runner.stop()));
+  // allSettled: one runner refusing to stop must not strand fastify.close() and the exit behind it
+  await Promise.allSettled([...currentRunners.values()].map((runner) => runner.stop()));
   currentRunners = new Map();
 }
