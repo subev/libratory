@@ -104,6 +104,13 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   });
   const startServerMutation = trpc.llmModels.startLocalServer.useMutation({ onSuccess: refreshModels });
 
+  // Polled, because the only thing that blocks a change here is a job someone else's click
+  // started — the row un-disables itself when that job ends, without the user reopening Settings.
+  const { data: pools } = trpc.workers.pools.useQuery(undefined, { refetchInterval: 3000 });
+  const setConcurrencyMutation = trpc.workers.setConcurrency.useMutation({
+    onSuccess: () => utils.workers.pools.invalidate(),
+  });
+
   const models = useLlmModels();
   const { data: defaultModel } = trpc.llmModels.getDefault.useQuery();
   const setDefaultMutation = trpc.llmModels.setDefault.useMutation({
@@ -267,6 +274,54 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             <p className="text-xs text-(--danger-text)">Could not read the saved keys: {secretsError.message}</p>
           ) : (
             <div className="space-y-3">{keysOfKind("voice").map(keyCard)}</div>
+          )}
+        </section>
+
+        <section data-testid="settings-workers">
+          <h3 className="text-sm font-semibold text-(--text-primary) mb-1">Background work</h3>
+          <p className="text-xs text-(--text-muted) mb-2">
+            How many jobs of each kind run at the same time. All of it runs on this machine: a higher
+            number means more books move at once, never that one book finishes sooner, and the pools
+            sharing the GPU slow each other down. The defaults suit a laptop doing other things too.
+          </p>
+          <div className="space-y-3">
+            {(pools ?? []).map((pool) => (
+              <div key={pool.name} className="rounded-md border border-(--border) p-3" data-testid={`settings-worker-${pool.name}`}>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="font-medium text-(--text-primary)">{pool.label}</span>
+                  <select
+                    value={pool.concurrency}
+                    onChange={(e) => setConcurrencyMutation.mutate({ pool: pool.name, concurrency: Number(e.target.value) })}
+                    disabled={pool.running > 0 || setConcurrencyMutation.isPending}
+                    className="ml-auto text-sm rounded-md border border-(--border-input) bg-(--bg-input) text-(--text-primary) px-2 py-1"
+                    data-testid={`settings-worker-select-${pool.name}`}
+                  >
+                    {Array.from({ length: pool.max }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>
+                        {n === pool.default ? `${n} — default` : n}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="mt-1.5 text-xs text-(--text-muted)">{pool.hint}</p>
+                {pool.caution && (
+                  <p className="mt-1 text-xs text-(--warning-text)" data-testid={`settings-worker-caution-${pool.name}`}>
+                    {pool.caution}
+                  </p>
+                )}
+                {pool.running > 0 && (
+                  <p className="mt-1 text-xs text-(--text-muted)" data-testid={`settings-worker-busy-${pool.name}`}>
+                    {pool.running} job{pool.running === 1 ? "" : "s"} running. Changing this restarts the
+                    queue and would kill them — wait for them to finish, or stop them, and this unlocks itself.
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+          {setConcurrencyMutation.error && (
+            <p className="mt-2 text-xs text-(--danger-text)" data-testid="settings-workers-error">
+              {setConcurrencyMutation.error.message}
+            </p>
           )}
         </section>
 

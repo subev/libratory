@@ -230,7 +230,7 @@ Upload → rawExtract (pdftotext, seconds, always)
        → assembleDocument → PDF / EPUB / synced EPUB
 ```
 
-Jobs run through [Graphile Worker](https://github.com/graphile/worker) in seven pools (TTS, raw text, extraction, prep, assembly, AI/translation, search indexing) with `maxAttempts: 1` — nothing retries silently; the user reviews failures and decides.
+Jobs run through [Graphile Worker](https://github.com/graphile/worker) in seven pools (TTS, raw text, extraction, prep, assembly, AI/translation, search indexing) with `maxAttempts: 1` — nothing retries silently; the user reviews failures and decides. Settings sets how many jobs each pool runs at once, within limits that keep a shared GPU usable.
 
 <details>
 <summary><b>TTS engines and sync maps</b></summary>

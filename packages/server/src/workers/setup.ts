@@ -21,6 +21,7 @@ import { indexBook } from "./index-book.ts";
 import { embedChunks } from "./embed-chunks.ts";
 import { sweepStrandedWork } from "./sweep.ts";
 import { env } from "../env.ts";
+import { POOL_META, poolByName, poolConcurrency, runningJobsByPool, setPoolConcurrency, type PoolMeta, type PoolName } from "./pools.ts";
 
 const connectionString = env.DATABASE_URL;
 
@@ -59,69 +60,56 @@ function wrapTask<P extends Record<string, unknown>>(
 }
 
 // Each pool only claims its own task_identifiers, so GPU-bound TTS can't starve
-// CPU-bound extraction or network-bound translation.
-export const WORKER_POOLS: { name: string; concurrency: number; taskList: TaskList }[] = [
-  {
-    name: "tts", // MLX contends for the GPU; >2 concurrent processes add little throughput
-    concurrency: 2,
-    taskList: {
-      synthesize: wrapTask("synthesize", synthesize),
-      synthesizeTranslation: wrapTask("synthesizeTranslation", synthesizeTranslation),
-    },
-  },
-  {
-    name: "raw", // pdftotext takes ~1s; must never queue behind a 30-minute marker run
-    concurrency: 2,
-    taskList: {
-      rawExtract: wrapTask("rawExtract", rawExtract),
-    },
-  },
-  {
-    name: "extraction",
-    concurrency: 1,
-    taskList: {
-      extract: wrapTask("extract", extract),
-      redetect: wrapTask("redetect", (payload) => redetect(payload as any)),
-      propose: wrapTask("propose", (payload) => propose(payload as any)),
-    },
-  },
-  {
-    name: "prep", // milliseconds of regex; must never queue behind a marker or propose run
-    concurrency: 2,
-    taskList: {
-      normalize: wrapTask("normalize", normalize),
-    },
-  },
-  {
-    name: "assembly", // ffmpeg concat / Vivliostyle render — independent of marker, must not queue behind a long extraction
-    concurrency: 1,
-    taskList: {
-      assemble: wrapTask("assemble", (payload, helpers) => assemble(payload as any, helpers)),
-      assembleDocument: wrapTask("assembleDocument", (payload, helpers) => assembleDocument(payload as any, helpers)),
-    },
-  },
-  {
-    name: "index", // BGE-M3 contends for the GPU with TTS; serial embedding keeps both usable
-    concurrency: 1,
-    taskList: {
-      indexBook: wrapTask("indexBook", indexBook),
-      embedChunks: wrapTask("embedChunks", (payload) => embedChunks(payload as any)),
-    },
-  },
-  {
-    name: "translate",
-    concurrency: 3,
-    taskList: {
-      translate: wrapTask("translate", translate),
-      translateTitles: wrapTask("translateTitles", (payload) => translateTitles(payload as any)),
-      cleanup: wrapTask("cleanup", (payload) => cleanup(payload as any)),
-      bookNote: wrapTask("bookNote", (payload) => bookNote(payload as any)),
-      digest: wrapTask("digest", (payload) => digest(payload as any)),
-    },
-  },
-];
+// CPU-bound extraction or network-bound translation. POOL_META owns the names, the tasks
+// and the configurable concurrency; the keys here have to match its `tasks` exactly.
+type TasksOf<N extends PoolName> = Extract<PoolMeta, { name: N }>["tasks"][number];
 
-let currentRunners: Runner[] = [];
+const TASK_LISTS: { [N in PoolName]: Record<TasksOf<N>, TaskList[string]> } = {
+  tts: {
+    synthesize: wrapTask("synthesize", synthesize),
+    synthesizeTranslation: wrapTask("synthesizeTranslation", synthesizeTranslation),
+  },
+  raw: {
+    rawExtract: wrapTask("rawExtract", rawExtract),
+  },
+  extraction: {
+    extract: wrapTask("extract", extract),
+    redetect: wrapTask("redetect", (payload) => redetect(payload as any)),
+    propose: wrapTask("propose", (payload) => propose(payload as any)),
+  },
+  prep: {
+    normalize: wrapTask("normalize", normalize),
+  },
+  assembly: {
+    assemble: wrapTask("assemble", (payload, helpers) => assemble(payload as any, helpers)),
+    assembleDocument: wrapTask("assembleDocument", (payload, helpers) => assembleDocument(payload as any, helpers)),
+  },
+  index: {
+    indexBook: wrapTask("indexBook", indexBook),
+    embedChunks: wrapTask("embedChunks", (payload) => embedChunks(payload as any)),
+  },
+  translate: {
+    translate: wrapTask("translate", translate),
+    translateTitles: wrapTask("translateTitles", (payload) => translateTitles(payload as any)),
+    cleanup: wrapTask("cleanup", (payload) => cleanup(payload as any)),
+    bookNote: wrapTask("bookNote", (payload) => bookNote(payload as any)),
+    digest: wrapTask("digest", (payload) => digest(payload as any)),
+  },
+};
+
+function runPool(name: PoolName): Promise<Runner> {
+  return run({
+    connectionString,
+    concurrency: poolConcurrency(poolByName(name)),
+    noHandleSignals: false,
+    taskList: TASK_LISTS[name] as TaskList,
+    // We don't use graphile cron; an empty crontab stops the per-pool
+    // "Failed to read crontab file" INFO line at startup
+    crontab: "",
+  });
+}
+
+let currentRunners = new Map<PoolName, Runner>();
 
 // A bundle finishing is not only a UI state change: books dropped in before the download existed
 // were parked as "waiting" rather than failed, and this is what makes that promise good. The
@@ -159,23 +147,39 @@ export async function startWorker(): Promise<Runner[]> {
   } catch (err) {
     console.error("[worker] Startup sweep failed:", err);
   }
-  currentRunners = await Promise.all(
-    WORKER_POOLS.map((pool) =>
-      run({
-        connectionString,
-        concurrency: pool.concurrency,
-        noHandleSignals: false,
-        taskList: pool.taskList,
-        // We don't use graphile cron; an empty crontab stops the per-pool
-        // "Failed to read crontab file" INFO line at startup
-        crontab: "",
-      }),
-    ),
+  const started = await Promise.all(
+    POOL_META.map(async (pool) => [pool.name, await runPool(pool.name)] as const),
   );
-  return currentRunners;
+  currentRunners = new Map(started);
+  return started.map(([, runner]) => runner);
+}
+
+// Replacing a runner is how a new concurrency takes effect. It is only safe on an idle pool —
+// graphile's graceful shutdown kills whatever is still running after five seconds — so the
+// caller has to have established that, and the check is repeated here against the race between
+// the browser reading "idle" and the user clicking.
+export async function applyPoolConcurrency(name: PoolName, concurrency: number): Promise<void> {
+  const pool = poolByName(name);
+  if (concurrency < 1 || concurrency > pool.max) {
+    throw new Error(`${pool.label} takes a number between 1 and ${pool.max}`);
+  }
+
+  const running = (await runningJobsByPool())[name];
+  if (running > 0) {
+    throw new Error(
+      `${pool.label} has ${running} job${running === 1 ? "" : "s"} running. Changing this restarts the pool, which would kill them — wait for them to finish, or stop them first.`,
+    );
+  }
+
+  setPoolConcurrency(pool, concurrency);
+  const existing = currentRunners.get(name);
+  if (!existing) return;
+  await existing.stop();
+  currentRunners.set(name, await runPool(name));
+  console.log(`[worker] Pool ${name} restarted at concurrency ${concurrency}`);
 }
 
 export async function stopWorker(): Promise<void> {
-  await Promise.all(currentRunners.map((runner) => runner.stop()));
-  currentRunners = [];
+  await Promise.all([...currentRunners.values()].map((runner) => runner.stop()));
+  currentRunners = new Map();
 }

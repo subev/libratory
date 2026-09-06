@@ -11,6 +11,8 @@ const repoRoot = process.env.LIBRATORY_HOME
 export const envFilePath = process.env.LIBRATORY_ENV_FILE ?? path.join(repoRoot, ".env");
 dotenv.config({ path: envFilePath });
 
+const workerConcurrency = z.coerce.number().int().positive().optional().catch(undefined);
+
 const envSchema = z.object({
   DATABASE_URL: z.string(),
   DATA_DIR: z.string().default("./data"),
@@ -48,6 +50,16 @@ const envSchema = z.object({
   CARTESIA_API_KEY: z.string().optional(),
   ELEVENLABS_API_KEY: z.string().optional(),
   ELEVENLABS_MODEL: z.string().default("eleven_multilingual_v2"),
+  // Settings → "Background work". Unset means the pool's own default; a value out of range or
+  // unparseable falls back to it too, because .env is hand-editable and a typo there should not
+  // stop the server from booting. `workers/pools.ts` owns the defaults and the ceilings.
+  WORKER_CONCURRENCY_TTS: workerConcurrency,
+  WORKER_CONCURRENCY_RAW: workerConcurrency,
+  WORKER_CONCURRENCY_EXTRACTION: workerConcurrency,
+  WORKER_CONCURRENCY_PREP: workerConcurrency,
+  WORKER_CONCURRENCY_ASSEMBLY: workerConcurrency,
+  WORKER_CONCURRENCY_INDEX: workerConcurrency,
+  WORKER_CONCURRENCY_TRANSLATE: workerConcurrency,
 });
 
 export const env = envSchema.parse(process.env);

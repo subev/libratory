@@ -16,6 +16,7 @@ import { llmModelsRouter } from "./routes/llm-models.ts";
 import { rendererRouter } from "./routes/renderer.ts";
 import { modelsRouter } from "./routes/models.ts";
 import { secretsRouter } from "./routes/secrets.ts";
+import { workersRouter } from "./routes/workers.ts";
 
 export const appRouter = router({
   books: booksRouter,
@@ -34,6 +35,7 @@ export const appRouter = router({
   renderer: rendererRouter,
   models: modelsRouter,
   secrets: secretsRouter,
+  workers: workersRouter,
 });
 
 export type AppRouter = typeof appRouter;
