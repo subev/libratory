@@ -5,6 +5,7 @@ import { BOOK_LANGUAGE_OPTIONS } from "../lib/languages.ts";
 import { Modal, ModalHeader } from "./Modal.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { Button } from "./Button.tsx";
+import type { OcrEngine } from "../lib/ocr.ts";
 
 export type ExtractScope = "selected" | "book" | "chapters";
 
@@ -34,7 +35,8 @@ export function ExtractModal({
   chaptersForSelected,
   chaptersTotal,
   isProcessing,
-  forceOcr,
+  ocrEngine,
+  canSetOcr,
   llmChapterDetection,
   chapterModel,
   language,
@@ -48,12 +50,14 @@ export function ExtractModal({
   chaptersForSelected: number;
   chaptersTotal: number;
   isProcessing: boolean;
-  forceOcr: boolean;
+  ocrEngine: OcrEngine | null;
+  /** Only rendered when a file still has no text of its own, or already has a searchable copy. */
+  canSetOcr: boolean;
   llmChapterDetection: boolean;
   chapterModel: string | null;
   language: string | null;
   voiceLabel: string;
-  onUpdateBook: (settings: { forceOcr?: boolean; llmChapterDetection?: boolean; chapterModel?: string; language?: string | null }) => void;
+  onUpdateBook: (settings: { ocrEngine?: OcrEngine | null; llmChapterDetection?: boolean; chapterModel?: string; language?: string | null }) => void;
   onStart: (scope: ExtractScope, autoSynthesize: boolean) => void;
   onClose: () => void;
 }) {
@@ -149,21 +153,23 @@ export function ExtractModal({
             <span className="min-w-0">Decides which voices the picker offers first.</span>
           </label>
 
-          <label className="flex gap-2 text-xs text-(--text-muted)">
-            <input
-              type="checkbox"
-              checked={forceOcr}
-              onChange={(e) => onUpdateBook({ forceOcr: e.target.checked })}
-              className="mt-0.5 rounded"
-            />
-            <span>
-              <span className="block text-(--text-secondary)">Scanned PDF — needs OCR</span>
-              Set this when the pages are images. Whatever text layer the file carries is discarded and the pages
-              are read afresh — a phone photo printed to PDF brings its print headers along, and those are enough
-              to look like text. Much slower; the original PDF is untouched. Pages with no text layer can't be
-              lined up with the voice word by word, so read-along marks a paragraph at a time on the page.
-            </span>
-          </label>
+          {canSetOcr && (
+            <label className="flex gap-2 text-xs text-(--text-muted)">
+              <input
+                type="checkbox"
+                checked={ocrEngine !== null}
+                onChange={(e) => onUpdateBook({ ocrEngine: e.target.checked ? "tesseract" : null })}
+                className="mt-0.5 rounded"
+                data-testid="book-ocr-engine"
+              />
+              <span>
+                <span className="block text-(--text-secondary)">Scanned PDF — needs OCR</span>
+                Set this when the pages are images. Tesseract reads them once into a searchable copy kept beside
+                the original, which is never replaced; every extraction, search and export afterwards reads that
+                copy, and read-along follows the voice word by word. About a second a page.
+              </span>
+            </label>
+          )}
 
           <label className="flex gap-2 text-xs text-(--text-muted)">
             <input

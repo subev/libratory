@@ -127,6 +127,9 @@ export const folders = pgTable("folders", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("folders_parent_id_idx").on(t.parentId), index("folders_profile_id_idx").on(t.profileId)]);
 
+export const OCR_ENGINES = ["tesseract", "surya"] as const;
+export type OcrEngine = (typeof OCR_ENGINES)[number];
+
 export const books = pgTable("books", {
   id: uuid("id").primaryKey().defaultRandom(),
   title: text("title").notNull(),
@@ -142,7 +145,8 @@ export const books = pgTable("books", {
   speed: real("speed").notNull().default(1.0),
   variantVoices: jsonb("variant_voices").$type<VariantVoices>(),
   error: text("error"),
-  forceOcr: boolean("force_ocr").notNull().default(false),
+  // null = the file already carries text, so no OCR step runs before extraction
+  ocrEngine: text("ocr_engine").$type<OcrEngine>(),
   llmChapterDetection: boolean("llm_chapter_detection").notNull().default(false),
   // null = default model; registry key from lib/llm.ts
   chapterModel: text("chapter_model"),
@@ -248,6 +252,12 @@ export const bookFiles = pgTable("book_files", {
   skipSynthesis: boolean("skip_synthesis").notNull().default(false),
   rawText: text("raw_text"),
   rawWords: integer("raw_words"),
+  // The OCR'd copy written beside the original, which is never replaced
+  searchablePdfPath: dataPath("searchable_pdf_path"),
+  ocrEngine: text("ocr_engine").$type<OcrEngine>(),
+  // Both fractions in [0,1]: mean word confidence, and the share of words under the low bar
+  ocrConfidence: real("ocr_confidence"),
+  ocrLowConfidenceFraction: real("ocr_low_confidence_fraction"),
   error: text("error"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

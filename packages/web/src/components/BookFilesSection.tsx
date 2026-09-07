@@ -3,6 +3,7 @@ import { ExtractModal, type ExtractScope } from "./ExtractModal.tsx";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
 import { IconStop, IconRefresh, IconDelete } from "./icons.tsx";
 import { Button } from "./Button.tsx";
+import type { OcrEngine } from "../lib/ocr.ts";
 
 export type BookFileRow = {
   id: string;
@@ -12,6 +13,8 @@ export type BookFileRow = {
   selected: boolean;
   skipSynthesis: boolean;
   rawWords?: number | null;
+  hasRawText?: boolean;
+  hasSearchablePdf?: boolean;
   error: string | null;
 };
 
@@ -25,7 +28,7 @@ export function BookFilesSection({
   chapters,
   bookId,
   isProcessing,
-  forceOcr,
+  ocrEngine,
   llmChapterDetection,
   chapterModel,
   language,
@@ -46,7 +49,7 @@ export function BookFilesSection({
   chapters: ChapterRowForFiles[];
   bookId: string;
   isProcessing: boolean;
-  forceOcr: boolean;
+  ocrEngine: OcrEngine | null;
   llmChapterDetection: boolean;
   chapterModel: string | null;
   language: string | null;
@@ -54,7 +57,7 @@ export function BookFilesSection({
   extractOpen: boolean;
   onExtractOpenChange: (open: boolean) => void;
   onStartExtraction: (scope: ExtractScope, autoSynthesize: boolean) => void;
-  onUpdateExtractionSettings: (settings: { forceOcr?: boolean; llmChapterDetection?: boolean; chapterModel?: string; language?: string | null }) => void;
+  onUpdateExtractionSettings: (settings: { ocrEngine?: OcrEngine | null; llmChapterDetection?: boolean; chapterModel?: string; language?: string | null }) => void;
   onSetSelected: (id: string, selected: boolean) => void;
   onSetAllSelected: (selected: boolean) => void | Promise<unknown>;
   onSetSelectedBatch: (ids: string[], selected: boolean) => void | Promise<unknown>;
@@ -310,7 +313,8 @@ export function BookFilesSection({
           chaptersForSelected={chaptersForSelected}
           chaptersTotal={chapters.length}
           isProcessing={isProcessing}
-          forceOcr={forceOcr}
+          ocrEngine={ocrEngine}
+          canSetOcr={files.some((f) => !f.hasRawText || f.hasSearchablePdf)}
           llmChapterDetection={llmChapterDetection}
           chapterModel={chapterModel}
           language={language}

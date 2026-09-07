@@ -36,7 +36,7 @@ type MarkerOutput = {
   };
 };
 
-const NEEDS_OCR = 'tick "Scanned PDF — needs OCR" and retry the file';
+const NEEDS_OCR = 'set an OCR engine under "About this book" in Extract… and retry the file';
 
 export type SourceBlock = {
   type: string;
@@ -361,18 +361,17 @@ export class ExtractAbortedError extends Error {
   }
 }
 
-function runMarkerSingle(pdfPath: string, outDir: string, device: "mps" | "cuda" | "cpu", log: LogFn, forceOcr: boolean, signal?: AbortSignal): Promise<void> {
+function runMarkerSingle(pdfPath: string, outDir: string, device: "mps" | "cuda" | "cpu", log: LogFn, signal?: AbortSignal): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     if (signal?.aborted) {
       reject(new ExtractAbortedError());
       return;
     }
 
-    // Marker decides for itself whether a page needs OCR, and a page carrying any text layer at
-    // all counts as good — a phone photo printed to PDF brings the print headers along, which is
-    // enough for it to skip the picture entirely. Forcing it means discarding that layer.
-    const args = [pdfPath, "--output_format", "json", "--output_dir", outDir];
-    args.push(forceOcr ? "--force_ocr" : "--disable_ocr");
+    // Marker is a layout engine here and nothing else: recognition happens once, in the OCR step,
+    // and is written into a searchable copy this then reads. Marker's own OCR threw the work away
+    // after every run and could never give word boxes.
+    const args = [pdfPath, "--output_format", "json", "--output_dir", outDir, "--disable_ocr"];
     const proc = spawn(
       path.join(CONDA_BIN, "marker_single"),
       args,
@@ -458,7 +457,6 @@ function runMarkerSingle(pdfPath: string, outDir: string, device: "mps" | "cuda"
 }
 
 export type ExtractOptions = {
-  forceOcr?: boolean;
   llmChapterDetection?: boolean;
   chapterModel?: string;
   signal?: AbortSignal;
@@ -567,22 +565,20 @@ async function detectChaptersFromMarkerJsonPath(markerJsonPath: string, pdfPath:
 export async function extractPdf(pdfPath: string, outDir: string, log: LogFn = noopLog, options: ExtractOptions = {}): Promise<DetectionResult> {
   await mkdir(outDir, { recursive: true });
 
-  const forceOcr = options.forceOcr ?? false;
-
-  // Marker with --disable_ocr can only pass through a text layer, so a scan without one is half a
-  // minute of layout recognition whose answer is known before it starts.
-  if (!forceOcr && (await pdfHasTextLayer(pdfPath)) === false) {
+  // Marker only passes a text layer through, so a scan without one is half a minute of layout
+  // recognition whose answer is known before it starts.
+  if ((await pdfHasTextLayer(pdfPath)) === false) {
     throw new Error(`"${path.basename(pdfPath)}" has no text layer and OCR is off — ${NEEDS_OCR}`);
   }
 
-  await log(`Running marker_single on "${path.basename(pdfPath)}"${forceOcr ? " (forcing OCR)" : " (OCR disabled)"}`);
+  await log(`Running marker_single on "${path.basename(pdfPath)}" (OCR disabled)`);
 
   // A Mac starts on Metal. Elsewhere the capabilities probe answers whether torch can see CUDA —
   // letting marker guess would spend the first half-hour attempt finding out the hard way.
   const capabilities = process.platform === "darwin" ? null : await readCapabilities().catch(() => null);
   const firstDevice = process.platform === "darwin" ? "mps" : capabilities?.cuda ? "cuda" : "cpu";
   try {
-    await runMarkerSingle(pdfPath, outDir, firstDevice, log, forceOcr, options.signal);
+    await runMarkerSingle(pdfPath, outDir, firstDevice, log, options.signal);
   } catch (deviceError) {
     if (deviceError instanceof ExtractAbortedError) throw deviceError;
     // Only a non-CPU failure gets a second chance: the MPS bug is real, and a CUDA install can be
@@ -591,7 +587,7 @@ export async function extractPdf(pdfPath: string, outDir: string, log: LogFn = n
     // Asserting the known MPS bug for any first-device failure is how "cannot execute this file"
     // was reported as a PyTorch problem three times in a row.
     await log(`${firstDevice.toUpperCase()} extraction failed: ${(deviceError as Error).message}. Retrying with CPU...`);
-    await runMarkerSingle(pdfPath, outDir, "cpu", log, forceOcr, options.signal);
+    await runMarkerSingle(pdfPath, outDir, "cpu", log, options.signal);
   }
 
   if (options.signal?.aborted) throw new ExtractAbortedError();

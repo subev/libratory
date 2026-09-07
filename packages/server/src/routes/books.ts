@@ -2,7 +2,7 @@ import { z } from "zod";
 import { modelKeySchema } from "../lib/llm.ts";
 import { router, publicProcedure } from "../trpc.ts";
 import { db } from "../db.ts";
-import { books, bookFiles, chapters, bookLogs, assemblies, documents, chapterVariants, folders, DEFAULT_PROFILE_ID } from "../schema.ts";
+import { books, bookFiles, chapters, bookLogs, assemblies, documents, chapterVariants, folders, DEFAULT_PROFILE_ID, OCR_ENGINES } from "../schema.ts";
 import type { Book, Chapter } from "../schema.ts";
 import { eq, desc, asc, gt, and, ne, inArray, ilike, sql } from "drizzle-orm";
 import { uploadsDir, bookOutputDir } from "../lib/paths.ts";
@@ -401,6 +401,11 @@ export const booksRouter = router({
           skipSynthesis: bookFiles.skipSynthesis,
           rawWords: bookFiles.rawWords,
           hasRawText: sql<boolean>`${bookFiles.rawText} is not null`,
+          // The path itself is never shipped; what the UI needs to know is that a copy exists
+          hasSearchablePdf: sql<boolean>`${bookFiles.searchablePdfPath} is not null`,
+          ocrEngine: bookFiles.ocrEngine,
+          ocrConfidence: bookFiles.ocrConfidence,
+          ocrLowConfidenceFraction: bookFiles.ocrLowConfidenceFraction,
           error: bookFiles.error,
           createdAt: bookFiles.createdAt,
         })
@@ -450,7 +455,7 @@ export const booksRouter = router({
       id: z.string().uuid(),
       voice: z.string().optional(),
       speed: z.number().min(0.5).max(2.0).optional(),
-      forceOcr: z.boolean().optional(),
+      ocrEngine: z.enum(OCR_ENGINES).nullable().optional(),
       llmChapterDetection: z.boolean().optional(),
       chapterModel: modelKeySchema.optional(),
       // ISO-639-1 of the book's own text; "" clears it back to unknown
@@ -465,7 +470,7 @@ export const booksRouter = router({
         updates.voice = input.voice;
       }
       if (input.speed !== undefined) updates.speed = input.speed;
-      if (input.forceOcr !== undefined) updates.forceOcr = input.forceOcr;
+      if (input.ocrEngine !== undefined) updates.ocrEngine = input.ocrEngine;
       if (input.llmChapterDetection !== undefined) updates.llmChapterDetection = input.llmChapterDetection;
       if (input.chapterModel !== undefined) updates.chapterModel = input.chapterModel;
       if (input.language !== undefined) updates.language = input.language || null;
@@ -528,7 +533,7 @@ export const booksRouter = router({
         id: z.string().uuid(),
         voice: z.string().optional(),
         speed: z.number().min(0.5).max(2.0).optional(),
-        forceOcr: z.boolean().optional(),
+        ocrEngine: z.enum(OCR_ENGINES).nullable().optional(),
         llmChapterDetection: z.boolean().optional(),
         chapterModel: modelKeySchema.optional(),
       })
@@ -549,7 +554,7 @@ export const booksRouter = router({
         updates.voice = input.voice;
       }
       if (input.speed) updates.speed = input.speed;
-      if (input.forceOcr !== undefined) updates.forceOcr = input.forceOcr;
+      if (input.ocrEngine !== undefined) updates.ocrEngine = input.ocrEngine;
       if (input.llmChapterDetection !== undefined) updates.llmChapterDetection = input.llmChapterDetection;
       if (input.chapterModel !== undefined) updates.chapterModel = input.chapterModel;
 
@@ -714,7 +719,7 @@ export const booksRouter = router({
     .input(
       z.object({
         id: z.string().uuid(),
-        forceOcr: z.boolean().optional(),
+        ocrEngine: z.enum(OCR_ENGINES).nullable().optional(),
         llmChapterDetection: z.boolean().optional(),
         chapterModel: modelKeySchema.optional(),
       })
@@ -734,7 +739,7 @@ export const booksRouter = router({
         outputPath: null,
         updatedAt: new Date(),
       };
-      if (input.forceOcr !== undefined) updates.forceOcr = input.forceOcr;
+      if (input.ocrEngine !== undefined) updates.ocrEngine = input.ocrEngine;
       if (input.llmChapterDetection !== undefined) updates.llmChapterDetection = input.llmChapterDetection;
       if (input.chapterModel !== undefined) updates.chapterModel = input.chapterModel;
       await db.update(books).set(updates).where(eq(books.id, input.id));
@@ -1202,7 +1207,7 @@ export const booksRouter = router({
       const cleared = (await db.execute(sql`
         DELETE FROM graphile_worker._private_jobs j
         USING graphile_worker._private_tasks t
-        WHERE t.id = j.task_id AND t.identifier IN ('normalize', 'synthesize', 'extract')
+        WHERE t.id = j.task_id AND t.identifier IN ('normalize', 'synthesize', 'extract', 'ocrTextLayer')
           AND (j.payload ->> 'bookId') = ${input.id}
           AND j.locked_at IS NULL
         RETURNING j.id

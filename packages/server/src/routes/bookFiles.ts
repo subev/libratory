@@ -126,6 +126,7 @@ export const bookFilesRouter = router({
       await db.delete(bookFiles).where(eq(bookFiles.id, input.id));
       await repointBookPdf(file.bookId);
       await unlink(file.pdfPath).catch(() => {});
+      if (file.searchablePdfPath) await unlink(file.searchablePdfPath).catch(() => {});
       await rm(path.join(bookTmpDir(file.bookId), `file_${file.index}`), { recursive: true, force: true }).catch(() => {});
       await updateBookTotalChapters(file.bookId);
       await appendLog(file.bookId, `Removed file "${file.filename}" and ${deletedCount} chapter(s)`);

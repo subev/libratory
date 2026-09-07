@@ -10,6 +10,7 @@ import { assemble } from "./assemble.ts";
 import { assembleDocument } from "./assemble-document.ts";
 import { redetect } from "./redetect.ts";
 import { propose } from "./propose.ts";
+import { ocrTextLayer } from "./ocr-text-layer.ts";
 import { translate } from "./translate.ts";
 import { translateTitles } from "./translate-titles.ts";
 import { cleanup } from "./cleanup.ts";
@@ -76,6 +77,7 @@ const TASK_LISTS: { [N in PoolName]: Record<TasksOf<N>, TaskList[string]> } = {
     extract: wrapTask("extract", extract),
     redetect: wrapTask("redetect", (payload) => redetect(payload as any)),
     propose: wrapTask("propose", (payload) => propose(payload as any)),
+    ocrTextLayer: wrapTask("ocrTextLayer", ocrTextLayer),
   },
   prep: {
     normalize: wrapTask("normalize", normalize),

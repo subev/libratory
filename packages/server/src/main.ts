@@ -18,6 +18,7 @@ import { registerScriptRunRoutes } from "./script-run-routes.ts";
 import { ensureDataDirs, outputDir, previewsDir } from "./lib/paths.ts";
 import { isAllowedOrigin, parseTrustedHosts } from "./lib/cors.ts";
 import { registerSpaFallback } from "./lib/spa-fallback.ts";
+import { readablePdfPath } from "./lib/pdf-raw-text.ts";
 import { db } from "./db.ts";
 import { books, bookFiles, assemblies, documents, chapters, chapterVariants } from "./schema.ts";
 import { eq } from "drizzle-orm";
@@ -100,7 +101,10 @@ async function main() {
     if (!file) {
       return reply.code(404).send({ error: "File not found" });
     }
-    return reply.type("application/pdf").sendFile(path.basename(file.pdfPath), path.dirname(file.pdfPath));
+    // The searchable copy where OCR wrote one: the reader lines the voice up against the text
+    // layer on these pages, and the original scan has none.
+    const served = readablePdfPath(file);
+    return reply.type("application/pdf").sendFile(path.basename(served), path.dirname(served));
   });
 
   // Books uploaded before book_files existed have their PDF on the book row
