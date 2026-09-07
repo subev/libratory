@@ -97,7 +97,8 @@ export function OcrTryPage() {
   const [now, setNow] = useState(() => Date.now());
   const [overlay, setOverlay] = useState(true);
   const [chosen, setChosen] = useState<OcrEngine | null>(null);
-  const [loupe, setLoupe] = useState<{ x: number; y: number; px: number; py: number } | null>(null);
+  const [loupe, setLoupe] = useState<{ x: number; y: number; ox: number; oy: number; w: number } | null>(null);
+  const image = useRef<HTMLImageElement | null>(null);
   const utils = trpc.useUtils();
   const update = trpc.books.updateSettings.useMutation({ onSuccess: () => void utils.books.get.invalidate({ id }) });
 
@@ -176,6 +177,22 @@ export function OcrTryPage() {
         : `Tesseract read this page cleanly. Surya would cost ${suryaTotal ?? "hours"} over the book for the same words and coarser read-along.`;
 
   const shade = (w: { conf: number }) => (w.conf < 60 ? "rounded-[2px] bg-(--lowconf) shadow-[0_0_0_1px_var(--lowconf-ring)]" : "");
+  // Once the words are placed, the pane shows the column of type and not the margins — the reader's
+  // column view — so a line is readable at the pane's width. Before that, the whole page.
+  const crop = (() => {
+    if (!info) return null;
+    const words = result?.lines.flatMap((l) => l.words) ?? [];
+    if (words.length === 0) return { x: 0, y: 0, w: info.width, h: info.height };
+    const pad = info.width * 0.015;
+    const x0 = Math.max(0, Math.min(...words.map((w) => w.x0)) - pad);
+    const y0 = Math.max(0, Math.min(...words.map((w) => w.y0)) - pad);
+    const x1 = Math.min(info.width, Math.max(...words.map((w) => w.x1)) + pad);
+    const y1 = Math.min(info.height, Math.max(...words.map((w) => w.y1)) + pad);
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  })();
+  const LOUPE_ZOOM = 2.4;
+  const loupeW = Math.min(760, window.innerWidth - 24);
+  const loupeH = 150;
   const busy = tesseract.isPending || surya.status === "warming" || surya.status === "streaming";
 
   return (
@@ -229,25 +246,48 @@ export function OcrTryPage() {
       )}
 
       <main className="flex flex-1 flex-wrap items-start gap-4 px-4 pb-20 pt-4">
-        <section className="sticky top-[62px] flex min-w-[280px] max-w-[440px] flex-[1_1_300px] flex-col self-stretch rounded-lg border border-(--border) bg-(--bg-card) p-3 text-xs" data-testid="ocr-try-image-pane">
+        <section className="sticky top-[62px] flex min-w-[280px] max-w-[560px] flex-[1_1_320px] flex-col self-stretch rounded-lg border border-(--border) bg-(--bg-card) p-3 text-xs" data-testid="ocr-try-image-pane">
           <div className="flex items-baseline gap-2"><span className="text-[13px] font-semibold">The page</span><span className="text-(--text-faint)">page {page} · rendered at 150 dpi</span></div>
           <p className="mt-0.5 max-w-[44ch] text-(--text-muted)">Ground truth. Neither transcription can be judged without it.</p>
-          <div className="relative mt-2 max-h-[70vh] overflow-auto rounded bg-(--bg-subtle) p-2">
-            {info && (
+          <div className="relative mt-2 max-h-[75vh] overflow-auto rounded bg-(--bg-subtle) p-2">
+            {info && crop && (
               <div
-                className="relative mx-auto w-fit max-w-full cursor-crosshair"
-                onMouseMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); setLoupe({ x: e.clientX, y: e.clientY, px: (e.clientX - r.left) / r.width, py: (e.clientY - r.top) / r.height }); }}
+                className="relative mx-auto w-full cursor-crosshair overflow-hidden"
+                style={{ aspectRatio: `${crop.w} / ${crop.h}` }}
+                onMouseMove={(e) => {
+                  const r = image.current?.getBoundingClientRect();
+                  if (r) setLoupe({ x: e.clientX, y: e.clientY, ox: e.clientX - r.left, oy: e.clientY - r.top, w: r.width });
+                }}
                 onMouseLeave={() => setLoupe(null)}
               >
-                <img src={info.imageUrl} alt={`Page ${page}`} className="block max-w-full" data-testid="ocr-try-image" />
+                <img
+                  ref={image}
+                  src={info.imageUrl}
+                  alt={`Page ${page}`}
+                  className="absolute max-w-none"
+                  style={{ width: `${(info.width / crop.w) * 100}%`, left: `${(-crop.x / crop.w) * 100}%`, top: `${(-crop.y / crop.h) * 100}%` }}
+                  data-testid="ocr-try-image"
+                />
                 {overlay && result && doubted.map((w, i) => (
-                  <span key={i} className="pointer-events-none absolute rounded-[2px] bg-(--lowconf) shadow-[0_0_0_1px_var(--lowconf-ring)]" style={{ left: `${(w.x0 / info.width) * 100}%`, top: `${(w.y0 / info.height) * 100}%`, width: `${((w.x1 - w.x0) / info.width) * 100}%`, height: `${((w.y1 - w.y0) / info.height) * 100}%` }} />
+                  <span key={i} className="pointer-events-none absolute rounded-[2px] bg-(--lowconf) shadow-[0_0_0_1px_var(--lowconf-ring)]" style={{ left: `${((w.x0 - crop.x) / crop.w) * 100}%`, top: `${((w.y0 - crop.y) / crop.h) * 100}%`, width: `${((w.x1 - w.x0) / crop.w) * 100}%`, height: `${((w.y1 - w.y0) / crop.h) * 100}%` }} />
                 ))}
               </div>
             )}
           </div>
           {loupe && info && (
-            <div className="pointer-events-none fixed z-30 h-44 w-44 overflow-hidden rounded-full border border-(--border) bg-(--bg-card) shadow-lg" style={{ left: loupe.x - 88, top: loupe.y - 88, backgroundImage: `url(${info.imageUrl})`, backgroundSize: "300% auto", backgroundRepeat: "no-repeat", backgroundPosition: `${loupe.px * 100}% ${loupe.py * 100}%` }} />
+            <div
+              className="pointer-events-none fixed z-30 overflow-hidden rounded-md border border-(--border) bg-(--bg-card) shadow-lg"
+              style={{
+                width: loupeW,
+                height: loupeH,
+                left: Math.max(8, Math.min(loupe.x - loupeW / 2, window.innerWidth - loupeW - 8)),
+                top: loupe.y - loupeH - 18 < 8 ? loupe.y + 24 : loupe.y - loupeH - 18,
+                backgroundImage: `url(${info.imageUrl})`,
+                backgroundRepeat: "no-repeat",
+                backgroundSize: `${loupe.w * LOUPE_ZOOM}px auto`,
+                backgroundPosition: `${loupeW / 2 - loupe.ox * LOUPE_ZOOM}px ${loupeH / 2 - loupe.oy * LOUPE_ZOOM}px`,
+              }}
+            />
           )}
           <div className="mt-2 flex items-center gap-2">
             <Button size="sm" onClick={() => setOverlay((v) => !v)} disabled={!result} data-testid="ocr-try-overlay">{overlay ? <IconShow /> : <IconHide />}{result ? `Where Tesseract doubted · ${doubted.length}` : "Where Tesseract doubted"}</Button>
