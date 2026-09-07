@@ -9,6 +9,7 @@ import { describeError } from "./errors.ts";
 import { detectChaptersWithLlm } from "./toc-detect.ts";
 import { PREFACE_MIN_WORDS } from "./chapter-rules.ts";
 import { readCapabilities } from "./model-bundles.ts";
+import { pdfHasTextLayer } from "./pdf-raw-text.ts";
 
 const CONDA_BIN = env.CONDA_ENV_PATH;
 
@@ -34,6 +35,8 @@ type MarkerOutput = {
     table_of_contents: MarkerTocEntry[];
   };
 };
+
+const NEEDS_OCR = 'tick "Scanned PDF — needs OCR" and retry the file';
 
 export type SourceBlock = {
   type: string;
@@ -272,7 +275,8 @@ export function sliceChaptersAtIndices(
 ): ExtractedChapter[] {
   const sorted = [...new Set(boundaryIndices)].sort((a, b) => a - b);
   if (sorted.length === 0) {
-    return [chapterFromBlocks("Full Text", allBlocks)];
+    const whole = chapterFromBlocks("Full Text", allBlocks);
+    return whole.text.trim() ? [whole] : [];
   }
 
   const chapters: ExtractedChapter[] = [];
@@ -316,6 +320,7 @@ function splitByWordCount(allBlocks: FlatBlock[], wordsPerChapter = 5000): Extra
   const includedBlocks = allBlocks.filter((b) => b.included);
   const totalWords = includedBlocks.reduce((sum, b) => sum + b.text.split(/\s+/).filter(Boolean).length, 0);
 
+  if (totalWords === 0) return [];
   if (totalWords <= wordsPerChapter) {
     return [chapterFromBlocks("Full Text", allBlocks)];
   }
@@ -533,6 +538,14 @@ export async function collectBlocksFromMarkerOutput(outDir: string): Promise<Fla
 async function detectChaptersFromMarkerJsonPath(markerJsonPath: string, pdfPath: string, log: LogFn, options: ExtractOptions): Promise<DetectionResult> {
   const allBlocks = await collectBlocksFromMarkerJson(markerJsonPath);
 
+  // Blank blocks are dropped when the JSON is read, so "no blocks" is the only shape emptiness
+  // takes here. Two AI calls and a heuristic pass over it still answer nothing, and the run ends on
+  // a chapter of zero words that reads as a bug in detection rather than a page with no text on it.
+  // Stated as a fact with the remedy conditional, because unreadable marker output lands here too.
+  if (allBlocks.length === 0) {
+    throw new Error(`Marker returned no text for "${path.basename(pdfPath)}". If the pages are images, ${NEEDS_OCR}`);
+  }
+
   if (options.llmChapterDetection) {
     try {
       const detection = await detectChaptersWithLlm([{ fileIndex: null, blocks: allBlocks, pdfPath }], log, { model: options.chapterModel });
@@ -555,6 +568,13 @@ export async function extractPdf(pdfPath: string, outDir: string, log: LogFn = n
   await mkdir(outDir, { recursive: true });
 
   const forceOcr = options.forceOcr ?? false;
+
+  // Marker with --disable_ocr can only pass through a text layer, so a scan without one is half a
+  // minute of layout recognition whose answer is known before it starts.
+  if (!forceOcr && (await pdfHasTextLayer(pdfPath)) === false) {
+    throw new Error(`"${path.basename(pdfPath)}" has no text layer and OCR is off — ${NEEDS_OCR}`);
+  }
+
   await log(`Running marker_single on "${path.basename(pdfPath)}"${forceOcr ? " (forcing OCR)" : " (OCR disabled)"}`);
 
   // A Mac starts on Metal. Elsewhere the capabilities probe answers whether torch can see CUDA —

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { findMarkerJson, pickNumberedChapterIndices, type FlatBlock } from "./marker.ts";
+import { findMarkerJson, pickNumberedChapterIndices, sliceChaptersAtIndices, type FlatBlock } from "./marker.ts";
 
 function heading(text: string, page: number, level = 1): FlatBlock {
   return { type: "SectionHeader", text, hierarchy: null, level, page, included: true };
@@ -135,6 +135,36 @@ describe("pickNumberedChapterIndices", () => {
   });
 });
 
+
+describe("a PDF that gave up no text", () => {
+  // Reading the marker JSON drops blank blocks, so a scan extracted with OCR off arrives here as no
+  // blocks at all. Answering with one "Full Text" chapter of zero words hides that behind something
+  // that looks like a detection result, and the book lands in the library with a chapter nobody can
+  // read or narrate.
+  it("returns no chapters rather than an empty Full Text", () => {
+    expect(sliceChaptersAtIndices([], [])).toEqual([]);
+  });
+
+  // Every block outside KEEP_BLOCK_TYPES — a page of running heads and figure captions — reaches
+  // chapterFromBlocks with blocks but no includable text.
+  it("returns no chapters when nothing in the blocks is includable", () => {
+    const furniture: FlatBlock[] = [
+      { type: "PageHeader", text: "Motivation Traits", hierarchy: null, page: 1, included: false },
+      { type: "PageFooter", text: "61", hierarchy: null, page: 1, included: false },
+    ];
+
+    expect(sliceChaptersAtIndices(furniture, [])).toEqual([]);
+  });
+
+  it("still returns the whole document when there is text and no boundaries", () => {
+    const blocks = [paragraph(1), paragraph(2)];
+
+    const [whole, ...rest] = sliceChaptersAtIndices(blocks, []);
+    expect(rest).toEqual([]);
+    expect(whole?.title).toBe("Full Text");
+    expect(whole?.text).toContain("Some body text.");
+  });
+});
 
 describe("findMarkerJson", () => {
   async function outDir(files: Record<string, string[]>): Promise<string> {
