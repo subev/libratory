@@ -1,18 +1,22 @@
 import { memo, useCallback, useEffect, useRef } from "react";
 import { useDefaultModelKey, useLlmModels } from "../lib/use-llm-models.ts";
 import { formatTokens } from "../lib/ai-presets.ts";
+import { Dropdown } from "./Dropdown.tsx";
 
 export const ModelPicker = memo(function ModelPicker({
   value,
   onChange,
   requireTools = false,
   testId,
+  placement,
 }: {
   value: string;
   onChange: (key: string) => void;
   // library chat needs tool calling; models without it stay visible but disabled
   requireTools?: boolean;
-  testId?: string;
+  testId: string;
+  // A picker in a modal's footer opens upward: the panel clips whatever hangs below it
+  placement?: "below" | "above";
 }) {
   const models = useLlmModels();
   const { key: defaultKey, pending: defaultPending } = useDefaultModelKey();
@@ -48,27 +52,24 @@ export const ModelPicker = memo(function ModelPicker({
 
   const active = models.find((m) => m.key === value);
   return (
-    <select
+    <Dropdown
       value={active?.key ?? ""}
-      onChange={(e) => onChange(e.target.value)}
-      title={active?.hint}
+      onChange={onChange}
+      options={models.map((m) => {
+        const noTools = requireTools && !m.supportsTools;
+        return {
+          value: m.key,
+          label: `${m.label}${noTools ? " (no chat tools)" : ""}`,
+          hint: `${m.hint} · ${formatTokens(m.contextTokens)} context`,
+          disabled: noTools,
+          group: m.source,
+        };
+      })}
+      placeholder={models.length === 0 ? "No AI model available" : "Choose a model"}
       disabled={models.length === 0}
-      className="text-sm rounded-md border border-(--border) bg-(--bg-card) text-(--text-primary) px-2 py-1.5 max-w-60 truncate"
-      data-testid={testId}
-    >
-      {models.length === 0 && <option value="">No AI model available</option>}
-      {[...new Set(models.map((m) => m.source))].map((source) => (
-        <optgroup key={source} label={source}>
-          {models
-            .filter((m) => m.source === source)
-            .map((m) => (
-              <option key={m.key} value={m.key} disabled={requireTools && !m.supportsTools} title={`${m.hint} · ${formatTokens(m.contextTokens)} context`}>
-                {m.label}
-                {requireTools && !m.supportsTools ? " (no chat tools)" : ""}
-              </option>
-            ))}
-        </optgroup>
-      ))}
-    </select>
+      width="w-80"
+      placement={placement}
+      testId={testId}
+    />
   );
 });

@@ -1,11 +1,12 @@
 import { test, expect, uploadFixtureBook, FAKE_REPLY, FAKE_MODEL_KEY, FAKE_TINY_KEY } from "./fixtures.ts";
+import { pickOption } from "./helpers/dropdown.ts";
 
 test("UC2: Ask AI streams the answer, saves a note, and the note becomes a chapter", async ({ page, fakeLlm: _fakeLlm }) => {
   await uploadFixtureBook(page);
 
   await page.getByRole("button", { name: "Ask AI (whole book)" }).click();
   const modal = page.getByTestId("chapter-ai-modal");
-  await modal.getByTestId("ai-model-toggle").selectOption(FAKE_MODEL_KEY);
+  await pickOption(modal, "ai-model-toggle", FAKE_MODEL_KEY);
   await modal.getByTestId("ai-prompt-input").fill("What is this book about?");
   await modal.getByTestId("ai-run").click();
 
@@ -31,10 +32,10 @@ test("UC2: the context meter blocks a scope that exceeds the model's context", a
   await page.getByRole("button", { name: "Ask AI (whole book)" }).click();
   const modal = page.getByTestId("chapter-ai-modal");
   await modal.getByTestId("ai-prompt-input").fill("Summarize");
-  await modal.getByTestId("ai-model-toggle").selectOption(FAKE_MODEL_KEY);
+  await pickOption(modal, "ai-model-toggle", FAKE_MODEL_KEY);
   await expect(modal.getByTestId("ai-run")).toBeEnabled();
 
-  await modal.getByTestId("ai-model-toggle").selectOption(FAKE_TINY_KEY);
+  await pickOption(modal, "ai-model-toggle", FAKE_TINY_KEY);
   await expect(modal.getByTestId("ai-run")).toBeDisabled();
   await expect(modal.getByTestId("ai-context-usage")).toContainText("%");
 });

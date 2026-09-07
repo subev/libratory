@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import { test, expect } from "./fixtures.ts";
 import { trpcMutation } from "./helpers/trpc.ts";
 import { ENV_PATH } from "./helpers/env.ts";
+import { pickOption } from "./helpers/dropdown.ts";
 
 // Text preparation is milliseconds of regex, so it is the one pool that is reliably idle
 // mid-suite — every other one can legitimately be busy while these tests run.
@@ -20,9 +21,9 @@ test("settings: a worker concurrency change lands in .env and survives a reopen"
 
     const select = page.getByTestId(`settings-worker-select-${POOL}`);
     await expect(select).toBeEnabled();
-    before = await select.inputValue();
+    before = (await select.getAttribute("data-value")) ?? "";
     const target = before === "4" ? "3" : "4";
-    await select.selectOption(target);
+    await pickOption(page, `settings-worker-select-${POOL}`, target);
 
     await expect
       .poll(async () => await fs.readFile(ENV_PATH, "utf8"))
@@ -30,7 +31,7 @@ test("settings: a worker concurrency change lands in .env and survives a reopen"
 
     await page.goto("/");
     await page.getByTestId("settings-gear").click();
-    await expect(page.getByTestId(`settings-worker-select-${POOL}`)).toHaveValue(target);
+    await expect(page.getByTestId(`settings-worker-select-${POOL}`)).toHaveAttribute("data-value", target);
   } finally {
     // The server keeps the value in memory and in its running pool, so put both back before
     // restoring the file the suite's other tests read

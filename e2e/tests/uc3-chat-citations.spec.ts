@@ -1,4 +1,5 @@
 import { test, expect, uploadFixtureBook, FAKE_CITED_REPLY, FAKE_MODEL_KEY } from "./fixtures.ts";
+import { pickOption } from "./helpers/dropdown.ts";
 
 // Indexing runs BGE-M3 embeddings locally — first load can take a while, so full tier
 test.describe("chat with citations", { tag: "@slow" }, () => {
@@ -8,7 +9,7 @@ test.describe("chat with citations", { tag: "@slow" }, () => {
     await uploadFixtureBook(page, { waitForIndex: true });
     await page.getByRole("link", { name: /Chat/ }).click();
 
-    await page.getByTestId("chat-model").selectOption(FAKE_MODEL_KEY);
+    await pickOption(page, "chat-model", FAKE_MODEL_KEY);
     await page.getByTestId("chat-input").fill("How does the voyage begin?");
     await page.getByTestId("chat-send").click();
 

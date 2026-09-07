@@ -5,6 +5,7 @@ import { Modal, ModalHeader } from "./Modal.tsx";
 import { useLlmModels } from "../lib/use-llm-models.ts";
 import { formatTokens } from "../lib/ai-presets.ts";
 import { Button } from "./Button.tsx";
+import { Dropdown } from "./Dropdown.tsx";
 import { OcrLanguagePacksSettings } from "./OcrLanguagePacksSettings.tsx";
 
 type SecretVar = RouterInputs["secrets"]["set"]["envVar"];
@@ -153,27 +154,18 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
         <section data-testid="settings-default-model">
           <h3 className="text-sm font-semibold text-(--text-primary) mb-2">Default AI model</h3>
           <div className="rounded-md border border-(--border) p-3">
-            <select
+            <Dropdown
               value={chosenDefault}
-              onChange={(e) => setDefaultMutation.mutate({ key: e.target.value || null })}
+              onChange={(key) => setDefaultMutation.mutate({ key: key || null })}
               disabled={setDefaultMutation.isPending || (models.length === 0 && !chosenMissing)}
-              className="w-full text-sm rounded-md border border-(--border-input) bg-(--bg-input) text-(--text-primary) px-2 py-1.5"
-              data-testid="settings-default-model-select"
-            >
-              <option value="">Automatic — V4 Flash when configured, else the first available model</option>
-              {chosenMissing && <option value={chosenDefault}>{defaultModel?.steppedOver ?? chosenDefault} (not available right now)</option>}
-              {[...new Set(models.map((m) => m.source))].map((source) => (
-                <optgroup key={source} label={source}>
-                  {models
-                    .filter((m) => m.source === source)
-                    .map((m) => (
-                      <option key={m.key} value={m.key} title={`${m.hint} · ${formatTokens(m.contextTokens)} context`}>
-                        {m.label}
-                      </option>
-                    ))}
-                </optgroup>
-              ))}
-            </select>
+              fill
+              options={[
+                { value: "", label: "Automatic — V4 Flash when configured, else the first available model" },
+                ...(chosenMissing ? [{ value: chosenDefault, label: `${defaultModel?.steppedOver ?? chosenDefault} (not available right now)` }] : []),
+                ...models.map((m) => ({ value: m.key, label: m.label, hint: `${m.hint} · ${formatTokens(m.contextTokens)} context`, group: m.source })),
+              ]}
+              testId="settings-default-model-select"
+            />
             <p className="mt-2 text-xs text-(--text-muted)">
               Preselected wherever a model is picked — cleanup, Ask AI, translations, digests, chat, chapter detection.
             </p>
@@ -290,19 +282,18 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               <div key={pool.name} className="rounded-md border border-(--border) p-3" data-testid={`settings-worker-${pool.name}`}>
                 <div className="flex items-center gap-2 text-sm">
                   <span className="font-medium text-(--text-primary)">{pool.label}</span>
-                  <select
-                    value={pool.concurrency}
-                    onChange={(e) => setConcurrencyMutation.mutate({ pool: pool.name, concurrency: Number(e.target.value) })}
-                    disabled={pool.running > 0 || setConcurrencyMutation.isPending}
-                    className="ml-auto text-sm rounded-md border border-(--border-input) bg-(--bg-input) text-(--text-primary) px-2 py-1"
-                    data-testid={`settings-worker-select-${pool.name}`}
-                  >
-                    {Array.from({ length: pool.max }, (_, i) => i + 1).map((n) => (
-                      <option key={n} value={n}>
-                        {n === pool.default ? `${n} — default` : n}
-                      </option>
-                    ))}
-                  </select>
+                  <span className="ml-auto">
+                    <Dropdown
+                      value={String(pool.concurrency)}
+                      onChange={(n) => setConcurrencyMutation.mutate({ pool: pool.name, concurrency: Number(n) })}
+                      disabled={pool.running > 0 || setConcurrencyMutation.isPending}
+                      size="sm"
+                      align="right"
+                      width="w-36"
+                      options={Array.from({ length: pool.max }, (_, i) => i + 1).map((n) => ({ value: String(n), label: n === pool.default ? `${n} — default` : String(n) }))}
+                      testId={`settings-worker-select-${pool.name}`}
+                    />
+                  </span>
                 </div>
                 <p className="mt-1.5 text-xs text-(--text-muted)">{pool.hint}</p>
                 {pool.caution && (

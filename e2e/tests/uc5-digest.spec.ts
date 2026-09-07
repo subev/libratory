@@ -1,4 +1,5 @@
 import { test, expect, createApiBook, FAKE_REPLY, FAKE_MODEL_KEY } from "./fixtures.ts";
+import { pickOption } from "./helpers/dropdown.ts";
 import { trpcQuery } from "./helpers/trpc.ts";
 
 function sourceBook(title: string) {
@@ -17,7 +18,7 @@ test("UC5: a digest writes one suspended AI chapter per source book, with a note
   const modal = page.getByTestId("digest-modal");
   await modal.getByTestId("digest-title").fill("Evening Digest");
   await modal.getByTestId("digest-prompt").fill("Retell each book as a short radio essay.");
-  await modal.getByTestId("digest-model").selectOption(FAKE_MODEL_KEY);
+  await pickOption(modal, "digest-model", FAKE_MODEL_KEY);
   await modal.getByTestId("digest-create").click();
 
   // Creating a digest lands directly on the new book's page

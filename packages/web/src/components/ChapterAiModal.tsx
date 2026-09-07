@@ -199,7 +199,7 @@ export function ChapterAiModal({ scope, onClose }: { scope: AiScope; onClose: ()
             </div>
           )}
           <div className="flex items-center gap-2 shrink-0">
-            <ModelPicker value={model} onChange={setModel} testId="ai-model-toggle" />
+            <ModelPicker value={model} onChange={setModel} testId="ai-model-toggle" placement="above" />
             <Button
               variant="primary"
               onClick={run}

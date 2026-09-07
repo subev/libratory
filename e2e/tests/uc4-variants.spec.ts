@@ -1,4 +1,5 @@
 import { test, expect, createApiBook, FAKE_REPLY, FAKE_MODEL_KEY } from "./fixtures.ts";
+import { pickOption } from "./helpers/dropdown.ts";
 import { trpcQuery } from "./helpers/trpc.ts";
 
 const CHAPTER_TEXT = "The original chapter text that must survive the transform untouched.";
@@ -19,7 +20,7 @@ test("UC4: a rewrite variant streams in and keeps its params; the original stays
   const modal = page.getByTestId("translation-modal");
   await modal.getByTestId("translation-language").selectOption("preset:eli5");
   await modal.getByTestId("translation-thinking-toggle").check();
-  await modal.getByTestId("variant-model").selectOption(FAKE_MODEL_KEY);
+  await pickOption(modal, "variant-model", FAKE_MODEL_KEY);
   await modal.getByTestId("translation-start").click();
 
   await expect(modal.getByTestId("translation-text")).toContainText(FAKE_REPLY);

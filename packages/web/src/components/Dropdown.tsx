@@ -16,6 +16,9 @@ export function Dropdown({
   title,
   disabled = false,
   size = "md",
+  fill = false,
+  placement = "below",
+  align = "left",
   width = "w-72",
   icon,
 }: {
@@ -27,6 +30,9 @@ export function Dropdown({
   title?: string;
   disabled?: boolean;
   size?: "sm" | "md";
+  fill?: boolean;
+  placement?: "below" | "above";
+  align?: "left" | "right";
   width?: string;
   icon?: ReactNode;
 }) {
@@ -35,7 +41,9 @@ export function Dropdown({
   return (
     <Menu
       testId={`${testId}-menu`}
-      width={width}
+      width={fill ? "w-full" : width}
+      placement={placement}
+      align={align}
       trigger={({ open, toggle }) => (
         <Button
           type="button"
@@ -45,7 +53,7 @@ export function Dropdown({
           title={title ?? active?.hint}
           aria-haspopup="listbox"
           aria-expanded={open}
-          className="max-w-60"
+          className={fill ? "w-full justify-between" : "max-w-60"}
           data-testid={testId}
           data-value={active?.value ?? ""}
         >

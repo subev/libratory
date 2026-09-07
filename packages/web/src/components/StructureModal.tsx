@@ -459,7 +459,7 @@ export function StructureModal({
           >
             Propose (LLM)
           </Button>
-          <ModelPicker value={model} onChange={setModel} testId="structure-chapter-model" />
+          <ModelPicker value={model} onChange={setModel} testId="structure-chapter-model" placement="above" />
           {proposalRunning ? (
             <span className="text-sm text-(--accent-text) truncate" data-testid="proposal-running" title={proposalProgress}>
               {proposalProgress?.replace(/^\[AI\]\s*/, "") ??
