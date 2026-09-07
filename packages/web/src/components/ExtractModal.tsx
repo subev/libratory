@@ -2,13 +2,13 @@ import { useState } from "react";
 
 import { AfterExtractChoice } from "./AfterExtractChoice.tsx";
 import { BOOK_LANGUAGE_OPTIONS } from "../lib/languages.ts";
-import { Link } from "react-router";
 import { trpc } from "../trpc.ts";
 import { Modal, ModalHeader } from "./Modal.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { Button } from "./Button.tsx";
 import type { OcrEngine } from "../lib/ocr.ts";
 import { packForBookLanguage, useOcrLanguages } from "../lib/use-ocr-languages.ts";
+import { OcrEngineChoice } from "./OcrEngineChoice.tsx";
 import { OcrLanguagePackRow } from "./OcrLanguagePackRow.tsx";
 
 export type ExtractScope = "selected" | "book" | "chapters";
@@ -166,41 +166,17 @@ export function ExtractModal({
           </label>
 
           {canSetOcr && (
-            <div className="space-y-1.5 text-xs text-(--text-muted)" data-testid="book-ocr-engine">
-              <span className="block text-(--text-secondary)">Scanned pages</span>
-              <span className="block">
-                The pages are images. One engine reads them once into a searchable copy kept beside the original, which
-                is never replaced; every extraction, search and export afterwards reads that copy.
-              </span>
-              {([
-                ["tesseract", "Tesseract", "about a second a page; read-along word by word"],
-                ["surya", "Surya", "roughly ten times slower; better on photographed, curled, faded or skewed pages; read-along word by word at estimated positions, a character or so off at worst"],
-              ] as const).map(([value, name, trade]) => (
-                <label key={value} className="flex gap-2">
-                  <input
-                    type="radio"
-                    name="ocr-engine"
-                    checked={(ocrEngine ?? "tesseract") === value}
-                    onChange={() => onUpdateBook({ ocrEngine: value })}
-                    className="mt-0.5"
-                    data-testid={`book-ocr-engine-${value}`}
-                  />
-                  <span><span className="text-(--text-secondary)">{name}</span>{ocrEngine === null && value === "tesseract" ? " (suggested)" : ""} — {trade}</span>
-                </label>
-              ))}
-              {(ocrEngine ?? "tesseract") === "tesseract" && (
-                <span className="block" data-testid="book-ocr-suggestion">
-                  {suggestion.isLoading ? "Looking at a page for its script…"
-                    : language ? `Read as ${languageLabel(language)}, the book's language.`
-                    : suggestion.data?.script && suggestedPack ? `${suggestion.data.script} script on page ${suggestion.data.page} — read as ${suggestedPack.name} unless the book's language is set above.`
-                    : "Read as English unless the book's language is set above."}
-                </span>
-              )}
-              <span className="block">
-                <Link to={`/books/${bookId}/ocr?file=${tryFileIndex}`} className="text-(--accent-text) hover:text-(--accent-text-hover)" data-testid="book-ocr-try">Try one page…</Link>
-                {" "}— see both engines on a page you pick, with the image beside them, before committing 300 pages to one.
-              </span>
-            </div>
+            <OcrEngineChoice
+              value={ocrEngine}
+              onChange={(engine) => onUpdateBook({ ocrEngine: engine })}
+              tryHref={`/books/${bookId}/ocr?file=${tryFileIndex}`}
+              note={(ocrEngine ?? "tesseract") === "tesseract"
+                ? suggestion.isLoading ? "Looking at a page for its script…"
+                  : language ? `Read as ${languageLabel(language)}, the book's language.`
+                  : suggestion.data?.script && suggestedPack ? `${suggestion.data.script} script on page ${suggestion.data.page} — read as ${suggestedPack.name} unless the book's language is set above.`
+                  : "Read as English unless the book's language is set above."
+                : undefined}
+            />
           )}
           {canSetOcr && (ocrEngine ?? "tesseract") === "tesseract" && pack && <OcrLanguagePackRow code={pack.code} />}
 

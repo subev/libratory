@@ -6,6 +6,8 @@ import { getVoiceById, voiceSupportsSpeedControl, getVoiceLabel } from "../lib/v
 import { AI_PRESETS } from "../lib/ai-presets.ts";
 import { BOOK_LANGUAGE_OPTIONS } from "../lib/languages.ts";
 import { ModelPicker } from "./ModelPicker.tsx";
+import { OcrEngineChoice } from "./OcrEngineChoice.tsx";
+import type { OcrEngine } from "../lib/ocr.ts";
 import { PillToggle } from "./PillToggle.tsx";
 import { profileHeaders } from "../lib/profile.ts";
 import { AfterExtractChoice } from "./AfterExtractChoice.tsx";
@@ -60,6 +62,22 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
+  const [scans, setScans] = useState<string[]>([]);
+  const [ocrEngine, setOcrEngine] = useState<OcrEngine>("tesseract");
+  // One file at a time, each asked once: a drop of fifty PDFs is a few seconds in the background, not a gigabyte at once
+  const probed = useRef(new Map<File, boolean | null>());
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      const { hasTextLayer } = await import("../lib/pdf-text-layer.ts");
+      for (const file of stagedFiles) {
+        if (!live) return;
+        if (!probed.current.has(file)) probed.current.set(file, await hasTextLayer(file));
+        if (live) setScans(stagedFiles.filter((f) => probed.current.get(f) === false).map((f) => f.name));
+      }
+    })();
+    return () => { live = false; };
+  }, [stagedFiles]);
   const [customTitle, setCustomTitle] = useState("");
   const [language, setLanguage] = useState("");
   // A new array each render would recompute the voice library's language memos on every keystroke
@@ -118,6 +136,7 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
     if (title) formData.append("title", title);
     formData.append("voice", voice);
     formData.append("speed", String(voiceSupportsSpeedControl(voice) ? speed : 1.0));
+    if (scans.length > 0) formData.append("ocrEngine", ocrEngine);
     formData.append("fullExtract", String(fullExtract));
     formData.append("llmChapterDetection", String(fullExtract && llmChapterDetection));
     if (fullExtract && llmChapterDetection) formData.append("chapterModel", chapterModel);
@@ -468,6 +487,13 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
               </div>
             )}
 
+            {scans.length > 0 && (
+              <OcrEngineChoice
+                value={ocrEngine}
+                onChange={setOcrEngine}
+                note={`${scans.length === 1 ? `${scans[0]} has` : `${scans.length} of these files have`} no text layer. Read in the language set above, or from the page's own script when none is.`}
+              />
+            )}
           </fieldset>
 
           {fullExtract && (
