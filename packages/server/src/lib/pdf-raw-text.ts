@@ -16,6 +16,20 @@ export async function extractPdfRawText(pdfPath: string): Promise<string | null>
   }
 }
 
+// Three-valued on purpose: null means pdftotext could not be run at all, and failing an extraction
+// on that would break every book on a machine missing poppler rather than the one scanned PDF.
+export async function pdfHasTextLayer(pdfPath: string): Promise<boolean | null> {
+  try {
+    const { stdout } = await execFileAsync("pdftotext", [pdfPath, "-"], {
+      timeout: 60_000,
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    return stdout.trim().length > 0;
+  } catch {
+    return null;
+  }
+}
+
 // Producers write their own name into /Author often enough that a shelf sorted by it would be
 // sorted by software; those, and anything that reads like a path or a filename, are not a person.
 const NOT_A_PERSON = /^(user|admin|owner|unknown|author|microsoft|adobe|acrobat|word|pdf|scanner|hp|canon|epson|xerox)\b/i;

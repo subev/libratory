@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { findMarkerJson, pickNumberedChapterIndices, type FlatBlock } from "./marker.ts";
+import { findMarkerJson, pickNumberedChapterIndices, sliceChaptersAtIndices, type FlatBlock } from "./marker.ts";
 
 function heading(text: string, page: number, level = 1): FlatBlock {
   return { type: "SectionHeader", text, hierarchy: null, level, page, included: true };
@@ -135,6 +135,29 @@ describe("pickNumberedChapterIndices", () => {
   });
 });
 
+
+describe("a PDF that gave up no text", () => {
+  // A scan extracted with OCR off reaches here with blocks that have no text in them. Answering
+  // with one "Full Text" chapter of zero words hides that behind something that looks like a
+  // detection result, and the book lands in the library with a chapter nobody can read or narrate.
+  it("returns no chapters rather than an empty Full Text", () => {
+    const blank: FlatBlock[] = [
+      { type: "Text", text: "", hierarchy: null, page: 1, included: true },
+      { type: "Text", text: "   ", hierarchy: null, page: 2, included: true },
+    ];
+
+    expect(sliceChaptersAtIndices(blank, [])).toEqual([]);
+  });
+
+  it("still returns the whole document when there is text and no boundaries", () => {
+    const blocks = [paragraph(1), paragraph(2)];
+
+    const [whole, ...rest] = sliceChaptersAtIndices(blocks, []);
+    expect(rest).toEqual([]);
+    expect(whole?.title).toBe("Full Text");
+    expect(whole?.text).toContain("Some body text.");
+  });
+});
 
 describe("findMarkerJson", () => {
   async function outDir(files: Record<string, string[]>): Promise<string> {
