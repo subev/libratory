@@ -553,7 +553,6 @@ export function BookDetail() {
   const selectedInFlightNow = book.chapters.some((c) => c.selected && (c.status === "pending" || c.status === "normalizing" || c.status === "synthesizing"));
   const stage: "review" | "narrate" | "export" = !structureConfirmed ? "review" : audioReady > 0 && !selectedInFlightNow ? "export" : "narrate";
   const trayActions: TrayAction[] = [
-    { id: "export", label: "Export…", onClick: () => setExportOpen(true), pinned: true, primary: stage === "export" },
     ...(hasActiveChapters || translationAudioQueued
       ? [{
           id: "cancel-processing",
@@ -895,11 +894,16 @@ export function BookDetail() {
                 actions={trayActions}
                 compact={layout.trayCompact}
                 primary={
-                  stage === "review" ? (
-                    <Button variant="primary" size="sm" className="animate-pulse" onClick={() => setShowStructure(true)} data-testid="tray-review-chapters">
-                      Review chapters
+                  <>
+                    {stage === "review" && (
+                      <Button variant="primary" size="sm" className="animate-pulse" onClick={() => setShowStructure(true)} data-testid="tray-review-chapters">
+                        Review chapters
+                      </Button>
+                    )}
+                    <Button variant={stage === "export" ? "primary" : "secondary"} size="sm" onClick={() => setExportOpen(true)} data-testid="open-export">
+                      Export…
                     </Button>
-                  ) : undefined
+                  </>
                 }
               />
             )}
