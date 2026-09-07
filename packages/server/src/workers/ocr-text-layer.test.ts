@@ -63,7 +63,7 @@ describe("ocrTextLayer worker", () => {
 
     const file = row(await db.select().from(bookFiles).where(eq(bookFiles.bookId, bookId)));
     expect(file.searchablePdfPath).toBe(path.join(path.dirname(pdfPath), "00_scan.ocr.pdf"));
-    expect(await exists(file.searchablePdfPath!)).toBe(true);
+    expect(await exists(file.searchablePdfPath ?? "")).toBe(true);
     expect(await exists(pdfPath)).toBe(true);
     expect(file.ocrEngine).toBe("tesseract");
     expect(file.rawWords).toBeGreaterThan(0);

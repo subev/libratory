@@ -41,6 +41,8 @@ export async function rawExtract(payload: RawExtractPayload, { addJob }: { addJo
     } else if (!(await stat(file.pdfPath).catch(() => null))) {
       // Blaming the PDF for bytes that are not there sends the reader looking for the wrong fault
       await appendLog(bookId, `"${file.filename}" is missing from disk — remove it from the book`, file.index);
+    } else if (book?.ocrEngine) {
+      await appendLog(bookId, `Raw text unavailable for "${file.filename}" — the pages are images; OCR is queued and the text arrives when it has read them`, file.index);
     } else {
       await appendLog(bookId, `Raw text unavailable for "${file.filename}" — PDF may be scanned or encrypted. Set an OCR engine under "About this book" in Extract… and the pages are read into a searchable copy first`, file.index);
     }

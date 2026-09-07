@@ -52,7 +52,7 @@ function run(command: string, args: string[], signal: AbortSignal | undefined, o
       reject(new ExtractAbortedError());
       return;
     }
-    const proc = spawn(command, args, { env: tesseractEnv() });
+    const proc = spawn(command, args, { env: tesseractEnv(), stdio: ["ignore", "ignore", "pipe"] });
     const handleAbort = () => proc.kill("SIGKILL");
     signal?.addEventListener("abort", handleAbort, { once: true });
 
@@ -142,7 +142,7 @@ export const runTesseractOcr: OcrRunner = async ({ pdfPath, outPdfPath, language
       const page = Number(match[1]) + 1;
       if (page <= lastLogged) return;
       lastLogged = page;
-      void log(`OCR page ${page}/${pages}`);
+      log(`OCR page ${page}/${pages}`).catch(() => {});
     });
 
     const stats = statsFromTsv(await readFile(`${base}.tsv`, "utf-8"));
