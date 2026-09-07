@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -19,7 +19,7 @@ afterAll(async () => {
 describe("the tools the app expects to find in its bundle", () => {
   it("names real executables, not the keys around them", () => {
     const names = Object.keys(pins.bundledTools.versions);
-    expect(names).toEqual(["ffmpeg", "pdftotext", "pdfinfo"]);
+    expect(names).toEqual(["ffmpeg", "pdftotext", "pdfinfo", "tesseract", "pdftoppm"]);
     expect(names).not.toContain("url");
     expect(names).not.toContain("sha256");
   });
@@ -30,7 +30,7 @@ describe("the tools the app expects to find in its bundle", () => {
     // Homebrew is in the search order behind the bundle, so this only holds for names that cannot
     // be on any PATH — the point is that the *names* are what is probed for.
     expect(missingTools(empty)).toEqual(expect.arrayContaining([]));
-    expect(missingTools(empty).every((t) => ["ffmpeg", "pdftotext", "pdfinfo"].includes(t))).toBe(true);
+    expect(missingTools(empty).every((t) => Object.keys(pins.bundledTools.versions).includes(t))).toBe(true);
   });
 
   it("finds them once they are where the bundle puts them", async () => {
@@ -62,10 +62,13 @@ describe("what a first run has to put in place before any step reads it", () => 
     const resources = path.join(d, "resources");
     const home = path.join(d, "home");
     await mkdir(path.join(resources, "scripts"), { recursive: true });
+    await mkdir(path.join(resources, "tessdata", "configs"), { recursive: true });
     for (const f of ["pyproject.toml", "uv.lock", "docker-compose.yml"]) {
       await writeFile(path.join(resources, f), "");
     }
     await writeFile(path.join(resources, "scripts", "models.py"), "");
+    await writeFile(path.join(resources, "tessdata", "eng.traineddata"), "shipped");
+    await writeFile(path.join(resources, "tessdata", "configs", "pdf"), "");
     stageRuntime(resources, home);
     return { resources, home };
   }
@@ -91,6 +94,21 @@ describe("what a first run has to put in place before any step reads it", () => 
   it("creates the home directory when there is not one yet", async () => {
     const { home } = await stagedInto();
     expect(existsSync(home)).toBe(true);
+  });
+
+  // TESSDATA_PREFIX is one directory holding both the shipped packs and any the user downloaded,
+  // and an update replaces Resources wholesale — so this refreshes what shipped and touches
+  // nothing else. Replacing the directory would silently delete a pack somebody waited on.
+  it("refreshes the shipped tessdata without deleting a downloaded pack", async () => {
+    const { resources, home } = await stagedInto();
+    await writeFile(path.join(home, "tessdata", "bul.traineddata"), "downloaded");
+    await writeFile(path.join(resources, "tessdata", "eng.traineddata"), "newer");
+
+    stageRuntime(resources, home);
+
+    expect(await readFile(path.join(home, "tessdata", "eng.traineddata"), "utf8")).toBe("newer");
+    expect(existsSync(path.join(home, "tessdata", "bul.traineddata"))).toBe(true);
+    expect(existsSync(path.join(home, "tessdata", "configs", "pdf"))).toBe(true);
   });
 });
 

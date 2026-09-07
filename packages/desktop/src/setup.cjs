@@ -59,6 +59,10 @@ function sh(cmd, args, opts = {}) {
 function stageRuntime(resources, home) {
   mkdirSync(home, { recursive: true });
   cpSync(path.join(resources, "scripts"), path.join(home, "scripts"), { recursive: true });
+  // TESSDATA_PREFIX is one directory and downloaded language packs land in it, so the shipped
+  // files are copied over rather than the directory replaced — an update must not delete a pack
+  // the user waited on. force:true is what keeps the shipped ones current across versions.
+  cpSync(path.join(resources, "tessdata"), path.join(home, "tessdata"), { recursive: true, force: true });
   for (const f of ["pyproject.toml", "uv.lock", "docker-compose.yml"]) {
     copyFileSync(path.join(resources, f), path.join(home, f));
   }

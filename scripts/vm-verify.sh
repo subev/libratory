@@ -24,6 +24,7 @@ echo "  macOS $(sw_vers -productVersion) on $(uname -m)"
 test -d /opt/homebrew/bin && echo "  NOTE  this image has Homebrew; the tool checks below are what matter"
 check "no ffmpeg on PATH" '! command -v ffmpeg'
 check "no pdftotext on PATH" '! command -v pdftotext'
+check "no tesseract on PATH" '! command -v tesseract'
 check "no Python 3.12 on PATH" '! command -v python3.12'
 check "no existing Libratory data" '! test -d "$HOME/Library/Application Support/Libratory"'
 if ! command -v docker >/dev/null 2>&1 && ! test -S /var/run/docker.sock; then
@@ -55,9 +56,15 @@ fi
 echo
 echo "=== the bundled tools, with no Homebrew to fall back on ==="
 BIN="$APP/Contents/Resources/bin"
-for t in ffmpeg pdftotext pdfinfo; do
+TESSDATA="$APP/Contents/Resources/tessdata"
+for t in ffmpeg pdftotext pdfinfo pdftoppm; do
   check "$t runs from the bundle" "env PATH=/usr/bin:/bin '$BIN/$t' $([ "$t" = ffmpeg ] && echo -version || echo -v)"
 done
+check "tesseract runs from the bundle" "env PATH=/usr/bin:/bin '$BIN/tesseract' --version"
+# The packs alone are not enough: writing a searchable PDF needs configs/pdf and pdf.ttf in the
+# same directory, and a bundle missing them fails at OCR time with no useful message.
+check "the shipped language packs are found" "env PATH=/usr/bin:/bin TESSDATA_PREFIX='$TESSDATA' '$BIN/tesseract' --list-langs | grep -q '^eng$'"
+check "tesseract can write a searchable PDF" "test -f '$TESSDATA/pdf.ttf' && test -f '$TESSDATA/configs/pdf'"
 
 echo
 echo "=== first run ==="

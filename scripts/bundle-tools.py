@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Copies ffmpeg, pdftotext and pdfinfo — plus every library they need — into the desktop bundle.
+"""Copies ffmpeg, poppler and tesseract — plus every library they need — into the desktop bundle.
 
 Homebrew's binaries link their dependencies by absolute path into /opt/homebrew, so copying one
 into an app gives you something that only runs on a machine that already has Homebrew, which is
@@ -7,6 +7,11 @@ the prerequisite the app exists to remove. This walks the dependency closure, co
 rewrites every load command to @loader_path so the folder runs from anywhere.
 
     python3 scripts/bundle-tools.py [--out packages/desktop/resources/bin]
+
+Tesseract also needs data beside its binary: the eng/osd language packs, and — the part that costs
+an hour to rediscover — configs/pdf and pdf.ttf, without which `tesseract … pdf` fails instantly
+with no useful message. Those are copied into <resources>/tessdata so one tarball carries both, and
+setup.cjs stages that directory into HOME where downloaded packs join them.
 
 Same lesson as the embedded Postgres, and the same reason DYLD_LIBRARY_PATH is not the answer:
 the hardened runtime strips DYLD_*, so it would work in development and fail in the shipped app.
@@ -24,6 +29,10 @@ PINS_FILE = Path(__file__).parent / "pins.json"
 PINNED = json.loads(PINS_FILE.read_text())["bundledTools"]["versions"]
 TOOLS = list(PINNED)
 SYSTEM_PREFIXES = ("/usr/lib/", "/System/")
+# Only these two packs ship: 26 MB against 1.14 GB for all 125, and every other language is one
+# download away. osd earns its place by naming the script on a page, which is what makes the
+# download offer a suggestion rather than a list of 125 names.
+TESSDATA = ["eng.traineddata", "osd.traineddata", "pdf.ttf", "configs", "tessconfigs"]
 
 
 def rpaths(binary: Path) -> list[str]:
@@ -101,14 +110,19 @@ def relocate(path: Path, libdir_rel: str) -> None:
     check(["codesign", "--force", "--sign", "-", "--timestamp=none", str(path)], "re-signing")
 
 
-VERSION_RE = re.compile(r"(?:ffmpeg|pdftotext|pdfinfo) version (\d+[\d.]*)")
+VERSION_RE = re.compile(r"(?:ffmpeg|pdftotext|pdfinfo|pdftoppm)(?: version)? (\d+[\d.]*)|tesseract (\d+[\d.]*)")
+
+
+def version_flag(name: str) -> str:
+    if name == "ffmpeg":
+        return "-version"
+    return "--version" if name == "tesseract" else "-v"
 
 
 def installed_version(binary: Path) -> str | None:
-    flag = "-version" if binary.name == "ffmpeg" else "-v"
-    out = subprocess.run([str(binary), flag], capture_output=True, text=True)
+    out = subprocess.run([str(binary), version_flag(binary.name)], capture_output=True, text=True)
     m = VERSION_RE.search(out.stdout + out.stderr)
-    return m.group(1) if m else None
+    return (m.group(1) or m.group(2)) if m else None
 
 
 # Homebrew ships one version of each of these and upgrades it under you — today's formula is ffmpeg
@@ -133,11 +147,30 @@ def check_versions(originals: list[Path], update: bool) -> int:
         "\nThese go inside the DMG, so a change here reaches every user. Adopt it deliberately:\n"
         "  1. extract and synthesize a real book with the new versions\n"
         "  2. python3 scripts/bundle-tools.py --update-pins\n"
-        "  3. tar -czf libratory-tools-arm64.tar.gz -C packages/desktop/resources bin\n"
+        "  3. tar -czf libratory-tools-arm64.tar.gz -C packages/desktop/resources bin tessdata\n"
         "  4. gh release create tools-N that tarball, and put its url + sha256 in pins.json",
         file=sys.stderr,
     )
     return 1
+
+
+# TESSDATA_PREFIX is one directory, so the packs, the configs and pdf.ttf all have to live in it.
+def copy_tessdata(dest: Path) -> Path:
+    prefix = subprocess.run(["brew", "--prefix"], capture_output=True, text=True).stdout.strip()
+    source = Path(prefix) / "share" / "tessdata"
+    if not source.is_dir():
+        raise SystemExit(f"No tessdata at {source} — brew install tesseract")
+    shutil.rmtree(dest, ignore_errors=True)
+    dest.mkdir(parents=True)
+    for name in TESSDATA:
+        item = source / name
+        if not item.exists():
+            raise SystemExit(f"{item} is missing — brew install tesseract")
+        if item.is_dir():
+            shutil.copytree(item, dest / name)
+        else:
+            shutil.copy2(item, dest / name)
+    return dest
 
 
 def main() -> int:
@@ -155,7 +188,7 @@ def main() -> int:
     for tool in TOOLS:
         found = shutil.which(tool)
         if not found:
-            print(f"{tool} is not installed — brew install ffmpeg poppler", file=sys.stderr)
+            print(f"{tool} is not installed — brew install ffmpeg poppler tesseract", file=sys.stderr)
             return 1
         originals.append(Path(found).resolve())
 
@@ -185,13 +218,19 @@ def main() -> int:
     for root in roots:
         relocate(root, "@loader_path/lib")
 
+    tessdata = copy_tessdata(out.parent / "tessdata")
+
     total = sum(f.stat().st_size for f in out.rglob("*") if f.is_file())
+    data_total = sum(f.stat().st_size for f in tessdata.rglob("*") if f.is_file())
     print(f"{len(TOOLS)} tools + {len(libs)} libraries -> {out}  ({total / 1e6:.0f} MB)")
+    print(f"tessdata -> {tessdata}  ({data_total / 1e6:.0f} MB)")
 
     # Proving it here beats discovering it on a machine with no Homebrew
     for root in roots:
-        flag = "-version" if root.name == "ffmpeg" else "-v"
-        r = subprocess.run([str(root), flag], capture_output=True, text=True, env={"PATH": "/usr/bin:/bin"})
+        env = {"PATH": "/usr/bin:/bin"}
+        if root.name == "tesseract":
+            env["TESSDATA_PREFIX"] = str(tessdata)
+        r = subprocess.run([str(root), version_flag(root.name)], capture_output=True, text=True, env=env)
         first = [l for l in (r.stdout + r.stderr).splitlines() if l.strip()][:1]
         ok = bool(first) and "error" not in first[0].lower()
         print(f"  {root.name}: {'OK' if ok else 'FAILED'} {first[0][:56] if first else ''}")

@@ -21,13 +21,15 @@
     }
   },
   "bundledTools": {
-    "_comment": "ffmpeg, pdftotext and pdfinfo ship inside the DMG, and Homebrew has no versioned formula for any of them \u2014 a build machine that installs 'ffmpeg' gets whatever is current that week, which reached CI as 8.1.2 against the 7.1.1 this was tested with. So the built bundle is the artefact, downloaded and checksummed like uv and bun. Rebuild with scripts/bundle-tools.py, upload a new tools-N release, update this.",
+    "_comment": "ffmpeg, poppler's pdftotext/pdfinfo/pdftoppm and tesseract ship inside the DMG, and Homebrew has no versioned formula for any of them \u2014 a build machine that installs 'ffmpeg' gets whatever is current that week, which reached CI as 8.1.2 against the 7.1.1 this was tested with. So the built bundle is the artefact, downloaded and checksummed like uv and bun. It carries the eng/osd traineddata and tesseract's configs alongside the binaries, because writing a searchable PDF needs configs/pdf and pdf.ttf beside the language files. Rebuild with scripts/bundle-tools.py, upload a new tools-N release, update this.",
     "url": "https://github.com/subev/libratory/releases/download/tools-1/pdf2audio-tools-arm64.tar.gz",
     "sha256": "1c74fab64df7156c5516b3b4959e3c6d1a5bec102e175830d7efffcf518416b1",
     "versions": {
       "ffmpeg": "7.1.1",
       "pdftotext": "25.05.0",
-      "pdfinfo": "25.05.0"
+      "pdfinfo": "25.05.0",
+      "tesseract": "5.5.0",
+      "pdftoppm": "25.05.0"
     }
   }
 }

@@ -33,6 +33,8 @@ else
   INSTALL="install via your package manager:"
 fi
 POPPLER_PKG="poppler"; [ "$PLATFORM" = "linux" ] && POPPLER_PKG="poppler-utils"
+# Debian splits the English pack and script detection out of the engine, and OCR needs both.
+TESSERACT_PKG="tesseract"; [ "$PLATFORM" = "linux" ] && TESSERACT_PKG="tesseract-ocr tesseract-ocr-eng tesseract-ocr-osd"
 NODE_HINT="brew install node"; [ "$PLATFORM" = "linux" ] && NODE_HINT="from nodejs.org or your distribution"
 PYTHON_HINT="brew install python@3.12"
 if [ "$PLATFORM" = "linux" ]; then
@@ -43,6 +45,7 @@ missing=()
 command -v ffmpeg >/dev/null 2>&1 || missing+=("ffmpeg ($INSTALL ffmpeg)")
 command -v espeak-ng >/dev/null 2>&1 || missing+=("espeak-ng ($INSTALL espeak-ng)")
 command -v pdftotext >/dev/null 2>&1 || missing+=("pdftotext ($INSTALL $POPPLER_PKG)")
+command -v tesseract >/dev/null 2>&1 || missing+=("tesseract ($INSTALL $TESSERACT_PKG)")
 command -v pnpm >/dev/null 2>&1 || missing+=("pnpm (npm install -g pnpm)")
 if [ "$PLATFORM" = "linux" ]; then
   # Read-along EPUBs are packed with the system zip; every Mac ships it, minimal servers do not.
@@ -73,6 +76,7 @@ fi
 echo "  ffmpeg: $(which ffmpeg)"
 echo "  espeak-ng: $(which espeak-ng)"
 echo "  pdftotext: $(which pdftotext)"
+echo "  tesseract: $(which tesseract)"
 echo "  python: $PYTHON ($("$PYTHON" --version))"
 echo "  node: $(node --version), pnpm: $(pnpm --version)"
 if command -v docker >/dev/null 2>&1; then
