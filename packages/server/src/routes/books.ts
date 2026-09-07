@@ -539,6 +539,13 @@ export const booksRouter = router({
       return book;
     }),
 
+  confirmStructure: publicProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ input }) => {
+      await db.update(books).set({ structureConfirmedAt: new Date(), updatedAt: new Date() }).where(eq(books.id, input.id));
+      return { confirmed: true };
+    }),
+
   retry: publicProcedure
     .input(
       z.object({

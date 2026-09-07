@@ -162,6 +162,8 @@ export const books = pgTable("books", {
   origin: jsonb("origin").$type<BookOrigin>(),
   digestJob: jsonb("digest_job").$type<DigestJob>(),
   searchIndex: jsonb("search_index").$type<SearchIndexJob>(),
+  // Set when someone looked at the chapters and said they are right; cleared whenever they are rebuilt
+  structureConfirmedAt: timestamp("structure_confirmed_at", { withTimezone: true }),
   // "set null", never cascade: book deletion must go through deleteBook (disk cleanup)
   folderId: uuid("folder_id").references(() => folders.id, { onDelete: "set null" }),
   profileId: uuid("profile_id").notNull().default(DEFAULT_PROFILE_ID).references(() => profiles.id),

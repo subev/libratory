@@ -253,6 +253,13 @@
       "when": 1788776623804,
       "tag": "0035_ocr_text_layer",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1788811389555,
+      "tag": "0036_structure_confirmed",
+      "breakpoints": true
     }
   ]
 }

@@ -741,6 +741,16 @@ describe("booksRouter.retry with forgetTextLayer", () => {
     for (const d of [garbled.dir, clean.dir]) await rm(d, { recursive: true, force: true });
   });
 
+  it("forgets a confirmed structure when the chapters are rebuilt", async () => {
+    const db = getDb();
+    const { bookId, dir } = await scannedBook(0.05);
+    await caller.confirmStructure({ id: bookId });
+    expect(row(await db.select().from(books).where(eq(books.id, bookId))).structureConfirmedAt).not.toBeNull();
+    await caller.retry({ id: bookId });
+    expect(row(await db.select().from(books).where(eq(books.id, bookId))).structureConfirmedAt).toBeNull();
+    await rm(dir, { recursive: true, force: true });
+  });
+
   it("drops the searchable copy and its figures, sets the engine, and re-extracts", async () => {
     const db = getDb();
     const { bookId, copy, dir } = await scannedBook(0.2);

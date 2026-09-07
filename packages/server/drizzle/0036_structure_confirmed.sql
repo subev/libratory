@@ -1,0 +1,1 @@
+ALTER TABLE "books" ADD COLUMN "structure_confirmed_at" timestamp with time zone;

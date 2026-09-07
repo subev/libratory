@@ -547,7 +547,13 @@ export function BookDetail() {
     },
   };
 
+  // The tray's one orange button is the next step in the pipeline: look at the chapters, then narrate, then export
+  const structureConfirmed = Boolean(book.structureConfirmedAt);
+  const audioReady = book.chapters.filter((c) => c.selected && c.audioPath).length;
+  const selectedInFlightNow = book.chapters.some((c) => c.selected && (c.status === "pending" || c.status === "normalizing" || c.status === "synthesizing"));
+  const stage: "review" | "narrate" | "export" = !structureConfirmed ? "review" : audioReady > 0 && !selectedInFlightNow ? "export" : "narrate";
   const trayActions: TrayAction[] = [
+    ...(stage !== "export" ? [{ id: "export", label: "Export…", onClick: () => setExportOpen(true), pinned: true }] : []),
     ...(hasActiveChapters || translationAudioQueued
       ? [{
           id: "cancel-processing",
@@ -888,9 +894,19 @@ export function BookDetail() {
                 actions={trayActions}
                 compact={layout.trayCompact}
                 primary={
-                  <Button variant="primary" size="sm" onClick={() => setExportOpen(true)} data-testid="open-export">
-                    Export…
-                  </Button>
+                  stage === "review" ? (
+                    <Button variant="primary" size="sm" className="animate-pulse" onClick={() => setShowStructure(true)} data-testid="tray-review-chapters">
+                      Review chapters
+                    </Button>
+                  ) : stage === "narrate" ? (
+                    <Button variant="primary" size="sm" onClick={() => setShowSynthesize(true)} data-testid="tray-synthesize">
+                      Synthesize…
+                    </Button>
+                  ) : (
+                    <Button variant="primary" size="sm" onClick={() => setExportOpen(true)} data-testid="open-export">
+                      Export…
+                    </Button>
+                  )
                 }
               />
             )}
@@ -1054,18 +1070,19 @@ export function BookDetail() {
             <>
               <div className="flex items-center gap-2 mb-3 flex-wrap shrink-0">
                 <Button
-                  variant="secondary"
+                  variant={stage === "review" && book.kind === "pdf" ? "primary" : "secondary"}
+                  className={stage === "review" && book.kind === "pdf" ? "animate-pulse" : ""}
                   onClick={() => setShowStructure(true)}
                   disabled={book.kind !== "pdf"}
                   title={
                     book.kind !== "pdf"
                       ? "Synthetic book — no PDF structure to edit"
-                      : "Review every detected heading and edit chapter boundaries by hand"
+                      : "Look at the chapters that were found, fix their boundaries, or let the AI propose them — then say they are right"
                   }
                   data-testid="open-structure"
                 >
-                  <IconStructure className="w-4 h-4 text-(--accent-text)" />
-                  Structure
+                  <IconStructure className={`w-4 h-4 ${stage === "review" && book.kind === "pdf" ? "" : "text-(--accent-text)"}`} />
+                  Review chapters
                 </Button>
                 {book.chapterDetection && (
                   <span
@@ -1233,6 +1250,7 @@ export function BookDetail() {
           isProcessing={isProcessing}
           chapterProposal={book.chapterProposal ?? null}
           chapterModel={book.chapterModel ?? null}
+          confirmed={structureConfirmed}
           files={book.files?.map((f) => ({ id: f.id, index: f.index, filename: f.filename }))}
           onClose={() => setShowStructure(false)}
           onChanged={invalidate}

@@ -1,5 +1,5 @@
 import { db } from "../db.ts";
-import { chapters, chapterVariants, type ChapterSource } from "../schema.ts";
+import { books, chapters, chapterVariants, type ChapterSource } from "../schema.ts";
 import { and, asc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { appendLog } from "./log.ts";
 
@@ -38,6 +38,7 @@ export async function insertSuspendedChapters(
 // reset — their audio files are deleted along with the book output dir. Returns k,
 // which callers use as the offset for newly detected chapters.
 export async function resetChaptersKeepingInserted(bookId: string): Promise<number> {
+  await db.update(books).set({ structureConfirmedAt: null }).where(eq(books.id, bookId));
   const kept = await db
     .select({ id: chapters.id })
     .from(chapters)
