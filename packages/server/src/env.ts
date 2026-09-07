@@ -17,6 +17,9 @@ const envSchema = z.object({
   DATABASE_URL: z.string(),
   DATA_DIR: z.string().default("./data"),
   PORT: z.coerce.number().default(3034),
+  // Echoed back by /health so the desktop launcher can tell the server it spawned from whatever
+  // else already had the port — usually a checkout's dev server, serving a different web bundle.
+  LIBRATORY_INSTANCE: z.string().optional(),
   // Localhost by default: the desktop app opens a window on the same machine, and a library that
   // answers the whole coffee-shop network is not a default anyone chose.
   HOST: z.string().default("127.0.0.1"),

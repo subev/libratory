@@ -2,6 +2,7 @@
 const { app, BrowserWindow, Menu, shell, dialog, ipcMain } = require("electron");
 const { execFileSync, spawn } = require("node:child_process");
 const { createWriteStream, renameSync, statSync } = require("node:fs");
+const { randomUUID } = require("node:crypto");
 
 const path = require("node:path");
 const setup = require("./setup.cjs");
@@ -9,6 +10,7 @@ const docker = require("./docker.cjs");
 const crash = require("./crash.cjs");
 const runtime = require("./runtime.cjs");
 const updater = require("./updater.cjs");
+const health = require("./health.cjs");
 
 const PORT = Number(process.env.LIBRATORY_PORT || 3034);
 
@@ -43,6 +45,10 @@ const DEFAULT_DATABASE_URL = "postgres://libratory:libratory@localhost:5433/libr
 let win = null;
 /** @type {import("node:child_process").ChildProcess | null} */
 let server = null;
+// Regenerated per spawn, so a "Check again" after a failed boot cannot be satisfied by the server
+// the previous attempt left behind.
+/** @type {string} */
+let INSTANCE = "";
 
 // First run pulls a 644 MB Postgres image, which took longer than the two-minute timeout this used
 // to have — killed mid-pull, and reported as "Postgres would not start". Docker's own output is
@@ -138,6 +144,7 @@ function appLog(line) {
 
 function startServer(onDied) {
   killOrphanedServers();
+  INSTANCE = randomUUID();
   const bundled = path.join(RESOURCES, "libratory-server");
   server = spawn(bundled, [], { env: serverEnv(), stdio: ["ignore", "pipe", "pipe"] });
   let tail = "";
@@ -178,20 +185,10 @@ function serverEnv() {
     DATABASE_URL: process.env.DATABASE_URL || CONFIG.databaseUrl || DEFAULT_DATABASE_URL,
     LIBRATORY_ENV_FILE: process.env.LIBRATORY_ENV_FILE || CONFIG.envFile || path.join(HOME, ".env"),
     PORT: String(PORT),
+    LIBRATORY_INSTANCE: INSTANCE,
     // A GUI app's PATH omits Homebrew, and the workers spawn ffmpeg, pdftotext and pdfinfo
     PATH: setup.toolPath(RESOURCES),
   };
-}
-
-async function waitFor(url, timeoutMs, abandoned = () => false) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (abandoned()) return false;
-    const ok = await fetch(url, { signal: AbortSignal.timeout(2000) }).then((r) => r.ok).catch(() => false);
-    if (ok) return true;
-    await new Promise((r) => setTimeout(r, 700));
-  }
-  return false;
 }
 
 let booting = false;
@@ -271,9 +268,12 @@ const STEPS = [
       /** @type {string | null} */
       let died = null;
       startServer((reason) => { died = reason; });
-      const ready = await waitFor(`${ctx.url}/health`, 120000, () => Boolean(died));
+      const state = await health.waitForServer(`${ctx.url}/health`, INSTANCE, 120000, () => Boolean(died));
+      // Before `died`: a taken port kills our server too, and "address already in use" sends the
+      // reader looking for a crash rather than for the other server that is about to be adopted.
+      if (state === "foreign") throw new Error(`Something else is already serving ${ctx.url} — most likely a \`pnpm dev\` server from a checkout. Quit it, or launch with LIBRATORY_PORT set to a free port.`);
       if (died) throw new Error(died);
-      if (!ready) throw new Error("The server did not start — check Console.app for Libratory.");
+      if (state !== "ours") throw new Error("The server did not start — check Console.app for Libratory.");
     },
   },
 ];
