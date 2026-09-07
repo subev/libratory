@@ -6,7 +6,7 @@ export const VARIANTS = ["primary", "secondary", "danger", "warning", "success",
 type Variant = (typeof VARIANTS)[number];
 type Size = "sm" | "md";
 
-const BASE = "inline-flex items-center justify-center gap-1.5 font-medium whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed";
+const BASE = "inline-flex cursor-pointer items-center justify-center gap-1.5 font-medium whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed";
 
 const VARIANT: Record<Variant, string> = {
   primary: "bg-(--accent) text-(--on-accent) hover:bg-(--accent-hover)",
