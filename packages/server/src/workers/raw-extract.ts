@@ -4,6 +4,7 @@ import { books, bookFiles } from "../schema.ts";
 import { eq, asc, and, isNull, isNotNull } from "drizzle-orm";
 import { extractPdfRawText, extractPdfAuthor, countWords, readablePdfPath } from "../lib/pdf-raw-text.ts";
 import { appendLog } from "../lib/log.ts";
+import { adoptDetectedLanguage } from "../lib/detect-language.ts";
 import { stat } from "node:fs/promises";
 
 export type RawExtractPayload = {
@@ -37,6 +38,7 @@ export async function rawExtract(payload: RawExtractPayload, { addJob }: { addJo
       const words = countWords(text);
       await db.update(bookFiles).set({ rawText: text, rawWords: words }).where(eq(bookFiles.id, file.id));
       await appendLog(bookId, `Raw text: "${file.filename}" — ${words.toLocaleString()} words`, file.index);
+      if (extracted === 0) await adoptDetectedLanguage(bookId, text, (msg) => appendLog(bookId, msg));
       extracted++;
     } else if (!(await stat(file.pdfPath).catch(() => null))) {
       // Blaming the PDF for bytes that are not there sends the reader looking for the wrong fault

@@ -8,6 +8,7 @@ import { BOOK_LANGUAGE_OPTIONS } from "../lib/languages.ts";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { OcrEngineChoice } from "./OcrEngineChoice.tsx";
 import type { OcrEngine } from "../lib/ocr.ts";
+import type { PdfProbe } from "../lib/pdf-text-layer.ts";
 import { PillToggle } from "./PillToggle.tsx";
 import { profileHeaders } from "../lib/profile.ts";
 import { AfterExtractChoice } from "./AfterExtractChoice.tsx";
@@ -65,15 +66,22 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
   const [scans, setScans] = useState<string[]>([]);
   const [ocrEngine, setOcrEngine] = useState<OcrEngine>("tesseract");
   // One file at a time, each asked once: a drop of fifty PDFs is a few seconds in the background, not a gigabyte at once
-  const probed = useRef(new Map<File, boolean | null>());
+  const probed = useRef(new Map<File, PdfProbe>());
+  const [detectedLanguage, setDetectedLanguage] = useState<string | null>(null);
+  const languageTouched = useRef(false);
   useEffect(() => {
     let live = true;
     (async () => {
-      const { hasTextLayer } = await import("../lib/pdf-text-layer.ts");
+      const [{ probePdf }, { detectLanguage }] = await Promise.all([import("../lib/pdf-text-layer.ts"), import("../lib/detect-language.ts")]);
       for (const file of stagedFiles) {
         if (!live) return;
-        if (!probed.current.has(file)) probed.current.set(file, await hasTextLayer(file));
-        if (live) setScans(stagedFiles.filter((f) => probed.current.get(f) === false).map((f) => f.name));
+        if (!probed.current.has(file)) probed.current.set(file, await probePdf(file));
+        if (!live) return;
+        const probes = stagedFiles.map((f) => probed.current.get(f)).filter((p): p is PdfProbe => p !== undefined);
+        setScans(stagedFiles.filter((f) => probed.current.get(f)?.hasText === false).map((f) => f.name));
+        const detected = detectLanguage(probes.map((p) => p.sample).join(" "));
+        setDetectedLanguage(detected);
+        if (detected && !languageTouched.current) setLanguage(detected);
       }
     })();
     return () => { live = false; };
@@ -445,7 +453,7 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
               <span className="text-sm text-(--text-primary)">Language</span>
               <select
                 value={language}
-                onChange={(e) => setLanguage(e.target.value)}
+                onChange={(e) => { languageTouched.current = true; setLanguage(e.target.value); }}
                 className="rounded-md border border-(--border-input) bg-(--bg-input) px-2 py-1 text-sm text-(--text-primary)"
                 data-testid="upload-language"
               >
@@ -454,7 +462,9 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
                   <option key={code} value={code}>{label}</option>
                 ))}
               </select>
-              <span className="min-w-0 text-xs text-(--text-muted)">Decides which voices the picker offers first.</span>
+              <span className="min-w-0 text-xs text-(--text-muted)">
+                Decides which voices the picker offers first.{detectedLanguage && language === detectedLanguage ? " Read from the text — change it if that is wrong." : ""}
+              </span>
             </label>
           </div>
 

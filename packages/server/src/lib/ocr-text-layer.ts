@@ -6,6 +6,7 @@ import { db } from "../db.ts";
 import { bookFiles, type BookFile, type OcrEngine } from "../schema.ts";
 import { runSuryaOcr } from "./ocr-surya.ts";
 import { runTesseractOcr, type OcrStats } from "./ocr-tesseract.ts";
+import { adoptDetectedLanguage } from "./detect-language.ts";
 import { bookTmpDir } from "./paths.ts";
 import { countWords, extractPdfRawText, pdfHasTextLayer } from "./pdf-raw-text.ts";
 
@@ -80,6 +81,8 @@ export async function ensureTextLayer({
       ...(rawText ? { rawText, rawWords } : {}),
     })
     .where(eq(bookFiles.id, file.id));
+
+  if (rawText) await adoptDetectedLanguage(bookId, rawText, log);
 
   const confidence = percent(stats.confidence);
   const garbled = percent(stats.lowConfidenceFraction);
