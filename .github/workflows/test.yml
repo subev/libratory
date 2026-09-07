@@ -36,9 +36,10 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      # The read-along EPUB tests shell out to the real zip and unzip; asking apt is cheaper than
-      # trusting the runner image's inventory.
-      - run: sudo apt-get update && sudo apt-get install -y zip unzip
+      # The read-along EPUB tests shell out to the real zip and unzip, and the OCR tests run
+      # tesseract and poppler for real against a one-page scan; asking apt is cheaper than trusting
+      # the runner image's inventory.
+      - run: sudo apt-get update && sudo apt-get install -y zip unzip poppler-utils tesseract-ocr tesseract-ocr-eng
 
       - run: pnpm install --frozen-lockfile
 
@@ -52,8 +53,9 @@ jobs:
       - run: pnpm -r build
 
       # All three packages: the server suite clones its template database per file, web and
-      # desktop are plain vitest. Python is never spawned — subprocess seams are mocked. The URL
-      # is set here because env.ts requires one and a runner has no .env to read it from.
+      # desktop are plain vitest. No model ever runs — the one Python the suite spawns is the Surya
+      # stub under test/fixtures, plain python3. The URL is set here because env.ts requires one
+      # and a runner has no .env to read it from.
       - run: pnpm test
         env:
           DATABASE_URL: postgres://libratory:libratory@localhost:5433/libratory
