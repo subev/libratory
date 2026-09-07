@@ -105,16 +105,21 @@ function main() {
     console.log(`\n  This build was NOT notarised. macOS will refuse it and the updater cannot install it.`);
   }
 
-  return { tag, notes, isNewest, risky: notarised !== "yes" };
+  if (!isNewest) {
+    console.log(`\n  ${tag} is older than ${tags.filter((t) => newer(t, tag)).join(", ")}, which is already out.`);
+  }
+
+  return { tag, notes, isNewest, risky: notarised !== "yes" || !isNewest };
 }
 
 const plan = main();
 
 const publish = () => {
   const flags = ["release", "edit", plan.tag, "--draft=false", "--notes-file", "-"];
-  if (plan.isNewest) flags.push("--latest");
+  // Explicit either way: GitHub's make_latest defaults to true, so an older draft would take the badge.
+  flags.push(plan.isNewest ? "--latest" : "--latest=false");
   execFileSync("gh", flags, { cwd: REPO, input: plan.notes, stdio: ["pipe", "inherit", "inherit"] });
-  console.log(`\n  Published ${plan.tag}. Everyone running an older build will be offered it.\n`);
+  console.log(`\n  Published ${plan.tag}.${plan.isNewest ? " Everyone running an older build will be offered it." : " It is not the latest release, so nobody is offered it as an update."}\n`);
 };
 
 if (go) {

@@ -127,9 +127,11 @@ pnpm ship             # publish the draft that build produced
 `release` and `ship` are separate on purpose: cutting a release is reversible, publishing one is
 not, because `electron-updater` starts offering it to everyone the moment it stops being a draft.
 `scripts/ship.mjs` refuses a build that is still running, one that failed, one missing an artefact,
-and warns loudly about one the notary did not accept — all four look like a perfectly normal draft
-in the GitHub UI. If the notes are still the workflow's placeholder it writes them from the commit
-subjects since the previous tag.
+and warns loudly about one the notary did not accept or one a newer release has already overtaken —
+all five look like a perfectly normal draft in the GitHub UI. A draft that is not the newest is
+published with `--latest=false`, so an old one left lying around cannot take the Latest badge. If
+the notes are still the workflow's placeholder it writes them from the commit subjects since the
+previous tag.
 
 **From GitHub:** Actions → **Release** → *Run workflow*. Same script, run on the runner, so a
 release needs no checkout at all.
