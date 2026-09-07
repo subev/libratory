@@ -244,7 +244,7 @@ export function OcrTryPage() {
         <span className="h-4 w-px bg-(--border)" />
         <label className="flex items-center gap-2">
           <span className="text-[10px] font-semibold tracking-wider text-(--text-faint)">LANGUAGE</span>
-          <Dropdown value={language} options={languageOptions} onChange={setPickedLanguage} testId="ocr-try-language" className="py-1 text-xs" />
+          <Dropdown value={language} options={languageOptions} onChange={setPickedLanguage} testId="ocr-try-language" size="sm" />
           <Chip tone={packInstalled ? "done" : "warn"}>{packInstalled ? "pack installed" : `pack not installed · ${languageEntry ? formatBytes(languageEntry.bytes) : ""}`}</Chip>
         </label>
         <span className="h-4 w-px bg-(--border)" />

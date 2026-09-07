@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Button } from "./Button.tsx";
 import { Menu, MenuItem } from "./Menu.tsx";
 import { IconChevronDown } from "./icons.tsx";
 
@@ -14,7 +15,7 @@ export function Dropdown({
   placeholder = "Choose…",
   title,
   disabled = false,
-  className = "",
+  size = "md",
   width = "w-72",
   icon,
 }: {
@@ -25,7 +26,7 @@ export function Dropdown({
   placeholder?: string;
   title?: string;
   disabled?: boolean;
-  className?: string;
+  size?: "sm" | "md";
   width?: string;
   icon?: ReactNode;
 }) {
@@ -36,21 +37,22 @@ export function Dropdown({
       testId={`${testId}-menu`}
       width={width}
       trigger={({ open, toggle }) => (
-        <button
+        <Button
           type="button"
+          size={size}
           onClick={toggle}
           disabled={disabled}
           title={title ?? active?.hint}
           aria-haspopup="listbox"
           aria-expanded={open}
-          className={`inline-flex max-w-60 items-center gap-1.5 rounded-md border border-(--border) bg-(--bg-card) px-2 py-1.5 text-sm text-(--text-primary) hover:bg-(--bg-card-hover) disabled:opacity-50 ${className}`}
+          className="max-w-60"
           data-testid={testId}
           data-value={active?.value ?? ""}
         >
           {icon}
           <span className="truncate">{active?.label ?? placeholder}</span>
           <IconChevronDown className="h-3.5 w-3.5 shrink-0 text-(--text-muted)" />
-        </button>
+        </Button>
       )}
     >
       {(close) => (
