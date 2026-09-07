@@ -36,7 +36,7 @@ type MarkerOutput = {
   };
 };
 
-const NEEDS_OCR = 'extract it again with "Scanned PDF — needs OCR"';
+const NEEDS_OCR = 'tick "Scanned PDF — needs OCR" and retry the file';
 
 export type SourceBlock = {
   type: string;
@@ -538,10 +538,12 @@ export async function collectBlocksFromMarkerOutput(outDir: string): Promise<Fla
 async function detectChaptersFromMarkerJsonPath(markerJsonPath: string, pdfPath: string, log: LogFn, options: ExtractOptions): Promise<DetectionResult> {
   const allBlocks = await collectBlocksFromMarkerJson(markerJsonPath);
 
-  // Two AI calls and a heuristic pass over nothing still answer nothing, and the run ends on a
-  // chapter of zero words that reads as a bug in detection rather than a PDF with no text in it.
-  if (allBlocks.every((b) => !b.text.trim())) {
-    throw new Error(`Marker found no text in "${path.basename(pdfPath)}" — ${NEEDS_OCR}`);
+  // Blank blocks are dropped when the JSON is read, so "no blocks" is the only shape emptiness
+  // takes here. Two AI calls and a heuristic pass over it still answer nothing, and the run ends on
+  // a chapter of zero words that reads as a bug in detection rather than a page with no text on it.
+  // Stated as a fact with the remedy conditional, because unreadable marker output lands here too.
+  if (allBlocks.length === 0) {
+    throw new Error(`Marker returned no text for "${path.basename(pdfPath)}". If the pages are images, ${NEEDS_OCR}`);
   }
 
   if (options.llmChapterDetection) {

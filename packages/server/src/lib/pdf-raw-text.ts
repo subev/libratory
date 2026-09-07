@@ -3,31 +3,29 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-export async function extractPdfRawText(pdfPath: string): Promise<string | null> {
+// One pdftotext run behind both questions below. Null means the tool could not be run at all, which
+// has to stay distinguishable from "it ran and the pages were empty": failing an extraction on the
+// first would break every book on a machine missing poppler rather than the one scanned PDF.
+async function pdfToText(pdfPath: string): Promise<string | null> {
   try {
     const { stdout } = await execFileAsync("pdftotext", [pdfPath, "-"], {
       timeout: 60_000,
       maxBuffer: 64 * 1024 * 1024,
     });
-    const text = stdout.replace(/[ \t]+\n/g, "\n").trim();
-    return text || null;
+    return stdout;
   } catch {
     return null;
   }
 }
 
-// Three-valued on purpose: null means pdftotext could not be run at all, and failing an extraction
-// on that would break every book on a machine missing poppler rather than the one scanned PDF.
+export async function extractPdfRawText(pdfPath: string): Promise<string | null> {
+  const stdout = await pdfToText(pdfPath);
+  return stdout === null ? null : stdout.replace(/[ \t]+\n/g, "\n").trim() || null;
+}
+
 export async function pdfHasTextLayer(pdfPath: string): Promise<boolean | null> {
-  try {
-    const { stdout } = await execFileAsync("pdftotext", [pdfPath, "-"], {
-      timeout: 60_000,
-      maxBuffer: 64 * 1024 * 1024,
-    });
-    return stdout.trim().length > 0;
-  } catch {
-    return null;
-  }
+  const stdout = await pdfToText(pdfPath);
+  return stdout === null ? null : stdout.trim().length > 0;
 }
 
 // Producers write their own name into /Author often enough that a shelf sorted by it would be
