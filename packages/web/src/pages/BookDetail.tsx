@@ -930,6 +930,10 @@ export function BookDetail() {
               onSetAllSelected={(selected) => setAllFilesSelectedMutation.mutateAsync({ bookId: book.id, selected })}
               onSetSelectedBatch={(ids, selected) => setFileSelectedBatchMutation.mutateAsync({ ids, selected })}
               onRemove={(fid) => removeFileMutation.mutate({ id: fid })}
+              onRedoWithSurya={() => {
+                if (!confirm("Read every page again with Surya? Slower, but better on photographed pages. This replaces the chapters and deletes the audio and exports.")) return;
+                retryMutation.mutate({ id: book.id, ocrEngine: "surya", forgetTextLayer: true });
+              }}
               voiceLabel={getVoiceLabel(book.voice)}
               extractOpen={extractOpen}
               onExtractOpenChange={setExtractOpen}

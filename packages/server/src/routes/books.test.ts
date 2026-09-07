@@ -1,4 +1,7 @@
 import { eq } from "drizzle-orm";
+import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ensureGraphileTables, getDb, insertJob, resetDb, row } from "../../test/setup.ts";
@@ -706,5 +709,49 @@ describe("booksRouter.list hasText", () => {
     expect(byTitle.get("Chaptered")).toBe(true);
     expect(byTitle.get("Raw only")).toBe(true);
     expect(byTitle.get("Bare")).toBe(false);
+  });
+});
+
+describe("booksRouter.retry with forgetTextLayer", () => {
+  const caller = booksRouter.createCaller({});
+  beforeEach(async () => {
+    await resetDb(getDb());
+    mockQuickAddJob.mockReset();
+  });
+
+  async function scannedBook(lowConfidenceFraction: number) {
+    const db = getDb();
+    const dir = await mkdtemp(path.join(tmpdir(), "retry-ocr-"));
+    const copy = path.join(dir, "f0.ocr.pdf");
+    await writeFile(copy, "x");
+    const bookId = crypto.randomUUID();
+    await db.insert(books).values({ id: bookId, title: "Scan", filename: "f0.pdf", pdfPath: "/tmp/f0.pdf", ocrEngine: "tesseract" });
+    await db.insert(bookFiles).values({
+      bookId, index: 0, filename: "f0.pdf", pdfPath: "/tmp/f0.pdf", status: "done",
+      searchablePdfPath: copy, ocrEngine: "tesseract", ocrConfidence: 0.7, ocrLowConfidenceFraction: lowConfidenceFraction,
+    });
+    return { bookId, copy, dir };
+  }
+
+  it("flags a garbled Tesseract read on the file, and only that", async () => {
+    const garbled = await scannedBook(0.2);
+    const clean = await scannedBook(0.05);
+    expect((await caller.get({ id: garbled.bookId })).files.map((f) => f.ocrGarbled)).toEqual([true]);
+    expect((await caller.get({ id: clean.bookId })).files.map((f) => f.ocrGarbled)).toEqual([false]);
+    for (const d of [garbled.dir, clean.dir]) await rm(d, { recursive: true, force: true });
+  });
+
+  it("drops the searchable copy and its figures, sets the engine, and re-extracts", async () => {
+    const db = getDb();
+    const { bookId, copy, dir } = await scannedBook(0.2);
+
+    const book = await caller.retry({ id: bookId, ocrEngine: "surya", forgetTextLayer: true });
+
+    expect(book?.ocrEngine).toBe("surya");
+    const file = row(await db.select().from(bookFiles).where(eq(bookFiles.bookId, bookId)));
+    expect(file).toMatchObject({ searchablePdfPath: null, ocrEngine: null, ocrConfidence: null, ocrLowConfidenceFraction: null, status: "pending" });
+    await expect(stat(copy)).rejects.toThrow();
+    expect(mockQuickAddJob).toHaveBeenCalledWith(expect.anything(), "extract", { bookId }, expect.anything());
+    await rm(dir, { recursive: true, force: true });
   });
 });

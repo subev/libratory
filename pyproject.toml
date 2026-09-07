@@ -20,6 +20,7 @@ dependencies = [
   "regex==2024.11.6",
   "FlagEmbedding==1.4.0",
   "huggingface_hub==0.36.2",
+  "pypdf==6.17.0",
   # scipy 1.18 requires numpy>=2 at runtime while declaring a looser bound, so a resolver picks it
   # happily and then transformers' model registry comes up half empty. 1.17 is the last numpy-1 one.
   "scipy==1.17.0",

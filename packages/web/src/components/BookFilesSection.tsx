@@ -15,8 +15,13 @@ export type BookFileRow = {
   rawWords?: number | null;
   hasRawText?: boolean;
   hasSearchablePdf?: boolean;
+  ocrConfidence?: number | null;
+  ocrLowConfidenceFraction?: number | null;
+  ocrGarbled?: boolean;
   error: string | null;
 };
+
+const percent = (fraction: number | null | undefined) => `${Math.round((fraction ?? 0) * 100)}%`;
 
 type ChapterRowForFiles = {
   sourceFileIndex: number | null;
@@ -41,6 +46,7 @@ export function BookFilesSection({
   onSetAllSelected,
   onSetSelectedBatch,
   onRemove,
+  onRedoWithSurya,
   onCancelExtraction,
   onCancel,
   onFilesAdded,
@@ -62,6 +68,7 @@ export function BookFilesSection({
   onSetAllSelected: (selected: boolean) => void | Promise<unknown>;
   onSetSelectedBatch: (ids: string[], selected: boolean) => void | Promise<unknown>;
   onRemove: (id: string) => void;
+  onRedoWithSurya: () => void;
   onCancelExtraction: () => void;
   onCancel: (id: string) => void;
   onFilesAdded: () => void;
@@ -224,6 +231,17 @@ export function BookFilesSection({
                   {file.error && (
                     <span className="mt-0.5 text-xs text-(--danger-text) wrap-break-word line-clamp-2" title={file.error}>
                       {file.error}
+                    </span>
+                  )}
+                  {file.ocrGarbled && (
+                    <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-(--warning-text)" data-testid={`file-ocr-advisory-${file.id}`}>
+                      <span className="wrap-break-word">
+                        Tesseract read this at {percent(file.ocrConfidence)} average confidence — {percent(file.ocrLowConfidenceFraction)} of
+                        words look garbled. Pages that were photographed rather than scanned often read better with the slower engine.
+                      </span>
+                      <Button size="sm" onClick={onRedoWithSurya} disabled={isProcessing} data-testid={`file-ocr-redo-surya-${file.id}`}>
+                        Redo with Surya
+                      </Button>
                     </span>
                   )}
                 </td>

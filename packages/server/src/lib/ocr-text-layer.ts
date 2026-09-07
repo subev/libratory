@@ -4,9 +4,13 @@ import path from "node:path";
 
 import { db } from "../db.ts";
 import { bookFiles, type BookFile, type OcrEngine } from "../schema.ts";
+import { runSuryaOcr } from "./ocr-surya.ts";
 import { runTesseractOcr, type OcrStats } from "./ocr-tesseract.ts";
 import { bookTmpDir } from "./paths.ts";
 import { countWords, extractPdfRawText, pdfHasTextLayer } from "./pdf-raw-text.ts";
+
+// Above this share of doubted words a Tesseract read is offered a second pass with Surya.
+export const OCR_GARBLED_FRACTION = 0.15;
 
 export type OcrTarget = Pick<BookFile, "id" | "index" | "filename" | "pdfPath" | "searchablePdfPath">;
 
@@ -54,7 +58,8 @@ export async function ensureTextLayer({
       stats = await runTesseractOcr({ pdfPath: file.pdfPath, outPdfPath, language, workDir, log, signal });
       break;
     case "surya":
-      throw new Error("Surya OCR is not available yet");
+      stats = await runSuryaOcr({ pdfPath: file.pdfPath, outPdfPath, language, workDir, log, signal });
+      break;
     default: {
       const unhandled: never = engine;
       throw new Error(`unhandled OCR engine ${unhandled}`);

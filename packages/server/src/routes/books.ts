@@ -19,6 +19,7 @@ import { measureBookDiskUsage, measureDirs, removeDirs, bookTotalSizeCached, fil
 import { chapterChunkPreviewDir } from "../lib/chunk-previews.ts";
 import { translationChunkPreviewDir } from "../workers/synthesize-translation.ts";
 import { insertSuspendedChapters, resetChaptersKeepingInserted } from "../lib/insert-chapters.ts";
+import { OCR_GARBLED_FRACTION } from "../lib/ocr-text-layer.ts";
 import { countAsciiNonAscii } from "../lib/token-estimate.ts";
 import { assembleJobKey, documentJobKey, inFlightInputs } from "../lib/output-readiness.ts";
 import { randomUUID } from "node:crypto";
@@ -416,7 +417,11 @@ export const booksRouter = router({
       const assembleQueued = await hasQueuedAssembleJob(input.id);
       const folderPath = book.folderId ? await folderAncestors(book.folderId) : [];
 
-      return { ...book, status, chapters: chaptersWithStats, totalWords, totalDurationMs, files, rawTextTotalWords, assembleQueued, folderPath };
+      const filesWithAdvice = files.map((f) => ({
+        ...f,
+        ocrGarbled: f.ocrEngine === "tesseract" && (f.ocrLowConfidenceFraction ?? 0) >= OCR_GARBLED_FRACTION,
+      }));
+      return { ...book, status, chapters: chaptersWithStats, totalWords, totalDurationMs, files: filesWithAdvice, rawTextTotalWords, assembleQueued, folderPath };
     }),
 
   logs: publicProcedure
@@ -533,6 +538,7 @@ export const booksRouter = router({
         voice: z.string().optional(),
         speed: z.number().min(0.5).max(2.0).optional(),
         ocrEngine: z.enum(OCR_ENGINES).nullable().optional(),
+        forgetTextLayer: z.boolean().optional(),
         llmChapterDetection: z.boolean().optional(),
         chapterModel: modelKeySchema.optional(),
       })
@@ -541,6 +547,16 @@ export const booksRouter = router({
       const [existing] = await db.select().from(books).where(eq(books.id, input.id));
       if (!existing) throw new Error("Book not found");
       if (existing.kind !== "pdf") throw new Error("Synthetic books have no PDF to re-extract");
+      if (input.forgetTextLayer) {
+        const copies = await db.select({ id: bookFiles.id, searchablePdfPath: bookFiles.searchablePdfPath }).from(bookFiles).where(eq(bookFiles.bookId, input.id));
+        for (const copy of copies) {
+          if (copy.searchablePdfPath) await rm(copy.searchablePdfPath, { force: true }).catch(() => {});
+        }
+        await db
+          .update(bookFiles)
+          .set({ searchablePdfPath: null, ocrEngine: null, ocrConfidence: null, ocrLowConfidenceFraction: null })
+          .where(eq(bookFiles.bookId, input.id));
+      }
 
       const updates: Record<string, unknown> = {
         status: "pending",
