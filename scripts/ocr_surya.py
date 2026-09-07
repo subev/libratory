@@ -127,7 +127,7 @@ def line_operators(line: dict, page, view_w: float, view_h: float) -> str:
     if not units:
         return ""
     baseline_vy = y1 - box_h * 0.2
-    mb = page.mediabox
+    mb = page.cropbox
     left, bottom = float(mb.left), float(mb.bottom)
     user_w, user_h = float(mb.width), float(mb.height)
     rotation = page.rotation % 360

@@ -193,6 +193,7 @@ async function extractMultipleFiles(
       });
       if (produced) {
         if (!book.ocrEngine) {
+          book.ocrEngine = "tesseract";
           await db.update(books).set({ ocrEngine: "tesseract", updatedAt: new Date() }).where(eq(books.id, book.id));
           await fileLog(`No text layer in "${file.filename}" — read with Tesseract by default; change the engine under "About this book" in Extract…`);
         }

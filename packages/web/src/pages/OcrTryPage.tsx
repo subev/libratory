@@ -326,7 +326,7 @@ export function OcrTryPage() {
               ))}
             </div>
             <div className="mt-3 flex items-end gap-2">
-              {result && <span className="max-w-[32ch] text-(--text-faint)">Shaded words are the ones Tesseract itself scored under 60% — its own doubt, not our judgement.</span>}
+              {result && <span className="max-w-[32ch] text-(--text-faint)">{languageEntry && !languageEntry.iso ? `${languageEntry.name} has no book language to save; the run will pick a pack from the page's script unless the book's language is set.` : "Shaded words are the ones Tesseract itself scored under 60% — its own doubt, not our judgement."}</span>}
               <Button variant={chosen === "tesseract" ? "success" : "primary"} size="sm" className="ml-auto" onClick={() => commit("tesseract")} disabled={!result || update.isPending} data-testid="ocr-try-use-tesseract">{chosen === "tesseract" ? <IconChosen /> : <IconChoose />}{chosen === "tesseract" ? "Using Tesseract" : "Use Tesseract for this book"}</Button>
             </div>
           </section>
@@ -380,7 +380,6 @@ export function OcrTryPage() {
           )}
           {update.error && <span className="block text-(--danger-text)">{update.error.message}</span>}
         </span>
-        {chosen && <Button size="sm" onClick={() => setChosen(null)}>Change</Button>}
         <Button variant={chosen ? "primary" : "secondary"} size="sm" onClick={() => { stopSurya(); navigate(`/books/${id}?extract=1`); }} disabled={busy && !chosen} title={chosen ? "Returns to the Extract dialog with your other settings as you left them; the engine is already saved" : "Returns to the Extract dialog; no engine is saved"} data-testid="ocr-try-back-extract">{chosen ? "Back to Extract" : "Cancel"}</Button>
       </footer>
     </div>

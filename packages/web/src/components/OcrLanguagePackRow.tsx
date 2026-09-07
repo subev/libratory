@@ -74,7 +74,7 @@ export function OcrLanguagePackRow({
           <span className="font-medium text-(--text-secondary)">No network.</span> {lang.name} ({size}) can't be fetched right now.
           {offlineHint ? ` ${offlineHint}` : ""}
         </span>
-        <Button size="sm" onClick={start} disabled>Download</Button>
+        <Button size="sm" onClick={start} disabled={download.isPending} data-testid={`ocr-pack-${code}-retry`}>Try again</Button>
       </div>
     );
   }

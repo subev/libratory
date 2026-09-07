@@ -6,6 +6,13 @@ const PACK_BY_ISO: Record<string, string> = {
   fr: "fra", he: "heb", hi: "hin", hr: "hrv", hu: "hun", id: "ind", it: "ita", ja: "jpn", ko: "kor", nl: "nld",
   no: "nor", pl: "pol", pt: "por", ro: "ron", ru: "rus", sk: "slk", sl: "slv", sr: "srp", sv: "swe", tr: "tur",
   uk: "ukr", vi: "vie", zh: "chi_sim",
+  af: "afr", am: "amh", as: "asm", az: "aze", be: "bel", bn: "ben", bo: "bod", br: "bre", bs: "bos", ca: "cat", co: "cos",
+  cy: "cym", dv: "div", dz: "dzo", eo: "epo", et: "est", eu: "eus", fo: "fao", fy: "fry", ga: "gle", gd: "gla", gl: "glg",
+  gu: "guj", ht: "hat", hy: "hye", is: "isl", iu: "iku", jv: "jav", ka: "kat", kk: "kaz", km: "khm", kn: "kan", ku: "kmr",
+  ky: "kir", la: "lat", lb: "ltz", lo: "lao", lt: "lit", lv: "lav", mi: "mri", mk: "mkd", ml: "mal", mn: "mon", mr: "mar",
+  ms: "msa", mt: "mlt", my: "mya", ne: "nep", oc: "oci", or: "ori", pa: "pan", ps: "pus", qu: "que", sa: "san", sd: "snd",
+  si: "sin", sq: "sqi", su: "sun", sw: "swa", ta: "tam", te: "tel", tg: "tgk", th: "tha", ti: "tir", tl: "fil", to: "ton",
+  tt: "tat", ug: "uig", ur: "urd", uz: "uzb", yi: "yid", yo: "yor",
 };
 
 export type TesseractLanguage = { pack: string; name: string };

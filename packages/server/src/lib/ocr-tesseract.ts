@@ -127,11 +127,16 @@ function requireInstalled(installed: string[], choice: TesseractLanguage): Tesse
 
 // Reading a Cyrillic scan as English quietly is the failure this guards against: with no language
 // on the book, the page's own script picks the pack, and a script with no installed pack stops here.
-async function chooseLanguage(language: string | null, images: string[], log: (msg: string) => Promise<void>): Promise<TesseractLanguage> {
+async function chooseLanguage(language: string | null, pdfPath: string, pages: number, workDir: string, signal: AbortSignal | undefined, log: (msg: string) => Promise<void>): Promise<TesseractLanguage> {
   const installed = await installedPacks();
   if (language) return requireInstalled(installed, tesseractLanguage(language));
-  const sample = images[Math.min(4, images.length - 1)];
-  const script = sample ? await detectScript(sample) : null;
+  const sampleDir = path.join(workDir, "osd");
+  await mkdir(sampleDir, { recursive: true });
+  const samplePage = Math.min(5, pages);
+  await run("pdftoppm", ["-r", String(RENDER_DPI), "-png", "-gray", "-f", String(samplePage), "-l", String(samplePage), pdfPath, path.join(sampleDir, "pg")], signal);
+  const sample = (await readdir(sampleDir)).find((f) => f.endsWith(".png"));
+  const script = sample ? await detectScript(path.join(sampleDir, sample)) : null;
+  await rm(sampleDir, { recursive: true, force: true }).catch(() => {});
   const candidates = packsForScript(script);
   if (!script || candidates.length === 0) return requireInstalled(installed, tesseractLanguage("en"));
   const pack = candidates.find((c) => installed.includes(c));
@@ -152,8 +157,8 @@ export const runTesseractOcr: OcrRunner = async ({ pdfPath, outPdfPath, language
 
   try {
     const pages = await pdfPageCount(pdfPath);
+    const { pack, name } = await chooseLanguage(language, pdfPath, pages, workDir, signal, log);
     const images = await renderPages(pdfPath, workDir, pages, log, signal);
-    const { pack, name } = await chooseLanguage(language, images, log);
 
     const listPath = path.join(workDir, "pages.txt");
     await writeFile(listPath, images.join("\n") + "\n");
