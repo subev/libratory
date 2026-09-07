@@ -47,7 +47,7 @@ Every book is a row you can open, and every chapter inside it is a row you can e
 <details>
 <summary><b>Turning a book into audio, in detail</b></summary>
 
-**Chapter detection** tries plain rules first — headings, numbering, the shape of the page — and can then read the book's own table of contents with an AI model if you turn that on. You can also draw the boundaries by hand. Every upload gets instant `pdftotext` raw text, so a book is browsable in seconds — the slow Marker extraction (OCR-capable) is opt-in and can run later, or never.
+**Chapter detection** tries plain rules first — headings, numbering, the shape of the page — and can then read the book's own table of contents with an AI model if you turn that on. You can also draw the boundaries by hand. Every upload gets instant `pdftotext` raw text, so a book is browsable in seconds — the slow Marker extraction is opt-in and can run later, or never. A scanned book is read once by Tesseract into a searchable copy kept beside the original, and everything afterwards — extraction, search, export, word-by-word read-along — works off that copy.
 
 **Per chapter** you can edit the text, re-synthesize, include or exclude it, suspend and queue it, and run AI cleanup over OCR artifacts. When it narrates, it reads your edited text if there is any, then the cleaned-up extraction, then the raw text — whichever exists first. Assembly produces a single M4B with native chapter markers and a cover.
 
@@ -134,8 +134,8 @@ Signed and notarised; installs its own runtime, so a fresh clone needs nothing i
 
 An Apple Silicon Mac, or a Linux machine (x86_64 or arm64, CPU is enough), or Windows through Docker Desktop and WSL2. The two MLX narrators (KugelAudio, BG-TTS V5) need Metal and stay Mac-only — the UI greys them out with the reason; Kokoro, Pocket, Meta MMS and the cloud voices run everywhere.
 
-- **Mac**: [Homebrew](https://brew.sh), then: `brew install ffmpeg poppler espeak-ng python@3.12 node pnpm` — for running from source, which spawns `ffmpeg` and `pdftotext` off your `PATH`. The packaged app carries its own copies and needs none of this.
-- **Linux (from source)**: `ffmpeg espeak-ng poppler-utils zip unzip python3.12 node pnpm` from your package manager — `pnpm run setup` names whatever is missing. Or skip all of it and run the Docker image.
+- **Mac**: [Homebrew](https://brew.sh), then: `brew install ffmpeg poppler tesseract espeak-ng python@3.12 node pnpm` — for running from source, which spawns `ffmpeg`, `pdftotext` and `tesseract` off your `PATH`. The packaged app carries its own copies and needs none of this.
+- **Linux (from source)**: `ffmpeg espeak-ng poppler-utils tesseract-ocr tesseract-ocr-eng tesseract-ocr-osd zip unzip python3.12 node pnpm` from your package manager — `pnpm run setup` names whatever is missing. Or skip all of it and run the Docker image.
 - Docker — [OrbStack](https://orbstack.dev/) or Docker Desktop on a Mac, Docker Engine on Linux (Postgres). The desktop app will require it too.
 - Optional: an AI model for translation, rewrites, cleanup, digests, Ask AI, chat, and LLM chapter detection — [Ollama](https://ollama.com) or LM Studio running locally (auto-discovered, fully offline), or a [DeepSeek](https://platform.deepseek.com/) / OpenAI / Anthropic / Gemini API key.
 - Optional: a [Cartesia](https://cartesia.ai) or [ElevenLabs](https://elevenlabs.io) API key for their cloud voices.
@@ -225,7 +225,8 @@ Kyutai's terms prohibit cloning a voice without that person's consent, along wit
 
 ```
 Upload → rawExtract (pdftotext, seconds, always)
-       → extract (Marker, opt-in, OCR-capable) → normalize → synthesize (TTS) → assemble → M4B
+       → ocrTextLayer (Tesseract, only for a scan with no text of its own)
+       → extract (Marker layout, opt-in) → normalize → synthesize (TTS) → assemble → M4B
        → translate/transform → synthesizeTranslation → per-variant assembly
        → assembleDocument → PDF / EPUB / synced EPUB
 ```
@@ -280,7 +281,7 @@ data/previews/                    Voice preview M4As
 <details>
 <summary><b>Models: what downloads when</b></summary>
 
-- Every TTS/extraction subprocess runs with `HF_HUB_OFFLINE=1`, so models never download at synthesis time. `pnpm run setup` caches only what the core path needs — **Kokoro-82M, ~350 MB**. The heavy optional bundles arrive at the doorway of the feature that needs them, with a size and a button: **Marker/Surya 5.1 GB** (full extraction and OCR), **BGE-M3 4.3 GB** (library search and chat), **Bulgarian narrators 1.2 GB**. `WITH_ALL_MODELS=1 pnpm run setup` fetches everything up front instead — setup used to do that unconditionally, which meant ~15 GB and an hour before the app could open a page.
+- Every TTS/extraction subprocess runs with `HF_HUB_OFFLINE=1`, so models never download at synthesis time. `pnpm run setup` caches only what the core path needs — **Kokoro-82M, ~350 MB**. The heavy optional bundles arrive at the doorway of the feature that needs them, with a size and a button: **Marker/Surya 5.1 GB** (full extraction), **BGE-M3 4.3 GB** (library search and chat), **Bulgarian narrators 1.2 GB**. `WITH_ALL_MODELS=1 pnpm run setup` fetches everything up front instead — setup used to do that unconditionally, which meant ~15 GB and an hour before the app could open a page.
 - `scripts/models.py --status` lists the bundles and what is cached; `--download <id>` fetches one; `--capabilities` reports whether MLX is usable, which is what greys out the two Metal-only narrators (BG-TTS V5 and KugelAudio) instead of letting them fail at synthesis. Everything else falls back to the CPU. A `.models-missing` file at the repo root (one bundle id per line) makes the app pretend those are absent — the only sane way to work on a download gate without deleting gigabytes.
 - The first PDF/EPUB export downloads a rendering browser (~350 MB) into the Vivliostyle cache. In the packaged app the Vivliostyle CLI itself (~230 MB of npm packages) is installed at that same moment, into `VIVLIOSTYLE_DIR` — a compiled binary has no `node_modules` to resolve it from.
 - Python dependencies are a **uv project**: `pyproject.toml` + `uv.lock` at the repo root, installed with `uv sync --frozen` (setup fetches `uv` into `.uv/` if it is missing). 189 packages resolve in under two seconds and install in about thirteen. Four pins deliberately contradict what `mlx-audio` and `nanocodec-mlx` declare — transformers 5.x breaks marker, huggingface_hub 1.x is untested here, nanocodec wants an older mlx, and numpy must stay on 1.x — and those are `[tool.uv] override-dependencies` rather than the `--no-deps` installs they used to be.
@@ -335,7 +336,7 @@ pnpm app        # build and install over /Applications, quarantine cleared (~15 
 pnpm app:dmg    # the same, plus a DMG to hand to someone
 ```
 
-It fetches Bun and bundles ffmpeg/pdftotext/pdfinfo on first run, so a fresh clone needs nothing installed globally. `--install` matters more than it sounds: without it you end up reading the behaviour of whatever is in `/Applications` while editing the build in `release/`.
+It fetches Bun and bundles ffmpeg, poppler and tesseract on first run, so a fresh clone needs nothing installed globally. `--install` matters more than it sounds: without it you end up reading the behaviour of whatever is in `/Applications` while editing the build in `release/`.
 
 On first launch it checks Docker, brings up Postgres, downloads `uv`, builds the Python environment from `uv.lock`, fetches the Kokoro voice, and starts the server — which serves the UI too, so there is one port and no Vite. About 2.4 GB downloaded once — 1.4 GB of Python and PyTorch, the 347 MB Kokoro voice, and the 644 MB Postgres image; later launches take seconds. **Docker is the one thing it cannot install for you**, and the first-run screen says so rather than failing — it explains what Docker is and links to Docker Desktop and OrbStack, rather than naming a prerequisite and stopping.
 

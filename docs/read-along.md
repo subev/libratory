@@ -126,9 +126,11 @@ or which never landed on a page. Saying nothing is deliberate: the alternative i
 their book has no text layer on the strength of a missing file.
 
 The two fields are independent, and a reader that conflates them will say the wrong thing. A scan
-narrated by Kokoro is `granularity: "word"` with `marks: "paragraph"` — the voice is measured to
-the word and the page cannot show it. The reverse is just as common: a born-digital book narrated
-by the Bulgarian MLX narrator is `chunk` and `word`.
+that was never OCR'd and is narrated by Kokoro is `granularity: "word"` with `marks: "paragraph"` —
+the voice is measured to the word and the page cannot show it. Give the same scan a text layer
+(`ocrEngine: "tesseract"` on the book) and it becomes `word`/`word`, because everything downstream
+then reads the searchable copy Tesseract wrote. The reverse is just as common: a born-digital book
+narrated by the Bulgarian MLX narrator is `chunk` and `word`.
 
 ## How the rectangles are produced
 
