@@ -124,6 +124,9 @@ const publish = () => {
 
 if (go) {
   publish();
+} else if (!process.stdin.isTTY) {
+  // No terminal to answer the prompt: readline never resolves and node dies on the pending await.
+  fail("Nothing can answer the prompt — stdin is not a terminal.", `pnpm ship --yes publishes ${plan.tag} without asking.`);
 } else {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   const question = plan.risky ? "  Publish anyway? [y/N] " : "  Publish to everyone? [y/N] ";
