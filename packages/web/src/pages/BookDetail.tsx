@@ -553,7 +553,7 @@ export function BookDetail() {
   const selectedInFlightNow = book.chapters.some((c) => c.selected && (c.status === "pending" || c.status === "normalizing" || c.status === "synthesizing"));
   const stage: "review" | "narrate" | "export" = !structureConfirmed ? "review" : audioReady > 0 && !selectedInFlightNow ? "export" : "narrate";
   const trayActions: TrayAction[] = [
-    ...(stage !== "export" ? [{ id: "export", label: "Export…", onClick: () => setExportOpen(true), pinned: true }] : []),
+    { id: "export", label: "Export…", onClick: () => setExportOpen(true), pinned: true, primary: stage === "export" },
     ...(hasActiveChapters || translationAudioQueued
       ? [{
           id: "cancel-processing",
@@ -567,6 +567,7 @@ export function BookDetail() {
       : []),
     {
       id: "synthesize",
+      primary: stage === "narrate",
       label: `Synthesize (${selectedSynthesizable})${langSuffix}`,
       pinned: true,
       onClick: () => setShowSynthesize(true),
@@ -898,15 +899,7 @@ export function BookDetail() {
                     <Button variant="primary" size="sm" className="animate-pulse" onClick={() => setShowStructure(true)} data-testid="tray-review-chapters">
                       Review chapters
                     </Button>
-                  ) : stage === "narrate" ? (
-                    <Button variant="primary" size="sm" onClick={() => setShowSynthesize(true)} data-testid="tray-synthesize">
-                      Synthesize…
-                    </Button>
-                  ) : (
-                    <Button variant="primary" size="sm" onClick={() => setExportOpen(true)} data-testid="open-export">
-                      Export…
-                    </Button>
-                  )
+                  ) : undefined
                 }
               />
             )}

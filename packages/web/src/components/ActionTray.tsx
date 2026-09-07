@@ -12,6 +12,8 @@ export type TrayAction = {
   danger?: boolean;
   /** Survives the collapse — the primary verb and anything whose absence is information. */
   pinned?: boolean;
+  /** The one orange verb: the next step in the pipeline. */
+  primary?: boolean;
 };
 
 // Pinned under the table it acts on, because the toolbar used to scroll away from its own selection.
@@ -59,7 +61,7 @@ export function ActionTray({
         ) : (
           <Button
             key={action.id}
-            variant="secondary"
+            variant={action.primary ? "primary" : "secondary"}
             size="sm"
             onClick={action.onClick}
             disabled={action.disabled}
