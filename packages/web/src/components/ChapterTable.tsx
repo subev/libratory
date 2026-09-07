@@ -108,6 +108,20 @@ export function ChapterTable({
   const deepLinked = searchParams.get("chapter");
   const deepLinkedIndex = deepLinked ? chapters.findIndex((c) => c.id === deepLinked) : -1;
   const modalChapterIndex = pickedChapterIndex ?? (deepLinkedIndex >= 0 ? deepLinkedIndex : null);
+  // Inside the modal, [ and ] walk the chapters; the page's book switch stays out while a dialog is open
+  useEffect(() => {
+    if (modalChapterIndex === null) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "[" && e.key !== "]") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      const next = (modalChapterIndex ?? 0) + (e.key === "]" ? 1 : -1);
+      if (next >= 0 && next < chapters.length) setPickedChapterIndex(next);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [modalChapterIndex, chapters.length, setPickedChapterIndex]);
   const openChapterModal = (index: number | null) => {
     setPickedChapterIndex(index);
     // The updater form, and the has() check inside it: ?variant= and the shell's own param are
