@@ -22,11 +22,12 @@ RUN pnpm --filter @libratory/web build
 # ---- Runtime ----------------------------------------------------------------
 FROM node:22-bookworm AS runtime
 # ffmpeg carries the built-in aac encoder lib/ffmpeg.ts falls back to; espeak-ng is the G2P floor
-# under Kokoro; poppler-utils is pdftotext; zip/unzip pack and unpack the read-along EPUBs.
+# under Kokoro; poppler-utils is pdftotext and pdftoppm; tesseract-ocr reads scanned pages (osd
+# names the script); zip/unzip pack and unpack the read-along EPUBs.
 # chromium renders the PDF/EPUB document exports — lib/vivliostyle.ts prefers a system browser,
 # and the alternative is a 345 MB in-volume Chrome that would still be missing its shared libraries.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ffmpeg espeak-ng poppler-utils zip unzip chromium \
+      ffmpeg espeak-ng poppler-utils tesseract-ocr tesseract-ocr-eng tesseract-ocr-osd zip unzip chromium \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

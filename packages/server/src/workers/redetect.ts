@@ -3,6 +3,7 @@ import { books, bookFiles, chapters, assemblies, documents } from "../schema.ts"
 import { eq, asc } from "drizzle-orm";
 import { redetectChaptersFromExistingMarkerOutput } from "../lib/marker.ts";
 import { bookTmpDir, bookOutputDir } from "../lib/paths.ts";
+import { readablePdfPath } from "../lib/pdf-raw-text.ts";
 import { appendLog } from "../lib/log.ts";
 import { insertSuspendedChapters, resetChaptersKeepingInserted } from "../lib/insert-chapters.ts";
 import { rm } from "node:fs/promises";
@@ -84,7 +85,7 @@ export async function redetect(payload: RedetectPayload) {
       for (const file of files) {
         const fileTmpDir = path.join(bookTmpDir(bookId), `file_${file.index}`);
         try {
-          const { chapters: detected, method } = await redetectChaptersFromExistingMarkerOutput(fileTmpDir, file.pdfPath, log, {
+          const { chapters: detected, method } = await redetectChaptersFromExistingMarkerOutput(fileTmpDir, readablePdfPath(file), log, {
             llmChapterDetection: book.llmChapterDetection,
             chapterModel: book.chapterModel ?? undefined,
           });

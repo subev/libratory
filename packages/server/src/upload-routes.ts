@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { env } from "./env.ts";
 import { db } from "./db.ts";
-import { books, bookFiles, folders, type NoteJob } from "./schema.ts";
+import { books, bookFiles, folders, OCR_ENGINES, type NoteJob } from "./schema.ts";
 import { eq, and, desc } from "drizzle-orm";
 import { profileIdFromHeader } from "./trpc.ts";
 import { isUuid } from "./lib/uuid.ts";
@@ -74,7 +74,7 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
     const { parseTtsVoice } = await import("./lib/tts.ts");
     parseTtsVoice(voice);
     const speed = parseFloat(fields.speed ?? "1.0");
-    const forceOcr = fields.forceOcr === "true";
+    const ocrEngine = OCR_ENGINES.find((e) => e === fields.ocrEngine) ?? null;
     const llmChapterDetection = fields.llmChapterDetection === "true";
     const chapterModel = fields.chapterModel?.trim().slice(0, 64) || null;
     const skipSynthesis = fields.skipSynthesis === "true";
@@ -110,7 +110,7 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
         pdfPath: firstFile.pdfPath,
         voice,
         speed,
-        forceOcr,
+        ocrEngine,
         llmChapterDetection,
         chapterModel,
         skipSynthesis,
@@ -138,8 +138,11 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
       { bookId, ...(note ? { note } : {}) },
       { maxAttempts: 1 },
     );
+    // Extraction does the OCR inline, per file, so queueing both would read every page twice.
     if (fullExtract) {
       await quickAddJob({ connectionString }, "extract", { bookId }, { maxAttempts: 1 });
+    } else if (ocrEngine) {
+      await quickAddJob({ connectionString }, "ocrTextLayer", { bookId }, { maxAttempts: 1 });
     }
 
     return reply.send(book);
@@ -208,6 +211,8 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
     if (usesFullExtraction) {
       await db.update(books).set({ status: "pending", error: null, updatedAt: new Date() }).where(eq(books.id, bookId));
       await quickAddJob({ connectionString }, "extract", { bookId }, { maxAttempts: 1 });
+    } else if (book.ocrEngine) {
+      await quickAddJob({ connectionString }, "ocrTextLayer", { bookId }, { maxAttempts: 1 });
     }
 
     const [updated] = await db.select().from(books).where(eq(books.id, bookId));

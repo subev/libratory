@@ -204,8 +204,10 @@ function serverEnv() {
     LIBRATORY_ENV_FILE: process.env.LIBRATORY_ENV_FILE || CONFIG.envFile || path.join(HOME, ".env"),
     PORT: String(PORT),
     LIBRATORY_INSTANCE: INSTANCE,
-    // A GUI app's PATH omits Homebrew, and the workers spawn ffmpeg, pdftotext and pdfinfo
+    // A GUI app's PATH omits Homebrew, and the workers spawn ffmpeg, poppler and tesseract
     PATH: setup.toolPath(RESOURCES),
+    // Staged out of the bundle by stageRuntime; downloaded language packs land in the same place
+    TESSDATA_PREFIX: path.join(HOME, "tessdata"),
   };
 }
 

@@ -39,11 +39,11 @@ fi
 
 
 
-# The three CLI tools that ship inside the app are downloaded, not built: Homebrew has no versioned
+# The CLI tools that ship inside the app are downloaded, not built: Homebrew has no versioned
 # formula for them and upgrades them under you, so a machine that installs "ffmpeg" gets whatever is
 # current — which is how CI came to hold 8.1.2 against the 7.1.1 this was tested with. Pinned and
 # checksummed here for the same reason uv and bun are. scripts/bundle-tools.py rebuilds it.
-if [ ! -d "$DESKTOP/resources/bin" ]; then
+if [ ! -d "$DESKTOP/resources/bin" ] || [ ! -d "$DESKTOP/resources/tessdata" ]; then
   echo "==> fetching the bundled CLI tools"
   read -r TOOLS_URL TOOLS_SHA <<<"$(node -e '
     const p = require("./scripts/pins.json").bundledTools;
@@ -54,6 +54,11 @@ if [ ! -d "$DESKTOP/resources/bin" ]; then
   echo "$TOOLS_SHA  /tmp/p2a-tools.tar.gz" | shasum -a 256 -c - >/dev/null
   tar -xzf /tmp/p2a-tools.tar.gz -C "$DESKTOP/resources"
   rm -f /tmp/p2a-tools.tar.gz
+  [ -d "$DESKTOP/resources/tessdata" ] || {
+    echo "    the pinned tools tarball carries no tessdata — rebuild with scripts/bundle-tools.py," >&2
+    echo "    upload a new tools-N release and update url/sha256 in scripts/pins.json" >&2
+    exit 1
+  }
 fi
 [ -f "$DESKTOP/build/icon.icns" ] || { echo "==> rendering the icon"; bash scripts/make-icon.sh; }
 

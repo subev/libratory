@@ -44,6 +44,11 @@ export async function extractPdfAuthor(pdfPath: string): Promise<string | null> 
   }
 }
 
+// Every path that reads a book's pages goes through here; pdfPath is only for handing the file back.
+export function readablePdfPath(file: { pdfPath: string; searchablePdfPath: string | null }): string {
+  return file.searchablePdfPath ?? file.pdfPath;
+}
+
 export function countWords(text: string): number {
   return text.split(/\s+/).filter(Boolean).length;
 }

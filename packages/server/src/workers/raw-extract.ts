@@ -2,7 +2,7 @@ import type { WorkerUtils } from "graphile-worker";
 import { db } from "../db.ts";
 import { books, bookFiles } from "../schema.ts";
 import { eq, asc, and, isNull, isNotNull } from "drizzle-orm";
-import { extractPdfRawText, extractPdfAuthor, countWords } from "../lib/pdf-raw-text.ts";
+import { extractPdfRawText, extractPdfAuthor, countWords, readablePdfPath } from "../lib/pdf-raw-text.ts";
 import { appendLog } from "../lib/log.ts";
 import { stat } from "node:fs/promises";
 
@@ -32,7 +32,7 @@ export async function rawExtract(payload: RawExtractPayload, { addJob }: { addJo
 
   let extracted = 0;
   for (const file of files) {
-    const text = await extractPdfRawText(file.pdfPath);
+    const text = await extractPdfRawText(readablePdfPath(file));
     if (text) {
       const words = countWords(text);
       await db.update(bookFiles).set({ rawText: text, rawWords: words }).where(eq(bookFiles.id, file.id));
@@ -41,8 +41,10 @@ export async function rawExtract(payload: RawExtractPayload, { addJob }: { addJo
     } else if (!(await stat(file.pdfPath).catch(() => null))) {
       // Blaming the PDF for bytes that are not there sends the reader looking for the wrong fault
       await appendLog(bookId, `"${file.filename}" is missing from disk — remove it from the book`, file.index);
+    } else if (book?.ocrEngine) {
+      await appendLog(bookId, `Raw text unavailable for "${file.filename}" — the pages are images; OCR is queued and the text arrives when it has read them`, file.index);
     } else {
-      await appendLog(bookId, `Raw text unavailable for "${file.filename}" — PDF may be scanned or encrypted. Extract it as "Scanned PDF — needs OCR"; pages with no text layer read along a paragraph at a time rather than word by word`, file.index);
+      await appendLog(bookId, `Raw text unavailable for "${file.filename}" — PDF may be scanned or encrypted. Set an OCR engine under "About this book" in Extract… and the pages are read into a searchable copy first`, file.index);
     }
   }
 

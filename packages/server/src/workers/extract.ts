@@ -4,6 +4,8 @@ import { books, bookFiles, chapters } from "../schema.ts";
 import { eq, ne, and, asc, max } from "drizzle-orm";
 import { extractPdf, ExtractAbortedError } from "../lib/marker.ts";
 import { registerExtractAbort, clearExtractAbort } from "../lib/extract-registry.ts";
+import { ensureTextLayer } from "../lib/ocr-text-layer.ts";
+import { readablePdfPath } from "../lib/pdf-raw-text.ts";
 import { bookTmpDir } from "../lib/paths.ts";
 import { appendLog } from "../lib/log.ts";
 import path from "node:path";
@@ -98,7 +100,6 @@ async function extractSinglePdf(
   signal?: AbortSignal,
 ) {
   const { chapters: extractedChapters, method } = await extractPdf(book.pdfPath, tmpOut, log, {
-    forceOcr: book.forceOcr,
     llmChapterDetection: book.llmChapterDetection,
     chapterModel: book.chapterModel ?? undefined,
     signal,
@@ -181,9 +182,25 @@ async function extractMultipleFiles(
 
     const abort = registerExtractAbort(file.id);
     try {
+      let source: { pdfPath: string; searchablePdfPath: string | null } = file;
+      if (book.ocrEngine) {
+        await ensureTextLayer({
+          bookId: book.id,
+          file,
+          engine: book.ocrEngine,
+          language: book.language,
+          log: fileLog,
+          signal: abort.signal,
+        });
+        const [refreshed] = await db
+          .select({ pdfPath: bookFiles.pdfPath, searchablePdfPath: bookFiles.searchablePdfPath })
+          .from(bookFiles)
+          .where(eq(bookFiles.id, file.id));
+        if (refreshed) source = refreshed;
+      }
       const tmpOut = path.join(bookTmpDir(book.id), `file_${file.index}`);
       const count = await extractSinglePdf(
-        { ...book, pdfPath: file.pdfPath },
+        { ...book, pdfPath: readablePdfPath(source) },
         tmpOut,
         fileLog,
         addJob,

@@ -86,8 +86,8 @@ jobs:
           cache: pnpm
 
       # Every upload runs raw extraction, which shells out to pdftotext — the first thing the
-      # suite does, and the runner image has no poppler.
-      - run: sudo apt-get update && sudo apt-get install -y poppler-utils
+      # suite does, and the runner image has no poppler. The OCR tests run tesseract for real.
+      - run: sudo apt-get update && sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-eng
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build

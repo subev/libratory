@@ -2,11 +2,13 @@ import { db } from "../db.ts";
 import { bookFiles, type Book } from "../schema.ts";
 import { eq, asc } from "drizzle-orm";
 import { bookTmpDir } from "./paths.ts";
+import { readablePdfPath } from "./pdf-raw-text.ts";
 import path from "node:path";
 
 export type MarkerSource = {
   fileIndex: number | null;
   filename: string;
+  /** The searchable copy where one exists — everything downstream reads the pages, not the file. */
   pdfPath: string;
   outDir: string;
 };
@@ -27,7 +29,7 @@ export async function listMarkerSources(book: Book): Promise<MarkerSource[]> {
   return files.map((f) => ({
     fileIndex: f.index,
     filename: f.filename,
-    pdfPath: f.pdfPath,
+    pdfPath: readablePdfPath(f),
     outDir: path.join(bookTmpDir(book.id), `file_${f.index}`),
   }));
 }
