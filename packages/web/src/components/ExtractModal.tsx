@@ -174,7 +174,7 @@ export function ExtractModal({
               </span>
               {([
                 ["tesseract", "Tesseract", "about a second a page; read-along word by word"],
-                ["surya", "Surya", "roughly ten times slower; better on photographed, curled, faded or skewed pages; read-along a paragraph at a time"],
+                ["surya", "Surya", "roughly ten times slower; better on photographed, curled, faded or skewed pages; read-along word by word at estimated positions, a character or so off at worst"],
               ] as const).map(([value, name, trade]) => (
                 <label key={value} className="flex gap-2">
                   <input

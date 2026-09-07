@@ -165,7 +165,7 @@ export function OcrTryPage() {
 
   const callout = result?.callout;
   const evidence = !callout ? null : callout.kind === "clean"
-    ? { icon: <IconCheck />, tone: "bg-(--success-bg) text-(--success-text)", head: "Nothing to report on this page.", body: `${confPct} average confidence and ${callout.count} doubted words, neither banded nor spread. Tesseract read it cleanly, so the slower engine would cost ${suryaTotal ?? "hours"} and give you paragraph-level read-along instead of word-level.` }
+    ? { icon: <IconCheck />, tone: "bg-(--success-bg) text-(--success-text)", head: "Nothing to report on this page.", body: `${confPct} average confidence and ${callout.count} doubted words, neither banded nor spread. Tesseract read it cleanly, so the slower engine would cost ${suryaTotal ?? "hours"} and mark words at estimated positions instead of measured ones.` }
     : callout.kind === "edge"
       ? { icon: <IconScan />, tone: "bg-(--warning-bg) text-(--warning-text)", head: `All ${callout.count} doubted words fall in the ${callout.side}most ${callout.bandPct}% of the page.`, body: `One band, not scattered${callout.allLastWords ? " — and every one of them is a line's last word" : ""}. That is the edge that curled away from the lens, which is what Tesseract loses on a photographed page and what Surya reads in context.` }
       : { icon: <IconScattered />, tone: "bg-(--bg-subtle) text-(--text-secondary)", head: `The ${callout.count} doubted words are spread across the page, not banded at an edge.`, body: "So nothing here says this page was photographed — faint print, an unfamiliar face or an archaic orthography does the same. Surya may still read it better, but this is not the case it was added for: compare the two results yourself before spending the time." };
@@ -174,7 +174,7 @@ export function OcrTryPage() {
     ? "Runs only when you ask. Tesseract's result, a second away, is usually enough to decide."
     : callout?.kind === "edge" ? `Tesseract lost the ${callout.side} edge of this page. This is the case Surya was added for.`
       : callout?.kind === "scattered" ? "Tesseract doubted words all over this page. Surya may read them better; the image decides."
-        : `Tesseract read this page cleanly. Surya would cost ${suryaTotal ?? "hours"} over the book for the same words and coarser read-along.`;
+        : `Tesseract read this page cleanly. Surya would cost ${suryaTotal ?? "hours"} over the book for the same words, with word positions estimated rather than measured.`;
 
   const shade = (w: { conf: number }) => (w.conf < 60 ? "rounded-[2px] bg-(--lowconf) shadow-[0_0_0_1px_var(--lowconf-ring)]" : "");
   // Once the words are placed, the pane shows the column of type and not the margins — the reader's
@@ -335,7 +335,7 @@ export function OcrTryPage() {
             <div className="flex items-center gap-2"><span className="text-[13px] font-semibold">Surya</span>
               {surya.status === "warming" || surya.status === "streaming" ? <Chip tone="work">reading</Chip> : surya.status === "done" ? <Chip tone="done">done in {Math.round(surya.elapsedMs / 1000)}s</Chip> : surya.status === "stopped" ? <Chip tone="idle">stopped</Chip> : surya.status === "error" ? <Chip tone="warn">failed</Chip> : <Chip tone="idle">not run</Chip>}
             </div>
-            <div className="mt-2"><Meta rows={[["Speed", suryaSeconds ? `${Math.round(suryaSeconds)}s on page ${page}, measured` : "roughly ten times slower — about a minute a page"], ["Read-along", "a paragraph at a time"], ["Damaged page", "still accurate"], ["This book", suryaSeconds && suryaTotal ? `${suryaTotal} for ${pageCount} pages at this rate` : suryaTotal ? `${suryaTotal}, guessing ten times Tesseract's rate` : "longer — measure it here first"]]} /></div>
+            <div className="mt-2"><Meta rows={[["Speed", suryaSeconds ? `${Math.round(suryaSeconds)}s on page ${page}, measured` : "roughly ten times slower — about a minute a page"], ["Read-along", "word by word, positions estimated"], ["Damaged page", "still accurate"], ["This book", suryaSeconds && suryaTotal ? `${suryaTotal} for ${pageCount} pages at this rate` : suryaTotal ? `${suryaTotal}, guessing ten times Tesseract's rate` : "longer — measure it here first"]]} /></div>
             {(surya.status === "warming" || surya.status === "streaming") && <div className="mt-2 h-[3px] overflow-hidden rounded bg-(--bg-subtle)"><div className="h-full w-[30%] bg-(--accent) animate-[slide-indeterminate_1.5s_linear_infinite]" /></div>}
             {surya.status !== "offer" && (
               <div className="mt-2 flex items-center gap-2 text-(--text-muted)" data-testid="ocr-try-surya-meter">
@@ -376,7 +376,7 @@ export function OcrTryPage() {
           {!chosen ? (
             <><strong>Nothing is committed yet.</strong> Choosing an engine here saves it on the book — all {pageCount} pages, and every extraction after this one. Whole-book times are extrapolated from the page you sampled, so a different page gives different numbers.</>
           ) : (
-            <><strong>{chosen === "tesseract" ? "Tesseract" : "Surya"} is set on {title}.</strong> All {pageCount} pages at the rate page {page} ran — {chosen === "tesseract" ? tessTotal : suryaTotal} — and read-along will mark {chosen === "tesseract" ? "words" : "a paragraph at a time"}. Saved on the book: every extraction from now on uses it until you change it.</>
+            <><strong>{chosen === "tesseract" ? "Tesseract" : "Surya"} is set on {title}.</strong> All {pageCount} pages at the rate page {page} ran — {chosen === "tesseract" ? tessTotal : suryaTotal} — and read-along will mark {chosen === "tesseract" ? "words" : "words at estimated positions"}. Saved on the book: every extraction from now on uses it until you change it.</>
           )}
           {update.error && <span className="block text-(--danger-text)">{update.error.message}</span>}
         </span>
