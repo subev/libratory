@@ -1,12 +1,12 @@
 import { execFile } from "node:child_process";
-import { access, mkdir, open, readdir, readFile, rename } from "node:fs/promises";
+import { access, mkdir, open, readdir, readFile, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "../db.ts";
 import { bookFiles } from "../schema.ts";
-import { detectScript as detectPageScript, LOW_CONFIDENCE, pdfPageCount } from "./ocr-tesseract.ts";
+import { detectScript as detectPageScript, LOW_CONFIDENCE, pdfPageCount, statsFromConfidences } from "./ocr-tesseract.ts";
 import { OCR_GARBLED_FRACTION } from "./ocr-text-layer.ts";
 import { bookTmpDir } from "./paths.ts";
 import { ensureTessdata, installedPacks, tesseractEnv } from "./tessdata.ts";
@@ -44,12 +44,20 @@ async function renderPng(png: string, pdfPath: string, page: number, dpi: number
   const dir = path.dirname(png);
   await mkdir(dir, { recursive: true });
   if (await exists(png)) return png;
-  const prefix = `render-${path.basename(png, ".png")}`;
-  await execFileAsync("pdftoppm", ["-r", String(dpi), "-png", "-f", String(page), "-l", String(page), pdfPath, path.join(dir, prefix)], { timeout: 60_000 });
-  const produced = (await readdir(dir)).find((f) => f.startsWith(`${prefix}-`) && f.endsWith(".png"));
-  if (!produced) throw new Error(`pdftoppm rendered nothing for page ${page}`);
-  await rename(path.join(dir, produced), png);
-  return png;
+  // pdftoppm names its output after the document's page count, so a scratch dir of its own is what
+  // makes the one file it wrote findable however many pages the session has already tried.
+  const scratch = path.join(dir, `render-${path.basename(png, ".png")}`);
+  await rm(scratch, { recursive: true, force: true });
+  await mkdir(scratch, { recursive: true });
+  try {
+    await execFileAsync("pdftoppm", ["-r", String(dpi), "-png", "-f", String(page), "-l", String(page), pdfPath, path.join(scratch, "pg")], { timeout: 60_000 });
+    const produced = (await readdir(scratch)).find((f) => f.endsWith(".png"));
+    if (!produced) throw new Error(`pdftoppm rendered nothing for page ${page}`);
+    await rename(path.join(scratch, produced), png);
+    return png;
+  } finally {
+    await rm(scratch, { recursive: true, force: true }).catch(() => {});
+  }
 }
 
 async function pngSize(file: string): Promise<{ width: number; height: number }> {
@@ -125,7 +133,6 @@ export async function tesseractPage(png: string, pack: string, pageWidth: number
   const elapsedMs = Date.now() - started;
   const lines = parseTsvLines(await readFile(`${base}.tsv`, "utf-8"));
   const words = lines.flatMap((l) => l.words);
-  const confidence = words.length ? words.reduce((sum, w) => sum + w.conf, 0) / words.length / 100 : null;
-  const lowConfidenceFraction = words.length ? words.filter((w) => w.conf < LOW_CONFIDENCE).length / words.length : null;
-  return { lines, confidence, lowConfidenceFraction, elapsedMs, callout: classifyDoubt(words, pageWidth) };
+  const stats = statsFromConfidences(words.map((w) => w.conf));
+  return { lines, ...stats, elapsedMs, callout: classifyDoubt(words, pageWidth) };
 }

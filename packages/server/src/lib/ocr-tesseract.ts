@@ -90,21 +90,23 @@ async function renderPages(pdfPath: string, workDir: string, pages: number, log:
   return rendered.map((f) => path.join(workDir, f));
 }
 
+export function statsFromConfidences(confidences: number[]): OcrStats {
+  if (confidences.length === 0) return { confidence: null, lowConfidenceFraction: null };
+  const sum = confidences.reduce((a, conf) => a + conf, 0);
+  const low = confidences.filter((conf) => conf < LOW_CONFIDENCE).length;
+  return { confidence: sum / confidences.length / 100, lowConfidenceFraction: low / confidences.length };
+}
+
 function statsFromTsv(tsv: string): OcrStats {
-  let total = 0;
-  let sum = 0;
-  let low = 0;
+  const confidences: number[] = [];
   for (const line of tsv.split("\n").slice(1)) {
     const columns = line.split("\t");
     if (columns[0] !== "5") continue;
     const conf = Number(columns[10]);
     if (!Number.isFinite(conf) || conf < 0) continue;
-    total++;
-    sum += conf;
-    if (conf < LOW_CONFIDENCE) low++;
+    confidences.push(conf);
   }
-  if (total === 0) return { confidence: null, lowConfidenceFraction: null };
-  return { confidence: sum / total / 100, lowConfidenceFraction: low / total };
+  return statsFromConfidences(confidences);
 }
 
 export async function detectScript(png: string): Promise<string | null> {
@@ -127,8 +129,7 @@ function requireInstalled(installed: string[], choice: TesseractLanguage): Tesse
 
 // Reading a Cyrillic scan as English quietly is the failure this guards against: with no language
 // on the book, the page's own script picks the pack, and a script with no installed pack stops here.
-async function chooseLanguage(language: string | null, pdfPath: string, pages: number, workDir: string, signal: AbortSignal | undefined, log: (msg: string) => Promise<void>): Promise<TesseractLanguage> {
-  const installed = await installedPacks();
+async function chooseLanguage(installed: string[], language: string | null, pdfPath: string, pages: number, workDir: string, signal: AbortSignal | undefined, log: (msg: string) => Promise<void>): Promise<TesseractLanguage> {
   if (language) return requireInstalled(installed, tesseractLanguage(language));
   const sampleDir = path.join(workDir, "osd");
   await mkdir(sampleDir, { recursive: true });
@@ -150,14 +151,15 @@ async function chooseLanguage(language: string | null, pdfPath: string, pages: n
 
 export const runTesseractOcr: OcrRunner = async ({ pdfPath, outPdfPath, language, workDir, log, signal }) => {
   await ensureTessdata();
-  if (language) requireInstalled(await installedPacks(), tesseractLanguage(language));
+  const installed = await installedPacks();
+  if (language) requireInstalled(installed, tesseractLanguage(language));
 
   await rm(workDir, { recursive: true, force: true });
   await mkdir(workDir, { recursive: true });
 
   try {
     const pages = await pdfPageCount(pdfPath);
-    const { pack, name } = await chooseLanguage(language, pdfPath, pages, workDir, signal, log);
+    const { pack, name } = await chooseLanguage(installed, language, pdfPath, pages, workDir, signal, log);
     const images = await renderPages(pdfPath, workDir, pages, log, signal);
 
     const listPath = path.join(workDir, "pages.txt");

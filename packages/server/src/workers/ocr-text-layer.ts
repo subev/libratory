@@ -2,7 +2,7 @@ import type { WorkerUtils } from "graphile-worker";
 import { asc, eq } from "drizzle-orm";
 
 import { db } from "../db.ts";
-import { books, bookFiles } from "../schema.ts";
+import { books, bookFiles, DEFAULT_OCR_ENGINE } from "../schema.ts";
 import { clearExtractAbort, registerExtractAbort } from "../lib/extract-registry.ts";
 import { appendLog } from "../lib/log.ts";
 import { ExtractAbortedError } from "../lib/marker.ts";
@@ -29,22 +29,26 @@ export async function ocrTextLayer(payload: OcrTextLayerPayload, { addJob }: { a
     .from(bookFiles)
     .where(eq(bookFiles.bookId, bookId))
     .orderBy(asc(bookFiles.index));
-  const needs = [];
+  const needs: { file: (typeof files)[number]; hasTextLayer?: boolean | null }[] = [];
   for (const file of files) {
-    if ((force && file.searchablePdfPath) || (!file.searchablePdfPath && (await pdfHasTextLayer(file.pdfPath)) === false)) needs.push(file);
+    if (force && file.searchablePdfPath) needs.push({ file });
+    else if (!file.searchablePdfPath) {
+      const hasTextLayer = await pdfHasTextLayer(file.pdfPath);
+      if (hasTextLayer === false) needs.push({ file, hasTextLayer });
+    }
   }
   if (needs.length === 0) return;
 
-  const engine = book.ocrEngine ?? "tesseract";
+  const engine = book.ocrEngine ?? DEFAULT_OCR_ENGINE;
   await db.update(books).set({ status: "extracting", error: null, updatedAt: new Date() }).where(eq(books.id, bookId));
 
   const abort = registerExtractAbort(bookId);
   try {
     let written = 0;
-    for (const file of needs) {
+    for (const { file, hasTextLayer } of needs) {
       const fileLog = (msg: string) => appendLog(bookId, msg, file.index);
       if (!book.ocrEngine) await fileLog(`No text layer in "${file.filename}" — reading it with Tesseract by default; change the engine under "About this book" in Extract…`);
-      const produced = await ensureTextLayer({ bookId, file, engine, language: book.language, force, log: fileLog, signal: abort.signal });
+      const produced = await ensureTextLayer({ bookId, file, engine, language: book.language, force, hasTextLayer, log: fileLog, signal: abort.signal });
       if (produced) written++;
     }
 

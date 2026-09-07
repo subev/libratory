@@ -129,6 +129,7 @@ export const folders = pgTable("folders", {
 
 export const OCR_ENGINES = ["tesseract", "surya"] as const;
 export type OcrEngine = (typeof OCR_ENGINES)[number];
+export const DEFAULT_OCR_ENGINE: OcrEngine = "tesseract";
 
 export const books = pgTable("books", {
   id: uuid("id").primaryKey().defaultRandom(),

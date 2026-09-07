@@ -30,6 +30,7 @@ export async function ensureTextLayer({
   engine,
   language,
   force = false,
+  hasTextLayer,
   log,
   signal,
 }: {
@@ -38,6 +39,8 @@ export async function ensureTextLayer({
   engine: OcrEngine;
   language: string | null;
   force?: boolean;
+  /** What pdfHasTextLayer already said, when the caller has asked. */
+  hasTextLayer?: boolean | null;
   log: (msg: string) => Promise<void>;
   signal?: AbortSignal;
 }): Promise<boolean> {
@@ -50,7 +53,8 @@ export async function ensureTextLayer({
   if (rereading) await log(`"${file.filename}" was read by ${file.ocrEngine} — reading it again with ${engine}`);
 
   // null means pdftotext could not run at all — a machine fault, not a scan, so it must not force OCR.
-  if ((await pdfHasTextLayer(file.pdfPath)) !== false) return false;
+  const scanned = hasTextLayer === undefined ? await pdfHasTextLayer(file.pdfPath) : hasTextLayer;
+  if (scanned !== false) return false;
 
   const previous = file.searchablePdfPath;
   const outPdfPath = path.join(path.dirname(file.pdfPath), `${path.basename(file.pdfPath, ".pdf")}.ocr.pdf`);

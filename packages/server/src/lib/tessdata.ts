@@ -7,6 +7,7 @@ import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream } from "node:stream/web";
 import { promisify } from "node:util";
+import { z } from "zod";
 
 import { env } from "../env.ts";
 import { isoForPack } from "./tesseract-languages.ts";
@@ -68,6 +69,8 @@ export async function installedPacks(dir = tessdataDir()): Promise<string[]> {
 }
 
 const downloads = new Map<string, PackDownload>();
+
+export const packCodeSchema = z.string().refine((c) => TESSDATA_LANGUAGES.some((l) => l.code === c), "Unknown language pack");
 
 export function manifestEntry(code: string): TessdataLanguage {
   const entry = TESSDATA_LANGUAGES.find((l) => l.code === code);

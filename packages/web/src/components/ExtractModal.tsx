@@ -5,7 +5,7 @@ import { trpc } from "../trpc.ts";
 import { Modal, ModalHeader } from "./Modal.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { Button } from "./Button.tsx";
-import type { OcrEngine } from "../lib/ocr.ts";
+import { DEFAULT_OCR_ENGINE, type OcrEngine } from "../lib/ocr.ts";
 import { packForBookLanguage, useOcrLanguages } from "../lib/use-ocr-languages.ts";
 import { OcrEngineChoice } from "./OcrEngineChoice.tsx";
 import { OcrLanguagePackRow } from "./OcrLanguagePackRow.tsx";
@@ -89,6 +89,7 @@ export function ExtractModal({
   const [confirmedScope, setConfirmedScope] = useState<ExtractScope | null>(null);
   const confirmed = confirmedScope === scope;
   const blocked = disabledReason(scope) ?? (losing > 0 && !confirmed ? "Confirm the chapters you're replacing" : null);
+  const usingTesseract = (ocrEngine ?? DEFAULT_OCR_ENGINE) === DEFAULT_OCR_ENGINE;
 
   return (
     <Modal size="md" onClose={onClose} testId="extract-modal">
@@ -146,14 +147,14 @@ export function ExtractModal({
                 : isProcessing
                   ? "The pages are pictures. They are being read in the background right now; extraction picks up the result."
                   : "The pages are pictures. Extraction reads them first, with the engine below, into a copy kept beside the original."}
-              note={(ocrEngine ?? "tesseract") === "tesseract"
+              note={usingTesseract
                 ? suggestion.isLoading ? "Looking at a page for its alphabet…"
                   : language ? `Read as ${languageLabel(language)}, the book's language.`
                   : suggestion.data?.script && suggestedPack ? `${suggestion.data.script} letters on page ${suggestion.data.page} — read as ${suggestedPack.name} unless the language below says otherwise.`
                   : "Read as English unless the language below says otherwise."
                 : undefined}
             />
-            {(ocrEngine ?? "tesseract") === "tesseract" && pack && <OcrLanguagePackRow code={pack.code} />}
+            {usingTesseract && pack && <OcrLanguagePackRow code={pack.code} />}
           </div>
         )}
 

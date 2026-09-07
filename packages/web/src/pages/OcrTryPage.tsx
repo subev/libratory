@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { trpc } from "../trpc.ts";
 import type { RouterOutputs } from "../../../server/src/router.ts";
@@ -7,6 +7,7 @@ import { dur, preselectLanguage } from "../lib/ocr-try.ts";
 import type { OcrEngine } from "../lib/ocr.ts";
 import { packForBookLanguage, useOcrLanguages } from "../lib/use-ocr-languages.ts";
 import { Button } from "../components/Button.tsx";
+import { Dropdown, type DropdownOption } from "../components/Dropdown.tsx";
 import { ModelBundleNotice } from "../components/ModelBundleNotice.tsx";
 import { OcrLanguagePackRow } from "../components/OcrLanguagePackRow.tsx";
 import { IconArrowLeft, IconAdd, IconChoose, IconChosen, IconHide, IconInfo, IconMinus, IconRerun, IconScan, IconScattered, IconShow, IconStop, IconCheck } from "../components/icons.tsx";
@@ -26,6 +27,16 @@ type SuryaAction =
   | { type: "reset" };
 
 const SURYA_IDLE: SuryaState = { status: "offer", lines: [], total: null, startedAt: 0, elapsedMs: 0, error: null };
+
+const ENGINE_CARD = "flex min-w-[280px] flex-[1_1_300px] flex-col rounded-lg border border-(--border) bg-(--bg-card) p-3 text-xs";
+
+function Working({ tone }: { tone: string }) {
+  return (
+    <div className="mt-2 h-[3px] overflow-hidden rounded bg-(--bg-subtle)">
+      <div className={`h-full w-[30%] animate-[slide-indeterminate_1.5s_linear_infinite] ${tone}`} />
+    </div>
+  );
+}
 
 function suryaReducer(state: SuryaState, action: SuryaAction): SuryaState {
   switch (action.type) {
@@ -84,12 +95,28 @@ export function OcrTryPage() {
   const page = info?.page ?? pageWanted;
 
   const [pickedLanguage, setPickedLanguage] = useState<string | null>(null);
-  const known = new Set(languages.map((l) => l.code));
-  const detected = (info?.candidates ?? []).filter((code) => known.has(code));
+  const detected = useMemo(() => {
+    const known = new Set(languages.map((l) => l.code));
+    return (info?.candidates ?? []).filter((code) => known.has(code));
+  }, [languages, info?.candidates]);
   const bookPack = packForBookLanguage(languages, book.data?.language ?? null);
   const language = pickedLanguage ?? preselectLanguage(book.data?.language ? bookPack?.code ?? null : null, detected);
   const languageEntry = languages.find((l) => l.code === language);
   const packInstalled = info?.installedLanguages.includes(language) ?? true;
+
+  const languageOptions = useMemo<DropdownOption[]>(() => {
+    const label = (l: { name: string; installed: boolean; bytes: number }) =>
+      `${l.name} — ${l.installed ? "installed" : `${formatBytes(l.bytes)} to download`}`;
+    const inDetected = (code: string) => detected.includes(code);
+    return [
+      ...detected.flatMap((code) => {
+        const l = languages.find((x) => x.code === code);
+        return l ? [{ value: l.code, label: label(l), group: `Detected on this page — ${info?.script ?? ""}` }] : [];
+      }),
+      ...languages.filter((l) => l.installed && !inDetected(l.code)).map((l) => ({ value: l.code, label: label(l), group: "Installed" })),
+      ...languages.filter((l) => !l.installed && !inDetected(l.code)).map((l) => ({ value: l.code, label: label(l), group: `All languages — ${languages.length}` })),
+    ];
+  }, [languages, detected, info?.script]);
 
   const tesseract = trpc.ocrTry.tesseract.useMutation();
   const [surya, dispatch] = useReducer(suryaReducer, SURYA_IDLE);
@@ -157,8 +184,9 @@ export function OcrTryPage() {
   const suryaEstimate = suryaSeconds ?? (tessSeconds ? tessSeconds * SURYA_SLOWER : null);
   const tessTotal = tessSeconds && pageCount ? dur(tessSeconds * pageCount) : null;
   const suryaTotal = suryaEstimate && pageCount ? dur(suryaEstimate * pageCount) : null;
-  const doubted = result ? result.lines.flatMap((l) => l.words).filter((w) => w.conf < 60) : [];
-  const wordCount = result ? result.lines.reduce((n, l) => n + l.words.length, 0) : 0;
+  const words = useMemo(() => result?.lines.flatMap((l) => l.words) ?? [], [result]);
+  const doubted = useMemo(() => words.filter((w) => w.conf < 60), [words]);
+  const wordCount = words.length;
   const confPct = result?.confidence != null ? `${Math.round(result.confidence * 100)}%` : null;
   const elapsed = surya.status === "warming" || surya.status === "streaming" ? Math.max(0, Math.round((now - surya.startedAt) / 1000)) : 0;
   const suryaLeft = surya.total && surya.lines.length > 0 ? Math.max(1, Math.round(((now - surya.startedAt) / surya.lines.length) * (surya.total - surya.lines.length) / 1000)) : null;
@@ -179,9 +207,8 @@ export function OcrTryPage() {
   const shade = (w: { conf: number }) => (w.conf < 60 ? "rounded-[2px] bg-(--lowconf) shadow-[0_0_0_1px_var(--lowconf-ring)]" : "");
   // Once the words are placed, the pane shows the column of type and not the margins — the reader's
   // column view — so a line is readable at the pane's width. Before that, the whole page.
-  const crop = (() => {
+  const crop = useMemo(() => {
     if (!info) return null;
-    const words = result?.lines.flatMap((l) => l.words) ?? [];
     if (words.length === 0) return { x: 0, y: 0, w: info.width, h: info.height };
     const pad = info.width * 0.015;
     const x0 = Math.max(0, Math.min(...words.map((w) => w.x0)) - pad);
@@ -189,7 +216,7 @@ export function OcrTryPage() {
     const x1 = Math.min(info.width, Math.max(...words.map((w) => w.x1)) + pad);
     const y1 = Math.min(info.height, Math.max(...words.map((w) => w.y1)) + pad);
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
-  })();
+  }, [info, words]);
   const LOUPE_ZOOM = 2.4;
   const loupeW = Math.min(760, window.innerWidth - 24);
   const loupeH = 150;
@@ -217,19 +244,7 @@ export function OcrTryPage() {
         <span className="h-4 w-px bg-(--border)" />
         <label className="flex items-center gap-2">
           <span className="text-[10px] font-semibold tracking-wider text-(--text-faint)">LANGUAGE</span>
-          <select value={language} onChange={(e) => setPickedLanguage(e.target.value)} className="rounded border border-(--border-input) bg-(--bg-input) px-1.5 py-1 text-xs" data-testid="ocr-try-language">
-            {detected.length > 0 && (
-              <optgroup label={`Detected on this page — ${info?.script}`}>
-                {detected.map((code) => { const l = languages.find((x) => x.code === code); return l ? <option key={code} value={code}>{l.name}{l.installed ? " — installed" : ` — ${formatBytes(l.bytes)} to download`}</option> : null; })}
-              </optgroup>
-            )}
-            <optgroup label="Installed">
-              {languages.filter((l) => l.installed && !detected.includes(l.code)).map((l) => <option key={l.code} value={l.code}>{l.name} — installed</option>)}
-            </optgroup>
-            <optgroup label={`All languages — ${languages.length}`}>
-              {languages.filter((l) => !l.installed && !detected.includes(l.code)).map((l) => <option key={l.code} value={l.code}>{l.name} — {formatBytes(l.bytes)}</option>)}
-            </optgroup>
-          </select>
+          <Dropdown value={language} options={languageOptions} onChange={setPickedLanguage} testId="ocr-try-language" className="py-1 text-xs" />
           <Chip tone={packInstalled ? "done" : "warn"}>{packInstalled ? "pack installed" : `pack not installed · ${languageEntry ? formatBytes(languageEntry.bytes) : ""}`}</Chip>
         </label>
         <span className="h-4 w-px bg-(--border)" />
@@ -302,12 +317,12 @@ export function OcrTryPage() {
         </section>
 
         <div className="flex min-w-[280px] flex-[2_1_470px] flex-wrap items-stretch gap-4">
-          <section className="flex min-w-[280px] flex-[1_1_300px] flex-col rounded-lg border border-(--border) bg-(--bg-card) p-3 text-xs" data-testid="ocr-try-tesseract">
+          <section className={ENGINE_CARD} data-testid="ocr-try-tesseract">
             <div className="flex items-center gap-2"><span className="text-[13px] font-semibold">Tesseract</span>
               {!packInstalled ? <Chip tone="warn">needs {languageEntry?.name}</Chip> : tesseract.isPending ? <Chip tone="work">reading</Chip> : result ? <Chip tone="done">done in {tessSeconds?.toFixed(1)}s</Chip> : tesseract.error ? <Chip tone="warn">failed</Chip> : <Chip tone="idle">not run</Chip>}
             </div>
             <div className="mt-2"><Meta rows={[["Speed", result ? `${tessSeconds?.toFixed(1)}s on page ${page}, measured` : "about a second a clean page, longer on a damaged one"], ["Read-along", "word by word"], ["Damaged page", "degrades — margins first"], ["This book", tessTotal ? `${tessTotal} for ${pageCount} pages at this rate` : "minutes, not hours"]]} /></div>
-            {tesseract.isPending && <div className="mt-2 h-[3px] overflow-hidden rounded bg-(--bg-subtle)"><div className="h-full w-[30%] bg-(--badge-extracting-text) animate-[slide-indeterminate_1.5s_linear_infinite]" /></div>}
+            {tesseract.isPending && <Working tone="bg-(--badge-extracting-text)" />}
             {result && confPct && (
               <div className="mt-2 flex items-center gap-2">
                 <span className="text-(--text-faint)">Average confidence</span>
@@ -331,12 +346,12 @@ export function OcrTryPage() {
             </div>
           </section>
 
-          <section className="flex min-w-[280px] flex-[1_1_300px] flex-col rounded-lg border border-(--border) bg-(--bg-card) p-3 text-xs" data-testid="ocr-try-surya">
+          <section className={ENGINE_CARD} data-testid="ocr-try-surya">
             <div className="flex items-center gap-2"><span className="text-[13px] font-semibold">Surya</span>
               {surya.status === "warming" || surya.status === "streaming" ? <Chip tone="work">reading</Chip> : surya.status === "done" ? <Chip tone="done">done in {Math.round(surya.elapsedMs / 1000)}s</Chip> : surya.status === "stopped" ? <Chip tone="idle">stopped</Chip> : surya.status === "error" ? <Chip tone="warn">failed</Chip> : <Chip tone="idle">not run</Chip>}
             </div>
             <div className="mt-2"><Meta rows={[["Speed", suryaSeconds ? `${Math.round(suryaSeconds)}s on page ${page}, measured` : "roughly ten times slower — about a minute a page"], ["Read-along", "word by word, positions estimated"], ["Damaged page", "still accurate"], ["This book", suryaSeconds && suryaTotal ? `${suryaTotal} for ${pageCount} pages at this rate` : suryaTotal ? `${suryaTotal}, guessing ten times Tesseract's rate` : "longer — measure it here first"]]} /></div>
-            {(surya.status === "warming" || surya.status === "streaming") && <div className="mt-2 h-[3px] overflow-hidden rounded bg-(--bg-subtle)"><div className="h-full w-[30%] bg-(--accent) animate-[slide-indeterminate_1.5s_linear_infinite]" /></div>}
+            {(surya.status === "warming" || surya.status === "streaming") && <Working tone="bg-(--accent)" />}
             {surya.status !== "offer" && (
               <div className="mt-2 flex items-center gap-2 text-(--text-muted)" data-testid="ocr-try-surya-meter">
                 <span className="min-w-0 flex-1">

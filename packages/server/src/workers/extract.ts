@@ -1,6 +1,6 @@
 import type { WorkerUtils } from "graphile-worker";
 import { db } from "../db.ts";
-import { books, bookFiles, chapters } from "../schema.ts";
+import { books, bookFiles, chapters, DEFAULT_OCR_ENGINE } from "../schema.ts";
 import { eq, ne, and, asc, max } from "drizzle-orm";
 import { extractPdf, ExtractAbortedError } from "../lib/marker.ts";
 import { registerExtractAbort, clearExtractAbort } from "../lib/extract-registry.ts";
@@ -183,7 +183,7 @@ async function extractMultipleFiles(
     const abort = registerExtractAbort(file.id);
     try {
       let source: { pdfPath: string; searchablePdfPath: string | null } = file;
-      const engine = book.ocrEngine ?? file.ocrEngine ?? "tesseract";
+      const engine = book.ocrEngine ?? file.ocrEngine ?? DEFAULT_OCR_ENGINE;
       const produced = await ensureTextLayer({
         bookId: book.id,
         file,
