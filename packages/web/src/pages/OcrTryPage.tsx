@@ -327,7 +327,7 @@ export function OcrTryPage() {
             </div>
             <div className="mt-3 flex items-end gap-2">
               {result && <span className="max-w-[32ch] text-(--text-faint)">{languageEntry && !languageEntry.iso ? `${languageEntry.name} has no book language to save; the run will pick a pack from the page's script unless the book's language is set.` : "Shaded words are the ones Tesseract itself scored under 60% — its own doubt, not our judgement."}</span>}
-              <Button variant={chosen === "tesseract" ? "success" : "primary"} size="sm" className="ml-auto" onClick={() => commit("tesseract")} disabled={!result || update.isPending} data-testid="ocr-try-use-tesseract">{chosen === "tesseract" ? <IconChosen /> : <IconChoose />}{chosen === "tesseract" ? "Using Tesseract" : "Use Tesseract for this book"}</Button>
+              <Button variant={chosen === "tesseract" ? "success" : "secondary"} size="sm" className="ml-auto" onClick={() => commit("tesseract")} disabled={!result || update.isPending} data-testid="ocr-try-use-tesseract">{chosen === "tesseract" ? <IconChosen /> : <IconChoose />}{chosen === "tesseract" ? "Using Tesseract" : "Use Tesseract for this book"}</Button>
             </div>
           </section>
 
@@ -354,7 +354,7 @@ export function OcrTryPage() {
               {surya.status === "offer" && (info && !info.bundleInstalled ? <ModelBundleNotice id="extraction" verb="Surya" /> : (
                 <div className="space-y-2">
                   <p className="text-(--text-muted)">{offerText}</p>
-                  <Button variant="primary" size="sm" onClick={runSurya} disabled={!info} data-testid="ocr-try-run-surya">Run Surya on page {page}{suryaEstimate ? ` · ${dur(suryaEstimate)}` : ""}</Button>
+                  <Button variant="secondary" size="sm" onClick={runSurya} disabled={!info} data-testid="ocr-try-run-surya">Run Surya on page {page}{suryaEstimate ? ` · ${dur(suryaEstimate)}` : ""}</Button>
                   <p className="text-(--text-faint)">It never starts on its own — a minute of your GPU is not something to spend by accident.</p>
                 </div>
               ))}
@@ -364,7 +364,7 @@ export function OcrTryPage() {
             </div>
             <div className="mt-3 flex items-end gap-2">
               {surya.status === "done" && <span className="max-w-[30ch] text-(--text-faint)">No confidence figure: Surya reports none, so there is nothing to compare against {confPct ?? "Tesseract's"}.</span>}
-              <Button variant={chosen === "surya" ? "success" : "primary"} size="sm" className="ml-auto" onClick={() => commit("surya")} disabled={surya.status !== "done" || update.isPending} data-testid="ocr-try-use-surya">{chosen === "surya" ? <IconChosen /> : <IconChoose />}{chosen === "surya" ? "Using Surya" : "Use Surya for this book"}</Button>
+              <Button variant={chosen === "surya" ? "success" : "secondary"} size="sm" className="ml-auto" onClick={() => commit("surya")} disabled={surya.status !== "done" || update.isPending} data-testid="ocr-try-use-surya">{chosen === "surya" ? <IconChosen /> : <IconChoose />}{chosen === "surya" ? "Using Surya" : "Use Surya for this book"}</Button>
             </div>
           </section>
         </div>

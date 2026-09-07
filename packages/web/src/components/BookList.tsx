@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { trpc } from "../trpc.ts";
 import { formatBytes, formatRelativeTime } from "../lib/format.ts";
 import { loadBookSort, saveBookSort, sortBooks, sortFolders, type BookSortDir, type BookSortKey, type FolderRow } from "../lib/book-sort.ts";
@@ -272,6 +272,7 @@ export function BookList({
   onClearFilter: () => void;
   onAddBooks: () => void;
 }) {
+  const navigate = useNavigate();
   const utils = trpc.useUtils();
   const layout = useLibraryLayout();
   const { data, isLoading } = trpc.books.list.useQuery({ folderId }, {
@@ -509,9 +510,13 @@ export function BookList({
             return (
               <tr
                 key={book.id}
-                className={`hover:bg-(--bg-card-hover) ${selectedIds.has(book.id) ? "bg-(--bg-selected)" : ""}`}
+                className={`cursor-pointer hover:bg-(--bg-card-hover) ${selectedIds.has(book.id) ? "bg-(--bg-selected)" : ""}`}
                 draggable
                 onDragStart={(e) => setDragItems(e, dragItemsFor("book", book.id))}
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest("a, button, input, label, select")) return;
+                  navigate(`/books/${book.id}`);
+                }}
               >
                 <td className="px-3 py-3">
                   <input

@@ -234,6 +234,8 @@ export function BookDetail() {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
       if (askScope || showStructure || showTranslation || showSynthesize) return;
+      // A modal on top means the keys belong to it, not to the shelf underneath
+      if (document.querySelector('[role="dialog"]')) return;
       const target = e.key === "[" ? prevBookId : nextBookId;
       if (target) navigate(`/books/${target}`);
     }
