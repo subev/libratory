@@ -316,7 +316,7 @@ describe("booksRouter.extractChapters", () => {
       expect.any(Object),
       "extract",
       { bookId },
-      { maxAttempts: 1 }
+      expect.objectContaining({ maxAttempts: 1 })
     );
   });
 

@@ -14,7 +14,7 @@ import { parseTtsVoice } from "../lib/tts.ts";
 import { collectBlocksFromMarkerOutput, sliceChaptersAtIndices, type ExtractedChapter } from "../lib/marker.ts";
 import { listMarkerSources } from "../lib/marker-sources.ts";
 import { cumulativeWords } from "../lib/toc-anchor.ts";
-import { abortExtract } from "../lib/extract-registry.ts";
+import { abortExtract, extractRunning } from "../lib/extract-registry.ts";
 import { measureBookDiskUsage, measureDirs, removeDirs, bookTotalSizeCached, fileSize } from "../lib/disk-usage.ts";
 import { chapterChunkPreviewDir } from "../lib/chunk-previews.ts";
 import { translationChunkPreviewDir } from "../workers/synthesize-translation.ts";
@@ -108,6 +108,14 @@ async function cleanableChunkDirs(bookId: string): Promise<string[]> {
 
 async function withFileSizes<T extends { outputPath: string }>(rows: T[]): Promise<(T & { sizeBytes: number | null })[]> {
   return Promise.all(rows.map(async (row) => ({ ...row, sizeBytes: await fileSize(row.outputPath) })));
+}
+
+
+// A second run on top of a running one inserted every chapter twice; the in-memory registry knows
+// what is in flight in this process, and the cancel route is how a run is stopped.
+async function extractionRunning(bookId: string): Promise<boolean> {
+  const files = await db.select({ id: bookFiles.id }).from(bookFiles).where(eq(bookFiles.bookId, bookId));
+  return extractRunning([bookId, ...files.map((f) => f.id)]);
 }
 
 export const booksRouter = router({
@@ -526,7 +534,7 @@ export const booksRouter = router({
         })
         .returning();
 
-      await quickAddJob({ connectionString }, "extract", { bookId: id }, { maxAttempts: 1 });
+      await quickAddJob({ connectionString }, "extract", { bookId: id }, { maxAttempts: 1, jobKey: `extract:${id}`, jobKeyMode: "replace" });
 
       return book;
     }),
@@ -547,6 +555,7 @@ export const booksRouter = router({
       const [existing] = await db.select().from(books).where(eq(books.id, input.id));
       if (!existing) throw new Error("Book not found");
       if (existing.kind !== "pdf") throw new Error("Synthetic books have no PDF to re-extract");
+      if (await extractionRunning(input.id)) throw new Error("Extraction is already running for this book — stop it first, then re-extract");
       if (input.forgetTextLayer) {
         const copies = await db.select({ id: bookFiles.id, searchablePdfPath: bookFiles.searchablePdfPath }).from(bookFiles).where(eq(bookFiles.bookId, input.id));
         for (const copy of copies) {
@@ -584,7 +593,7 @@ export const booksRouter = router({
         await appendLog(input.id, `Kept ${keptCount} inserted chapter${keptCount === 1 ? "" : "s"} (moved to the front, audio reset)`);
       }
 
-      await quickAddJob({ connectionString }, "extract", { bookId: input.id }, { maxAttempts: 1 });
+      await quickAddJob({ connectionString }, "extract", { bookId: input.id }, { maxAttempts: 1, jobKey: `extract:${input.id}`, jobKeyMode: "replace" });
 
       const [book] = await db.select().from(books).where(eq(books.id, input.id));
       return book;
@@ -705,6 +714,7 @@ export const booksRouter = router({
       const [book] = await db.select().from(books).where(eq(books.id, input.id));
       if (!book) throw new Error("Book not found");
       if (book.kind !== "pdf") throw new Error("Synthetic books have no PDF to extract");
+      if (await extractionRunning(input.id)) throw new Error("Extraction is already running for this book — stop it first");
       if (book.status === "extracting" || book.status === "assembling") {
         throw new Error("Cannot extract chapters while book is processing");
       }
@@ -725,7 +735,7 @@ export const booksRouter = router({
 
       await db.update(books).set({ status: "pending", error: null, updatedAt: new Date() }).where(eq(books.id, input.id));
       await appendLog(input.id, "Queued chapter extraction");
-      await quickAddJob({ connectionString }, "extract", { bookId: input.id }, { maxAttempts: 1 });
+      await quickAddJob({ connectionString }, "extract", { bookId: input.id }, { maxAttempts: 1, jobKey: `extract:${input.id}`, jobKeyMode: "replace" });
 
       return reloadBook(input.id);
     }),

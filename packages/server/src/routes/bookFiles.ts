@@ -174,7 +174,7 @@ export const bookFilesRouter = router({
 
       await updateBookTotalChapters(input.bookId);
       await appendLog(input.bookId, `Re-extracting ${selectedFiles.length} selected file(s)`);
-      await quickAddJob({ connectionString }, "extract", { bookId: input.bookId }, { maxAttempts: 1 });
+      await quickAddJob({ connectionString }, "extract", { bookId: input.bookId }, { maxAttempts: 1, jobKey: `extract:${input.bookId}`, jobKeyMode: "replace" });
 
       return { success: true };
     }),

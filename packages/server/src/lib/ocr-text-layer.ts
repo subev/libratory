@@ -12,7 +12,7 @@ import { countWords, extractPdfRawText, pdfHasTextLayer } from "./pdf-raw-text.t
 // Above this share of doubted words a Tesseract read is offered a second pass with Surya.
 export const OCR_GARBLED_FRACTION = 0.15;
 
-export type OcrTarget = Pick<BookFile, "id" | "index" | "filename" | "pdfPath" | "searchablePdfPath">;
+export type OcrTarget = Pick<BookFile, "id" | "index" | "filename" | "pdfPath" | "searchablePdfPath" | "ocrEngine">;
 
 function percent(fraction: number | null): string | null {
   return fraction === null ? null : `${Math.round(fraction * 100)}%`;
@@ -36,10 +36,13 @@ export async function ensureTextLayer({
   log: (msg: string) => Promise<void>;
   signal?: AbortSignal;
 }): Promise<boolean> {
-  if (file.searchablePdfPath && !force) {
+  // The book's engine is the truth: a copy the other engine wrote is stale, not done.
+  const rereading = Boolean(file.searchablePdfPath && file.ocrEngine && file.ocrEngine !== engine);
+  if (file.searchablePdfPath && !force && !rereading) {
     await log(`"${file.filename}" already has a searchable copy`);
     return false;
   }
+  if (rereading) await log(`"${file.filename}" was read by ${file.ocrEngine} — reading it again with ${engine}`);
 
   // null means pdftotext could not run at all — a machine fault, not a scan, so it must not force OCR.
   if ((await pdfHasTextLayer(file.pdfPath)) !== false) return false;

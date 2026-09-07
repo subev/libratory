@@ -20,3 +20,7 @@ export function abortExtract(key: string): boolean {
   controllers.delete(key);
   return true;
 }
+
+export function extractRunning(keys: string[]): boolean {
+  return keys.some((key) => controllers.has(key));
+}
