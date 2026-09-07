@@ -1,7 +1,6 @@
-// Every code the book-language dropdown can produce (packages/web/src/lib/languages.ts, derived
-// from TRANSLATION_LANGUAGES) plus the four that list drops today but a stored book may still
-// carry. The name is what an error message shows, so it has to read like the option the user
-// picked rather than a three-letter tessdata code nobody chose.
+// Every code the book-language dropdown can produce (packages/web/src/lib/languages.ts), plus the
+// four that list drops today but a stored book may still carry. The name is what an error message
+// shows, so it reads like the option the user picked rather than a tessdata code nobody chose.
 const TESSDATA_BY_CODE: Record<string, { pack: string; name: string }> = {
   ar: { pack: "ara", name: "Arabic" },
   bg: { pack: "bul", name: "Bulgarian" },

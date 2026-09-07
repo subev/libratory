@@ -28,7 +28,6 @@ afterAll(async () => {
 
 const exists = (p: string) => stat(p).then(() => true, () => false);
 
-// The book's uploads directory, where the searchable copy is written beside the original
 async function scannedBook(engineSet = true) {
   const db = getDb();
   const dir = await mkdtemp(path.join(tmpdir(), "ocr-worker-"));

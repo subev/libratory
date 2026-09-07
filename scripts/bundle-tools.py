@@ -29,9 +29,8 @@ PINS_FILE = Path(__file__).parent / "pins.json"
 PINNED = json.loads(PINS_FILE.read_text())["bundledTools"]["versions"]
 TOOLS = list(PINNED)
 SYSTEM_PREFIXES = ("/usr/lib/", "/System/")
-# Only these two packs ship: 26 MB against 1.14 GB for all 125, and every other language is one
-# download away. osd earns its place by naming the script on a page, which is what makes the
-# download offer a suggestion rather than a list of 125 names.
+# Only these two ship — 15 MB against 1.14 GB for all 125, and every other language is a download.
+# osd earns its place by naming the script on a page, which is what makes that offer intelligent.
 TESSDATA = ["eng.traineddata", "osd.traineddata", "pdf.ttf", "configs", "tessconfigs"]
 
 

@@ -96,9 +96,8 @@ describe("what a first run has to put in place before any step reads it", () => 
     expect(existsSync(home)).toBe(true);
   });
 
-  // TESSDATA_PREFIX is one directory holding both the shipped packs and any the user downloaded,
-  // and an update replaces Resources wholesale — so this refreshes what shipped and touches
-  // nothing else. Replacing the directory would silently delete a pack somebody waited on.
+  // An update replaces Resources wholesale, so a staging step that replaced the directory would
+  // delete every pack the user had downloaded into it.
   it("refreshes the shipped tessdata without deleting a downloaded pack", async () => {
     const { resources, home } = await stagedInto();
     await writeFile(path.join(home, "tessdata", "bul.traineddata"), "downloaded");

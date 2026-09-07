@@ -368,9 +368,8 @@ function runMarkerSingle(pdfPath: string, outDir: string, device: "mps" | "cuda"
       return;
     }
 
-    // Marker is a layout engine here and nothing else: recognition happens once, in the OCR step,
-    // and is written into a searchable copy this then reads. Marker's own OCR threw the work away
-    // after every run and could never give word boxes.
+    // A layout engine and nothing else: recognition happens once in the OCR step, and what
+    // arrives here is the searchable copy that step wrote.
     const args = [pdfPath, "--output_format", "json", "--output_dir", outDir, "--disable_ocr"];
     const proc = spawn(
       path.join(CONDA_BIN, "marker_single"),
