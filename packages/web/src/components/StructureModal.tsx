@@ -99,8 +99,6 @@ export function StructureModal({
   }, [structure]);
 
   const proposeMutation = trpc.books.proposeChapters.useMutation({ onSuccess: onChanged });
-  const utils = trpc.useUtils();
-  const confirmMutation = trpc.books.confirmStructure.useMutation({ onSuccess: () => { void utils.books.get.invalidate({ id: bookId }); onClose(); } });
   const applyMutation = trpc.books.applyChapterBoundaries.useMutation({
     onSuccess: () => {
       onChanged();
@@ -463,22 +461,13 @@ export function StructureModal({
           <div className="flex-1" />
           <span className="text-sm text-(--text-muted)">{selectedCount} boundaries</span>
           <Button
-            variant="success"
-            onClick={() => confirmMutation.mutate({ id: bookId })}
-            disabled={confirmed || isProcessing || confirmMutation.isPending}
-            title="Saves that you looked at these chapters and they are right. You can still change them later, but re-cutting chapters removes their audio and everything built on them."
-            data-testid="confirm-structure"
-          >
-            {confirmed ? "Chapters confirmed" : "These chapters are right"}
-          </Button>
-          <Button
-            variant="primary"
+            variant={confirmed ? "secondary" : "primary"}
             onClick={apply}
             disabled={selectedCount === 0 || isProcessing || applyMutation.isPending}
             title={
               selectedCount === 0 ? "Check at least one heading" :
               isProcessing ? "Wait for processing to finish" :
-              "Delete existing chapters and re-slice at the checked boundaries"
+              "Cut the chapters at the checked boundaries — that is the review. Later changes remove the audio those chapters had."
             }
             data-testid="apply-boundaries"
           >

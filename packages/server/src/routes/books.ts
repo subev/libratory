@@ -918,6 +918,7 @@ export const booksRouter = router({
       await rm(bookOutputDir(input.id), { recursive: true, force: true }).catch(() => {});
       await db.delete(assemblies).where(eq(assemblies.bookId, input.id));
       const keptCount = await resetChaptersKeepingInserted(input.id);
+      await db.update(books).set({ structureConfirmedAt: new Date() }).where(eq(books.id, input.id));
 
       await appendLog(input.id, `Applying ${input.boundaries.length} manual chapter boundaries`);
       if (oldChapters.length > 0) {

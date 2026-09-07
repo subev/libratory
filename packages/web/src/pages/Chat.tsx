@@ -5,6 +5,7 @@ import { DefaultChatTransport } from "ai";
 import { trpc } from "../trpc.ts";
 import { profileHeaders } from "../lib/profile.ts";
 import { ModelPicker } from "../components/ModelPicker.tsx";
+import { Dropdown } from "../components/Dropdown.tsx";
 import { ChatMessage } from "../components/chat/ChatMessage.tsx";
 import { SavedAnswers } from "../components/chat/SavedAnswers.tsx";
 import { PdfPreviewModal } from "../components/PdfPreviewModal.tsx";
@@ -130,19 +131,12 @@ export function Chat() {
                 </button>
               </span>
             ) : (
-            <select
+            <Dropdown
               value={folderId ?? ""}
-              onChange={(e) => setSearchParams(e.target.value ? { folderId: e.target.value } : {})}
-              className="text-sm rounded-md border border-(--border) bg-(--bg-card) text-(--text-primary) px-2 py-1.5"
-              data-testid="chat-scope"
-            >
-              <option value="">Whole library</option>
-              {folderOptions.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {"  ".repeat(f.depth)}{f.name}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setSearchParams(v ? { folderId: v } : {})}
+              testId="chat-scope"
+              options={[{ value: "", label: "Whole library" }, ...folderOptions.map((f) => ({ value: f.id, label: `${"\u00a0\u00a0".repeat(f.depth)}${f.name}` }))]}
+            />
             )}
             <ModelPicker value={model} onChange={setModel} requireTools testId="chat-model" />
           </div>
