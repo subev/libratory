@@ -6,6 +6,8 @@ import { Modal, ModalHeader } from "./Modal.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { Button } from "./Button.tsx";
 import type { OcrEngine } from "../lib/ocr.ts";
+import { packForBookLanguage, useOcrLanguages } from "../lib/use-ocr-languages.ts";
+import { OcrLanguagePackRow } from "./OcrLanguagePackRow.tsx";
 
 export type ExtractScope = "selected" | "book" | "chapters";
 
@@ -60,6 +62,8 @@ export function ExtractModal({
   onStart: (scope: ExtractScope, autoSynthesize: boolean) => void;
   onClose: () => void;
 }) {
+  const { languages: ocrLanguages } = useOcrLanguages();
+  const pack = packForBookLanguage(ocrLanguages, language);
   const disabledReason = (scope: ExtractScope) => {
     if (isProcessing) return "Wait for the current extraction to finish";
     if (scope === "selected" && selectedCount === 0) return "Select files first";
@@ -169,6 +173,7 @@ export function ExtractModal({
               </span>
             </label>
           )}
+          {canSetOcr && ocrEngine === "tesseract" && pack && <OcrLanguagePackRow code={pack.code} />}
 
           <label className="flex gap-2 text-xs text-(--text-muted)">
             <input

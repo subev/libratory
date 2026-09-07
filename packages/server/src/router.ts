@@ -15,6 +15,7 @@ import { pocketVoicesRouter } from "./routes/pocket-voices.ts";
 import { llmModelsRouter } from "./routes/llm-models.ts";
 import { rendererRouter } from "./routes/renderer.ts";
 import { modelsRouter } from "./routes/models.ts";
+import { ocrLanguagesRouter } from "./routes/ocr-languages.ts";
 import { secretsRouter } from "./routes/secrets.ts";
 import { workersRouter } from "./routes/workers.ts";
 
@@ -34,6 +35,7 @@ export const appRouter = router({
   llmModels: llmModelsRouter,
   renderer: rendererRouter,
   models: modelsRouter,
+  ocrLanguages: ocrLanguagesRouter,
   secrets: secretsRouter,
   workers: workersRouter,
 });

@@ -5,6 +5,7 @@ import { Modal, ModalHeader } from "./Modal.tsx";
 import { useLlmModels } from "../lib/use-llm-models.ts";
 import { formatTokens } from "../lib/ai-presets.ts";
 import { Button } from "./Button.tsx";
+import { OcrLanguagePacksSettings } from "./OcrLanguagePacksSettings.tsx";
 
 type SecretVar = RouterInputs["secrets"]["set"]["envVar"];
 
@@ -324,6 +325,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             </p>
           )}
         </section>
+
+        <OcrLanguagePacksSettings />
 
         <p className="text-xs text-(--text-faint)">
           Keys take effect immediately and are never sent back to the browser.

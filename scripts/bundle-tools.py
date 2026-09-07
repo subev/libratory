@@ -15,7 +15,9 @@ Same lesson as the embedded Postgres, and the same reason DYLD_LIBRARY_PATH is n
 the hardened runtime strips DYLD_*, so it would work in development and fail in the shipped app.
 """
 import argparse
+import hashlib
 import json
+import urllib.request
 import os
 import re
 import shutil
@@ -24,11 +26,16 @@ import sys
 from pathlib import Path
 
 PINS_FILE = Path(__file__).parent / "pins.json"
-PINNED = json.loads(PINS_FILE.read_text())["bundledTools"]["versions"]
+PINS = json.loads(PINS_FILE.read_text())
+PINNED = PINS["bundledTools"]["versions"]
+TESSDATA_PIN = PINS["tessdata"]
 TOOLS = list(PINNED)
 SYSTEM_PREFIXES = ("/usr/lib/", "/System/")
-# Only two packs ship — 15 MB against 1.14 GB for all 125; the rest are downloads, and osd names the script.
-TESSDATA = ["eng.traineddata", "osd.traineddata", "pdf.ttf", "configs", "tessconfigs"]
+# Two packs ship (26 MB against 1.14 GB for all of them); the rest are downloads, and osd names the script.
+# They come from the pinned tessdata_best tree the app downloads from, so shipped and downloaded packs
+# are one model family — Homebrew's eng is the fast model and reads worse.
+SHIPPED_PACKS = ["eng", "osd"]
+TESSERACT_FILES = ["pdf.ttf", "configs", "tessconfigs"]
 
 
 def rpaths(binary: Path) -> list[str]:
@@ -150,6 +157,19 @@ def check_versions(originals: list[Path], update: bool) -> int:
     return 1
 
 
+def fetch_pack(code: str, blobs: dict[str, dict], dest: Path) -> None:
+    blob = blobs.get(f"{code}.traineddata")
+    if not blob:
+        raise SystemExit(f"{code}.traineddata is not in the pinned tessdata tree")
+    url = f"https://raw.githubusercontent.com/{TESSDATA_PIN['repo']}/{TESSDATA_PIN['commit']}/{code}.traineddata"
+    with urllib.request.urlopen(url) as r:
+        data = r.read()
+    digest = hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+    if len(data) != blob["size"] or digest != blob["sha"]:
+        raise SystemExit(f"{code}.traineddata does not match the pinned tree ({len(data)} bytes, sha1 {digest[:12]}…)")
+    (dest / f"{code}.traineddata").write_bytes(data)
+
+
 # TESSDATA_PREFIX is one directory, so the packs, the configs and pdf.ttf all have to live in it.
 def copy_tessdata(dest: Path) -> Path:
     prefix = subprocess.run(["brew", "--prefix"], capture_output=True, text=True).stdout.strip()
@@ -158,7 +178,7 @@ def copy_tessdata(dest: Path) -> Path:
         raise SystemExit(f"No tessdata at {source} — brew install tesseract")
     shutil.rmtree(dest, ignore_errors=True)
     dest.mkdir(parents=True)
-    for name in TESSDATA:
+    for name in TESSERACT_FILES:
         item = source / name
         if not item.exists():
             raise SystemExit(f"{item} is missing — brew install tesseract")
@@ -166,6 +186,11 @@ def copy_tessdata(dest: Path) -> Path:
             shutil.copytree(item, dest / name)
         else:
             shutil.copy2(item, dest / name)
+    tree_url = f"https://api.github.com/repos/{TESSDATA_PIN['repo']}/git/trees/{TESSDATA_PIN['commit']}"
+    with urllib.request.urlopen(tree_url) as r:
+        blobs = {e["path"]: e for e in json.load(r)["tree"] if e["type"] == "blob"}
+    for code in SHIPPED_PACKS:
+        fetch_pack(code, blobs, dest)
     return dest
 
 

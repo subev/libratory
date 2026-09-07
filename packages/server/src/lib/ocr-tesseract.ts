@@ -4,10 +4,10 @@ import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promise
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { env } from "../env.ts";
 import { ExtractAbortedError } from "./marker.ts";
 import { pdfHasTextLayer } from "./pdf-raw-text.ts";
 import { tesseractLanguage } from "./tesseract-languages.ts";
+import { ensureTessdata, installedPacks, tesseractEnv } from "./tessdata.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -30,20 +30,11 @@ const LOW_CONFIDENCE = 60;
 const RENDER_DPI = 300;
 const RENDER_CHUNK_PAGES = 20;
 
-function tesseractEnv(): NodeJS.ProcessEnv {
-  return env.TESSDATA_PREFIX ? { ...process.env, TESSDATA_PREFIX: env.TESSDATA_PREFIX } : process.env;
-}
-
 async function pageCount(pdfPath: string): Promise<number> {
   const { stdout } = await execFileAsync("pdfinfo", [pdfPath], { timeout: 30_000 });
   const pages = Number(stdout.match(/^Pages:\s+(\d+)$/m)?.[1]);
   if (!Number.isInteger(pages) || pages < 1) throw new Error(`pdfinfo could not count the pages of "${path.basename(pdfPath)}"`);
   return pages;
-}
-
-async function installedPacks(): Promise<string[]> {
-  const { stdout } = await execFileAsync("tesseract", ["--list-langs"], { timeout: 30_000, env: tesseractEnv() });
-  return stdout.split("\n").slice(1).map((line) => line.trim()).filter(Boolean);
 }
 
 function run(command: string, args: string[], signal: AbortSignal | undefined, onStderrLine?: (line: string) => void): Promise<void> {
@@ -118,8 +109,9 @@ function statsFromTsv(tsv: string): OcrStats {
 
 export const runTesseractOcr: OcrRunner = async ({ pdfPath, outPdfPath, language, workDir, log, signal }) => {
   const { pack, name } = tesseractLanguage(language);
+  await ensureTessdata();
   if (!(await installedPacks()).includes(pack)) {
-    throw new Error(`Tesseract has no ${name} language pack (${pack}.traineddata) — install it into the tessdata directory`);
+    throw new Error(`Tesseract has no ${name} language pack (${pack}.traineddata) — download it under "OCR language packs" in Settings`);
   }
 
   await rm(workDir, { recursive: true, force: true });

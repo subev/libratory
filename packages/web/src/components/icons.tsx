@@ -18,6 +18,7 @@ export {
   ArrowsOutSimple as IconExpand,
   Sparkle as IconAi,
   DownloadSimple as IconDownload,
+  WifiSlash as IconOffline,
   PlayCircle as IconContinue,
   Play as IconPlay,
   Pause as IconPause,

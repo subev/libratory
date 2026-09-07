@@ -21,7 +21,7 @@
     }
   },
   "bundledTools": {
-    "_comment": "ffmpeg, poppler's pdftotext/pdfinfo/pdftoppm and tesseract ship inside the DMG, and Homebrew has no versioned formula for any of them \u2014 a build machine that installs 'ffmpeg' gets whatever is current that week, which reached CI as 8.1.2 against the 7.1.1 this was tested with. So the built bundle is the artefact, downloaded and checksummed like uv and bun. It carries the eng/osd traineddata and tesseract's configs beside the binaries. Rebuild with scripts/bundle-tools.py, upload a new tools-N release, update this.",
+    "_comment": "ffmpeg, poppler's pdftotext/pdfinfo/pdftoppm and tesseract ship inside the DMG, and Homebrew has no versioned formula for any of them — a build machine that installs 'ffmpeg' gets whatever is current that week, which reached CI as 8.1.2 against the 7.1.1 this was tested with. So the built bundle is the artefact, downloaded and checksummed like uv and bun. It carries the eng/osd traineddata and tesseract's configs beside the binaries. Rebuild with scripts/bundle-tools.py, upload a new tools-N release, update this.",
     "url": "https://github.com/subev/libratory/releases/download/tools-1/pdf2audio-tools-arm64.tar.gz",
     "sha256": "1c74fab64df7156c5516b3b4959e3c6d1a5bec102e175830d7efffcf518416b1",
     "versions": {
@@ -31,5 +31,11 @@
       "tesseract": "5.5.0",
       "pdftoppm": "25.05.0"
     }
+  },
+  "tessdata": {
+    "_comment": "Tesseract language packs are fetched one file at a time from this tree, so the pin is a commit and the checksum is git's own blob SHA-1 from the tree listing; scripts/tessdata-manifest.mjs turns it into packages/server/src/lib/tessdata-manifest.ts, and scripts/bundle-tools.py fetches the shipped eng/osd from the same commit.",
+    "repo": "tesseract-ocr/tessdata_best",
+    "tag": "4.1.0",
+    "commit": "e2aad9b983032bb1beff9133104a67cdbb87ca4d"
   }
 }
