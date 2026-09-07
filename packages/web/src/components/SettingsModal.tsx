@@ -289,6 +289,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                       disabled={pool.running > 0 || setConcurrencyMutation.isPending}
                       size="sm"
                       align="right"
+                      placement="above"
                       width="w-36"
                       options={Array.from({ length: pool.max }, (_, i) => i + 1).map((n) => ({ value: String(n), label: n === pool.default ? `${n} — default` : String(n) }))}
                       testId={`settings-worker-select-${pool.name}`}
