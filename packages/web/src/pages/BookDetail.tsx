@@ -24,7 +24,6 @@ import { ActionTray, type TrayAction } from "../components/ActionTray.tsx";
 import { ExportModal, type ExportFormat, type ExportFormatId } from "../components/book/ExportModal.tsx";
 import { loadBookSort, sortBooks } from "../lib/book-sort.ts";
 import { formatBytes, formatDuration, pendingExportLabel, pendingExportSummary } from "../lib/format.ts";
-import { getVoiceLabel } from "../lib/voices.ts";
 import { IconStructure } from "../components/icons.tsx";
 
 // Named once because it names a control, and the control has been renamed twice
@@ -942,7 +941,6 @@ export function BookDetail() {
                 if (!confirm("Read every page again with Surya? Slower, but better on photographed pages. This replaces the chapters and deletes the audio and exports.")) return;
                 retryMutation.mutate({ id: book.id, ocrEngine: "surya", forgetTextLayer: true });
               }}
-              voiceLabel={getVoiceLabel(book.voice)}
               extractOpen={extractOpen}
               onExtractOpenChange={setExtractOpen}
               onStartExtraction={async (scope, autoSynthesize) => {

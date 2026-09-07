@@ -38,7 +38,6 @@ export function BookFilesSection({
   llmChapterDetection,
   chapterModel,
   language,
-  voiceLabel,
   extractOpen,
   onExtractOpenChange,
   onStartExtraction,
@@ -60,7 +59,6 @@ export function BookFilesSection({
   llmChapterDetection: boolean;
   chapterModel: string | null;
   language: string | null;
-  voiceLabel: string;
   extractOpen: boolean;
   onExtractOpenChange: (open: boolean) => void;
   onStartExtraction: (scope: ExtractScope, autoSynthesize: boolean) => void;
@@ -341,7 +339,6 @@ export function BookFilesSection({
           llmChapterDetection={llmChapterDetection}
           chapterModel={chapterModel}
           language={language}
-          voiceLabel={voiceLabel}
           onUpdateBook={onUpdateExtractionSettings}
           onClose={() => onExtractOpenChange(false)}
           onStart={(scope: ExtractScope, autoSynthesize: boolean) => {

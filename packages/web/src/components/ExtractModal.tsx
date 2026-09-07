@@ -1,6 +1,5 @@
 import { useState } from "react";
 
-import { AfterExtractChoice } from "./AfterExtractChoice.tsx";
 import { BOOK_LANGUAGE_OPTIONS } from "../lib/languages.ts";
 import { trpc } from "../trpc.ts";
 import { Modal, ModalHeader } from "./Modal.tsx";
@@ -47,7 +46,6 @@ export function ExtractModal({
   llmChapterDetection,
   chapterModel,
   language,
-  voiceLabel,
   onUpdateBook,
   onStart,
   onClose,
@@ -65,7 +63,6 @@ export function ExtractModal({
   llmChapterDetection: boolean;
   chapterModel: string | null;
   language: string | null;
-  voiceLabel: string;
   onUpdateBook: (settings: { ocrEngine?: OcrEngine | null; llmChapterDetection?: boolean; chapterModel?: string; language?: string | null }) => void;
   onStart: (scope: ExtractScope, autoSynthesize: boolean) => void;
   onClose: () => void;
@@ -91,7 +88,6 @@ export function ExtractModal({
   // The tick is against one scope's count, so changing the scope withdraws it
   const [confirmedScope, setConfirmedScope] = useState<ExtractScope | null>(null);
   const confirmed = confirmedScope === scope;
-  const [autoSynthesize, setAutoSynthesize] = useState(false);
   const blocked = disabledReason(scope) ?? (losing > 0 && !confirmed ? "Confirm the chapters you're replacing" : null);
 
   return (
@@ -200,12 +196,6 @@ export function ExtractModal({
             </select>
             <span className="min-w-0">Which voices come first, and how pictured pages are read. Filled from the text; change it if wrong.</span>
           </label>
-          <AfterExtractChoice
-            autoSynthesize={autoSynthesize}
-            onChange={setAutoSynthesize}
-            voiceLabel={voiceLabel}
-            chapterCount={scope === "selected" ? chaptersForSelected || undefined : chaptersTotal || undefined}
-          />
           <p className="text-xs text-(--text-faint)">Saved on the book as you change them.</p>
         </div>
       </div>
@@ -230,7 +220,7 @@ export function ExtractModal({
         <Button onClick={onClose}>Close</Button>
         <Button
           variant="primary"
-          onClick={() => onStart(scope, autoSynthesize)}
+          onClick={() => onStart(scope, false)}
           disabled={!!blocked}
           title={blocked ?? undefined}
           data-testid="extract-start"
