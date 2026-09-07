@@ -1,17 +1,7 @@
-import { useState, useRef, useCallback, useEffect, useMemo, type DragEvent, type ReactNode } from "react";
+import { useState, useRef, useCallback, useEffect, type DragEvent } from "react";
+import { useNavigate } from "react-router";
 import { captureDrop, type DroppedItems } from "../lib/dnd.ts";
-import { VoicePicker } from "./VoicePicker.tsx";
-import { SpeedSlider } from "./SpeedSlider.tsx";
-import { getVoiceById, voiceSupportsSpeedControl, getVoiceLabel } from "../lib/voices.ts";
-import { AI_PRESETS } from "../lib/ai-presets.ts";
-import { BOOK_LANGUAGE_OPTIONS } from "../lib/languages.ts";
-import { ModelPicker } from "./ModelPicker.tsx";
-import { OcrEngineChoice } from "./OcrEngineChoice.tsx";
-import type { OcrEngine } from "../lib/ocr.ts";
-import type { PdfProbe } from "../lib/pdf-text-layer.ts";
-import { PillToggle } from "./PillToggle.tsx";
 import { profileHeaders } from "../lib/profile.ts";
-import { AfterExtractChoice } from "./AfterExtractChoice.tsx";
 import { IconDragHandle, IconClose, IconAdd } from "./icons.tsx";
 import { Button } from "./Button.tsx";
 
@@ -29,79 +19,15 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-type OptionProps = {
-  label: string;
-  hint: ReactNode;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  title?: string;
-  testId?: string;
-};
 
-function Option({ label, hint, checked, onChange, title, testId }: OptionProps) {
-  return (
-    <label className="flex items-start gap-2 cursor-pointer" title={title}>
-      {/* h-5 is the label's line-height, so the box centres on the first line at any font size */}
-      <span className="flex h-5 items-center">
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
-          className="rounded"
-          data-testid={testId}
-        />
-      </span>
-      <span className="min-w-0">
-        <span className="block text-sm text-(--text-primary)">{label}</span>
-        <span className="block text-xs text-(--text-muted)">{hint}</span>
-      </span>
-    </label>
-  );
-}
 
 export function UploadZone({ onUploadComplete, folderId = null, initialDrop = null }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
-  const [scans, setScans] = useState<string[]>([]);
-  const [ocrEngine, setOcrEngine] = useState<OcrEngine>("tesseract");
-  // One file at a time, each asked once: a drop of fifty PDFs is a few seconds in the background, not a gigabyte at once
-  const probed = useRef(new Map<File, PdfProbe>());
-  const [detectedLanguage, setDetectedLanguage] = useState<string | null>(null);
-  const languageTouched = useRef(false);
-  useEffect(() => {
-    let live = true;
-    (async () => {
-      const [{ probePdf }, { detectLanguage }] = await Promise.all([import("../lib/pdf-text-layer.ts"), import("../lib/detect-language.ts")]);
-      for (const file of stagedFiles) {
-        if (!live) return;
-        if (!probed.current.has(file)) probed.current.set(file, await probePdf(file));
-        if (!live) return;
-        const probes = stagedFiles.map((f) => probed.current.get(f)).filter((p): p is PdfProbe => p !== undefined);
-        setScans(stagedFiles.filter((f) => probed.current.get(f)?.hasText === false).map((f) => f.name));
-        const detected = detectLanguage(probes.map((p) => p.sample).join(" "));
-        setDetectedLanguage(detected);
-        if (detected && !languageTouched.current) setLanguage(detected);
-      }
-    })();
-    return () => { live = false; };
-  }, [stagedFiles]);
   const [customTitle, setCustomTitle] = useState("");
-  const [language, setLanguage] = useState("");
-  // A new array each render would recompute the voice library's language memos on every keystroke
-  const priorityLanguages = useMemo(() => (language ? [language] : []), [language]);
-  const [voice, setVoice] = useState("kokoro:af_heart");
-  const [speed, setSpeed] = useState(1.0);
-  // Raw-text-only is the default: pdftotext lands in seconds, marker takes minutes — extract chapters later from the book page
-  const [fullExtract, setFullExtract] = useState(false);
-  const [llmChapterDetection, setLlmChapterDetection] = useState(false);
-  const [chapterModel, setChapterModel] = useState<string>("");
-  const [autoSynthesize, setAutoSynthesize] = useState(false);
   const [separateBooks, setSeparateBooks] = useState(false);
-  const [askAi, setAskAi] = useState(false);
-  const [notePreset, setNotePreset] = useState<string>("summarize");
-  const [notePrompt, setNotePrompt] = useState<string>(AI_PRESETS[0].prompt("book"));
-  const [noteModel, setNoteModel] = useState<string>("");
+  const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -142,28 +68,19 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
       formData.append("file", file);
     }
     if (title) formData.append("title", title);
-    formData.append("voice", voice);
-    formData.append("speed", String(voiceSupportsSpeedControl(voice) ? speed : 1.0));
-    if (scans.length > 0) formData.append("ocrEngine", ocrEngine);
-    formData.append("fullExtract", String(fullExtract));
-    formData.append("llmChapterDetection", String(fullExtract && llmChapterDetection));
-    if (fullExtract && llmChapterDetection) formData.append("chapterModel", chapterModel);
-    formData.append("skipSynthesis", String(!(fullExtract && autoSynthesize)));
-    if (language) formData.append("language", language);
     if (folderId) formData.append("folderId", folderId);
-    if (askAi && notePrompt.trim()) {
-      formData.append("notePrompt", notePrompt.trim());
-      formData.append("noteModel", noteModel);
-    }
+    formData.append("fullExtract", "false");
+    formData.append("skipSynthesis", "true");
     return formData;
   }
 
-  async function postUpload(formData: FormData) {
+  async function postUpload(formData: FormData): Promise<string> {
     const res = await fetch("/upload", { method: "POST", body: formData, headers: profileHeaders() });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       throw new Error(body.error ?? `Upload failed (${res.status})`);
     }
+    return ((await res.json()) as { id: string }).id;
   }
 
   async function upload() {
@@ -174,12 +91,13 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
     setError(null);
 
     try {
+      const created: string[] = [];
       if (asSeparateBooks) {
         const failures: string[] = [];
         const succeeded = new Set<File>();
         for (const file of stagedFiles) {
           try {
-            await postUpload(buildFormData([file], null));
+            created.push(await postUpload(buildFormData([file], null)));
             succeeded.add(file);
           } catch (err) {
             failures.push(`${file.name}: ${err instanceof Error ? err.message : "failed"}`);
@@ -191,12 +109,15 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
           throw new Error(`${failures.length} of ${stagedFiles.length} uploads failed — ${failures.join("; ")}`);
         }
       } else {
-        await postUpload(buildFormData(stagedFiles, customTitle.trim() || null));
+        created.push(await postUpload(buildFormData(stagedFiles, customTitle.trim() || null)));
       }
 
       setStagedFiles([]);
       setCustomTitle("");
       onUploadComplete(true);
+      // The book page is where every decision lives — engine, language, chapters — so the dialog asks none of them
+      const [first] = created;
+      if (first) navigate(`/books/${first}?extract=1`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
       onUploadComplete(false);
@@ -314,15 +235,7 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
   const isMultiFile = stagedFiles.length > 1;
   const isReorderable = isMultiFile && !separateBooks;
   const totalSize = stagedFiles.reduce((sum, file) => sum + file.size, 0);
-  const selectedVoice = getVoiceById(voice);
-  const speedEnabled = voiceSupportsSpeedControl(voice);
-  const noteTarget = isMultiFile && separateBooks ? "each book" : "the whole book";
 
-  const outcome = !fullExtract
-    ? "Raw text lands in seconds. Chapters and audio can follow later from the book page."
-    : autoSynthesize
-      ? "Extraction then narration, both in the background — minutes per book."
-      : "Marker reads the whole PDF in the background — minutes per book.";
 
   return (
     <div className="space-y-4">
@@ -448,137 +361,16 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
             </fieldset>
           )}
 
-          <div className="p-4">
-            <label className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-(--text-primary)">Language</span>
-              <select
-                value={language}
-                onChange={(e) => { languageTouched.current = true; setLanguage(e.target.value); }}
-                className="rounded-md border border-(--border-input) bg-(--bg-input) px-2 py-1 text-sm text-(--text-primary)"
-                data-testid="upload-language"
-              >
-                <option value="">Not set</option>
-                {BOOK_LANGUAGE_OPTIONS.map(({ code, label }) => (
-                  <option key={code} value={code}>{label}</option>
-                ))}
-              </select>
-              <span className="min-w-0 text-xs text-(--text-muted)">
-                Decides which voices the picker offers first.{detectedLanguage && language === detectedLanguage ? " Read from the text — change it if that is wrong." : ""}
-              </span>
-            </label>
-          </div>
-
-          <fieldset className="p-4 space-y-2">
-            <legend className="text-xs font-medium text-(--text-secondary) mb-1">Text extraction</legend>
-
-            <Option
-              label="Extract chapters now"
-              hint="Marker reads the whole PDF — minutes per book. Off, raw text still lands in seconds and chapters can wait."
-              title="Raw text is always extracted in seconds. Marker is the slow, layout-aware pass that finds chapter boundaries — you can also run it later from the book page."
-              checked={fullExtract}
-              onChange={setFullExtract}
-              testId="full-extract"
-            />
-
-            {fullExtract && (
-              <div className="pl-6 space-y-2">
-                <Option
-                  label="Follow the table of contents"
-                  hint="AI takes chapter boundaries from the TOC instead of from headings."
-                  checked={llmChapterDetection}
-                  onChange={setLlmChapterDetection}
-                />
-                {llmChapterDetection && (
-                  <div className="flex items-center gap-2 pl-6 text-xs text-(--text-muted)">
-                    <span>Model</span>
-                    <ModelPicker value={chapterModel} onChange={setChapterModel} testId="upload-chapter-model" />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {scans.length > 0 && (
-              <OcrEngineChoice
-                value={ocrEngine}
-                onChange={setOcrEngine}
-                note={`${scans.length === 1 ? `${scans[0]} has` : `${scans.length} of these files have`} no text layer. Read in the language set above, or from the page's own script when none is.`}
-              />
-            )}
-          </fieldset>
-
-          {fullExtract && (
-            <div className="p-4 space-y-3">
-              <AfterExtractChoice
-                autoSynthesize={autoSynthesize}
-                onChange={setAutoSynthesize}
-                voiceLabel={getVoiceLabel(voice)}
-              />
-              {autoSynthesize && (
-                <div className="pl-6 space-y-1">
-                  <div className="flex flex-wrap items-end gap-4">
-                    <VoicePicker value={voice} onChange={setVoice} priorityLanguages={priorityLanguages} />
-                    <SpeedSlider value={speed} onChange={setSpeed} disabled={!speedEnabled} />
-                  </div>
-                  {!speedEnabled && selectedVoice && (
-                    <p className="text-xs text-(--text-muted)">{selectedVoice.label} uses a fixed speed in v1.</p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="p-4 space-y-2">
-            <Option
-              label="Ask AI after upload"
-              hint={`Runs a prompt over the raw text of ${noteTarget} — the answer lands in the book's notes.`}
-              checked={askAi}
-              onChange={setAskAi}
-              testId="upload-ask-ai"
-            />
-
-            {askAi && (
-              <div className="ml-6 rounded-lg border border-(--border) bg-(--bg-subtle) p-3 space-y-2" data-testid="upload-ai-section">
-                <div className="flex flex-wrap gap-1.5">
-                  {AI_PRESETS.map((p) => (
-                    <PillToggle
-                      key={p.key}
-                      selected={notePreset === p.key}
-                      onClick={() => {
-                        setNotePreset(p.key);
-                        setNotePrompt(p.prompt("book"));
-                      }}
-                    >
-                      {p.label}
-                    </PillToggle>
-                  ))}
-                </div>
-                <textarea
-                  value={notePrompt}
-                  onChange={(e) => setNotePrompt(e.target.value)}
-                  rows={3}
-                  maxLength={4000}
-                  className="w-full resize-y rounded-md border border-(--border-input) bg-(--bg-card) p-2.5 text-sm text-(--text-primary) leading-relaxed"
-                  placeholder={`What should the AI answer about ${noteTarget}?`}
-                  data-testid="upload-ai-prompt"
-                />
-                <div className="flex items-center gap-2 text-xs text-(--text-muted)">
-                  <span>Model</span>
-                  <ModelPicker value={noteModel} onChange={setNoteModel} testId="upload-note-model" />
-                </div>
-              </div>
-            )}
-          </div>
-
           <div className="p-4 flex flex-wrap items-center gap-x-4 gap-y-2">
             <Button
               variant="primary"
               onClick={upload}
               disabled={isUploading}
             >
-              {isUploading ? "Uploading..." : !fullExtract ? "Upload" : autoSynthesize ? "Extract & synthesize" : "Extract"}
+              {isUploading ? "Uploading..." : separateBooks && isMultiFile ? "Upload and create books" : "Upload and create a book"}
               {isMultiFile ? ` (${stagedFiles.length} ${separateBooks ? "books" : "files"})` : ""}
             </Button>
-            <p className="min-w-0 flex-1 text-xs text-(--text-muted)">{outcome}</p>
+            <p className="min-w-0 flex-1 text-xs text-(--text-muted)">Raw text lands in seconds. You land on the book, where chapters, OCR and voices are decided.</p>
           </div>
         </div>
       )}

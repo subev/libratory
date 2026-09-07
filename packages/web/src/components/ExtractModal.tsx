@@ -43,6 +43,7 @@ export function ExtractModal({
   ocrEngine,
   canSetOcr,
   tryFileIndex,
+  scan,
   llmChapterDetection,
   chapterModel,
   language,
@@ -60,6 +61,7 @@ export function ExtractModal({
   ocrEngine: OcrEngine | null;
   canSetOcr: boolean;
   tryFileIndex: number;
+  scan: { read: boolean; engine: OcrEngine | null; confidence: number | null };
   llmChapterDetection: boolean;
   chapterModel: string | null;
   language: string | null;
@@ -130,25 +132,59 @@ export function ExtractModal({
           <p className="text-sm text-(--text-secondary)" data-testid="extract-first-run">
             {selectedCount === 0
               ? "No files are selected, so there is nothing to read. Close this and tick the files you want in the list above."
-              : `Marker reads ${selectedCount === 1 ? "the selected file" : `the ${selectedCount} selected files`} and finds the chapter boundaries — minutes per book. Nothing is replaced: this book has no chapters yet.`}
+              : `The app reads ${selectedCount === 1 ? "the selected file" : `the ${selectedCount} selected files`} and finds the chapter boundaries — minutes per book. Nothing is replaced: this book has no chapters yet.`}
           </p>
         )}
 
-        <div className="border-t border-(--border) pt-3">
-          <AfterExtractChoice
-            autoSynthesize={autoSynthesize}
-            onChange={setAutoSynthesize}
-            voiceLabel={voiceLabel}
-            chapterCount={scope === "selected" ? chaptersForSelected || undefined : chaptersTotal || undefined}
-          />
+        {canSetOcr && (
+          <div className="space-y-2 border-t border-(--border) pt-3">
+            <OcrEngineChoice
+              value={ocrEngine}
+              used={scan.engine}
+              onChange={(engine) => onUpdateBook({ ocrEngine: engine })}
+              tryHref={`/books/${bookId}/ocr?file=${tryFileIndex}`}
+              status={scan.read
+                ? `The pages are pictures, so they were read in the background with ${scan.engine === "surya" ? "Surya" : "Tesseract"}${scan.confidence !== null ? `, ${Math.round(scan.confidence * 100)}% sure of its words` : ""}. Extraction uses that copy.`
+                : isProcessing
+                  ? "The pages are pictures. They are being read in the background right now; extraction picks up the result."
+                  : "The pages are pictures. Extraction reads them first, with the engine below, into a copy kept beside the original."}
+              note={(ocrEngine ?? "tesseract") === "tesseract"
+                ? suggestion.isLoading ? "Looking at a page for its alphabet…"
+                  : language ? `Read as ${languageLabel(language)}, the book's language.`
+                  : suggestion.data?.script && suggestedPack ? `${suggestion.data.script} letters on page ${suggestion.data.page} — read as ${suggestedPack.name} unless the language below says otherwise.`
+                  : "Read as English unless the language below says otherwise."
+                : undefined}
+            />
+            {(ocrEngine ?? "tesseract") === "tesseract" && pack && <OcrLanguagePackRow code={pack.code} />}
+          </div>
+        )}
+
+        <div className="space-y-2 border-t border-(--border) pt-3">
+          <label className="flex gap-2 text-xs text-(--text-muted)">
+            <input
+              type="checkbox"
+              checked={llmChapterDetection}
+              onChange={(e) => onUpdateBook({ llmChapterDetection: e.target.checked })}
+              className="mt-0.5 rounded"
+            />
+            <span>
+              <span className="block text-(--text-secondary)">This book has a table of contents worth following</span>
+              The AI reads it to place the chapter boundaries. Off, the boundaries come from the headings on the pages.
+            </span>
+          </label>
+          {llmChapterDetection && (
+            <div className="flex items-center gap-2 pl-6 text-xs text-(--text-muted)">
+              <span>Model</span>
+              <ModelPicker
+                value={chapterModel ?? ""}
+                onChange={(key) => onUpdateBook({ chapterModel: key })}
+                testId="extract-chapter-model"
+              />
+            </div>
+          )}
         </div>
 
         <div className="space-y-2 border-t border-(--border) pt-3">
-          {/* Not app preferences — these describe the source and its text, and outlive any one run. */}
-          <p className="text-xs font-medium text-(--text-secondary)">
-            About this book <span className="font-normal text-(--text-faint)">— saved as you change them, and used by every extraction</span>
-          </p>
-
           <label className="flex items-center gap-2 text-xs text-(--text-muted)">
             <span className="text-(--text-secondary) w-28 shrink-0">Language</span>
             <select
@@ -162,49 +198,15 @@ export function ExtractModal({
                 <option key={code} value={code}>{label}</option>
               ))}
             </select>
-            <span className="min-w-0">Decides which voices the picker offers first.</span>
+            <span className="min-w-0">Which voices come first, and how pictured pages are read. Filled from the text; change it if wrong.</span>
           </label>
-
-          {canSetOcr && (
-            <OcrEngineChoice
-              value={ocrEngine}
-              onChange={(engine) => onUpdateBook({ ocrEngine: engine })}
-              tryHref={`/books/${bookId}/ocr?file=${tryFileIndex}`}
-              note={(ocrEngine ?? "tesseract") === "tesseract"
-                ? suggestion.isLoading ? "Looking at a page for its script…"
-                  : language ? `Read as ${languageLabel(language)}, the book's language.`
-                  : suggestion.data?.script && suggestedPack ? `${suggestion.data.script} script on page ${suggestion.data.page} — read as ${suggestedPack.name} unless the book's language is set above.`
-                  : "Read as English unless the book's language is set above."
-                : undefined}
-            />
-          )}
-          {canSetOcr && (ocrEngine ?? "tesseract") === "tesseract" && pack && <OcrLanguagePackRow code={pack.code} />}
-
-          <label className="flex gap-2 text-xs text-(--text-muted)">
-            <input
-              type="checkbox"
-              checked={llmChapterDetection}
-              onChange={(e) => onUpdateBook({ llmChapterDetection: e.target.checked })}
-              className="mt-0.5 rounded"
-            />
-            <span>
-              <span className="block text-(--text-secondary)">Has a table of contents worth following</span>
-              Uses AI to take chapter boundaries from the TOC. Without it, boundaries come from headings.
-            </span>
-          </label>
-
-          {llmChapterDetection && (
-            <div className="flex items-center gap-2 pl-6 text-xs text-(--text-muted)">
-              <span>Model</span>
-              <ModelPicker
-                value={chapterModel ?? ""}
-                onChange={(key) => onUpdateBook({ chapterModel: key })}
-                testId="extract-chapter-model"
-              />
-            </div>
-          )}
-
-          <p className="text-xs text-(--text-faint)">Saved on the book — every extraction from now on uses them.</p>
+          <AfterExtractChoice
+            autoSynthesize={autoSynthesize}
+            onChange={setAutoSynthesize}
+            voiceLabel={voiceLabel}
+            chapterCount={scope === "selected" ? chaptersForSelected || undefined : chaptersTotal || undefined}
+          />
+          <p className="text-xs text-(--text-faint)">Saved on the book as you change them.</p>
         </div>
       </div>
 

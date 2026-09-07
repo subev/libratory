@@ -15,6 +15,7 @@ export type BookFileRow = {
   rawWords?: number | null;
   hasRawText?: boolean;
   hasSearchablePdf?: boolean;
+  ocrEngine?: OcrEngine | null;
   ocrConfidence?: number | null;
   ocrLowConfidenceFraction?: number | null;
   ocrGarbled?: boolean;
@@ -73,6 +74,7 @@ export function BookFilesSection({
   onCancel: (id: string) => void;
   onFilesAdded: () => void;
 }) {
+  const scanned = files.filter((f) => !f.hasRawText || f.hasSearchablePdf);
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   // Selection is fire-and-forget from the checkboxes; the banner reports a failure, this only
   // stops an unhandled rejection now that the handlers return a promise.
@@ -333,8 +335,9 @@ export function BookFilesSection({
           isProcessing={isProcessing}
           bookId={bookId}
           ocrEngine={ocrEngine}
-          canSetOcr={files.some((f) => !f.hasRawText || f.hasSearchablePdf)}
-          tryFileIndex={files.find((f) => !f.hasRawText || f.hasSearchablePdf)?.index ?? 0}
+          canSetOcr={scanned.length > 0}
+          tryFileIndex={scanned[0]?.index ?? 0}
+          scan={{ read: scanned.length > 0 && scanned.every((f) => f.hasSearchablePdf), engine: scanned[0]?.ocrEngine ?? null, confidence: scanned[0]?.ocrConfidence ?? null }}
           llmChapterDetection={llmChapterDetection}
           chapterModel={chapterModel}
           language={language}

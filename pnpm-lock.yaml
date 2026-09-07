@@ -155,9 +155,6 @@ importers:
       ai:
         specifier: ^7.0.58
         version: 7.0.58(zod@3.25.76)
-      franc-min:
-        specifier: ^6.2.0
-        version: 6.2.0
       pdfjs-dist:
         specifier: ^6.2.108
         version: 6.2.108
