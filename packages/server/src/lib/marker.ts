@@ -368,8 +368,7 @@ function runMarkerSingle(pdfPath: string, outDir: string, device: "mps" | "cuda"
       return;
     }
 
-    // A layout engine and nothing else: recognition happens once in the OCR step, and what
-    // arrives here is the searchable copy that step wrote.
+    // Always --disable_ocr: recognition happened once in the OCR step, and this is the copy it wrote.
     const args = [pdfPath, "--output_format", "json", "--output_dir", outDir, "--disable_ocr"];
     const proc = spawn(
       path.join(CONDA_BIN, "marker_single"),
@@ -564,8 +563,7 @@ async function detectChaptersFromMarkerJsonPath(markerJsonPath: string, pdfPath:
 export async function extractPdf(pdfPath: string, outDir: string, log: LogFn = noopLog, options: ExtractOptions = {}): Promise<DetectionResult> {
   await mkdir(outDir, { recursive: true });
 
-  // Marker only passes a text layer through, so a scan without one is half a minute of layout
-  // recognition whose answer is known before it starts.
+  // Marker only passes a text layer through, so a scan without one fails after a pointless half-minute.
   if ((await pdfHasTextLayer(pdfPath)) === false) {
     throw new Error(`"${path.basename(pdfPath)}" has no text layer and OCR is off — ${NEEDS_OCR}`);
   }

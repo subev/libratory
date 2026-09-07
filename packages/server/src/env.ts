@@ -35,9 +35,8 @@ const envSchema = z.object({
   POCKET_ENV_PATH: z.string().default(path.join(repoRoot, ".venv-pocket", "bin")),
   // Where the vivliostyle CLI is installed when the server has no node_modules of its own.
   VIVLIOSTYLE_DIR: z.string().default(path.join(repoRoot, "vivliostyle")),
-  // One directory holding the traineddata files *and* configs/ + pdf.ttf, or `tesseract … pdf`
-  // fails with no useful message. Unset leaves tesseract on its compiled-in default (Homebrew,
-  // apt); the desktop app points it at the staged copy in HOME, where downloads land too.
+  // One directory holding the traineddata files *and* configs/ + pdf.ttf, or `tesseract … pdf` fails
+  // with no useful message. Unset leaves tesseract on its compiled-in default.
   TESSDATA_PREFIX: z.string().optional(),
   DEEPSEEK_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),

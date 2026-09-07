@@ -44,8 +44,7 @@ export async function extractPdfAuthor(pdfPath: string): Promise<string | null> 
   }
 }
 
-// Everything that reads a book's pages goes through here: once OCR has written a searchable copy
-// it is the one with the text on it, and the original is kept only to be handed back unchanged.
+// Every path that reads a book's pages goes through here; pdfPath is only for handing the file back.
 export function readablePdfPath(file: { pdfPath: string; searchablePdfPath: string | null }): string {
   return file.searchablePdfPath ?? file.pdfPath;
 }

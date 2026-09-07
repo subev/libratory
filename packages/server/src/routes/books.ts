@@ -401,7 +401,6 @@ export const booksRouter = router({
           skipSynthesis: bookFiles.skipSynthesis,
           rawWords: bookFiles.rawWords,
           hasRawText: sql<boolean>`${bookFiles.rawText} is not null`,
-          // The path itself is never shipped; what the UI needs to know is that a copy exists
           hasSearchablePdf: sql<boolean>`${bookFiles.searchablePdfPath} is not null`,
           ocrEngine: bookFiles.ocrEngine,
           ocrConfidence: bookFiles.ocrConfidence,

@@ -96,8 +96,7 @@ describe("what a first run has to put in place before any step reads it", () => 
     expect(existsSync(home)).toBe(true);
   });
 
-  // An update replaces Resources wholesale, so a staging step that replaced the directory would
-  // delete every pack the user had downloaded into it.
+  // An update replaces Resources wholesale, so replacing the directory would lose downloaded packs.
   it("refreshes the shipped tessdata without deleting a downloaded pack", async () => {
     const { resources, home } = await stagedInto();
     await writeFile(path.join(home, "tessdata", "bul.traineddata"), "downloaded");

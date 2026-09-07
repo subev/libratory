@@ -1,6 +1,5 @@
-// Regenerates fixtures/scanned-page.pdf — one page of real prose with no text layer at all, which
-// is the only kind of file the OCR step is allowed to touch. Rendered from the e2e booklet so the
-// words are known, then wrapped as an image-only PDF by PIL, which is what a scanner produces.
+// Regenerates fixtures/scanned-page.pdf: page 1 of the e2e booklet rendered and re-wrapped as an
+// image-only PDF, so the words are known and it carries no text layer at all.
 // Run: node packages/server/test/fixtures/make-scanned-page.mjs
 
 import { execFileSync } from "node:child_process";

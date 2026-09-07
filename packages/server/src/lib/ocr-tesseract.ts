@@ -26,7 +26,6 @@ export type OcrRunner = (input: {
   signal?: AbortSignal;
 }) => Promise<OcrStats>;
 
-// A word this far down is one the confidence advisory counts as garbled.
 const LOW_CONFIDENCE = 60;
 const RENDER_DPI = 300;
 const RENDER_CHUNK_PAGES = 20;
@@ -83,8 +82,7 @@ function run(command: string, args: string[], signal: AbortSignal | undefined, o
   });
 }
 
-// pdftoppm pads the page number to the width of the document's own page count, not of the range
-// asked for, so the names are read back off disk rather than predicted.
+// pdftoppm pads page numbers to the document's page count, not the range's, so names come off disk.
 async function renderPages(pdfPath: string, workDir: string, pages: number, log: (msg: string) => Promise<void>, signal?: AbortSignal): Promise<string[]> {
   for (let first = 1; first <= pages; first += RENDER_CHUNK_PAGES) {
     const last = Math.min(first + RENDER_CHUNK_PAGES - 1, pages);

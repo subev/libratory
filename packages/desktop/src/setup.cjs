@@ -59,8 +59,7 @@ function sh(cmd, args, opts = {}) {
 function stageRuntime(resources, home) {
   mkdirSync(home, { recursive: true });
   cpSync(path.join(resources, "scripts"), path.join(home, "scripts"), { recursive: true });
-  // Downloaded language packs land in this same directory, so the shipped files are copied over
-  // it rather than replacing it — an update must not take a pack the user waited on with it.
+  // Copied over, never replaced: an update must not take a downloaded language pack with it.
   cpSync(path.join(resources, "tessdata"), path.join(home, "tessdata"), { recursive: true, force: true });
   for (const f of ["pyproject.toml", "uv.lock", "docker-compose.yml"]) {
     copyFileSync(path.join(resources, f), path.join(home, f));

@@ -43,7 +43,6 @@ describe("runTesseractOcr", () => {
     expect(stats.lowConfidenceFraction).toBeGreaterThanOrEqual(0);
     expect(stats.lowConfidenceFraction).toBeLessThan(0.5);
 
-    // The rendered pages are the bulk of a 300-page run and are worth nothing once read
     expect(await exists(workDir)).toBe(false);
   }, 60_000);
 

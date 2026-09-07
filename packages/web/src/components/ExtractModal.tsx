@@ -51,7 +51,6 @@ export function ExtractModal({
   chaptersTotal: number;
   isProcessing: boolean;
   ocrEngine: OcrEngine | null;
-  /** Only rendered when a file still has no text of its own, or already has a searchable copy. */
   canSetOcr: boolean;
   llmChapterDetection: boolean;
   chapterModel: string | null;

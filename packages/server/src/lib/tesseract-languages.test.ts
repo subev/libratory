@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { tesseractLanguage } from "./tesseract-languages.ts";
 
-// Mirrors BOOK_LANGUAGE_OPTIONS in packages/web/src/lib/languages.ts, which the server cannot
-// import. A code the dropdown offers and the table does not carry stops OCR on that book.
+// Mirrors BOOK_LANGUAGE_OPTIONS in packages/web/src/lib/languages.ts, which the server cannot import.
 const BOOK_LANGUAGE_CODES = [
   "ar", "bg", "hr", "cs", "da", "nl", "en", "fi", "fr", "de", "el", "he", "hi", "hu", "id",
   "it", "ja", "ko", "no", "pl", "pt", "ro", "ru", "sk", "es", "sv", "tr", "uk", "vi",

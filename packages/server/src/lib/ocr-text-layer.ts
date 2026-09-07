@@ -37,8 +37,7 @@ export async function ensureTextLayer({
     return false;
   }
 
-  // null means pdftotext could not run at all, which is a machine fault rather than a scan —
-  // OCRing every book on a box missing poppler is the wrong answer to it.
+  // null means pdftotext could not run at all — a machine fault, not a scan, so it must not force OCR.
   const hasText = await pdfHasTextLayer(file.pdfPath);
   if (hasText !== false) {
     await log(`"${file.filename}" already carries a text layer — no OCR needed`);

@@ -57,8 +57,7 @@ export async function ocrTextLayer(payload: OcrTextLayerPayload, { addJob }: { a
       await addJob("indexBook", { bookId }, { maxAttempts: 1, jobKey: `index:${bookId}`, jobKeyMode: "replace" });
     }
   } catch (err) {
-    // The cancel route already put the book and its files where a stopped run belongs, and no
-    // searchable copy was written — saying "failed" over that turns a deliberate stop red.
+    // The cancel route already left the book where a stopped run belongs; "failed" over that reads red.
     if (err instanceof ExtractAbortedError) {
       await log("OCR cancelled");
       return;

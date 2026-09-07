@@ -54,8 +54,6 @@ if [ ! -d "$DESKTOP/resources/bin" ] || [ ! -d "$DESKTOP/resources/tessdata" ]; 
   echo "$TOOLS_SHA  /tmp/p2a-tools.tar.gz" | shasum -a 256 -c - >/dev/null
   tar -xzf /tmp/p2a-tools.tar.gz -C "$DESKTOP/resources"
   rm -f /tmp/p2a-tools.tar.gz
-  # A pre-tesseract tarball unpacks cleanly and produces an app whose OCR fails with no useful
-  # message, because TESSDATA_PREFIX would point at a directory that was never staged.
   [ -d "$DESKTOP/resources/tessdata" ] || {
     echo "    the pinned tools tarball carries no tessdata — rebuild with scripts/bundle-tools.py," >&2
     echo "    upload a new tools-N release and update url/sha256 in scripts/pins.json" >&2

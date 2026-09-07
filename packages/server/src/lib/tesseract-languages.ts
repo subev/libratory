@@ -1,6 +1,4 @@
-// Every code the book-language dropdown can produce (packages/web/src/lib/languages.ts), plus the
-// four that list drops today but a stored book may still carry. The name is what an error message
-// shows, so it reads like the option the user picked rather than a tessdata code nobody chose.
+// Mirrors packages/web/src/lib/languages.ts, plus codes that list has dropped but stored books carry.
 const TESSDATA_BY_CODE: Record<string, { pack: string; name: string }> = {
   ar: { pack: "ara", name: "Arabic" },
   bg: { pack: "bul", name: "Bulgarian" },
@@ -41,7 +39,6 @@ export type TesseractLanguage = { pack: string; name: string };
 
 const ENGLISH: TesseractLanguage = { pack: "eng", name: "English" };
 
-// A book with no language set is read as English, which is what ships and what most scans are.
 export function tesseractLanguage(code: string | null): TesseractLanguage {
   if (!code) return ENGLISH;
   const entry = TESSDATA_BY_CODE[code.trim().toLowerCase()];

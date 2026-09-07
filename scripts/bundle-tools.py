@@ -8,10 +8,8 @@ rewrites every load command to @loader_path so the folder runs from anywhere.
 
     python3 scripts/bundle-tools.py [--out packages/desktop/resources/bin]
 
-Tesseract also needs data beside its binary: the eng/osd language packs, and — the part that costs
-an hour to rediscover — configs/pdf and pdf.ttf, without which `tesseract … pdf` fails instantly
-with no useful message. Those are copied into <resources>/tessdata so one tarball carries both, and
-setup.cjs stages that directory into HOME where downloaded packs join them.
+Tesseract also needs data beside its binary — the eng/osd packs, plus configs/pdf and pdf.ttf,
+without which `tesseract … pdf` fails with no useful message — so <resources>/tessdata ships too.
 
 Same lesson as the embedded Postgres, and the same reason DYLD_LIBRARY_PATH is not the answer:
 the hardened runtime strips DYLD_*, so it would work in development and fail in the shipped app.
@@ -29,8 +27,7 @@ PINS_FILE = Path(__file__).parent / "pins.json"
 PINNED = json.loads(PINS_FILE.read_text())["bundledTools"]["versions"]
 TOOLS = list(PINNED)
 SYSTEM_PREFIXES = ("/usr/lib/", "/System/")
-# Only these two ship — 15 MB against 1.14 GB for all 125, and every other language is a download.
-# osd earns its place by naming the script on a page, which is what makes that offer intelligent.
+# Only two packs ship — 15 MB against 1.14 GB for all 125; the rest are downloads, and osd names the script.
 TESSDATA = ["eng.traineddata", "osd.traineddata", "pdf.ttf", "configs", "tessconfigs"]
 
 

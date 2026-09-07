@@ -101,8 +101,6 @@ async function main() {
     if (!file) {
       return reply.code(404).send({ error: "File not found" });
     }
-    // The searchable copy where OCR wrote one: the reader lines the voice up against the text
-    // layer on these pages, and the original scan has none.
     const served = readablePdfPath(file);
     return reply.type("application/pdf").sendFile(path.basename(served), path.dirname(served));
   });

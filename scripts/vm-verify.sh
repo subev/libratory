@@ -61,8 +61,6 @@ for t in ffmpeg pdftotext pdfinfo pdftoppm; do
   check "$t runs from the bundle" "env PATH=/usr/bin:/bin '$BIN/$t' $([ "$t" = ffmpeg ] && echo -version || echo -v)"
 done
 check "tesseract runs from the bundle" "env PATH=/usr/bin:/bin '$BIN/tesseract' --version"
-# The packs alone are not enough: writing a searchable PDF needs configs/pdf and pdf.ttf in the
-# same directory, and a bundle missing them fails at OCR time with no useful message.
 check "the shipped language packs are found" "env PATH=/usr/bin:/bin TESSDATA_PREFIX='$TESSDATA' '$BIN/tesseract' --list-langs | grep -q '^eng$'"
 check "tesseract can write a searchable PDF" "test -f '$TESSDATA/pdf.ttf' && test -f '$TESSDATA/configs/pdf'"
 
