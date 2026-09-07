@@ -163,13 +163,13 @@ export const bookFilesRouter = router({
 
         await db
           .update(bookFiles)
-          .set({ status: "pending", error: null })
+          .set({ status: "pending", error: null, skipSynthesis: true })
           .where(eq(bookFiles.id, file.id));
       }
 
       await db
         .update(books)
-        .set({ status: "pending", error: null, updatedAt: new Date() })
+        .set({ status: "pending", error: null, skipSynthesis: true, updatedAt: new Date() })
         .where(eq(books.id, input.bookId));
 
       await updateBookTotalChapters(input.bookId);

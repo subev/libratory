@@ -105,6 +105,12 @@ export function StructureModal({
       onClose();
     },
   });
+  const confirmMutation = trpc.books.confirmStructure.useMutation({
+    onSuccess: () => {
+      onChanged();
+      onClose();
+    },
+  });
 
   const proposalRunning = chapterProposal?.status === "running";
 
@@ -189,6 +195,10 @@ export function StructureModal({
         }))
     );
     if (boundaries.length === 0) return;
+    if (unchanged) {
+      confirmMutation.mutate({ id: bookId });
+      return;
+    }
     if (!confirm(`Re-slice the book into ${boundaries.length} chapters? Existing chapters, audio, and assemblies will be deleted.`)) return;
     applyMutation.mutate({ id: bookId, boundaries });
   }
@@ -231,6 +241,9 @@ export function StructureModal({
   }
 
   const selectedCount = selected.size;
+  // The chapters as they stand, unchanged: applying them records the review and replaces nothing
+  const currentStarts = structure?.files.flatMap((file) => file.headings.filter((h) => h.isChapterStart).map((h) => boundaryKey(file.fileIndex, h.blockIndex))) ?? [];
+  const unchanged = currentStarts.length === selectedCount && currentStarts.every((key) => selected.has(key) && !proposalTitles.has(key));
 
   return (
     <>
@@ -453,9 +466,9 @@ export function StructureModal({
                 `Proposal running${chapterProposal?.method === "llm" ? " (asking the model)" : ""}...`}
             </span>
           ) : null}
-          {applyMutation.error || proposeMutation.error ? (
+          {applyMutation.error || confirmMutation.error || proposeMutation.error ? (
             <span className="text-sm text-(--danger-text) truncate">
-              {(applyMutation.error ?? proposeMutation.error)?.message}
+              {(applyMutation.error ?? confirmMutation.error ?? proposeMutation.error)?.message}
             </span>
           ) : null}
           <div className="flex-1" />
@@ -463,15 +476,16 @@ export function StructureModal({
           <Button
             variant={confirmed ? "secondary" : "primary"}
             onClick={apply}
-            disabled={selectedCount === 0 || isProcessing || applyMutation.isPending}
+            disabled={selectedCount === 0 || isProcessing || applyMutation.isPending || confirmMutation.isPending}
             title={
               selectedCount === 0 ? "Check at least one heading" :
               isProcessing ? "Wait for processing to finish" :
+              unchanged ? "The chapters stay as they are — this only records that you looked at them." :
               "Cut the chapters at the checked boundaries — that is the review. Later changes remove the audio those chapters had."
             }
             data-testid="apply-boundaries"
           >
-            Apply boundaries
+            {unchanged ? "Keep these chapters" : "Apply boundaries"}
           </Button>
         </div>
       </Modal>

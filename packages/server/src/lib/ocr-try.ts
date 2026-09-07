@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "../db.ts";
 import { bookFiles } from "../schema.ts";
-import { detectScript as detectPageScript, LOW_CONFIDENCE } from "./ocr-tesseract.ts";
+import { detectScript as detectPageScript, LOW_CONFIDENCE, pdfPageCount } from "./ocr-tesseract.ts";
 import { OCR_GARBLED_FRACTION } from "./ocr-text-layer.ts";
 import { bookTmpDir } from "./paths.ts";
 import { ensureTessdata, installedPacks, tesseractEnv } from "./tessdata.ts";
@@ -29,10 +29,11 @@ export type Callout =
   | { kind: "edge"; count: number; side: "left" | "right"; bandPct: number; allLastWords: boolean }
   | { kind: "scattered"; count: number };
 
-export async function tryFile(bookId: string, fileIndex: number) {
+export async function tryTarget(bookId: string, fileIndex: number, page: number) {
   const [file] = await db.select().from(bookFiles).where(and(eq(bookFiles.bookId, bookId), eq(bookFiles.index, fileIndex)));
   if (!file) throw new Error("File not found");
-  return file;
+  const pageCount = await pdfPageCount(file.pdfPath);
+  return { file, pageCount, page: Math.max(1, Math.min(page, pageCount)) };
 }
 
 export function pagePngPath(bookId: string, fileIndex: number, page: number, suffix = ""): string {

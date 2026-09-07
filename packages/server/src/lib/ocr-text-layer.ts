@@ -13,6 +13,10 @@ import { countWords, extractPdfRawText, pdfHasTextLayer } from "./pdf-raw-text.t
 // Above this share of doubted words a Tesseract read is offered a second pass with Surya.
 export const OCR_GARBLED_FRACTION = 0.15;
 
+export function isGarbled(engine: OcrEngine | null, lowConfidenceFraction: number | null): boolean {
+  return engine === "tesseract" && (lowConfidenceFraction ?? 0) >= OCR_GARBLED_FRACTION;
+}
+
 export type OcrTarget = Pick<BookFile, "id" | "index" | "filename" | "pdfPath" | "searchablePdfPath" | "ocrEngine">;
 
 function percent(fraction: number | null): string | null {

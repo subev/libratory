@@ -21,8 +21,10 @@ export function packName(pack: string): string {
   return TESSDATA_LANGUAGES.find((l) => l.code === pack)?.name ?? pack;
 }
 
+const ISO_BY_PACK: Record<string, string> = Object.fromEntries(Object.entries(PACK_BY_ISO).map(([iso, p]) => [p, iso]));
+
 export function isoForPack(pack: string): string | null {
-  return Object.entries(PACK_BY_ISO).find(([, p]) => p === pack)?.[0] ?? null;
+  return ISO_BY_PACK[pack] ?? null;
 }
 
 export function tesseractLanguage(code: string | null): TesseractLanguage {

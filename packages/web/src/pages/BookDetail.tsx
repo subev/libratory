@@ -279,7 +279,6 @@ export function BookDetail() {
   const assembleVariantMutation = trpc.variants.assemble.useMutation({ onSuccess: invalidateVariants });
   const renameMutation = trpc.books.rename.useMutation({ onSuccess: invalidate });
   const updateSettingsMutation = trpc.books.updateSettings.useMutation({ onSuccess: invalidate });
-  const setAutoSynthesizeMutation = trpc.books.setAutoSynthesize.useMutation();
   const setVariantVoiceMutation = trpc.variants.setVoice.useMutation({ onSuccess: invalidate });
   const deleteChaptersMutation = trpc.chapters.deleteSelected.useMutation({ onSuccess: invalidate });
   const invalidateAudioSizes = () => {
@@ -722,7 +721,6 @@ export function BookDetail() {
   };
 
   const startRefusal =
-    setAutoSynthesizeMutation.error ??
     reExtractSelectedMutation.error ??
     retryMutation.error ??
     redetectMutation.error ??
@@ -958,15 +956,8 @@ export function BookDetail() {
               }}
               extractOpen={extractOpen}
               onExtractOpenChange={setExtractOpen}
-              onStartExtraction={async (scope, autoSynthesize) => {
-                for (const m of [setAutoSynthesizeMutation, reExtractSelectedMutation, retryMutation, redetectMutation]) m.reset();
-                try {
-                  // Starting with the previous follow-on setting is worse than not starting: it decides
-                  // whether hours of synthesis begin on their own when this finishes.
-                  await setAutoSynthesizeMutation.mutateAsync({ id: book.id, autoSynthesize });
-                } catch {
-                  return; // The banner is already showing it
-                }
+              onStartExtraction={(scope) => {
+                for (const m of [reExtractSelectedMutation, retryMutation, redetectMutation]) m.reset();
                 if (scope === "selected") reExtractSelectedMutation.mutate({ bookId: book.id });
                 else if (scope === "book") retryMutation.mutate({ id: book.id });
                 else redetectMutation.mutate({ id: book.id });

@@ -4,7 +4,7 @@ import { router, publicProcedure } from "../trpc.ts";
 import { db } from "../db.ts";
 import { books, bookFiles, chapters, bookLogs, assemblies, documents, chapterVariants, folders, DEFAULT_PROFILE_ID, OCR_ENGINES } from "../schema.ts";
 import type { Book, Chapter } from "../schema.ts";
-import { eq, desc, asc, gt, and, ne, inArray, ilike, sql } from "drizzle-orm";
+import { eq, desc, asc, gt, and, ne, inArray, ilike, isNotNull, sql } from "drizzle-orm";
 import { uploadsDir, bookOutputDir } from "../lib/paths.ts";
 import { deleteBook } from "../lib/delete-book.ts";
 import { folderAncestors } from "../lib/folders.ts";
@@ -19,7 +19,7 @@ import { measureBookDiskUsage, measureDirs, removeDirs, bookTotalSizeCached, fil
 import { chapterChunkPreviewDir } from "../lib/chunk-previews.ts";
 import { translationChunkPreviewDir } from "../workers/synthesize-translation.ts";
 import { insertSuspendedChapters, resetChaptersKeepingInserted } from "../lib/insert-chapters.ts";
-import { OCR_GARBLED_FRACTION } from "../lib/ocr-text-layer.ts";
+import { isGarbled } from "../lib/ocr-text-layer.ts";
 import { countAsciiNonAscii } from "../lib/token-estimate.ts";
 import { assembleJobKey, documentJobKey, inFlightInputs } from "../lib/output-readiness.ts";
 import { randomUUID } from "node:crypto";
@@ -427,7 +427,7 @@ export const booksRouter = router({
 
       const filesWithAdvice = files.map((f) => ({
         ...f,
-        ocrGarbled: f.ocrEngine === "tesseract" && (f.ocrLowConfidenceFraction ?? 0) >= OCR_GARBLED_FRACTION,
+        ocrGarbled: isGarbled(f.ocrEngine, f.ocrLowConfidenceFraction),
       }));
       return { ...book, status, chapters: chaptersWithStats, totalWords, totalDurationMs, files: filesWithAdvice, rawTextTotalWords, assembleQueued, folderPath };
     }),
@@ -488,17 +488,6 @@ export const booksRouter = router({
       if (input.language !== undefined) updates.language = input.language || null;
       if (input.author !== undefined) updates.author = input.author?.trim() || null;
       await db.update(books).set(updates).where(eq(books.id, input.id));
-      return { success: true };
-    }),
-
-  // Written just before an extraction runs; extract.ts reads it to decide whether new chapters are
-  // born "pending" (and queued for synthesis) or "suspended".
-  setAutoSynthesize: publicProcedure
-    .input(z.object({ id: z.string().uuid(), autoSynthesize: z.boolean() }))
-    .mutation(async ({ input }) => {
-      const skipSynthesis = !input.autoSynthesize;
-      await db.update(books).set({ skipSynthesis, updatedAt: new Date() }).where(eq(books.id, input.id));
-      await db.update(bookFiles).set({ skipSynthesis }).where(eq(bookFiles.bookId, input.id));
       return { success: true };
     }),
 
@@ -568,16 +557,18 @@ export const booksRouter = router({
         for (const copy of copies) {
           if (copy.searchablePdfPath) await rm(copy.searchablePdfPath, { force: true }).catch(() => {});
         }
+        // The raw text came out of the copy being forgotten; left behind, a failed re-read looks text-native
         await db
           .update(bookFiles)
-          .set({ searchablePdfPath: null, ocrEngine: null, ocrConfidence: null, ocrLowConfidenceFraction: null })
-          .where(eq(bookFiles.bookId, input.id));
+          .set({ searchablePdfPath: null, ocrEngine: null, ocrConfidence: null, ocrLowConfidenceFraction: null, rawText: null, rawWords: null })
+          .where(and(eq(bookFiles.bookId, input.id), isNotNull(bookFiles.searchablePdfPath)));
       }
 
       const updates: Record<string, unknown> = {
         status: "pending",
         error: null,
         outputPath: null,
+        skipSynthesis: true,
         updatedAt: new Date(),
       };
       if (input.voice) {
@@ -593,7 +584,7 @@ export const booksRouter = router({
       await rm(bookOutputDir(input.id), { recursive: true, force: true }).catch(() => {});
       const keptCount = await resetChaptersKeepingInserted(input.id);
       await db.delete(assemblies).where(eq(assemblies.bookId, input.id));
-      await db.update(bookFiles).set({ status: "pending", error: null }).where(eq(bookFiles.bookId, input.id));
+      await db.update(bookFiles).set({ status: "pending", error: null, skipSynthesis: true }).where(eq(bookFiles.bookId, input.id));
       await db.delete(bookLogs).where(eq(bookLogs.bookId, input.id));
       await appendLog(input.id, "Re-extracting from scratch");
       if (keptCount > 0) {

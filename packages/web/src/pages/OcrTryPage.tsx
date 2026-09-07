@@ -210,7 +210,7 @@ export function OcrTryPage() {
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-semibold tracking-wider text-(--text-faint)">PAGE</span>
           <Button variant="icon" size="sm" onClick={() => changePage(page - 1)} disabled={page <= 1} aria-label="Previous page"><IconMinus /></Button>
-          <input type="number" min={1} max={pageCount || undefined} value={page} onChange={(e) => changePage(Number(e.target.value))} className="w-16 rounded border border-(--border-input) bg-(--bg-input) px-1.5 py-1 text-center text-xs" data-testid="ocr-try-page-input" />
+          <input type="number" min={1} max={pageCount || undefined} key={page} defaultValue={page} onBlur={(e) => changePage(Number(e.target.value))} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} className="w-16 rounded border border-(--border-input) bg-(--bg-input) px-1.5 py-1 text-center text-xs" data-testid="ocr-try-page-input" />
           <Button variant="icon" size="sm" onClick={() => changePage(page + 1)} disabled={pageCount > 0 && page >= pageCount} aria-label="Next page"><IconAdd /></Button>
           <span className="max-w-[26ch] text-(--text-muted)">Aim at the worst page you have, not the first one.</span>
         </div>

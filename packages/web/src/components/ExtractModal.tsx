@@ -64,7 +64,7 @@ export function ExtractModal({
   chapterModel: string | null;
   language: string | null;
   onUpdateBook: (settings: { ocrEngine?: OcrEngine | null; llmChapterDetection?: boolean; chapterModel?: string; language?: string | null }) => void;
-  onStart: (scope: ExtractScope, autoSynthesize: boolean) => void;
+  onStart: (scope: ExtractScope) => void;
   onClose: () => void;
 }) {
   const { languages: ocrLanguages } = useOcrLanguages();
@@ -222,7 +222,7 @@ export function ExtractModal({
         <Button onClick={onClose}>Close</Button>
         <Button
           variant="primary"
-          onClick={() => onStart(scope, false)}
+          onClick={() => onStart(scope)}
           disabled={!!blocked}
           title={blocked ?? undefined}
           data-testid="extract-start"

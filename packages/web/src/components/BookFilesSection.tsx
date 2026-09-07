@@ -61,7 +61,7 @@ export function BookFilesSection({
   language: string | null;
   extractOpen: boolean;
   onExtractOpenChange: (open: boolean) => void;
-  onStartExtraction: (scope: ExtractScope, autoSynthesize: boolean) => void;
+  onStartExtraction: (scope: ExtractScope) => void;
   onUpdateExtractionSettings: (settings: { ocrEngine?: OcrEngine | null; llmChapterDetection?: boolean; chapterModel?: string; language?: string | null }) => void;
   onSetSelected: (id: string, selected: boolean) => void;
   onSetAllSelected: (selected: boolean) => void | Promise<unknown>;
@@ -73,6 +73,8 @@ export function BookFilesSection({
   onFilesAdded: () => void;
 }) {
   const scanned = files.filter((f) => !f.hasRawText || f.hasSearchablePdf);
+  const scanEngines = new Set(scanned.filter((f) => f.hasSearchablePdf).map((f) => f.ocrEngine ?? null));
+  const scanConfidences = scanned.map((f) => f.ocrConfidence).filter((c): c is number => typeof c === "number");
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   // Selection is fire-and-forget from the checkboxes; the banner reports a failure, this only
   // stops an unhandled rejection now that the handlers return a promise.
@@ -335,15 +337,20 @@ export function BookFilesSection({
           ocrEngine={ocrEngine}
           canSetOcr={scanned.length > 0}
           tryFileIndex={scanned[0]?.index ?? 0}
-          scan={{ read: scanned.length > 0 && scanned.every((f) => f.hasSearchablePdf), engine: scanned[0]?.ocrEngine ?? null, confidence: scanned[0]?.ocrConfidence ?? null, garbled: scanned.some((f) => f.ocrGarbled) }}
+          scan={{
+            read: scanned.length > 0 && scanned.every((f) => f.hasSearchablePdf),
+            engine: scanEngines.size === 1 ? [...scanEngines][0] ?? null : null,
+            confidence: scanConfidences.length > 0 ? Math.min(...scanConfidences) : null,
+            garbled: scanned.some((f) => f.ocrGarbled),
+          }}
           llmChapterDetection={llmChapterDetection}
           chapterModel={chapterModel}
           language={language}
           onUpdateBook={onUpdateExtractionSettings}
           onClose={() => onExtractOpenChange(false)}
-          onStart={(scope: ExtractScope, autoSynthesize: boolean) => {
+          onStart={(scope: ExtractScope) => {
             onExtractOpenChange(false);
-            onStartExtraction(scope, autoSynthesize);
+            onStartExtraction(scope);
           }}
         />
       )}

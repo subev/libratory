@@ -7,6 +7,7 @@ describe("dur", () => {
     expect(dur(8.7 * 312)).toBe("about 45 min");
     expect(dur(70.4 * 312)).toBe("about 6h 6m");
     expect(dur(5400)).toBe("about 1h 30m");
+    expect(dur(7190)).toBe("about 2h 00m");
     expect(dur(7200)).toBe("about 2h 00m");
   });
 });
