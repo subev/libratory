@@ -331,8 +331,10 @@ export function BookFilesSection({
           chaptersForSelected={chaptersForSelected}
           chaptersTotal={chapters.length}
           isProcessing={isProcessing}
+          bookId={bookId}
           ocrEngine={ocrEngine}
           canSetOcr={files.some((f) => !f.hasRawText || f.hasSearchablePdf)}
+          tryFileIndex={files.find((f) => !f.hasRawText || f.hasSearchablePdf)?.index ?? 0}
           llmChapterDetection={llmChapterDetection}
           chapterModel={chapterModel}
           language={language}

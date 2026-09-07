@@ -7,6 +7,7 @@ import { clearExtractAbort, registerExtractAbort } from "../lib/extract-registry
 import { appendLog } from "../lib/log.ts";
 import { ExtractAbortedError } from "../lib/marker.ts";
 import { ensureTextLayer } from "../lib/ocr-text-layer.ts";
+import { pdfHasTextLayer } from "../lib/pdf-raw-text.ts";
 
 export type OcrTextLayerPayload = {
   bookId: string;
@@ -23,36 +24,33 @@ export async function ocrTextLayer(payload: OcrTextLayerPayload, { addJob }: { a
     await log("Skipping OCR — synthetic books have no PDF to read");
     return;
   }
-  if (book.ocrEngine === null) {
-    await log("Skipping OCR — no OCR engine is set on this book");
-    return;
+  const files = await db
+    .select()
+    .from(bookFiles)
+    .where(eq(bookFiles.bookId, bookId))
+    .orderBy(asc(bookFiles.index));
+  const needs = [];
+  for (const file of files) {
+    if ((force && file.searchablePdfPath) || (!file.searchablePdfPath && (await pdfHasTextLayer(file.pdfPath)) === false)) needs.push(file);
   }
+  if (needs.length === 0) return;
 
+  const engine = book.ocrEngine ?? "tesseract";
   await db.update(books).set({ status: "extracting", error: null, updatedAt: new Date() }).where(eq(books.id, bookId));
 
   const abort = registerExtractAbort(bookId);
   try {
-    const files = await db
-      .select()
-      .from(bookFiles)
-      .where(eq(bookFiles.bookId, bookId))
-      .orderBy(asc(bookFiles.index));
-
     let written = 0;
-    for (const file of files) {
-      const produced = await ensureTextLayer({
-        bookId,
-        file,
-        engine: book.ocrEngine,
-        language: book.language,
-        force,
-        log: (msg) => appendLog(bookId, msg, file.index),
-        signal: abort.signal,
-      });
+    for (const file of needs) {
+      const fileLog = (msg: string) => appendLog(bookId, msg, file.index);
+      if (!book.ocrEngine) await fileLog(`No text layer in "${file.filename}" — reading it with Tesseract by default; change the engine under "About this book" in Extract…`);
+      const produced = await ensureTextLayer({ bookId, file, engine, language: book.language, force, log: fileLog, signal: abort.signal });
       if (produced) written++;
     }
 
-    await db.update(books).set({ status: "pending", error: null, updatedAt: new Date() }).where(eq(books.id, bookId));
+    const settled: Partial<typeof books.$inferInsert> = { status: "pending", error: null, updatedAt: new Date() };
+    if (written > 0 && !book.ocrEngine) settled.ocrEngine = engine;
+    await db.update(books).set(settled).where(eq(books.id, bookId));
     if (written > 0) {
       await addJob("indexBook", { bookId }, { maxAttempts: 1, jobKey: `index:${bookId}`, jobKeyMode: "replace" });
     }

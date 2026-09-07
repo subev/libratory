@@ -2,6 +2,8 @@ import { useState } from "react";
 
 import { AfterExtractChoice } from "./AfterExtractChoice.tsx";
 import { BOOK_LANGUAGE_OPTIONS } from "../lib/languages.ts";
+import { Link } from "react-router";
+import { trpc } from "../trpc.ts";
 import { Modal, ModalHeader } from "./Modal.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { Button } from "./Button.tsx";
@@ -37,8 +39,10 @@ export function ExtractModal({
   chaptersForSelected,
   chaptersTotal,
   isProcessing,
+  bookId,
   ocrEngine,
   canSetOcr,
+  tryFileIndex,
   llmChapterDetection,
   chapterModel,
   language,
@@ -52,8 +56,10 @@ export function ExtractModal({
   chaptersForSelected: number;
   chaptersTotal: number;
   isProcessing: boolean;
+  bookId: string;
   ocrEngine: OcrEngine | null;
   canSetOcr: boolean;
+  tryFileIndex: number;
   llmChapterDetection: boolean;
   chapterModel: string | null;
   language: string | null;
@@ -63,7 +69,10 @@ export function ExtractModal({
   onClose: () => void;
 }) {
   const { languages: ocrLanguages } = useOcrLanguages();
-  const pack = packForBookLanguage(ocrLanguages, language);
+  const suggestion = trpc.ocrTry.page.useQuery({ bookId, fileIndex: tryFileIndex, page: 5 }, { enabled: canSetOcr, staleTime: Infinity });
+  const suggestedPack = ocrLanguages.find((l) => l.code === (suggestion.data?.candidates ?? [])[0]) ?? null;
+  const pack = packForBookLanguage(ocrLanguages, language) ?? (language ? null : suggestedPack);
+  const languageLabel = (iso: string) => BOOK_LANGUAGE_OPTIONS.find((o) => o.code === iso)?.label ?? iso;
   const disabledReason = (scope: ExtractScope) => {
     if (isProcessing) return "Wait for the current extraction to finish";
     if (scope === "selected" && selectedCount === 0) return "Select files first";
@@ -157,23 +166,43 @@ export function ExtractModal({
           </label>
 
           {canSetOcr && (
-            <label className="flex gap-2 text-xs text-(--text-muted)">
-              <input
-                type="checkbox"
-                checked={ocrEngine !== null}
-                onChange={(e) => onUpdateBook({ ocrEngine: e.target.checked ? "tesseract" : null })}
-                className="mt-0.5 rounded"
-                data-testid="book-ocr-engine"
-              />
-              <span>
-                <span className="block text-(--text-secondary)">Scanned PDF — needs OCR</span>
-                Set this when the pages are images. Tesseract reads them once into a searchable copy kept beside
-                the original, which is never replaced; every extraction, search and export afterwards reads that
-                copy, and read-along follows the voice word by word. About a second a page.
+            <div className="space-y-1.5 text-xs text-(--text-muted)" data-testid="book-ocr-engine">
+              <span className="block text-(--text-secondary)">Scanned pages</span>
+              <span className="block">
+                The pages are images. One engine reads them once into a searchable copy kept beside the original, which
+                is never replaced; every extraction, search and export afterwards reads that copy.
               </span>
-            </label>
+              {([
+                ["tesseract", "Tesseract", "about a second a page; read-along word by word"],
+                ["surya", "Surya", "roughly ten times slower; better on photographed, curled, faded or skewed pages; read-along a paragraph at a time"],
+              ] as const).map(([value, name, trade]) => (
+                <label key={value} className="flex gap-2">
+                  <input
+                    type="radio"
+                    name="ocr-engine"
+                    checked={(ocrEngine ?? "tesseract") === value}
+                    onChange={() => onUpdateBook({ ocrEngine: value })}
+                    className="mt-0.5"
+                    data-testid={`book-ocr-engine-${value}`}
+                  />
+                  <span><span className="text-(--text-secondary)">{name}</span>{ocrEngine === null && value === "tesseract" ? " (suggested)" : ""} — {trade}</span>
+                </label>
+              ))}
+              {(ocrEngine ?? "tesseract") === "tesseract" && (
+                <span className="block" data-testid="book-ocr-suggestion">
+                  {suggestion.isLoading ? "Looking at a page for its script…"
+                    : language ? `Read as ${languageLabel(language)}, the book's language.`
+                    : suggestion.data?.script && suggestedPack ? `${suggestion.data.script} script on page ${suggestion.data.page} — read as ${suggestedPack.name} unless the book's language is set above.`
+                    : "Read as English unless the book's language is set above."}
+                </span>
+              )}
+              <span className="block">
+                <Link to={`/books/${bookId}/ocr?file=${tryFileIndex}`} className="text-(--accent-text) hover:text-(--accent-text-hover)" data-testid="book-ocr-try">Try one page…</Link>
+                {" "}— see both engines on a page you pick, with the image beside them, before committing 300 pages to one.
+              </span>
+            </div>
           )}
-          {canSetOcr && ocrEngine === "tesseract" && pack && <OcrLanguagePackRow code={pack.code} />}
+          {canSetOcr && (ocrEngine ?? "tesseract") === "tesseract" && pack && <OcrLanguagePackRow code={pack.code} />}
 
           <label className="flex gap-2 text-xs text-(--text-muted)">
             <input

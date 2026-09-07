@@ -66,7 +66,6 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
   const priorityLanguages = useMemo(() => (language ? [language] : []), [language]);
   const [voice, setVoice] = useState("kokoro:af_heart");
   const [speed, setSpeed] = useState(1.0);
-  const [needsOcr, setNeedsOcr] = useState(false);
   // Raw-text-only is the default: pdftotext lands in seconds, marker takes minutes — extract chapters later from the book page
   const [fullExtract, setFullExtract] = useState(false);
   const [llmChapterDetection, setLlmChapterDetection] = useState(false);
@@ -119,7 +118,6 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
     if (title) formData.append("title", title);
     formData.append("voice", voice);
     formData.append("speed", String(voiceSupportsSpeedControl(voice) ? speed : 1.0));
-    if (needsOcr) formData.append("ocrEngine", "tesseract");
     formData.append("fullExtract", String(fullExtract));
     formData.append("llmChapterDetection", String(fullExtract && llmChapterDetection));
     if (fullExtract && llmChapterDetection) formData.append("chapterModel", chapterModel);
@@ -470,13 +468,6 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
               </div>
             )}
 
-            <Option
-              label="Scanned PDF — needs OCR"
-              hint="The pages are read once with Tesseract into a searchable copy kept beside the original, which is left untouched. Everything afterwards reads that copy, so read-along follows the voice word by word. Saved on the book, so later extractions use it too."
-              title="Also covers a phone photo printed to PDF, where the only selectable text is the print header."
-              checked={needsOcr}
-              onChange={setNeedsOcr}
-            />
           </fieldset>
 
           {fullExtract && (

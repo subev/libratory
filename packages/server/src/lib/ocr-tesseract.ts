@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 
 import { ExtractAbortedError } from "./marker.ts";
 import { pdfHasTextLayer } from "./pdf-raw-text.ts";
-import { tesseractLanguage } from "./tesseract-languages.ts";
+import { packName, packsForScript, tesseractLanguage, type TesseractLanguage } from "./tesseract-languages.ts";
 import { ensureTessdata, installedPacks, tesseractEnv } from "./tessdata.ts";
 
 const execFileAsync = promisify(execFile);
@@ -26,11 +26,11 @@ export type OcrRunner = (input: {
   signal?: AbortSignal;
 }) => Promise<OcrStats>;
 
-const LOW_CONFIDENCE = 60;
+export const LOW_CONFIDENCE = 60;
 const RENDER_DPI = 300;
 const RENDER_CHUNK_PAGES = 20;
 
-async function pageCount(pdfPath: string): Promise<number> {
+export async function pdfPageCount(pdfPath: string): Promise<number> {
   const { stdout } = await execFileAsync("pdfinfo", [pdfPath], { timeout: 30_000 });
   const pages = Number(stdout.match(/^Pages:\s+(\d+)$/m)?.[1]);
   if (!Number.isInteger(pages) || pages < 1) throw new Error(`pdfinfo could not count the pages of "${path.basename(pdfPath)}"`);
@@ -107,19 +107,53 @@ function statsFromTsv(tsv: string): OcrStats {
   return { confidence: sum / total / 100, lowConfidenceFraction: low / total };
 }
 
-export const runTesseractOcr: OcrRunner = async ({ pdfPath, outPdfPath, language, workDir, log, signal }) => {
-  const { pack, name } = tesseractLanguage(language);
-  await ensureTessdata();
-  if (!(await installedPacks()).includes(pack)) {
-    throw new Error(`Tesseract has no ${name} language pack (${pack}.traineddata) — download it under "OCR language packs" in Settings`);
+export async function detectScript(png: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync("tesseract", [png, "-", "--psm", "0"], { timeout: 60_000, env: tesseractEnv() });
+    const script = stdout.match(/^Script:\s*(\S+)/m)?.[1] ?? null;
+    const confidence = Number(stdout.match(/^Script confidence:\s*([\d.]+)/m)?.[1]);
+    return script && confidence >= 1 ? script : null;
+  } catch {
+    return null;
   }
+}
+
+function requireInstalled(installed: string[], choice: TesseractLanguage): TesseractLanguage {
+  if (!installed.includes(choice.pack)) {
+    throw new Error(`Tesseract has no ${choice.name} language pack (${choice.pack}.traineddata) — download it under "OCR language packs" in Settings`);
+  }
+  return choice;
+}
+
+// Reading a Cyrillic scan as English quietly is the failure this guards against: with no language
+// on the book, the page's own script picks the pack, and a script with no installed pack stops here.
+async function chooseLanguage(language: string | null, images: string[], log: (msg: string) => Promise<void>): Promise<TesseractLanguage> {
+  const installed = await installedPacks();
+  if (language) return requireInstalled(installed, tesseractLanguage(language));
+  const sample = images[Math.min(4, images.length - 1)];
+  const script = sample ? await detectScript(sample) : null;
+  const candidates = packsForScript(script);
+  if (!script || candidates.length === 0) return requireInstalled(installed, tesseractLanguage("en"));
+  const pack = candidates.find((c) => installed.includes(c));
+  if (!pack) {
+    const names = candidates.slice(0, 3).map(packName).join(", ");
+    throw new Error(`${script} script on the page, but no pack for it is installed — download ${names} or another under "OCR language packs" in Settings, or set the book's language`);
+  }
+  await log(`${script} script on the page — reading it as ${packName(pack)}; set the book's language to choose`);
+  return { pack, name: packName(pack) };
+}
+
+export const runTesseractOcr: OcrRunner = async ({ pdfPath, outPdfPath, language, workDir, log, signal }) => {
+  await ensureTessdata();
+  if (language) requireInstalled(await installedPacks(), tesseractLanguage(language));
 
   await rm(workDir, { recursive: true, force: true });
   await mkdir(workDir, { recursive: true });
 
   try {
-    const pages = await pageCount(pdfPath);
+    const pages = await pdfPageCount(pdfPath);
     const images = await renderPages(pdfPath, workDir, pages, log, signal);
+    const { pack, name } = await chooseLanguage(language, images, log);
 
     const listPath = path.join(workDir, "pages.txt");
     await writeFile(listPath, images.join("\n") + "\n");

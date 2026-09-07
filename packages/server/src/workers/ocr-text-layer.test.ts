@@ -91,13 +91,13 @@ describe("ocrTextLayer worker", () => {
     expect(row(await db.select().from(bookFiles).where(eq(bookFiles.bookId, bookId))).ocrConfidence).toBeGreaterThan(0.5);
   }, 120_000);
 
-  it("says why and stops when the book has no OCR engine set", async () => {
+  it("reads a scan with Tesseract by default and records that choice on the book", async () => {
     const db = getDb();
     const { bookId } = await scannedBook(false);
 
     await ocrTextLayer({ bookId }, { addJob: vi.fn() } as any);
 
-    expect(row(await db.select().from(bookFiles).where(eq(bookFiles.bookId, bookId))).searchablePdfPath).toBeNull();
-    expect(row(await db.select().from(books).where(eq(books.id, bookId))).status).toBe("pending");
-  });
+    expect(row(await db.select().from(bookFiles).where(eq(bookFiles.bookId, bookId))).searchablePdfPath).not.toBeNull();
+    expect(row(await db.select().from(books).where(eq(books.id, bookId)))).toMatchObject({ status: "pending", ocrEngine: "tesseract" });
+  }, 60_000);
 });

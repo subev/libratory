@@ -141,7 +141,7 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
     // Extraction does the OCR inline, per file, so queueing both would read every page twice.
     if (fullExtract) {
       await quickAddJob({ connectionString }, "extract", { bookId }, { maxAttempts: 1 });
-    } else if (ocrEngine) {
+    } else {
       await quickAddJob({ connectionString }, "ocrTextLayer", { bookId }, { maxAttempts: 1 });
     }
 
@@ -211,7 +211,7 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
     if (usesFullExtraction) {
       await db.update(books).set({ status: "pending", error: null, updatedAt: new Date() }).where(eq(books.id, bookId));
       await quickAddJob({ connectionString }, "extract", { bookId }, { maxAttempts: 1 });
-    } else if (book.ocrEngine) {
+    } else {
       await quickAddJob({ connectionString }, "ocrTextLayer", { bookId }, { maxAttempts: 1 });
     }
 

@@ -72,6 +72,7 @@ export default defineConfig(({ mode }) => {
         "/files": API,
         "/preview": API,
         "/read": API,
+        "/ocr": API,
       },
     },
   };

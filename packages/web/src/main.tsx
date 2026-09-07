@@ -17,6 +17,7 @@ import { Chat } from "./pages/Chat.tsx";
 // Lazy so every other page stops paying for pdf.js
 const Reader = lazy(() => import("./pages/Reader.tsx").then((m) => ({ default: m.Reader })));
 const Components = lazy(() => import("./pages/Components.tsx").then((m) => ({ default: m.Components })));
+const OcrTryPage = lazy(() => import("./pages/OcrTryPage.tsx").then((m) => ({ default: m.OcrTryPage })));
 const ReaderOpen = lazy(() => import("./pages/ReaderOpen.tsx").then((m) => ({ default: m.ReaderOpen })));
 
 const queryClient = new QueryClient({
@@ -52,6 +53,7 @@ createRoot(document.getElementById("root")!).render(
                 <Route path="/folders/:folderId" element={<Home />} />
                 <Route path="/books/:id" element={<BookDetail />} />
                 <Route path="/books/:id/read" element={<Suspense fallback={null}><Reader /></Suspense>} />
+                <Route path="/books/:id/ocr" element={<Suspense fallback={null}><OcrTryPage /></Suspense>} />
                 <Route path="/open" element={<Suspense fallback={null}><ReaderOpen /></Suspense>} />
                 <Route path="/chat" element={<Chat />} />
                 <Route path="/components" element={<Suspense fallback={null}><Components /></Suspense>} />

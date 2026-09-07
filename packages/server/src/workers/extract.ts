@@ -183,15 +183,19 @@ async function extractMultipleFiles(
     const abort = registerExtractAbort(file.id);
     try {
       let source: { pdfPath: string; searchablePdfPath: string | null } = file;
-      if (book.ocrEngine) {
-        await ensureTextLayer({
-          bookId: book.id,
-          file,
-          engine: book.ocrEngine,
-          language: book.language,
-          log: fileLog,
-          signal: abort.signal,
-        });
+      const produced = await ensureTextLayer({
+        bookId: book.id,
+        file,
+        engine: book.ocrEngine ?? "tesseract",
+        language: book.language,
+        log: fileLog,
+        signal: abort.signal,
+      });
+      if (produced) {
+        if (!book.ocrEngine) {
+          await db.update(books).set({ ocrEngine: "tesseract", updatedAt: new Date() }).where(eq(books.id, book.id));
+          await fileLog(`No text layer in "${file.filename}" — read with Tesseract by default; change the engine under "About this book" in Extract…`);
+        }
         const [refreshed] = await db
           .select({ pdfPath: bookFiles.pdfPath, searchablePdfPath: bookFiles.searchablePdfPath })
           .from(bookFiles)

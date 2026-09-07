@@ -175,7 +175,8 @@ export function BookDetail() {
   const cancelFileMutation = trpc.bookFiles.cancel.useMutation({ onSuccess: invalidate });
 
   // Opened from the toolbar and from the raw-text block, so it cannot live in either of them.
-  const [extractOpen, setExtractOpen] = useState(false);
+  // Try one page hands back here with ?extract=1 so the modal reopens where the user left it
+  const [extractOpen, setExtractOpen] = useState(() => searchParams.get("extract") === "1");
   const [showStructure, setShowStructure] = useState(false);
   const [showTranslation, setShowTranslation] = useState(false);
   const [showSynthesize, setShowSynthesize] = useState(false);

@@ -42,11 +42,7 @@ export async function ensureTextLayer({
   }
 
   // null means pdftotext could not run at all — a machine fault, not a scan, so it must not force OCR.
-  const hasText = await pdfHasTextLayer(file.pdfPath);
-  if (hasText !== false) {
-    await log(`"${file.filename}" already carries a text layer — no OCR needed`);
-    return false;
-  }
+  if ((await pdfHasTextLayer(file.pdfPath)) !== false) return false;
 
   const previous = file.searchablePdfPath;
   const outPdfPath = path.join(path.dirname(file.pdfPath), `${path.basename(file.pdfPath, ".pdf")}.ocr.pdf`);

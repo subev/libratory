@@ -14,6 +14,7 @@ const CLIENT_ROUTES = [
   /^\/folders\/[^/]+$/,
   /^\/books\/[^/]+$/,
   /^\/books\/[^/]+\/read$/,
+  /^\/books\/[^/]+\/ocr$/,
 ];
 
 export function isClientRoute(method: string, url: string): boolean {

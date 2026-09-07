@@ -24,3 +24,39 @@ export function tesseractLanguage(code: string | null): TesseractLanguage {
   if (!pack) throw new Error(`Tesseract has no language pack mapped for "${code}"`);
   return { pack, name: packName(pack) };
 }
+
+// What OSD's script name usually means, most common first; the book's own language wins when it is set.
+const PACKS_BY_SCRIPT: Record<string, string[]> = {
+  Latin: ["eng", "fra", "deu", "spa", "ita", "por", "nld", "pol", "ces", "hun", "ron", "tur", "swe", "dan", "fin", "nor", "hrv", "slv", "slk", "vie", "ind"],
+  Cyrillic: ["bul", "rus", "ukr", "srp", "mkd", "bel"],
+  Han: ["chi_sim", "chi_tra", "jpn"],
+  Japanese: ["jpn"],
+  Hangul: ["kor"],
+  Arabic: ["ara", "fas", "urd"],
+  Hebrew: ["heb"],
+  Greek: ["ell"],
+  Devanagari: ["hin", "mar", "nep", "san"],
+  Thai: ["tha"],
+  Armenian: ["hye"],
+  Georgian: ["kat"],
+  Bengali: ["ben"],
+  Tamil: ["tam"],
+  Telugu: ["tel"],
+  Kannada: ["kan"],
+  Malayalam: ["mal"],
+  Gujarati: ["guj"],
+  Gurmukhi: ["pan"],
+  Sinhala: ["sin"],
+  Khmer: ["khm"],
+  Lao: ["lao"],
+  Myanmar: ["mya"],
+  Tibetan: ["bod"],
+  Ethiopic: ["amh", "tir"],
+  Syriac: ["syr"],
+  Cherokee: ["chr"],
+  Fraktur: ["frk", "deu"],
+};
+
+export function packsForScript(script: string | null): string[] {
+  return script ? PACKS_BY_SCRIPT[script] ?? [] : [];
+}

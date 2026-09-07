@@ -63,7 +63,7 @@ describe("POST /upload", () => {
     mockQuickAddJob.mockReset();
   });
 
-  it("creates a raw-only book by default and queues only rawExtract", async () => {
+  it("creates a raw-only book by default and queues raw text plus the OCR step, never extract", async () => {
     const app = await createApp();
     const { payload, headers } = multipartBody([
       { name: "file", value: "%PDF-fake", filename: "my_book.pdf" },
@@ -80,7 +80,8 @@ describe("POST /upload", () => {
     expect(files).toHaveLength(1);
     expect(files[0]?.status).toBe("raw");
 
-    expect(mockQuickAddJob).toHaveBeenCalledTimes(1);
+    expect(mockQuickAddJob).toHaveBeenCalledTimes(2);
+    expect((mockQuickAddJob.mock.calls as unknown[][]).map((c) => c[1])).toEqual(["rawExtract", "ocrTextLayer"]);
     expect(mockQuickAddJob).toHaveBeenCalledWith(
       expect.any(Object),
       "rawExtract",
@@ -229,7 +230,7 @@ describe("POST /upload/:bookId (append)", () => {
     return bookId;
   }
 
-  it("appends raw files to a raw-only book without queuing extract", async () => {
+  it("appends raw files to a raw-only book and queues the OCR step, not extract", async () => {
     const bookId = await insertBookWithFile("raw");
     const app = await createApp();
     const { payload, headers } = multipartBody([
@@ -244,7 +245,7 @@ describe("POST /upload/:bookId (append)", () => {
     expect(files.map((f) => f.status)).toEqual(["raw", "raw"]);
 
     const jobNames = mockQuickAddJob.mock.calls.map((c: any[]) => c[1]);
-    expect(jobNames).toEqual(["rawExtract"]);
+    expect(jobNames).toEqual(["rawExtract", "ocrTextLayer"]);
   });
 
   it("appends pending files and queues extract for a fully-extracted book", async () => {

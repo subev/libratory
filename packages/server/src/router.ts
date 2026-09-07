@@ -16,6 +16,7 @@ import { llmModelsRouter } from "./routes/llm-models.ts";
 import { rendererRouter } from "./routes/renderer.ts";
 import { modelsRouter } from "./routes/models.ts";
 import { ocrLanguagesRouter } from "./routes/ocr-languages.ts";
+import { ocrTryRouter } from "./routes/ocr-try.ts";
 import { secretsRouter } from "./routes/secrets.ts";
 import { workersRouter } from "./routes/workers.ts";
 
@@ -36,6 +37,7 @@ export const appRouter = router({
   renderer: rendererRouter,
   models: modelsRouter,
   ocrLanguages: ocrLanguagesRouter,
+  ocrTry: ocrTryRouter,
   secrets: secretsRouter,
   workers: workersRouter,
 });

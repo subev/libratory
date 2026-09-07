@@ -12,6 +12,7 @@ import { registerReaderRoutes } from "./lib/reader-routes.ts";
 import { registerUploadRoutes } from "./upload-routes.ts";
 import { registerChatRoutes } from "./chat-routes.ts";
 import { registerTranslationStreamRoutes } from "./translation-stream-routes.ts";
+import { registerOcrTryRoutes } from "./lib/ocr-try-routes.ts";
 import { registerApiRoutes } from "./api-routes.ts";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { registerScriptRunRoutes } from "./script-run-routes.ts";
@@ -81,6 +82,7 @@ async function main() {
   fastify.get("/health", async () => ({ ok: true, instance: env.LIBRATORY_INSTANCE ?? null }));
 
   registerUploadRoutes(fastify);
+  registerOcrTryRoutes(fastify);
   registerChatRoutes(fastify);
   registerTranslationStreamRoutes(fastify);
   registerApiRoutes(fastify);

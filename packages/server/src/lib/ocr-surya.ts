@@ -34,7 +34,7 @@ export function parseSuryaEvent(line: string): SuryaEvent | null {
   }
 }
 
-async function device(): Promise<"mps" | "cuda" | "cpu"> {
+export async function suryaDevice(): Promise<"mps" | "cuda" | "cpu"> {
   if (process.platform === "darwin") return "mps";
   const capabilities = await readCapabilities().catch(() => null);
   return capabilities?.cuda ? "cuda" : "cpu";
@@ -108,7 +108,7 @@ export const makeSuryaRunner = (spawnWith: SuryaSpawn = {}): OcrRunner => async 
     else if (e.event === "page") log(`OCR page ${e.page}/${pages}`).catch(() => {});
   };
   const args = ["--pdf", pdfPath, "--out", outPdfPath];
-  const first = await device();
+  const first = await suryaDevice();
   try {
     try {
       await runSurya(args, { signal, onEvent, ...spawnWith }, first);

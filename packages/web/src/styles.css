@@ -212,6 +212,9 @@
   --warning-hover: light-dark(var(--pal-brass-400), var(--pal-brass-300));
   --warning-bg: var(--pal-brass-a15);
   --warning-bg-hover: var(--pal-brass-a25);
+  /* Words the OCR engine itself doubted: a tint and a ring, distinct from every warning surface */
+  --lowconf: light-dark(rgb(224 145 61 / 38%), rgb(224 145 61 / 34%));
+  --lowconf-ring: light-dark(oklch(0.48 0.09 70 / 35%), rgb(224 145 61 / 45%));
   --warning-text: light-dark(var(--pal-brass-700), var(--pal-brass-300));
 
 
