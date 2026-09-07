@@ -6,7 +6,8 @@ import { probe, waitForServer } from "./health.cjs";
 
 const servers: Server[] = [];
 afterAll(() => {
-  for (const s of servers) s.close();
+  // close() alone waits out fetch's keep-alive sockets, which holds the worker open for seconds
+  for (const s of servers) { s.closeAllConnections(); s.close(); }
 });
 
 async function serving(body: unknown, status = 200): Promise<string> {
@@ -54,5 +55,12 @@ describe("telling our server from whatever else has the port", () => {
 
   it("abandons the wait once the server it spawned has died", async () => {
     expect(await waitForServer("http://127.0.0.1:1/health", "tok-1", 5000, () => true)).toBe("abandoned");
+  });
+
+  // Our server dies of EADDRINUSE within milliseconds of a taken port, so a launcher that reads
+  // `abandoned` before it probes reports the crash and never names the server holding the port.
+  it("names the foreign server even when ours has already died of the taken port", async () => {
+    const url = await serving({ ok: true, instance: "tok-other" });
+    expect(await waitForServer(url, "tok-1", 5000, () => true)).toBe("foreign");
   });
 });

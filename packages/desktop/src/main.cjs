@@ -88,15 +88,33 @@ function composeUp(cli, env, onOutput) {
 // server from two versions ago. Adopting the orphan is not worth the complexity; ending it is.
 function killOrphanedServers() {
   const bundled = path.join(RESOURCES, "libratory-server");
+  const signalled = [];
   try {
     const out = execFileSync("/usr/bin/pgrep", ["-f", bundled], { encoding: "utf8" });
     for (const pid of out.split("\n").map((n) => Number(n.trim())).filter(Boolean)) {
       if (pid !== process.pid) {
-        try { process.kill(pid, "SIGTERM"); } catch {}
+        try { process.kill(pid, "SIGTERM"); signalled.push(pid); } catch {}
       }
     }
   } catch {
     // pgrep exits non-zero when nothing matches, which is the common case
+  }
+  return signalled;
+}
+
+const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+
+// SIGTERM is where the old server *starts* shutting down: it drains in-flight graphile jobs before
+// closing the socket, and a synthesis chunk holds that open for minutes. Spawning into the port it
+// still owns produced a server that died of EADDRINUSE and a launcher that then found the *old*
+// instance id on /health and blamed a dev server that was not there.
+async function waitForOrphansToExit(pids, timeoutMs, onWaiting) {
+  if (pids.length === 0) return;
+  const deadline = Date.now() + timeoutMs;
+  let announced = false;
+  while (Date.now() < deadline && pids.some(alive)) {
+    if (!announced) { onWaiting?.(); announced = true; }
+    await new Promise((r) => setTimeout(r, 250));
   }
 }
 
@@ -142,8 +160,8 @@ function appLog(line) {
   logRaw(`${line}\n`);
 }
 
-function startServer(onDied) {
-  killOrphanedServers();
+async function startServer(onDied, onWaiting) {
+  await waitForOrphansToExit(killOrphanedServers(), 120000, onWaiting);
   INSTANCE = randomUUID();
   const bundled = path.join(RESOURCES, "libratory-server");
   server = spawn(bundled, [], { env: serverEnv(), stdio: ["ignore", "pipe", "pipe"] });
@@ -264,10 +282,10 @@ const STEPS = [
   {
     id: "server",
     label: "Starting Libratory",
-    async run(ctx) {
+    async run(ctx, detail) {
       /** @type {string | null} */
       let died = null;
-      startServer((reason) => { died = reason; });
+      await startServer((reason) => { died = reason; }, () => detail("Waiting for the previous run to finish its work"));
       const state = await health.waitForServer(`${ctx.url}/health`, INSTANCE, 120000, () => Boolean(died));
       // Before `died`: a taken port kills our server too, and "address already in use" sends the
       // reader looking for a crash rather than for the other server that is about to be adopted.

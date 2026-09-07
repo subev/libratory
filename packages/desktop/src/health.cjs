@@ -15,9 +15,11 @@ async function probe(url, instance) {
 async function waitForServer(url, instance, timeoutMs, abandoned = () => false) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (abandoned()) return "abandoned";
+    // Probed before `abandoned` is consulted: a taken port kills our server within milliseconds, and
+    // checking that first reports "address already in use" for the very case this exists to name.
     const state = await probe(url, instance);
     if (state !== "down") return state;
+    if (abandoned()) return "abandoned";
     await new Promise((r) => setTimeout(r, POLL_MS));
   }
   return "timeout";
