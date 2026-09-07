@@ -77,7 +77,7 @@ async function main() {
 
   // What the desktop launcher waits for. Probing a business route instead meant renaming a router
   // would present as "the server did not start", with the real reason nowhere.
-  fastify.get("/health", async () => ({ ok: true }));
+  fastify.get("/health", async () => ({ ok: true, instance: env.LIBRATORY_INSTANCE ?? null }));
 
   registerUploadRoutes(fastify);
   registerChatRoutes(fastify);
