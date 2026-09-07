@@ -4,7 +4,7 @@ import type { OcrEngine } from "../lib/ocr.ts";
 
 // The one description of the two engines, shown wherever a scan is about to be read
 export function OcrEngineChoice({ value, onChange, note, tryHref, status, used = null }: { value: OcrEngine | null; onChange: (engine: OcrEngine) => void; note?: ReactNode; tryHref?: string; status?: ReactNode; used?: OcrEngine | null }) {
-  const tag = (engine: OcrEngine) => (used === engine ? " (done)" : used ? " — reads every page again and replaces that copy" : value === null && engine === "tesseract" ? " (suggested)" : "");
+  const tag = (engine: OcrEngine) => (used === engine ? " — already done, keep it" : used ? " — reads every page again, slower, and replaces the copy you have" : value === null && engine === "tesseract" ? " (suggested)" : "");
   return (
     <div className="space-y-1.5 text-xs text-(--text-muted)" data-testid="book-ocr-engine">
       <span className="block text-(--text-secondary)">Pages that are pictures</span>

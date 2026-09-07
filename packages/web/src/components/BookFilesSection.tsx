@@ -335,7 +335,7 @@ export function BookFilesSection({
           ocrEngine={ocrEngine}
           canSetOcr={scanned.length > 0}
           tryFileIndex={scanned[0]?.index ?? 0}
-          scan={{ read: scanned.length > 0 && scanned.every((f) => f.hasSearchablePdf), engine: scanned[0]?.ocrEngine ?? null, confidence: scanned[0]?.ocrConfidence ?? null }}
+          scan={{ read: scanned.length > 0 && scanned.every((f) => f.hasSearchablePdf), engine: scanned[0]?.ocrEngine ?? null, confidence: scanned[0]?.ocrConfidence ?? null, garbled: scanned.some((f) => f.ocrGarbled) }}
           llmChapterDetection={llmChapterDetection}
           chapterModel={chapterModel}
           language={language}
