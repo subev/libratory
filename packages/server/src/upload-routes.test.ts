@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getDb, resetDb, row } from "../test/setup.ts";
 import { books, bookFiles, folders } from "./schema.ts";
 import { eq, asc } from "drizzle-orm";
+import path from "node:path";
+import { readFile } from "node:fs/promises";
+import { uploadsDir } from "./lib/paths.ts";
 
 const { mockQuickAddJob } = vi.hoisted(() => ({
   mockQuickAddJob: vi.fn(async () => {}),
@@ -33,10 +36,10 @@ afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
 });
 
-async function createApp() {
+async function createApp(preservePath = false) {
   const app = Fastify();
   apps.push(app);
-  await app.register(multipart, { limits: { fileSize: 500 * 1024 * 1024 } });
+  await app.register(multipart, { preservePath, limits: { fileSize: 500 * 1024 * 1024 } });
   registerUploadRoutes(app);
   await app.ready();
   return app;
@@ -61,6 +64,20 @@ describe("POST /upload", () => {
   beforeEach(async () => {
     await resetDb(getDb());
     mockQuickAddJob.mockReset();
+  });
+
+  it("keeps untrusted filenames as metadata and generates the storage path", async () => {
+    const app = await createApp(true);
+    const filename = "nested/../../outside.pdf";
+    const { payload, headers } = multipartBody([{ name: "file", filename, value: "%PDF-test" }]);
+    const res = await app.inject({ method: "POST", url: "/upload", payload, headers });
+    expect(res.statusCode).toBe(200);
+    const [file] = await getDb().select().from(bookFiles);
+    expect(file?.filename).toBe(filename);
+    if (!file) throw new Error("Uploaded file missing");
+    expect(path.dirname(file.pdfPath)).toBe(path.join(uploadsDir, file.bookId));
+    expect(path.basename(file.pdfPath)).toMatch(/^00_[a-f0-9-]{36}\.pdf$/);
+    expect(await readFile(file.pdfPath, "utf8")).toBe("%PDF-test");
   });
 
   it("creates a raw-only book by default and queues raw text plus the OCR step, never extract", async () => {

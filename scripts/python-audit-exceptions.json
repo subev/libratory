@@ -1,0 +1,65 @@
+[
+  {
+    "id": "GHSA-4j2p-28q2-5m79",
+    "package": "accelerate",
+    "version": "1.14.0",
+    "expires": "2026-10-08",
+    "reason": "No upstream fix is published. Only the application-selected model repositories are loaded; arbitrary checkpoint imports are not exposed. Track the sharded-checkpoint loader fix in tasks/security-ml-upgrades.md."
+  },
+  {
+    "id": "GHSA-29pf-2h5f-8g72",
+    "package": "transformers",
+    "version": "4.57.6",
+    "expires": "2026-10-08",
+    "reason": "Patched only in Transformers 5, incompatible with the current Marker runtime. Model repositories are application-selected, with local-only inference. This remains a model supply-chain risk; see tasks/security-ml-upgrades.md."
+  },
+  {
+    "id": "GHSA-69w3-r845-3855",
+    "package": "transformers",
+    "version": "4.57.6",
+    "expires": "2026-10-08",
+    "reason": "The app does not train or resume Trainer checkpoints and uses PyTorch 2.13, above the affected <2.6 condition. Remove with the Transformers 5 migration."
+  },
+  {
+    "id": "GHSA-fgcw-684q-jj6r",
+    "package": "transformers",
+    "version": "4.57.6",
+    "expires": "2026-10-08",
+    "reason": "The app does not load LightGlue or expose arbitrary model repositories. Marker currently requires Transformers 4; remove with the Transformers 5 migration."
+  },
+  {
+    "id": "GHSA-xrqw-3rrv-vx5w",
+    "package": "transformers",
+    "version": "4.57.6",
+    "expires": "2026-10-08",
+    "reason": "The app does not save user-provided tokenizers/processors or chat templates through save_pretrained. Marker currently requires Transformers 4; remove with its migration."
+  },
+  {
+    "id": "PYSEC-2025-217",
+    "package": "transformers",
+    "version": "4.57.6",
+    "expires": "2026-10-08",
+    "reason": "The app does not run the X-CLIP checkpoint conversion utility. Remove with the Transformers migration when upstream supplies a fix."
+  },
+  {
+    "id": "PYSEC-2026-2288",
+    "package": "transformers",
+    "version": "4.57.6",
+    "expires": "2026-10-08",
+    "reason": "The app does not train or resume Trainer checkpoints and uses PyTorch 2.13, above the affected <2.6 condition. Remove with the Transformers 5 migration."
+  },
+  {
+    "id": "PYSEC-2026-2289",
+    "package": "transformers",
+    "version": "4.57.6",
+    "expires": "2026-10-08",
+    "reason": "Patched only in Transformers 5, incompatible with the current Marker runtime. Model repositories are application-selected, with local-only inference. This remains a model supply-chain risk; see tasks/security-ml-upgrades.md."
+  },
+  {
+    "id": "PYSEC-2026-2290",
+    "package": "transformers",
+    "version": "4.57.6",
+    "expires": "2026-10-08",
+    "reason": "The app does not load LightGlue or expose arbitrary model repositories. Marker currently requires Transformers 4; remove with the Transformers 5 migration."
+  }
+]

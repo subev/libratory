@@ -3,6 +3,7 @@ import Fastify, { type FastifyRequest } from "fastify";
 import cors, { type FastifyCorsOptions } from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
+import rateLimit from "@fastify/rate-limit";
 import { existsSync } from "node:fs";
 import { fastifyTRPCPlugin } from "@trpc/server/adapters/fastify";
 import { appRouter } from "./router.ts";
@@ -28,6 +29,7 @@ import { access, readdir, unlink } from "node:fs/promises";
 import { createFastifyOptions } from "./fastify-config.ts";
 import { isUuid } from "./lib/uuid.ts";
 import { registerErrorHandler } from "./lib/error-handler.ts";
+import { PREVIEW_RATE_LIMIT } from "./lib/request-limits.ts";
 
 const { PORT } = env;
 
@@ -57,6 +59,7 @@ async function main() {
     callback(null, { origin: isAllowedOrigin(req.headers.origin, req.headers.host, trustedHosts) });
   });
   await fastify.register(multipart, { limits: { fileSize: 500 * 1024 * 1024 } });
+  await fastify.register(rateLimit, { global: false });
 
   await fastify.register(fastifyStatic, {
     root: outputDir,
@@ -212,7 +215,7 @@ async function main() {
   // rather than being told to come back later, so the client needs no polling protocol.
   const previewGenerating = new Map<string, Promise<void>>();
 
-  fastify.get("/preview/:voiceId", async (request, reply) => {
+  fastify.get("/preview/:voiceId", { config: { rateLimit: PREVIEW_RATE_LIMIT } }, async (request, reply) => {
     const { voiceId } = request.params as { voiceId: string };
 
     const { parseTtsVoice, previewFileBase } = await import("./lib/tts.ts");

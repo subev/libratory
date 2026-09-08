@@ -9,15 +9,14 @@ import path from "node:path";
 import { env } from "../env.ts";
 import type { ChapterDocument } from "./document-html.ts";
 import { bunEnv } from "./bun-runtime.ts";
+import rendererPackage from "./vivliostyle-package.json";
 
 const execFileAsync = promisify(execFile);
 
 // The desktop app is one compiled binary with no node_modules beside it, so the CLI is installed
 // into VIVLIOSTYLE_DIR at the same moment the renderer is downloaded. Kept in step with the
 // dependency the repo resolves — see vivliostyle.test.ts.
-export const CLI_VERSION = "11.1.0";
-
-const INSTALLED_BIN = path.join(env.VIVLIOSTYLE_DIR, "node_modules", "@vivliostyle", "cli", "dist", "cli.js");
+export const CLI_VERSION = rendererPackage.dependencies["@vivliostyle/cli"];
 
 // Two homes, one question: the CLI a checkout resolves from node_modules, or the one the packaged
 // app installed for itself. The answer cannot change without going through installCli, so it is
@@ -46,10 +45,15 @@ function resolveBundledPkg(): string | null {
 
 // By version, because a CLI_VERSION bump has to reach installs that already hold an older copy —
 // and by the bin as well, because an install killed midway leaves the package.json without it.
-function installedCliBin(): string | null {
-  const pkgPath = path.join(env.VIVLIOSTYLE_DIR, "node_modules", "@vivliostyle", "cli", "package.json");
+export function installedCliBin(root = env.VIVLIOSTYLE_DIR): string | null {
+  const pkgPath = path.join(root, "node_modules", "@vivliostyle", "cli", "package.json");
   const version = readJson<{ version?: string }>(pkgPath)?.version;
-  return version === CLI_VERSION && existsSync(INSTALLED_BIN) ? INSTALLED_BIN : null;
+  const manifest = readJson<{ overrides?: Record<string, string> }>(path.join(root, "package.json"));
+  // A security-only override bump must also invalidate a previously installed renderer.
+  const currentOverrides = Object.entries(rendererPackage.overrides)
+    .every(([name, constraint]) => manifest?.overrides?.[name] === constraint);
+  const bin = path.join(root, "node_modules", "@vivliostyle", "cli", "dist", "cli.js");
+  return version === CLI_VERSION && currentOverrides && existsSync(bin) ? bin : null;
 }
 
 function readJson<T>(filePath: string | null): T | null {
@@ -82,7 +86,7 @@ export async function installCli(): Promise<void> {
   await mkdir(env.VIVLIOSTYLE_DIR, { recursive: true });
   await writeFile(
     path.join(env.VIVLIOSTYLE_DIR, "package.json"),
-    JSON.stringify({ name: "libratory-vivliostyle", private: true, dependencies: { "@vivliostyle/cli": CLI_VERSION } }, null, 2),
+    JSON.stringify(rendererPackage, null, 2),
     "utf-8",
   );
   await execFileAsync(process.execPath, ["install"], { cwd: env.VIVLIOSTYLE_DIR, env: bunEnv, timeout: 15 * 60_000, maxBuffer: 16 * 1024 * 1024 });

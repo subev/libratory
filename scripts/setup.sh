@@ -53,9 +53,9 @@ if [ "$PLATFORM" = "linux" ]; then
   command -v unzip >/dev/null 2>&1 || missing+=("unzip ($INSTALL unzip)")
 fi
 if command -v node >/dev/null 2>&1; then
-  node -e 'process.exit(+process.versions.node.split(".")[0] >= 20 ? 0 : 1)' || missing+=("Node.js >= 20 ($NODE_HINT)")
+  node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major > 22 || (major === 22 && minor >= 12) ? 0 : 1)' || missing+=("Node.js >= 22.12 ($NODE_HINT)")
 else
-  missing+=("Node.js >= 20 ($NODE_HINT)")
+  missing+=("Node.js >= 22.12 ($NODE_HINT)")
 fi
 
 PYTHON=""
@@ -163,7 +163,7 @@ POCKET_PY="$POCKET_VENV_DIR/bin/python"
 # half a gigabyte of wheel and a train of nvidia-* packages the engine never loads.
 POCKET_TORCH=()
 [ "$PLATFORM" = "linux" ] && POCKET_TORCH=(--torch-backend=cpu)
-"$UV" pip install --python "$POCKET_PY" --quiet "${POCKET_TORCH[@]}" -r "$REPO_DIR/scripts/requirements-pocket.txt"
+"$UV" --no-config pip install --python "$POCKET_PY" --quiet "${POCKET_TORCH[@]}" -r "$REPO_DIR/scripts/requirements-pocket.txt"
 
 # .env is written later in this script, so read the token straight out of it when present.
 if [ -z "${HF_TOKEN:-}" ] && [ -f "$REPO_DIR/.env" ]; then

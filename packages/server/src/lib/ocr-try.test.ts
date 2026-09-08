@@ -3,10 +3,22 @@ import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { classifyDoubt, detectScript, parseTsvLines, renderTryPage, tesseractPage, type TryWord } from "./ocr-try.ts";
+import { classifyDoubt, detectScript, pagePngPath, parseTsvLines, renderTryPage, tesseractPage, type TryWord } from "./ocr-try.ts";
 
 const FIXTURE = path.resolve(import.meta.dirname, "../../test/fixtures/scanned-page.pdf");
-const BOOK = "00000000-0000-4000-8000-00000000try1";
+const BOOK = "00000000-0000-4000-8000-000000000ab1";
+
+describe("OCR scratch paths", () => {
+  it("rejects traversal and invalid page numbers before touching disk", () => {
+    for (const id of ["../outside", "a/../../outside", "..\\outside"]) {
+      expect(() => pagePngPath(id, 0, 1)).toThrow("Invalid OCR page reference");
+    }
+    for (const page of [0, -1, 1.5, NaN, Infinity]) {
+      expect(() => pagePngPath(BOOK, 0, page)).toThrow("Invalid OCR page reference");
+    }
+    expect(pagePngPath(BOOK, 0, 1)).toContain(`${BOOK}/ocr-try/f0-p1.png`);
+  });
+});
 
 afterAll(async () => {
   await rm(path.resolve("data/tmp", BOOK), { recursive: true, force: true });

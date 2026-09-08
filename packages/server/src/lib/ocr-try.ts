@@ -36,7 +36,13 @@ export async function tryTarget(bookId: string, fileIndex: number, page: number)
   return { file, pageCount, page: Math.max(1, Math.min(page, pageCount)) };
 }
 
-export function pagePngPath(bookId: string, fileIndex: number, page: number, suffix = ""): string {
+export function pagePngPath(bookId: string, fileIndex: number, page: number, suffix: "" | "-osd" = ""): string {
+  // Keep this check at the path boundary as well as the HTTP/tRPC boundary. A future internal
+  // caller must not turn a book ID or page reference into a traversal through the scratch tree.
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(bookId)
+      || !Number.isSafeInteger(fileIndex) || fileIndex < 0 || !Number.isSafeInteger(page) || page < 1) {
+    throw new Error("Invalid OCR page reference");
+  }
   return path.join(bookTmpDir(bookId), "ocr-try", `f${fileIndex}-p${page}${suffix}.png`);
 }
 

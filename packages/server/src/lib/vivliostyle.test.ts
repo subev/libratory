@@ -3,7 +3,8 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { CLI_VERSION, rendererInstalled } from "./vivliostyle.ts";
+import { CLI_VERSION, installedCliBin, rendererInstalled } from "./vivliostyle.ts";
+import rendererPackage from "./vivliostyle-package.json";
 
 const dirs: string[] = [];
 afterAll(async () => {
@@ -55,10 +56,30 @@ describe("rendererInstalled", () => {
 // not have — and reinstalls when the two disagree — so the pinned version and the dependency are
 // two spellings of one thing.
 describe("CLI_VERSION", () => {
+  it("requires a reinstall when security overrides change even at the same CLI version", async () => {
+    const root = await scratch();
+    const cli = path.join(root, "node_modules", "@vivliostyle", "cli");
+    await mkdir(path.join(cli, "dist"), { recursive: true });
+    await writeFile(path.join(cli, "package.json"), JSON.stringify({ version: CLI_VERSION }));
+    await writeFile(path.join(cli, "dist", "cli.js"), "");
+    await writeFile(path.join(root, "package.json"), JSON.stringify({ ...rendererPackage, overrides: {} }));
+    expect(installedCliBin(root)).toBeNull();
+    await writeFile(path.join(root, "package.json"), JSON.stringify(rendererPackage));
+    expect(installedCliBin(root)).toBe(path.join(cli, "dist", "cli.js"));
+  });
   it("is the version this repo depends on", async () => {
     const pkg = JSON.parse(await readFile(path.resolve(import.meta.dirname, "../../package.json"), "utf-8")) as {
       dependencies: Record<string, string>;
     };
-    expect(pkg.dependencies["@vivliostyle/cli"]).toBe(`^${CLI_VERSION}`);
+    expect(pkg.dependencies["@vivliostyle/cli"]).toBe(CLI_VERSION);
+  });
+
+  it("applies the checkout's security fixes to desktop renderer installs", async () => {
+    const pkg = JSON.parse(await readFile(path.resolve(import.meta.dirname, "../../../../package.json"), "utf-8")) as {
+      pnpm: { overrides: Record<string, string> };
+    };
+    for (const [name, version] of Object.entries(rendererPackage.overrides)) {
+      expect(pkg.pnpm.overrides[name], name).toBe(version);
+    }
   });
 });

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { env } from "./env.ts";
 import { scriptPath } from "./lib/paths.ts";
 import { bunEnv } from "./lib/bun-runtime.ts";
+import { SCRIPT_RATE_LIMIT } from "./lib/request-limits.ts";
 
 const ymdSchema = z.string().regex(/^\d{4}-?\d{2}-?\d{2}$/);
 const paramsSchema = z.object({
@@ -51,7 +52,7 @@ let running = false;
 // web UI can trigger a feed build without a terminal. The child is deliberately
 // not killed on disconnect — the book should still be created.
 export function registerScriptRunRoutes(fastify: FastifyInstance) {
-  fastify.get("/scripts/hn-top10/stream", async (request, reply) => {
+  fastify.get("/scripts/hn-top10/stream", { config: { rateLimit: SCRIPT_RATE_LIMIT } }, async (request, reply) => {
     const parsed = paramsSchema.safeParse(request.query);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Invalid parameters", issues: parsed.error.issues });
@@ -116,7 +117,7 @@ export function registerScriptRunRoutes(fastify: FastifyInstance) {
 
   // Dry-run selection for the modal's preview list — runs the script in
   // --list --json mode so the picking logic stays single-sourced.
-  fastify.get("/scripts/hn-top10/preview", async (request, reply) => {
+  fastify.get("/scripts/hn-top10/preview", { config: { rateLimit: SCRIPT_RATE_LIMIT } }, async (request, reply) => {
     const parsed = paramsSchema.safeParse(request.query);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Invalid parameters", issues: parsed.error.issues });

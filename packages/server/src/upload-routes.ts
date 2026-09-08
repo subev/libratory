@@ -14,6 +14,7 @@ import { randomUUID } from "node:crypto";
 import { quickAddJob } from "graphile-worker";
 import { rm } from "node:fs/promises";
 import { createCustomPocketVoice } from "./lib/pocket-voices.ts";
+import { UPLOAD_RATE_LIMIT } from "./lib/request-limits.ts";
 
 const connectionString = env.DATABASE_URL;
 
@@ -28,7 +29,8 @@ async function saveUploadedFiles(request: FastifyRequest, pdfDir: string, startI
     if (part.type === "file") {
       if (!part.filename.toLowerCase().endsWith(".pdf")) continue;
       const idx = startIndex + files.length;
-      const safeName = `${String(idx).padStart(2, "0")}_${part.filename}`;
+      // The display name is metadata; no client-controlled bytes belong in a filesystem path.
+      const safeName = `${String(idx).padStart(2, "0")}_${randomUUID()}.pdf`;
       const pdfPath = path.join(pdfDir, safeName);
       await pipeline(part.file, createWriteStream(pdfPath));
       files.push({ index: idx, filename: part.filename, pdfPath });
@@ -51,7 +53,7 @@ function parseNoteRequest(fields: Record<string, string>): { prompt: string; mod
 }
 
 export function registerUploadRoutes(fastify: FastifyInstance) {
-  fastify.post("/upload", async (request, reply) => {
+  fastify.post("/upload", { config: { rateLimit: UPLOAD_RATE_LIMIT } }, async (request, reply) => {
     const bookId = randomUUID();
     const pdfDir = path.join(uploadsDir, bookId);
     await mkdir(pdfDir, { recursive: true });
@@ -148,7 +150,7 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
     return reply.send(book);
   });
 
-  fastify.post("/upload/:bookId", async (request, reply) => {
+  fastify.post("/upload/:bookId", { config: { rateLimit: UPLOAD_RATE_LIMIT } }, async (request, reply) => {
     const { bookId } = request.params as { bookId: string };
     if (!isUuid(bookId)) return reply.code(400).send({ error: "Invalid book id" });
     const [book] = await db.select().from(books).where(eq(books.id, bookId));
@@ -158,7 +160,7 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
     if (book.kind !== "pdf") {
       return reply.code(400).send({ error: "Cannot add PDF files to a synthetic book" });
     }
-    const pdfDir = path.join(uploadsDir, bookId);
+    const pdfDir = path.join(uploadsDir, book.id);
     await mkdir(pdfDir, { recursive: true });
 
     // If this is a legacy book with no book_files rows, backfill the original file
@@ -220,7 +222,7 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
   });
 
   // Reference recordings for Pocket TTS voice cloning: any container ffmpeg can decode.
-  fastify.post("/upload/pocket-voice", async (request, reply) => {
+  fastify.post("/upload/pocket-voice", { config: { rateLimit: UPLOAD_RATE_LIMIT } }, async (request, reply) => {
     await mkdir(tmpDir, { recursive: true });
     const scratchPath = path.join(tmpDir, `pocket-voice-${randomUUID()}`);
 

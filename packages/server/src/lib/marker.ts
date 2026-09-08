@@ -10,6 +10,7 @@ import { detectChaptersWithLlm } from "./toc-detect.ts";
 import { PREFACE_MIN_WORDS } from "./chapter-rules.ts";
 import { readCapabilities } from "./model-bundles.ts";
 import { pdfHasTextLayer } from "./pdf-raw-text.ts";
+import { stripHtml } from "./marker-html.ts";
 
 const CONDA_BIN = env.CONDA_ENV_PATH;
 
@@ -69,17 +70,6 @@ const KEEP_BLOCK_TYPES = new Set([
   "Handwriting",
 ]);
 
-function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .trim();
-}
 
 export type FlatBlock = {
   type: string;

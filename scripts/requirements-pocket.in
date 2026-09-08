@@ -1,0 +1,7 @@
+# Pocket TTS runs in its own venv (.venv-pocket), NOT the main one: it requires numpy>=2
+# while the marker/kokoro stack in pyproject.toml is pinned to numpy 1.26.4.
+# CPU-only by design — no MPS, so the torch pin here is independent of the main env's.
+pocket-tts==2.1.0
+soundfile==0.13.1
+numpy==2.5.2
+torch==2.13.0
