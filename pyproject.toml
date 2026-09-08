@@ -4,18 +4,18 @@ version = "0"
 requires-python = "==3.12.*"
 dependencies = [
   # Apple Silicon only — MLX is Metal, and there is no wheel for anything else.
-  "mlx==0.32.0 ; sys_platform == 'darwin' and platform_machine == 'arm64'",
+  "mlx==0.32.2 ; sys_platform == 'darwin' and platform_machine == 'arm64'",
   "mlx-lm==0.31.3 ; sys_platform == 'darwin' and platform_machine == 'arm64'",
-  "mlx-audio==0.4.5 ; sys_platform == 'darwin' and platform_machine == 'arm64'",
+  "mlx-audio==0.5.1 ; sys_platform == 'darwin' and platform_machine == 'arm64'",
   "nanocodec-mlx ; sys_platform == 'darwin' and platform_machine == 'arm64'",
 
   "marker-pdf==1.10.2",
   "surya-ocr==0.17.1",
   "kokoro==0.9.4",
   "misaki==0.9.4",
-  "soundfile==0.13.1",
+  "soundfile==0.14.0",
   "numpy==1.26.4",
-  "torch==2.13.0",
+  "torch==2.14.0",
   "setuptools>=83.0.0",
   "transformers==4.57.6",
   "regex==2024.11.6",
@@ -24,7 +24,7 @@ dependencies = [
   "pypdf==6.17.0",
   # scipy 1.18 requires numpy>=2 at runtime while declaring a looser bound, so a resolver picks it
   # happily and then transformers' model registry comes up half empty. 1.17 is the last numpy-1 one.
-  "scipy==1.17.0",
+  "scipy==1.18.1",
   # misaki's English G2P calls spacy.cli.download() at synthesis time when this is absent — a
   # network fetch in the middle of a job, on a machine that may be offline. Declared instead.
   "en-core-web-sm",
@@ -54,7 +54,7 @@ override-dependencies = [
   "huggingface_hub==0.36.2",
   "numpy==1.26.4",
   # nanocodec-mlx pins mlx 0.29.2; mlx-audio 0.4.5 needs 0.32. --no-deps hid this entirely.
-  "mlx==0.32.0",
+  "mlx==0.32.2",
   # Marker/Surya still cap Pillow at <11, including their latest releases. The image operations
   # used here are compatible with 12; 12.3 closes the PDF/image parser and memory-safety advisories.
   "pillow==12.3.0",
