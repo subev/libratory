@@ -2,6 +2,6 @@
 # while the marker/kokoro stack in pyproject.toml is pinned to numpy 1.26.4.
 # CPU-only by design — no MPS, so the torch pin here is independent of the main env's.
 pocket-tts==2.1.0
-soundfile==0.13.1
+soundfile==0.14.0
 numpy==2.5.2
-torch==2.13.0
+torch==2.14.0
