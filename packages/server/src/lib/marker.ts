@@ -340,6 +340,18 @@ function splitByWordCount(allBlocks: FlatBlock[], wordsPerChapter = 5000): Extra
   return chapters;
 }
 
+// tqdm's bar shape, not any "n/m": marker's own "Saved markdown to …/file_0/00_…" was reaching
+// the log as a progress line called "2026-09-08 18: 0/00", and real errors mangled the same way.
+const TQDM_PROGRESS = /([^:\r]*):\s*\d+%\|[^|]*\|\s*(\d+)\/(\d+)/;
+
+export type MarkerProgress = { stage: string; current: number; total: number };
+
+export function parseMarkerProgress(line: string): MarkerProgress | null {
+  const [, stage, current, total] = TQDM_PROGRESS.exec(line) ?? [];
+  if (current === undefined || total === undefined) return null;
+  return { stage: stage?.trim() || "Processing", current: Number(current), total: Number(total) };
+}
+
 type LogFn = (message: string) => Promise<void>;
 
 const noopLog: LogFn = async () => {};
@@ -386,12 +398,9 @@ function runMarkerSingle(pdfPath: string, outDir: string, device: "mps" | "cuda"
         stderrTail.push(line.trim());
         if (stderrTail.length > 20) stderrTail.shift();
       }
-      const progressMatch = line.match(/(\d+)\/(\d+)/);
-      if (progressMatch) {
-        const [, currentStr, totalStr] = progressMatch;
-        const current = Number(currentStr);
-        const total = Number(totalStr);
-        const stage = line.trim().split(":")[0]?.trim() || "Processing";
+      const progress = parseMarkerProgress(line);
+      if (progress) {
+        const { stage, current, total } = progress;
         const percent = total > 0 ? Math.floor((current / total) * 100) : 0;
         const isNewStage = stage !== lastStage;
         const isSignificantProgress = percent >= lastLoggedPercent + 1;
@@ -399,7 +408,7 @@ function runMarkerSingle(pdfPath: string, outDir: string, device: "mps" | "cuda"
         const isSilenceTooLong = Date.now() - lastLogTime >= 30_000;
 
         if (isNewStage || isSignificantProgress || isComplete || isSilenceTooLong) {
-          log(`${stage}: ${currentStr}/${totalStr}`);
+          log(`${stage}: ${current}/${total}`);
           lastStage = stage;
           lastLoggedPercent = percent;
           lastLogTime = Date.now();

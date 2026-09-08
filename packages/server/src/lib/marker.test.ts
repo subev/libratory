@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { findMarkerJson, pickNumberedChapterIndices, sliceChaptersAtIndices, type FlatBlock } from "./marker.ts";
+import { findMarkerJson, parseMarkerProgress, pickNumberedChapterIndices, sliceChaptersAtIndices, type FlatBlock } from "./marker.ts";
 
 function heading(text: string, page: number, level = 1): FlatBlock {
   return { type: "SectionHeader", text, hierarchy: null, level, page, included: true };
@@ -198,5 +198,22 @@ describe("findMarkerJson", () => {
   it("refuses a directory that only holds someone else's json", async () => {
     const root = await outDir({ ".": ["geometry.json"] });
     await expect(findMarkerJson(root)).rejects.toThrow(/did not produce a JSON output file/);
+  });
+});
+
+describe("parseMarkerProgress", () => {
+  it("reads the stage and the counts off a tqdm frame", () => {
+    expect(parseMarkerProgress("Recognizing Layout:  89%|########5 | 163/183 [00:41<00:05,  3.92it/s]"))
+      .toEqual({ stage: "Recognizing Layout", current: 163, total: 183 });
+  });
+
+  // "Saved markdown to …/file_0/00_Book" was logged as a progress line called "2026-09-08 18: 0/00"
+  it("ignores a logger line whose path happens to hold n/m", () => {
+    expect(parseMarkerProgress("2026-09-08 18:31:21,144 [INFO] marker: Saved markdown to /data/tmp/e6f/file_0/00_Book"))
+      .toBeNull();
+  });
+
+  it("leaves a failure to the branch that logs it whole", () => {
+    expect(parseMarkerProgress("2026-09-08 18:31:21,144 [ERROR] marker: page 3/23 failed")).toBeNull();
   });
 });
