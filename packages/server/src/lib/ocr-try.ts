@@ -8,7 +8,7 @@ import { db } from "../db.ts";
 import { bookFiles } from "../schema.ts";
 import { detectScript as detectPageScript, LOW_CONFIDENCE, pdfPageCount, statsFromConfidences } from "./ocr-tesseract.ts";
 import { OCR_GARBLED_FRACTION } from "./ocr-text-layer.ts";
-import { bookTmpDir } from "./paths.ts";
+import { tmpDir } from "./paths.ts";
 import { ensureTessdata, installedPacks, tesseractEnv } from "./tessdata.ts";
 import { packName } from "./tesseract-languages.ts";
 
@@ -43,7 +43,10 @@ export function pagePngPath(bookId: string, fileIndex: number, page: number, suf
       || !Number.isSafeInteger(fileIndex) || fileIndex < 0 || !Number.isSafeInteger(page) || page < 1) {
     throw new Error("Invalid OCR page reference");
   }
-  return path.join(bookTmpDir(bookId), "ocr-try", `f${fileIndex}-p${page}${suffix}.png`);
+  const png = path.resolve(tmpDir, bookId, "ocr-try", `f${fileIndex}-p${page}${suffix}.png`);
+  // Validate the resolved path too: filesystem consumers must stay inside our scratch tree.
+  if (!png.startsWith(tmpDir + path.sep)) throw new Error("Invalid OCR page reference");
+  return png;
 }
 
 async function renderPng(png: string, pdfPath: string, page: number, dpi: number): Promise<string> {

@@ -20,6 +20,11 @@ overrides:
   valibot: ^1.4.2
   vite: ^8.2.2
 
+patchedDependencies:
+  plist@3.1.0:
+    hash: 5e96a8183577f236291776ff1f850b331c49e31e1a49a8886503ce66ae3499e5
+    path: patches/plist@3.1.0.patch
+
 importers:
 
   .:
@@ -5268,7 +5273,7 @@ snapshots:
       fs-extra: 10.1.0
       isbinaryfile: 4.0.10
       minimist: 1.2.8
-      plist: 3.1.0
+      plist: 3.1.0(patch_hash=5e96a8183577f236291776ff1f850b331c49e31e1a49a8886503ce66ae3499e5)
     transitivePeerDependencies:
       - supports-color
 
@@ -5291,7 +5296,7 @@ snapshots:
       dir-compare: 4.2.0
       fs-extra: 11.2.0
       minimatch: 9.0.9
-      plist: 3.1.0
+      plist: 3.1.0(patch_hash=5e96a8183577f236291776ff1f850b331c49e31e1a49a8886503ce66ae3499e5)
     transitivePeerDependencies:
       - supports-color
 
@@ -6602,7 +6607,7 @@ snapshots:
       lazy-val: 1.0.5
       minimatch: 10.2.6
       pkijs: 3.4.0
-      plist: 3.1.0
+      plist: 3.1.0(patch_hash=5e96a8183577f236291776ff1f850b331c49e31e1a49a8886503ce66ae3499e5)
       proper-lockfile: 4.1.2
       resedit: 1.7.2
       semver: 7.7.4
@@ -9083,7 +9088,7 @@ snapshots:
     optionalDependencies:
       fsevents: 2.3.2
 
-  plist@3.1.0:
+  plist@3.1.0(patch_hash=5e96a8183577f236291776ff1f850b331c49e31e1a49a8886503ce66ae3499e5):
     dependencies:
       '@xmldom/xmldom': 0.9.12
       base64-js: 1.5.1

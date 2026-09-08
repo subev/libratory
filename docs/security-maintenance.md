@@ -6,6 +6,11 @@ The JavaScript audit initially reported 75 findings (43 high, 29 moderate, 3 low
 updates and targeted transitive overrides reduced this to zero. Root `package.json` records
 the overrides; remove them as upstream packages adopt patched dependencies.
 
+`patches/plist@3.1.0.patch` supplies the XML MIME type required by patched xmldom. Electron's
+packaging and signing tools still use this CommonJS plist release; newer plist majors are ESM.
+The desktop packaging test exercises the actual builder dependency. Remove the patch when
+those tools adopt a compatible parser.
+
 The document renderer is also installed independently by the desktop app. Its exact CLI version
 and overrides live in `packages/server/src/lib/vivliostyle-package.json`; tests check agreement
 with the checkout. Update both manifests together. The override of UUID to 14 requires the
