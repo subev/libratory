@@ -8,8 +8,6 @@ annotated-types==0.8.0
     # via pydantic
 anyio==4.15.1
     # via starlette
-beartype==0.22.9
-    # via pocket-tts
 certifi==2026.7.22
     # via requests
 cffi==2.1.1
@@ -22,6 +20,12 @@ colorama==0.4.6 ; sys_platform == 'win32'
     # via
     #   tqdm
     #   typer
+cuda-bindings==13.3.1 ; python_full_version < '3.15' and sys_platform == 'linux'
+    # via torch
+cuda-pathfinder==1.8.1 ; python_full_version < '3.15' and sys_platform == 'linux'
+    # via cuda-bindings
+cuda-toolkit==13.0.3.0 ; sys_platform == 'linux'
+    # via torch
 einops==0.8.2
     # via pocket-tts
 fastapi==0.141.1
@@ -39,7 +43,9 @@ h11==0.16.0
 hf-xet==1.6.0 ; platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64'
     # via huggingface-hub
 huggingface-hub==0.36.2
-    # via pocket-tts
+    # via
+    #   --override (workspace)
+    #   pocket-tts
 idna==3.19
     # via
     #   anyio
@@ -56,15 +62,57 @@ mpmath==1.3.0
     # via sympy
 networkx==3.6.1
     # via torch
-numpy==2.5.2
+numpy==1.26.4
     # via
+    #   --override (workspace)
     #   -r scripts/requirements-pocket.in
     #   pocket-tts
     #   scipy
     #   soundfile
+nvidia-cublas==13.1.1.3 ; sys_platform == 'linux'
+    # via
+    #   cuda-toolkit
+    #   nvidia-cudnn-cu13
+    #   nvidia-cusolver
+nvidia-cuda-cupti==13.0.85 ; (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')
+    # via cuda-toolkit
+nvidia-cuda-nvrtc==13.0.88 ; sys_platform == 'linux'
+    # via
+    #   cuda-toolkit
+    #   nvidia-cublas
+nvidia-cuda-runtime==13.0.96 ; (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')
+    # via cuda-toolkit
+nvidia-cudnn-cu13==9.20.0.48 ; sys_platform == 'linux'
+    # via torch
+nvidia-cufft==12.0.0.61 ; (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')
+    # via cuda-toolkit
+nvidia-cufile==1.15.1.6 ; (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')
+    # via cuda-toolkit
+nvidia-curand==10.4.0.35 ; (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')
+    # via cuda-toolkit
+nvidia-cusolver==12.0.4.66 ; (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')
+    # via cuda-toolkit
+nvidia-cusparse==12.6.3.3 ; (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')
+    # via
+    #   cuda-toolkit
+    #   nvidia-cusolver
+nvidia-cusparselt-cu13==0.8.1 ; sys_platform == 'linux'
+    # via torch
+nvidia-nccl-cu13==2.29.7 ; sys_platform == 'linux'
+    # via torch
+nvidia-nvjitlink==13.3.33 ; (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')
+    # via
+    #   cuda-toolkit
+    #   nvidia-cufft
+    #   nvidia-cusolver
+    #   nvidia-cusparse
+nvidia-nvshmem-cu13==3.4.5 ; sys_platform == 'linux'
+    # via torch
+nvidia-nvtx==13.0.85 ; (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')
+    # via cuda-toolkit
 packaging==26.3
     # via huggingface-hub
-pocket-tts==2.1.0
+pocket-tts==3.1.0
     # via -r scripts/requirements-pocket.in
 pycparser==3.0 ; implementation_name != 'PyPy'
     # via cffi
@@ -102,16 +150,14 @@ starlette==1.6.0
     # via fastapi
 sympy==1.14.0
     # via torch
-torch==2.13.0 ; sys_platform == 'darwin'
-    # via
-    #   -r scripts/requirements-pocket.in
-    #   pocket-tts
-torch==2.13.0+cpu ; sys_platform != 'darwin'
+torch==2.13.0
     # via
     #   -r scripts/requirements-pocket.in
     #   pocket-tts
 tqdm==4.70.0
     # via huggingface-hub
+triton==3.7.1 ; python_full_version < '3.15' and sys_platform == 'linux'
+    # via torch
 typer==0.27.2
     # via pocket-tts
 typing-extensions==4.16.0
