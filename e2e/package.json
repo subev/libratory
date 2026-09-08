@@ -11,9 +11,9 @@
     "fixtures:pdf": "node fixtures/make-fixture-pdf.mjs"
   },
   "devDependencies": {
-    "@playwright/test": "^1.55.0",
+    "@playwright/test": "^1.63.0",
     "@types/node": "^22.10.0",
-    "pdfkit": "^0.17.1",
+    "pdfkit": "^0.20.2",
     "typescript": "^7.0.2"
   }
 }
