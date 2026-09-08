@@ -82,16 +82,16 @@ importers:
     dependencies:
       '@ai-sdk/anthropic':
         specifier: ^4.0.41
-        version: 4.0.41(zod@3.25.76)
+        version: 4.0.41(zod@4.5.4)
       '@ai-sdk/google':
         specifier: ^4.0.50
-        version: 4.0.50(zod@3.25.76)
+        version: 4.0.50(zod@4.5.4)
       '@ai-sdk/openai':
         specifier: ^4.0.46
-        version: 4.0.46(zod@3.25.76)
+        version: 4.0.46(zod@4.5.4)
       '@ai-sdk/openai-compatible':
         specifier: ^3.0.27
-        version: 3.0.27(zod@3.25.76)
+        version: 3.0.27(zod@4.5.4)
       '@fastify/cors':
         specifier: ^11.0.0
         version: 11.2.0
@@ -112,7 +112,7 @@ importers:
         version: 11.2.0(typescript@7.0.2)(vite@8.2.2(@types/node@22.19.11)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13))
       ai:
         specifier: ^7.0.58
-        version: 7.0.58(zod@3.25.76)
+        version: 7.0.58(zod@4.5.4)
       dotenv:
         specifier: ^17.3.1
         version: 17.3.1
@@ -138,8 +138,8 @@ importers:
         specifier: ^3.4.5
         version: 3.4.8
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.5.4
+        version: 4.5.4
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -161,7 +161,7 @@ importers:
     dependencies:
       '@ai-sdk/react':
         specifier: ^4.0.61
-        version: 4.0.61(react@19.2.4)(zod@3.25.76)
+        version: 4.0.61(react@19.2.4)(zod@4.5.4)
       '@phosphor-icons/react':
         specifier: ^2.1.10
         version: 2.1.10(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -176,7 +176,7 @@ importers:
         version: 11.10.0(@tanstack/react-query@5.90.21(react@19.2.4))(@trpc/client@11.10.0(@trpc/server@11.10.0(typescript@7.0.2))(typescript@7.0.2))(@trpc/server@11.10.0(typescript@7.0.2))(react@19.2.4)(typescript@7.0.2)
       ai:
         specifier: ^7.0.58
-        version: 7.0.58(zod@3.25.76)
+        version: 7.0.58(zod@4.5.4)
       pdfjs-dist:
         specifier: ^6.2.108
         version: 6.2.108
@@ -5069,6 +5069,9 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
+  zod@4.5.4:
+    resolution: {integrity: sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA==}
+
   zwitch@1.0.5:
     resolution: {integrity: sha512-V50KMwwzqJV0NpZIZFwfOD5/lyny3WlSzRiXgA0G7VUnRlqttta1L6UQIHzd6EuBY/cHGfwTIck7w1yH6Q5zUw==}
 
@@ -5077,72 +5080,72 @@ packages:
 
 snapshots:
 
-  '@ai-sdk/anthropic@4.0.41(zod@3.25.76)':
+  '@ai-sdk/anthropic@4.0.41(zod@4.5.4)':
     dependencies:
       '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.29(zod@3.25.76)
-      zod: 3.25.76
+      '@ai-sdk/provider-utils': 5.0.29(zod@4.5.4)
+      zod: 4.5.4
 
-  '@ai-sdk/gateway@4.0.46(zod@3.25.76)':
+  '@ai-sdk/gateway@4.0.46(zod@4.5.4)':
     dependencies:
       '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.25(zod@3.25.76)
+      '@ai-sdk/provider-utils': 5.0.25(zod@4.5.4)
       '@vercel/oidc': 3.2.0
-      zod: 3.25.76
+      zod: 4.5.4
 
-  '@ai-sdk/google@4.0.50(zod@3.25.76)':
+  '@ai-sdk/google@4.0.50(zod@4.5.4)':
     dependencies:
       '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.29(zod@3.25.76)
-      zod: 3.25.76
+      '@ai-sdk/provider-utils': 5.0.29(zod@4.5.4)
+      zod: 4.5.4
 
-  '@ai-sdk/mcp@2.0.29(zod@3.25.76)':
+  '@ai-sdk/mcp@2.0.29(zod@4.5.4)':
     dependencies:
       '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.25(zod@3.25.76)
+      '@ai-sdk/provider-utils': 5.0.25(zod@4.5.4)
       pkce-challenge: 5.0.1
-      zod: 3.25.76
+      zod: 4.5.4
 
-  '@ai-sdk/openai-compatible@3.0.27(zod@3.25.76)':
+  '@ai-sdk/openai-compatible@3.0.27(zod@4.5.4)':
     dependencies:
       '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.25(zod@3.25.76)
-      zod: 3.25.76
+      '@ai-sdk/provider-utils': 5.0.25(zod@4.5.4)
+      zod: 4.5.4
 
-  '@ai-sdk/openai@4.0.46(zod@3.25.76)':
+  '@ai-sdk/openai@4.0.46(zod@4.5.4)':
     dependencies:
       '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.29(zod@3.25.76)
-      zod: 3.25.76
+      '@ai-sdk/provider-utils': 5.0.29(zod@4.5.4)
+      zod: 4.5.4
 
-  '@ai-sdk/provider-utils@5.0.25(zod@3.25.76)':
-    dependencies:
-      '@ai-sdk/provider': 4.0.7
-      '@standard-schema/spec': 1.1.0
-      '@workflow/serde': 4.1.0
-      eventsource-parser: 3.1.0
-      undici: 7.29.0
-      zod: 3.25.76
-
-  '@ai-sdk/provider-utils@5.0.29(zod@3.25.76)':
+  '@ai-sdk/provider-utils@5.0.25(zod@4.5.4)':
     dependencies:
       '@ai-sdk/provider': 4.0.7
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.1.0
       undici: 7.29.0
-      zod: 3.25.76
+      zod: 4.5.4
+
+  '@ai-sdk/provider-utils@5.0.29(zod@4.5.4)':
+    dependencies:
+      '@ai-sdk/provider': 4.0.7
+      '@standard-schema/spec': 1.1.0
+      '@workflow/serde': 4.1.0
+      eventsource-parser: 3.1.0
+      undici: 7.29.0
+      zod: 4.5.4
 
   '@ai-sdk/provider@4.0.7':
     dependencies:
       json-schema: 0.4.0
 
-  '@ai-sdk/react@4.0.61(react@19.2.4)(zod@3.25.76)':
+  '@ai-sdk/react@4.0.61(react@19.2.4)(zod@4.5.4)':
     dependencies:
-      '@ai-sdk/mcp': 2.0.29(zod@3.25.76)
+      '@ai-sdk/mcp': 2.0.29(zod@4.5.4)
       '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.25(zod@3.25.76)
-      ai: 7.0.58(zod@3.25.76)
+      '@ai-sdk/provider-utils': 5.0.25(zod@4.5.4)
+      ai: 7.0.58(zod@4.5.4)
       react: 19.2.4
       swr: 2.5.0(react@19.2.4)
       throttleit: 2.1.0
@@ -6521,12 +6524,12 @@ snapshots:
 
   agent-base@7.1.4: {}
 
-  ai@7.0.58(zod@3.25.76):
+  ai@7.0.58(zod@4.5.4):
     dependencies:
-      '@ai-sdk/gateway': 4.0.46(zod@3.25.76)
+      '@ai-sdk/gateway': 4.0.46(zod@4.5.4)
       '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.25(zod@3.25.76)
-      zod: 3.25.76
+      '@ai-sdk/provider-utils': 5.0.25(zod@4.5.4)
+      zod: 4.5.4
 
   ajv-formats@3.0.1(ajv@8.18.0):
     optionalDependencies:
@@ -10383,6 +10386,8 @@ snapshots:
       readable-stream: 4.7.0
 
   zod@3.25.76: {}
+
+  zod@4.5.4: {}
 
   zwitch@1.0.5: {}
 

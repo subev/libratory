@@ -37,7 +37,7 @@
     "linkedom": "^0.18.13",
     "music-metadata": "^11.15.0",
     "postgres": "^3.4.5",
-    "zod": "^3.25.76"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
