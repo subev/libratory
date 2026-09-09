@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { missingTools, stageRuntime, toolPath } from "./setup.cjs";
+import { failureMessage, missingTools, stageRuntime, toolPath } from "./setup.cjs";
 import pins from "../../../scripts/pins.json" with { type: "json" };
 
 const dirs: string[] = [];
@@ -110,3 +110,35 @@ describe("what a first run has to put in place before any step reads it", () => 
   });
 });
 
+
+// #19 arrived as four lines of stack and nothing else: the setup step kept only the last line of the
+// failing command's output, and uv's last line is a hint, not the cause. These pin what a reader of
+// the crash log has to be able to see.
+describe("what a failed setup command reports", () => {
+  const uv401 = [
+    "Resolved 312 packages in 1.20s",
+    "error: Failed to prepare distributions",
+    "  Caused by: Failed to fetch wheel: torch==2.13.0",
+    "  Caused by: HTTP status client error (401 Unauthorized) for url (https://pkgs.example.com/simple/torch/)",
+    "  help: `--index-url` is set in a uv configuration file",
+  ].join("\n");
+
+  it("keeps the cause, not just the hint uv ends on", () => {
+    const message = failureMessage(uv401, 2);
+    expect(message.split("\n")[0]).toBe("error: Failed to prepare distributions");
+    expect(message).toContain("401 Unauthorized");
+  });
+
+  it("drops the progress output above the error, so the crash title is the error", () => {
+    expect(failureMessage(uv401, 2)).not.toContain("Resolved 312 packages");
+  });
+
+  it("falls back to the tail for tools that do not mark an error line", () => {
+    expect(failureMessage("curl: (22) The requested URL returned error 403\n", 22))
+      .toBe("curl: (22) The requested URL returned error 403");
+  });
+
+  it("names the exit code when the command said nothing at all", () => {
+    expect(failureMessage("  \n\n", 137)).toBe("exit 137");
+  });
+});

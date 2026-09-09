@@ -50,6 +50,11 @@ function issueUrl(r) {
   return `${REPO}/issues/new?labels=crash&title=${encodeURIComponent(title)}&body=${encodeURIComponent(scrub(body))}`;
 }
 
+// The lines before the first stack frame — a failing command's cause can run to several of them,
+// and a frame in a dialog helps nobody. Capped so a long one still leaves the buttons on screen.
+const messageHead = (message) =>
+  message.split("\n").filter((l) => !/^\s+at\s/.test(l)).slice(0, 6).join("\n");
+
 // Electron's own dialog prints a stack trace and offers OK, which tells someone who did not write
 // the app nothing and sends us nothing. This keeps the detail but makes it one click to send.
 function show(r) {
@@ -58,7 +63,7 @@ function show(r) {
         type: "error",
         title: "Libratory stopped",
         message: "Libratory hit a problem it could not recover from.",
-        detail: `${r.message.split("\n").slice(0, 3).join("\n")}\n\nThe full details are in crash.log. Reporting it opens GitHub with everything filled in — you only have to say what you were doing.`,
+        detail: `${messageHead(r.message)}\n\nThe full details are in crash.log. Reporting it opens GitHub with everything filled in — you only have to say what you were doing.`,
         buttons: ["Report this", "Copy details", "Close"],
         defaultId: 0,
         cancelId: 2,

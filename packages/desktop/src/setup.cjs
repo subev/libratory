@@ -41,6 +41,19 @@ function toolPath(resources) {
   return toolDirs(resources).join(":");
 }
 
+// The last line of a failing command is reliably the least useful part of it: uv reports the cause
+// as a block — "error: Failed to fetch …", then the "Caused by:" line naming the HTTP status, then a
+// hint — so keeping one line turned a 401 from a private package registry into a bare stack trace
+// with nothing in it (#19). Start at the last "error:" when the tool marks one, else keep the tail.
+const FAILURE_LINES = 6;
+function failureMessage(tail, code) {
+  const lines = tail.split("\n").map((l) => l.trimEnd()).filter((l) => l.trim());
+  if (!lines.length) return `exit ${code}`;
+  const marked = lines.findLastIndex((l) => /^error\b/i.test(l));
+  const from = marked === -1 ? Math.max(0, lines.length - FAILURE_LINES) : marked;
+  return lines.slice(from, from + FAILURE_LINES).join("\n");
+}
+
 function sh(cmd, args, opts = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { ...opts, env: { ...process.env, PATH: toolPath(opts.resources), ...opts.env } });
@@ -49,7 +62,7 @@ function sh(cmd, args, opts = {}) {
     child.stdout?.on("data", keep);
     child.stderr?.on("data", keep);
     child.on("error", reject);
-    child.on("close", (code) => (code === 0 ? resolve(tail) : reject(new Error(tail.trim().split("\n").at(-1) || `exit ${code}`))));
+    child.on("close", (code) => (code === 0 ? resolve(tail) : reject(new Error(failureMessage(tail, code)))));
   });
 }
 
@@ -115,4 +128,4 @@ async function fetchEssentialModels(python, home, onOutput) {
   });
 }
 
-module.exports = { missingTools, toolPath, stageRuntime, pythonBin, syncPython, fetchEssentialModels };
+module.exports = { missingTools, toolPath, stageRuntime, pythonBin, syncPython, fetchEssentialModels, failureMessage };

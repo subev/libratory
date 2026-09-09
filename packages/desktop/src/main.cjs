@@ -325,7 +325,9 @@ async function runBoot() {
       send(step.id, "done", await step.run(ctx, (text) => send(step.id, "running", text)));
     } catch (err) {
       lastFailure = crash.record(err, HOME, `setup step: ${step.id}`);
-      send(step.id, "blocked", String((err instanceof Error && err.message) || err).slice(0, 200));
+      // One line in a pill that cannot wrap; the rest of the message is in crash.log and the report
+      const reason = String((err instanceof Error && err.message) || err);
+      send(step.id, "blocked", reason.replace(/\n[\s\S]*$/, "").slice(0, 200));
       win?.webContents.send("failed", { step: step.label });
       // Saying "skipped" beats leaving them at ○, which reads as "still to come"
       for (const later of STEPS.slice(i + 1)) send(later.id, "skipped");
