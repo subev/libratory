@@ -48,12 +48,13 @@ jobs:
       # The read-along EPUB tests shell out to the real zip and unzip, and the OCR tests run
       # tesseract and poppler for real against a one-page scan; asking apt is cheaper than trusting
       # the runner image's inventory.
-      # The rm: apt-get update exits 100 when any repo on the image is broken, and Google's Chrome
-      # repo served a Packages.gz that did not match its Release file on 2026-09-09 — failing both
-      # jobs before a test ran, over a repo nothing here installs from.
+      # update, not install, is what tolerates a failure: it exits 100 when *any* repo configured
+      # on the runner image is broken, and on 2026-09-09 Google's Chrome repo — which nothing here
+      # installs from — served a Packages.gz that did not match its own Release file and failed
+      # both jobs before a test ran. install is the real gate; it errors on a package it cannot
+      # find or fetch, so a genuinely broken Ubuntu index still stops the run.
       - run: |
-          sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/microsoft-prod.list
-          sudo apt-get update
+          sudo apt-get update || true
           sudo apt-get install -y zip unzip poppler-utils tesseract-ocr tesseract-ocr-eng
 
       - run: pnpm install --frozen-lockfile
@@ -106,12 +107,13 @@ jobs:
 
       # Every upload runs raw extraction, which shells out to pdftotext — the first thing the
       # suite does, and the runner image has no poppler. The OCR tests run tesseract for real.
-      # The rm: apt-get update exits 100 when any repo on the image is broken, and Google's Chrome
-      # repo served a Packages.gz that did not match its Release file on 2026-09-09 — failing both
-      # jobs before a test ran, over a repo nothing here installs from.
+      # update, not install, is what tolerates a failure: it exits 100 when *any* repo configured
+      # on the runner image is broken, and on 2026-09-09 Google's Chrome repo — which nothing here
+      # installs from — served a Packages.gz that did not match its own Release file and failed
+      # both jobs before a test ran. install is the real gate; it errors on a package it cannot
+      # find or fetch, so a genuinely broken Ubuntu index still stops the run.
       - run: |
-          sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/microsoft-prod.list
-          sudo apt-get update
+          sudo apt-get update || true
           sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-eng
 
       - run: pnpm install --frozen-lockfile
