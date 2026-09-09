@@ -3,8 +3,12 @@ updates:
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 2
+    ignore:
+      # Types describe our minimum supported Node runtime, not the newest Node major.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       security:
         applies-to: security-updates
@@ -12,29 +16,39 @@ updates:
       compatible:
         patterns: ["*"]
         update-types: [minor, patch]
+      major:
+        patterns: ["*"]
+        update-types: [major]
     # Renderer update PRs must also update vivliostyle-package.json; its test enforces agreement.
   - package-ecosystem: uv
     directory: /
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 3
+      interval: monthly
+    # ML upgrades need cached-model checks. uv also discovers Pocket's requirements and
+    # incorrectly applies the main environment's NumPy override to that separate environment.
+    # Zero disables version PRs only; security updates and the weekly audit remain enabled.
+    open-pull-requests-limit: 0
+    exclude-paths: ["scripts/**"]
     groups:
-      compatible:
+      security:
+        applies-to: security-updates
         patterns: ["*"]
-        update-types: [minor, patch]
   - package-ecosystem: pip
     directory: /scripts
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 3
+      interval: monthly
+    # Recompile manually with --no-config --universal --torch-backend cpu; bot-generated
+    # locks have pulled CUDA dependencies and lost the platform markers.
+    open-pull-requests-limit: 0
     groups:
-      pocket:
+      security:
+        applies-to: security-updates
         patterns: ["*"]
-        update-types: [minor, patch]
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    open-pull-requests-limit: 1
     groups:
       actions:
         patterns: ["*"]

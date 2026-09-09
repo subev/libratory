@@ -4,28 +4,31 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import * as schema from "../src/schema.ts";
 import { sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
+import { env } from "../src/env.ts";
 
 export type TestDatabase = ReturnType<typeof drizzle<typeof schema>>;
 
 let adminSql: ReturnType<typeof postgres>;
 let testSql: ReturnType<typeof postgres>;
 let testDb: TestDatabase;
-let currentDbName: string;
+const currentDbName = `libratory_test_${randomUUID().replace(/-/g, "")}`;
+const adminUrl = inject("adminUrl");
+const testUrl = new URL(adminUrl);
+testUrl.pathname = `/${currentDbName}`;
+// Modules such as search-index capture this URL when imported. Set it before the test file
+// loads: mocking db.ts alone leaves real quickAddJob calls migrating/queueing in the user's DB.
+env.DATABASE_URL = testUrl.href;
 
 beforeAll(async () => {
-  const adminUrl = inject("adminUrl");
   const templateDbName = inject("templateDbName");
 
   adminSql = postgres(adminUrl, { max: 1 });
 
   // Create unique test database from template
-  currentDbName = `libratory_test_${randomUUID().replace(/-/g, "")}`;
   await adminSql.unsafe(`CREATE DATABASE "${currentDbName}" TEMPLATE "${templateDbName}"`);
 
   // Connect to test database
-  const parsed = new URL(adminUrl);
-  const testUrl = `postgres://${parsed.username}:${parsed.password}@${parsed.hostname}:${parsed.port}/${currentDbName}`;
-  testSql = postgres(testUrl);
+  testSql = postgres(testUrl.href);
   testDb = drizzle(testSql, { schema });
 });
 

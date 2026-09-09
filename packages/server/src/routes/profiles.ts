@@ -4,6 +4,7 @@ import { db } from "../db.ts";
 import { profiles, folders, books, DEFAULT_PROFILE_ID } from "../schema.ts";
 import { eq, asc, count } from "drizzle-orm";
 import { bookTotalSizeCached } from "../lib/disk-usage.ts";
+import { profileIdSchema } from "../lib/profile-id.ts";
 
 export const profilesRouter = router({
   list: publicProcedure.query(async () => {
@@ -42,7 +43,7 @@ export const profilesRouter = router({
     }),
 
   rename: publicProcedure
-    .input(z.object({ id: z.string().uuid(), name: z.string().trim().min(1).max(100) }))
+    .input(z.object({ id: profileIdSchema, name: z.string().trim().min(1).max(100) }))
     .mutation(async ({ input }) => {
       const [profile] = await db
         .update(profiles)
@@ -54,7 +55,7 @@ export const profilesRouter = router({
     }),
 
   delete: publicProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(z.object({ id: profileIdSchema }))
     .mutation(async ({ input }) => {
       if (input.id === DEFAULT_PROFILE_ID) throw new Error("Cannot delete the default profile");
       const [book] = await db.select({ id: books.id }).from(books).where(eq(books.profileId, input.id)).limit(1);

@@ -12,11 +12,11 @@
     "start": "electron ."
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "electron": "^44.0.0",
+    "@types/node": "^22.20.1",
+    "electron": "^44.3.0",
     "electron-builder": "^26.15.3",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.0"
   },
   "main": "src/main.cjs",
   "build": {

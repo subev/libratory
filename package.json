@@ -30,12 +30,12 @@
     "lint:fix": "oxlint packages scripts e2e --fix"
   },
   "devDependencies": {
-    "oxlint": "^1.80.0",
-    "oxlint-tailwindcss": "^1.10.0",
+    "oxlint": "^1.82.0",
+    "oxlint-tailwindcss": "^1.11.0",
     "typescript": "^7.0.2"
   },
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.22.0"
   },
   "pnpm": {
     "overrides": {
@@ -59,7 +59,7 @@
     }
   },
   "dependencies": {
-    "defuddle": "^0.19.2",
+    "defuddle": "^0.19.3",
     "linkedom": "^0.18.13"
   }
 }

@@ -6,6 +6,7 @@ import { env } from "./env.ts";
 import { scriptPath } from "./lib/paths.ts";
 import { bunEnv } from "./lib/bun-runtime.ts";
 import { SCRIPT_RATE_LIMIT } from "./lib/request-limits.ts";
+import { profileIdSchema } from "./lib/profile-id.ts";
 
 const ymdSchema = z.string().regex(/^\d{4}-?\d{2}-?\d{2}$/);
 const paramsSchema = z.object({
@@ -16,7 +17,7 @@ const paramsSchema = z.object({
   perDay: z.enum(["0", "1"]).default("0"),
   synthesize: z.enum(["0", "1"]).default("0"),
   folder: z.string().regex(/^[\w. -]{1,100}$/).optional(),
-  profile: z.string().uuid().optional(),
+  profile: profileIdSchema.optional(),
   exclude: z.string().regex(/^\d+(,\d+)*$/).max(2000).optional(),
 });
 

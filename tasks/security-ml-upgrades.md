@@ -25,3 +25,15 @@ sharded checkpoint `weight_map` paths. The app does not offer arbitrary checkpoi
 that restriction is not a substitute for an upstream fix.
 
 Keep raw reports available; do not dismiss these GitHub alerts as fixed or turn off scanning.
+
+## Routine ML updates deferred on September 9
+
+Dependabot PRs #10–13 are being closed in favor of manually validated runtime upgrades.
+They do not resolve the five remaining security alerts. The uv group (#12) includes MLX 0.32.2,
+mlx-audio 0.5.1, SoundFile 0.14, PyTorch 2.14 and SciPy 1.18.1; it also applies NumPy 1.26.4
+to Pocket's NumPy 2 environment. Both the uv and pip updates regenerate Pocket requirements
+with CUDA dependencies, losing its CPU-only contract. Pocket 3.1 (#11/#13) is a separate major
+upgrade and needs voice/language/cloning checks. Recompile with the isolated command documented
+in docs/security-maintenance.md, and preserve Linux platform markers and the CPU torch index.
+
+Version PRs for Python are disabled; security PRs and the weekly audits remain enabled.

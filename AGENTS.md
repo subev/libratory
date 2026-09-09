@@ -43,7 +43,7 @@ Ideas and planned features live as individual markdown files in `tasks/`. Each f
 pnpm monorepo with two packages:
 
 - `packages/server` — Fastify + tRPC + Graphile Worker + Drizzle ORM (port 3034)
-- `packages/web` — React 19 + Vite + Tailwind CSS v4 + react-router v7 (port 3033)
+- `packages/web` — React 19 + Vite + Tailwind CSS v4 + react-router v8 (port 3033)
 
 Postgres runs in Docker (`docker-compose.yml` at root), mapped to host port **5433** on loopback only (not 5432, to avoid conflicts; not `0.0.0.0`, because the password is the default one). It was briefly bundled instead and that worked; Docker won because the desktop app requires it anyway and one path beats two — `tasks/desktop-app.md` has the findings.
 

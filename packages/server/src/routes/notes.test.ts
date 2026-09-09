@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getDb, resetDb, row } from "../../test/setup.ts";
 import { books, chapters, notes } from "../schema.ts";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 vi.mock("../db.ts", async () => {
   const { getDb } = await import("../../test/setup.ts");
@@ -77,6 +77,12 @@ describe("notesRouter", () => {
     });
     const book = row(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.totalChapters).toBe(3);
+    // db.ts is mocked above, but Graphile is real: indexing must use this same disposable DB.
+    const queued = await db.execute(sql`
+      SELECT j.payload FROM graphile_worker._private_jobs j
+      JOIN graphile_worker._private_tasks t ON t.id = j.task_id
+      WHERE t.identifier = 'indexBook' AND j.payload->>'bookId' = ${bookId}`);
+    expect(queued).toHaveLength(1);
   });
 
   it("creates the first chapter of a chapterless book at index 0", async () => {

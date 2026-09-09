@@ -48,6 +48,15 @@ describe("profilesRouter CRUD", () => {
     );
   });
 
+  it("can still rename the seeded default profile", async () => {
+    try {
+      const renamed = await caller.rename({ id: DEFAULT_PROFILE_ID, name: "Personal" });
+      expect(renamed).toMatchObject({ id: DEFAULT_PROFILE_ID, name: "Personal" });
+    } finally {
+      await caller.rename({ id: DEFAULT_PROFILE_ID, name: "Default" });
+    }
+  });
+
   it("refuses to delete a profile that still has content", async () => {
     const profile = await makeProfile("Wife");
     await getDb().insert(books).values({ title: "Hers", profileId: profile.id });

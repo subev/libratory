@@ -119,7 +119,7 @@ pnpm run setup    # deps, .venv, model cache, Postgres, migrations
 pnpm dev          # server on :3034, web on :3033
 ```
 
-Install first: `ffmpeg`, `poppler`, `espeak-ng`, Python 3.12, Node, pnpm, and Docker (for Postgres). On a Mac that's `brew install ffmpeg poppler espeak-ng python@3.12 node pnpm`; on Linux use your package manager — `pnpm run setup` names whatever is missing.
+Install first: `ffmpeg`, `poppler`, `espeak-ng`, Python 3.12, Node >=22.22, pnpm, and Docker (for Postgres). On a Mac that's `brew install ffmpeg poppler espeak-ng python@3.12 node pnpm`; on Linux use your package manager — `pnpm run setup` names whatever is missing.
 
 ### Desktop app — macOS
 

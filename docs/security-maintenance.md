@@ -14,7 +14,8 @@ those tools adopt a compatible parser.
 The document renderer is also installed independently by the desktop app. Its exact CLI version
 and overrides live in `packages/server/src/lib/vivliostyle-package.json`; tests check agreement
 with the checkout. Update both manifests together. The override of UUID to 14 requires the
-modern Node/Bun runtime already required by the CLI (Node >=22.12); press-ready only calls v4.
+modern Node/Bun runtime required by the CLI (its own floor is Node >=22.12; the repo now requires
+>=22.22); press-ready only calls v4.
 The old esbuild loader under drizzle-kit is kept on patched esbuild and checked by loading the
 CLI and the project's TypeScript configuration.
 
@@ -28,6 +29,67 @@ The remaining records are **deferred, not fixed**. Each has an exact package/ver
 and an expiry in `scripts/python-audit-exceptions.json`. CI prints them and fails for new
 findings, changed versions, expired exceptions, adverse package statuses, or invalid reports.
 [The ML migration task](../tasks/security-ml-upgrades.md) records the upstream blockers.
+
+## September 9 dependency refresh
+
+Reviewed npm versions, upstream migration notes, and the live GitHub Security tab. Updated
+React Router 7.18.3 → 8.3.1, Vitest 4.1.11 → 5.0.0, Zod 3.25.76 → 4.5.4, and Graphile Worker
+0.16.6 → 0.18.0. Also refreshed React/React DOM, tRPC (all three packages together), React Query,
+AI SDK and its providers, Fastify CORS/multipart, Postgres.js, dotenv, PDF.js, Electron,
+Playwright/PDFKit, oxlint, Defuddle and type definitions. Node types stay on the supported 22
+line; Vite, TypeScript, Drizzle and Vivliostyle were already at their latest stable versions.
+
+Compatibility decisions:
+
+- [React Router 8](https://github.com/remix-run/react-router/blob/main/CHANGELOG.md#v800)
+  requires Node >=22.22 and React >=19.2.7. The manifest, setup check and README now agree.
+  This app uses BrowserRouter; the framework-mode middleware/loader changes do not apply.
+- [Zod 4](https://zod.dev/v4/changelog) tightens UUID validation. Profile routes explicitly
+  accept the existing seeded default ID as well as RFC UUIDs through a shared schema, preserving
+  rename, the default-profile deletion guard, and HN builds after switching back to Default.
+- [Vitest 5](https://github.com/vitest-dev/vitest/releases/tag/v5.0.0) works with the existing
+  test configuration and Vite 8; no compatibility flags or disabled tests were needed.
+- [Graphile 0.18](https://github.com/graphile/worker/releases/tag/v0.18.0) moves to ESM;
+  0.17 also changes lock ownership to the worker pool. A disposable database upgrade from
+  0.16.6 preserved and executed an already-queued job. A permanent real-worker test checks
+  job-key deduplication, completed-job removal, and one-attempt failure retention. Stop old
+  server/worker processes before starting the updated version; do not run mixed versions.
+- [Multipart 10](https://github.com/fastify/fastify-multipart/releases/tag/v10.0.0) changes
+  `saveRequestFiles` results, which this app does not use. Upload tests exercise our streaming
+  path on 10.1.1.
+
+Validation: lint (existing warnings remain), typechecking including e2e, production web build,
+701 unit/integration tests, and all 28 browser tests against the compiled Bun server, including
+real extraction, synthesis, audiobook assembly, read-along and PDF/EPUB export. The browser run
+used a disposable library and settings file. Export passed on rerun after configuring its renderer
+prerequisite and making the test target the chapter tray's button across the tab transition.
+Electron 44.3.0, PDFKit fixture generation, and Drizzle CLI/config loading were also checked.
+
+The refresh exposed a test-isolation bug: real Graphile calls could capture the checkout's
+database URL even when `db.ts` was mocked. This applied the worker migrations to the local
+database during the first test run. The setup now assigns each test file's database URL before
+application modules load, and the note-to-chapter test verifies its index job exists there.
+
+Security result: `pnpm audit` reports **zero vulnerabilities**. GitHub has **zero open code-scanning
+and secret-scanning alerts**, with **five open Dependabot alerts**, all in the unchanged Python
+stack (four Transformers, one Accelerate). Pocket TTS's separate audit is also clean. The main
+Python audit still reports the same nine OSV
+records covered by the existing expiring exceptions. The larger ML migration remains in
+`tasks/security-ml-upgrades.md`; no alerts were dismissed and no exceptions were broadened.
+
+## Keeping bot PRs manageable
+
+Routine JavaScript updates run monthly in two groups (minor/patch and major), with at most two
+open version PRs. Node type majors are ignored because types follow the minimum supported runtime.
+Actions updates form one monthly group, capped at one open version PR. Test and Security workflows
+cancel older runs for the same event/branch when a newer commit arrives; release builds are unaffected.
+
+Python version PRs are disabled (`open-pull-requests-limit: 0`), while security update PRs,
+Dependabot alerts and weekly audits remain enabled. The uv updater excludes `scripts/**` so the
+pip updater owns Pocket's separate requirements. The September bot PRs demonstrated why ML
+updates require manual review: uv applied the main NumPy 1 override to Pocket, and both updaters
+generated CUDA dependencies for a CPU-only environment. Recompile Pocket with the command below
+and run real model checks before changing ML pins. Even security PRs need this review.
 
 ## Running audits
 

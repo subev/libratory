@@ -53,9 +53,9 @@ if [ "$PLATFORM" = "linux" ]; then
   command -v unzip >/dev/null 2>&1 || missing+=("unzip ($INSTALL unzip)")
 fi
 if command -v node >/dev/null 2>&1; then
-  node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major > 22 || (major === 22 && minor >= 12) ? 0 : 1)' || missing+=("Node.js >= 22.12 ($NODE_HINT)")
+  node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major > 22 || (major === 22 && minor >= 22) ? 0 : 1)' || missing+=("Node.js >= 22.22 ($NODE_HINT)")
 else
-  missing+=("Node.js >= 22.12 ($NODE_HINT)")
+  missing+=("Node.js >= 22.22 ($NODE_HINT)")
 fi
 
 PYTHON=""
