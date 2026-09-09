@@ -48,12 +48,17 @@ jobs:
       # The read-along EPUB tests shell out to the real zip and unzip, and the OCR tests run
       # tesseract and poppler for real against a one-page scan; asking apt is cheaper than trusting
       # the runner image's inventory.
-      # update, not install, is what tolerates a failure: it exits 100 when *any* repo configured
-      # on the runner image is broken, and on 2026-09-09 Google's Chrome repo — which nothing here
-      # installs from — served a Packages.gz that did not match its own Release file and failed
-      # both jobs before a test ran. install is the real gate; it errors on a package it cannot
-      # find or fetch, so a genuinely broken Ubuntu index still stops the run.
+      # A repo nothing here installs from must not be able to fail apt — not for this step, and not
+      # for `playwright install --with-deps`, which runs its own apt-get update. On 2026-09-09
+      # Google's Chrome repo served a Packages.gz that did not match its own Release file and
+      # failed every job before a test ran. The image's own cleanup only knows the old
+      # google-chrome.list name and current debs write a .sources file, so find it by content. The
+      # ls says which files were there, for whichever repo breaks next. update stays tolerant and
+      # install is the gate: it errors on a package it cannot find, so a broken Ubuntu index still
+      # stops the run.
       - run: |
+          ls /etc/apt/sources.list.d
+          sudo find /etc/apt/sources.list.d -type f -exec grep -lF dl.google.com {} + | sudo xargs -r rm -f
           sudo apt-get update || true
           sudo apt-get install -y zip unzip poppler-utils tesseract-ocr tesseract-ocr-eng
 
@@ -107,12 +112,17 @@ jobs:
 
       # Every upload runs raw extraction, which shells out to pdftotext — the first thing the
       # suite does, and the runner image has no poppler. The OCR tests run tesseract for real.
-      # update, not install, is what tolerates a failure: it exits 100 when *any* repo configured
-      # on the runner image is broken, and on 2026-09-09 Google's Chrome repo — which nothing here
-      # installs from — served a Packages.gz that did not match its own Release file and failed
-      # both jobs before a test ran. install is the real gate; it errors on a package it cannot
-      # find or fetch, so a genuinely broken Ubuntu index still stops the run.
+      # A repo nothing here installs from must not be able to fail apt — not for this step, and not
+      # for `playwright install --with-deps`, which runs its own apt-get update. On 2026-09-09
+      # Google's Chrome repo served a Packages.gz that did not match its own Release file and
+      # failed every job before a test ran. The image's own cleanup only knows the old
+      # google-chrome.list name and current debs write a .sources file, so find it by content. The
+      # ls says which files were there, for whichever repo breaks next. update stays tolerant and
+      # install is the gate: it errors on a package it cannot find, so a broken Ubuntu index still
+      # stops the run.
       - run: |
+          ls /etc/apt/sources.list.d
+          sudo find /etc/apt/sources.list.d -type f -exec grep -lF dl.google.com {} + | sudo xargs -r rm -f
           sudo apt-get update || true
           sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-eng
 
