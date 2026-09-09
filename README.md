@@ -242,7 +242,7 @@ Jobs run through [Graphile Worker](https://github.com/graphile/worker) in seven 
 
 **Cloud, optional:** [Cartesia](https://cartesia.ai) Sonic (`CARTESIA_API_KEY`) and [ElevenLabs](https://elevenlabs.io) (`ELEVENLABS_API_KEY`, whose free tier is 10,000 characters a month — synthesis checks what is left and refuses before spending rather than stopping halfway).
 
-During synthesis the server keeps a text↔audio timing map (`chNNN.sync.json`) next to each chapter's M4A — per chunk always, and per word where the engine reports it (Kokoro does, straight out of its own duration prediction). That map powers the web UI's read-along player and the synced EPUB export — and once it is written, the worker deletes the intermediate chunk WAVs to reclaim disk (`pnpm --filter server cleanup:chunks` sweeps leftovers from older runs).
+During synthesis the server keeps a text↔audio timing map (`chNNN.sync.json`) next to each chapter's M4A — per chunk always, and per word where the engine reports it (Kokoro straight out of its own duration prediction, Cartesia from `add_timestamps`, ElevenLabs from its character alignment). That map powers the web UI's read-along player and the synced EPUB export — and once it is written, the worker deletes the intermediate chunk WAVs to reclaim disk (`pnpm --filter server cleanup:chunks` sweeps leftovers from older runs).
 
 </details>
 

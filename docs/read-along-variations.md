@@ -59,15 +59,11 @@ The highlight can only be as fine as the timings the engine gives back.
 | KugelAudio | packed to ~285 chars | none | `chunk` |
 | Bulgarian MLX narrator | packed to ~285 chars | none — and it emits a fixed ~20–24 s per chunk by design | `chunk` |
 | Cartesia | packed to ~285 chars | **per word**, `add_timestamps` on the SSE endpoint | `word` |
+| ElevenLabs | packed to ~285 chars | **per character**, from `/with-timestamps`, grouped on whitespace into words — dropped entirely if the characters do not rejoin to the text sent, since one drift would misplace every word after it | `word` |
 
 `say` and MMS are chunked a sentence at a time, so their cues really are sentences even though
 `granularity` reports `chunk` — it is derived from the sync map, which does not record which
 engine wrote it.
-
-For reference, other hosted engines: **ElevenLabs** returns *character*-level alignment
-(`character_start_times_seconds` / `character_end_times_seconds`) from its
-`/with-timestamps` and `/stream/with-timestamps` endpoints — finer than anything used here.
-It is not a Libratory engine today.
 
 ## What the page itself is like
 
