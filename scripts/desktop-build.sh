@@ -12,6 +12,17 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+
+# Output kept for the failure, not the success. These three are noisy when they work and the only
+# line worth reading is the one they print when they do not — and `>/dev/null` threw exactly that
+# away: a DMG whose volume would not unmount exited 1 with an empty log and nothing to go on.
+quietly() {
+  local log status
+  log="$(mktemp -t libratory-build)"
+  if "$@" >"$log" 2>&1; then status=0; else status=$?; cat "$log" >&2; fi
+  rm -f "$log"
+  return $status
+}
 REPO="$PWD"
 DESKTOP="$REPO/packages/desktop"
 INSTALL=false; FAST=false; PACKAGE=true
@@ -63,12 +74,12 @@ fi
 [ -f "$DESKTOP/build/icon.icns" ] || { echo "==> rendering the icon"; bash scripts/make-icon.sh; }
 
 echo "==> building the web bundle"
-pnpm --filter @libratory/web build >/dev/null
+quietly pnpm --filter @libratory/web build
 
 echo "==> compiling the server"
 mkdir -p "$DESKTOP/resources"
-"$BUN" build --compile --target=bun-darwin-arm64 packages/server/src/main.ts \
-  --outfile "$DESKTOP/resources/libratory-server" >/dev/null
+quietly "$BUN" build --compile --target=bun-darwin-arm64 packages/server/src/main.ts \
+  --outfile "$DESKTOP/resources/libratory-server"
 rm -rf "$DESKTOP/resources/web" && cp -R packages/web/dist "$DESKTOP/resources/web"
 
 $PACKAGE || { echo "    resources staged; packaging left to the caller"; exit 0; }
@@ -85,7 +96,7 @@ export CSC_IDENTITY_AUTO_DISCOVERY=false
 # identity is passed only by the release workflow, and only when the secret exists — the flag lives
 # there rather than in package.json so that arriving certificate is not silently ignored.
 ADHOC="-c.mac.identity=-"
-if $FAST; then npx electron-builder --mac --dir $ADHOC >/dev/null; else npx electron-builder --mac $ADHOC >/dev/null; fi
+if $FAST; then quietly npx electron-builder --mac --dir $ADHOC; else quietly npx electron-builder --mac $ADHOC; fi
 
 APP="$DESKTOP/release/mac-arm64/Libratory.app"
 echo "    $APP"
