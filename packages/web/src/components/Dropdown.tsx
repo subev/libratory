@@ -3,7 +3,10 @@ import { Button } from "./Button.tsx";
 import { Menu, MenuItem } from "./Menu.tsx";
 import { IconChevronDown } from "./icons.tsx";
 
-export type DropdownOption = { value: string; label: string; hint?: string; disabled?: boolean; group?: string };
+export type DropdownOption = { value: string; label: string; hint?: string; disabled?: boolean; group?: string;
+  // For rows that act on the menu rather than choose from it — the model pickers' "Show all" — so
+  // selecting one does not dismiss the list the user is trying to open.
+  keepOpen?: boolean };
 
 // A select that looks like the app's other menus. Options carry a `group` for headed sections, and
 // the trigger keeps the caller's testid so tests click it and then `<testId>-option-<value>`.
@@ -71,7 +74,7 @@ export function Dropdown({
               {options.filter((o) => (o.group ?? "") === group).map((o) => (
                 <MenuItem
                   key={o.value}
-                  onClick={() => { onChange(o.value); close(); }}
+                  onClick={() => { onChange(o.value); if (!o.keepOpen) close(); }}
                   title={o.hint}
                   disabled={o.disabled}
                   testId={`${testId}-option-${o.value}`}

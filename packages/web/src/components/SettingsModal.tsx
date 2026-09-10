@@ -165,7 +165,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                 { value: "", label: "Automatic — V4 Flash when configured, else the first available model" },
                 ...(chosenMissing ? [{ value: chosenDefault, label: `${defaultModel?.steppedOver ?? chosenDefault} (not available right now)` }] : []),
                 ...shownModels.map((m) => ({ value: m.key, label: m.label, hint: `${m.hint} · ${formatTokens(m.contextTokens)} context`, group: m.source })),
-                ...(hiddenModels > 0 ? [{ value: SHOW_ALL_MODELS, label: `Show all ${models.length} models`, group: "" }] : []),
+                ...(hiddenModels > 0 ? [{ value: SHOW_ALL_MODELS, label: `Show all ${models.length} models`, group: "", keepOpen: true }] : []),
               ]}
               testId="settings-default-model-select"
             />

@@ -70,7 +70,7 @@ export const ModelPicker = memo(function ModelPicker({
       onChange={(next) => (next === SHOW_ALL_MODELS ? setShowAll(true) : onChange(next))}
       options={[
         ...shown.map(option),
-        ...(hidden > 0 ? [{ value: SHOW_ALL_MODELS, label: `Show all ${models.length} models`, group: "" }] : []),
+        ...(hidden > 0 ? [{ value: SHOW_ALL_MODELS, label: `Show all ${models.length} models`, group: "", keepOpen: true }] : []),
       ]}
       placeholder={models.length === 0 ? "No AI model available" : "Choose a model"}
       disabled={models.length === 0}
