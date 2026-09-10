@@ -1,7 +1,8 @@
-import { memo, useCallback, useEffect, useRef } from "react";
-import { useDefaultModelKey, useLlmModels } from "../lib/use-llm-models.ts";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { SHOW_ALL_MODELS, collapsibleModels, useDefaultModelKey, useLlmModels } from "../lib/use-llm-models.ts";
 import { formatTokens } from "../lib/ai-presets.ts";
 import { Dropdown } from "./Dropdown.tsx";
+import type { LlmModel } from "../lib/use-llm-models.ts";
 
 export const ModelPicker = memo(function ModelPicker({
   value,
@@ -20,6 +21,7 @@ export const ModelPicker = memo(function ModelPicker({
 }) {
   const models = useLlmModels();
   const { key: defaultKey, pending: defaultPending } = useDefaultModelKey();
+  const [showAll, setShowAll] = useState(false);
   const usable = useCallback(
     (key: string) => {
       const m = models.find((entry) => entry.key === key);
@@ -51,20 +53,25 @@ export const ModelPicker = memo(function ModelPicker({
   }, [models, value, requireTools, defaultKey, defaultPending, usable]);
 
   const active = models.find((m) => m.key === value);
+  const option = (m: LlmModel) => {
+    const noTools = requireTools && !m.supportsTools;
+    return {
+      value: m.key,
+      label: `${m.label}${noTools ? " (no chat tools)" : ""}`,
+      hint: `${m.hint} · ${formatTokens(m.contextTokens)} context`,
+      disabled: noTools,
+      group: m.source,
+    };
+  };
+  const { shown, hidden } = collapsibleModels(models, value, showAll);
   return (
     <Dropdown
       value={active?.key ?? ""}
-      onChange={onChange}
-      options={models.map((m) => {
-        const noTools = requireTools && !m.supportsTools;
-        return {
-          value: m.key,
-          label: `${m.label}${noTools ? " (no chat tools)" : ""}`,
-          hint: `${m.hint} · ${formatTokens(m.contextTokens)} context`,
-          disabled: noTools,
-          group: m.source,
-        };
-      })}
+      onChange={(next) => (next === SHOW_ALL_MODELS ? setShowAll(true) : onChange(next))}
+      options={[
+        ...shown.map(option),
+        ...(hidden > 0 ? [{ value: SHOW_ALL_MODELS, label: `Show all ${models.length} models`, group: "" }] : []),
+      ]}
       placeholder={models.length === 0 ? "No AI model available" : "Choose a model"}
       disabled={models.length === 0}
       width="w-80"

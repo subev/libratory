@@ -10,6 +10,7 @@ import { env, envFilePath } from "../env.ts";
 import { updateEnvFile } from "./env-file.ts";
 import { LLM_SECRETS, isConfigured, type SecretVar, type LlmSecretProvider } from "./secrets.ts";
 import { describeError } from "./errors.ts";
+import { cloudDef, cloudServers, parseCloudKey } from "./cloud-models.ts";
 
 // The cloud providers are whatever secrets.ts says they are; this adds the one that needs no key.
 export type LlmProviderKind = LlmSecretProvider | "openai-compatible";
@@ -29,6 +30,9 @@ export type LlmModelDef = {
   contextNote?: string;
   supportsTemperature: boolean;
   supportsTools: boolean;
+  // Curated here, or configured by the user (local server, custom endpoint). Everything else the
+  // pickers show was discovered from a provider's own listing and is hidden until asked for.
+  recommended?: boolean;
   // json_object mode is an OpenAI-compatible wire feature
   supportsJsonFormat: boolean;
 };
@@ -49,7 +53,11 @@ export function canonicalKey(key: string): string {
   return LEGACY_MODEL_KEYS[key] ?? key;
 }
 
-const CLOUD_MODELS: LlmModelDef[] = [
+// The models we recommend, and the only entries whose metadata is hand-checked. Everything else
+// the pickers offer is discovered from the provider at runtime — a model released this morning
+// shows up without a code change. Adding an entry here is a product decision ("this is the one to
+// start with"), not a maintenance chore, which is why it is safe for the list to be short.
+const PINNED_BASE: Omit<LlmModelDef, "recommended">[] = [
   {
     key: "flash", source: "DeepSeek", label: "V4.1 Flash", hint: "Fast and cheap — good default",
     provider: "deepseek", modelId: "deepseek-flash", contextTokens: 1_000_000,
@@ -86,6 +94,7 @@ const CLOUD_MODELS: LlmModelDef[] = [
     supportsTemperature: true, supportsTools: true, supportsJsonFormat: false,
   },
 ];
+const PINNED_MODELS: LlmModelDef[] = PINNED_BASE.map((m) => ({ ...m, recommended: true }));
 
 function openAiCompatModel(def: {
   key: string;
@@ -104,6 +113,9 @@ function openAiCompatModel(def: {
     provider: "openai-compatible",
     supportsTemperature: true,
     supportsJsonFormat: true,
+    // A local server or a custom endpoint is something the user set up on purpose, so it always
+    // belongs in the picker's default view — unlike the provider catalogues, which are long.
+    recommended: true,
     ...def,
   };
 }
@@ -159,7 +171,7 @@ function localEnvModel(): LlmModelDef | undefined {
 function staticModels(): LlmModelDef[] {
   const extras = [localEnvModel(), ...configModels()].filter((m): m is LlmModelDef => m !== undefined);
   const overridden = new Set(extras.map((m) => m.key));
-  return [...CLOUD_MODELS.filter((m) => !overridden.has(m.key)), ...extras];
+  return [...PINNED_MODELS.filter((m) => !overridden.has(m.key)), ...extras];
 }
 
 // --- Local server auto-discovery: Ollama and LM Studio need no configuration ---
@@ -321,9 +333,14 @@ export async function localServers(refresh = false): Promise<LocalServer[]> {
 }
 
 async function discoveredModels(): Promise<LlmModelDef[]> {
-  const found = (await localServers()).flatMap((s) => s.models);
-  const taken = new Set(staticModels().map((m) => `${m.baseUrl}|${m.modelId}`));
-  return found.filter((m) => !taken.has(`${m.baseUrl}|${m.modelId}`));
+  const [local, cloud] = await Promise.all([localServers(), cloudServers()]);
+  const found = [...local.flatMap((s) => s.models), ...cloud.flatMap((s) => s.models)];
+  const pinned = staticModels();
+  const taken = new Set(pinned.map((m) => `${m.baseUrl}|${m.modelId}`));
+  // A pinned model is named twice — once by us, once by its provider's listing. The pin wins: it
+  // carries the metadata the context guards were checked against.
+  const named = new Set(pinned.map((m) => `${m.provider}|${m.modelId}`));
+  return found.filter((m) => !taken.has(`${m.baseUrl}|${m.modelId}`) && !named.has(`${m.provider}|${m.modelId}`));
 }
 
 async function allModels(): Promise<LlmModelDef[]> {
@@ -411,6 +428,16 @@ function openAiCompatName(def: LlmModelDef): string {
   return def.provider === "deepseek" ? "deepseek" : def.key.replace(/[^A-Za-z0-9_-]/g, "_");
 }
 
+// Pinned entries and cloud keys resolve from the key alone: a cloud key names its own provider and
+// model id, so a running job is never made to wait on — or depend on — a listing that can fail.
+// Local ids say nothing about which port serves them, so those are the only ones worth probing.
+function offlineDef(wanted: string): LlmModelDef | undefined {
+  const pinned = staticModels().find((m) => m.key === wanted);
+  if (pinned) return pinned;
+  const parsed = parseCloudKey(wanted);
+  return parsed ? cloudDef(parsed.provider, parsed.modelId) : undefined;
+}
+
 export async function resolveLlm(key?: string): Promise<{ model: LanguageModel; def: LlmModelDef }> {
   // "" not ??: a picker that has not resolved yet submits "", which means "the default", not a model
   const wanted = key ? canonicalKey(key) : await defaultModelKey();
@@ -419,8 +446,7 @@ export async function resolveLlm(key?: string): Promise<{ model: LanguageModel; 
       "No AI model is available — start Ollama or LM Studio, or add an API key (e.g. DEEPSEEK_API_KEY) to .env",
     );
   }
-  // Static entries resolve without probing local servers
-  const def = staticModels().find((m) => m.key === wanted) ?? (await discoveredModels()).find((m) => m.key === wanted);
+  const def = offlineDef(wanted) ?? (await discoveredModels()).find((m) => m.key === wanted);
   if (!def) {
     throw new Error(
       wanted.startsWith("ollama:") || wanted.startsWith("lmstudio:")

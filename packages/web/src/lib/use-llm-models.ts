@@ -29,3 +29,20 @@ export function useActiveLlmModel(key: string): LlmModel | undefined {
   const { key: defaultKey } = useDefaultModelKey();
   return models.find((m) => m.key === key) ?? models.find((m) => m.key === defaultKey) ?? models[0];
 }
+
+// A provider's catalogue is long — OpenAI alone lists 50-odd ids, embeddings and tts among them.
+// Both the model picker and the Settings default dropdown show the curated picks plus whatever is
+// currently selected, and keep the rest behind one row. Shared here so the two agree.
+export const SHOW_ALL_MODELS = "__all__";
+
+export function collapsibleModels(
+  models: LlmModel[],
+  value: string,
+  showAll: boolean,
+): { shown: LlmModel[]; hidden: number } {
+  // The current value is always kept, however long the list: without it the trigger would read
+  // as unset, because Dropdown looks its label up among the options it was handed.
+  if (showAll) return { shown: models, hidden: 0 };
+  const shown = models.filter((m) => m.recommended || m.key === value);
+  return { shown, hidden: models.length - shown.length };
+}

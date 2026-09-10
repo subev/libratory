@@ -6,13 +6,16 @@ import { env } from "../env.ts";
 
 export const llmModelsRouter = router({
   list: publicProcedure.query(async () =>
-    (await availableModels()).map(({ key, label, hint, source, contextTokens, supportsTools }) => ({
+    (await availableModels()).map(({ key, label, hint, source, contextTokens, supportsTools, recommended }) => ({
       key,
       label,
       hint,
       source,
       contextTokens,
       supportsTools,
+      // The pickers show the curated set by default and everything else behind a "show all" row;
+      // see ModelPicker.
+      recommended: recommended ?? false,
     })),
   ),
 
