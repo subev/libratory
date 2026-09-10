@@ -61,5 +61,19 @@
     "version": "4.57.6",
     "expires": "2026-10-08",
     "reason": "The app does not load LightGlue or expose arbitrary model repositories. Marker currently requires Transformers 4; remove with the Transformers 5 migration."
+  },
+  {
+    "id": "PYSEC-2026-3804",
+    "package": "accelerate",
+    "version": "1.14.0",
+    "expires": "2026-10-08",
+    "reason": "No upstream fix is published. Only the application-selected model repositories are loaded; arbitrary checkpoint imports are not exposed. Track the sharded-checkpoint loader fix in tasks/security-ml-upgrades.md."
+  },
+  {
+    "id": "PYSEC-2026-3929",
+    "package": "transformers",
+    "version": "4.57.6",
+    "expires": "2026-10-08",
+    "reason": "The app does not save user-provided tokenizers/processors or chat templates through save_pretrained. Marker currently requires Transformers 4; remove with its migration."
   }
 ]
