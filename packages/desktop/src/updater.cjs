@@ -130,7 +130,7 @@ function install({ onStatus, onProgress } = {}) {
       title: "That update could not install itself",
       message: `Libratory ${downloaded} downloaded, but macOS would not let it replace the running app.`,
       detail: signature
-        ? "This build is not signed by an Apple developer certificate, and macOS only lets signed apps update themselves. Downloading the new version and dragging it to Applications works — it is the same file."
+        ? "macOS only lets an app be replaced in place by a copy carrying the same code signature, and these two do not match. That happens when the installed copy was built locally, was signed by someone else, or was signed with a different certificate than the new one. Dragging the new version to Applications works — it is the same file."
         : err.message,
       buttons: ["Open the downloads page", "Later"],
       defaultId: 0,
