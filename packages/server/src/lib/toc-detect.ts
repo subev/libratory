@@ -365,7 +365,7 @@ export function parseSelectionResponse(response: string, catalog: HeadingCatalog
 type LogFn = (message: string) => Promise<void>;
 type SourceBlocks = { fileIndex: number | null; blocks: FlatBlock[]; pdfPath?: string };
 
-// No maxTokens: deepseek-v4-flash spends its budget on reasoning first and a cap
+// No maxTokens: DeepSeek Flash spends its budget on reasoning first and a cap
 // can leave zero tokens for content (finish_reason "length", empty response).
 // Long timeout for the same reason — reasoning over a whole TOC can take minutes.
 // Low reasoning effort: TOC extraction and heading selection are structured tasks, and

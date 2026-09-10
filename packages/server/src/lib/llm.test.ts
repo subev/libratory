@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { modelKeySchema } from "./llm.ts";
+import { modelKeySchema, canonicalKey, resolveLlm } from "./llm.ts";
+import { env } from "../env.ts";
 
 describe("modelKeySchema", () => {
   it("accepts the shapes real keys have", () => {
@@ -16,5 +17,31 @@ describe("modelKeySchema", () => {
   it("refuses empty and over-long keys", () => {
     expect(modelKeySchema.safeParse("").success).toBe(false);
     expect(modelKeySchema.safeParse("a".repeat(65)).success).toBe(false);
+  });
+});
+
+describe("canonicalKey", () => {
+  it("maps the retired DeepSeek Pro key onto the model that now serves it", () => {
+    expect(canonicalKey("pro")).toBe("flash");
+  });
+
+  it("leaves every other key alone", () => {
+    for (const key of ["flash", "claude", "ollama:llama3.2", "lmstudio:qwen3-27b", "anything-else"]) {
+      expect(canonicalKey(key)).toBe(key);
+    }
+  });
+});
+
+describe("resolveLlm", () => {
+  it("resolves a retired Pro pick to the Flash model rather than failing as unknown", async () => {
+    const previous = env.DEEPSEEK_API_KEY;
+    env.DEEPSEEK_API_KEY = "test-key";
+    try {
+      const { def } = await resolveLlm("pro");
+      expect(def.key).toBe("flash");
+      expect(def.modelId).toBe("deepseek-flash");
+    } finally {
+      env.DEEPSEEK_API_KEY = previous;
+    }
   });
 });

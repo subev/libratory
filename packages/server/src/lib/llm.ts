@@ -40,16 +40,19 @@ export const modelKeySchema = z.string().min(1).max(64).refine((k) => !/[\r\n]/.
 
 const DEEPSEEK_URL = "https://api.deepseek.com";
 
+// DeepSeek retired V4 Pro on 2026-09-14: requests naming it are served by, and billed as, V4.1
+// Flash. Picks saved in .env and job rows stored before that still name it, so the key resolves
+// to the model that actually answers rather than erroring as unknown.
+const LEGACY_MODEL_KEYS: Record<string, string> = { pro: "flash" };
+
+export function canonicalKey(key: string): string {
+  return LEGACY_MODEL_KEYS[key] ?? key;
+}
 
 const CLOUD_MODELS: LlmModelDef[] = [
   {
-    key: "flash", source: "DeepSeek", label: "V4 Flash", hint: "Fast and cheap — good default",
-    provider: "deepseek", modelId: "deepseek-v4-flash", contextTokens: 1_000_000,
-    supportsTemperature: true, supportsTools: true, supportsJsonFormat: true,
-  },
-  {
-    key: "pro", source: "DeepSeek", label: "V4 Pro", hint: "Flagship reasoning model — slower, for harder questions",
-    provider: "deepseek", modelId: "deepseek-v4-pro", contextTokens: 1_000_000,
+    key: "flash", source: "DeepSeek", label: "V4.1 Flash", hint: "Fast and cheap — good default",
+    provider: "deepseek", modelId: "deepseek-flash", contextTokens: 1_000_000,
     supportsTemperature: true, supportsTools: true, supportsJsonFormat: true,
   },
   {
@@ -384,9 +387,8 @@ export async function defaultModelKey(known?: LlmModelDef[]): Promise<string | u
   const models = known ? known.filter(isAvailable) : await availableModels();
   // The user's pick (Settings → Default AI model) wins while its model is actually available;
   // a stopped Ollama or a removed key falls through to the automatic choice rather than erroring.
-  if (env.DEFAULT_LLM_MODEL && models.some((m) => m.key === env.DEFAULT_LLM_MODEL)) {
-    return env.DEFAULT_LLM_MODEL;
-  }
+  const chosen = env.DEFAULT_LLM_MODEL ? canonicalKey(env.DEFAULT_LLM_MODEL) : undefined;
+  if (chosen && models.some((m) => m.key === chosen)) return chosen;
   return (models.find((m) => m.key === "flash") ?? models[0])?.key;
 }
 
@@ -394,9 +396,9 @@ export async function defaultModelKey(known?: LlmModelDef[]): Promise<string | u
 // LM Studio falls through to a cloud model silently, which is a bill and a different result.
 export async function modelChoice(key?: string): Promise<{ key: string | null; label: string; steppedOver?: string }> {
   const models = await allModels();
-  const wanted = key || (await defaultModelKey(models)) || null;
+  const wanted = (key ? canonicalKey(key) : undefined) || (await defaultModelKey(models)) || null;
   const label = (of: string) => models.find((m) => m.key === of)?.label ?? of;
-  const chosen = env.DEFAULT_LLM_MODEL;
+  const chosen = env.DEFAULT_LLM_MODEL ? canonicalKey(env.DEFAULT_LLM_MODEL) : undefined;
   const steppedOver = !key && chosen && chosen !== wanted ? label(chosen) : undefined;
   return { key: wanted, label: wanted ? label(wanted) : "no model", ...(steppedOver ? { steppedOver } : {}) };
 }
@@ -410,8 +412,8 @@ function openAiCompatName(def: LlmModelDef): string {
 }
 
 export async function resolveLlm(key?: string): Promise<{ model: LanguageModel; def: LlmModelDef }> {
-  // || not ??: a picker that has not resolved yet submits "", which means "the default", not a model
-  const wanted = key || (await defaultModelKey());
+  // "" not ??: a picker that has not resolved yet submits "", which means "the default", not a model
+  const wanted = key ? canonicalKey(key) : await defaultModelKey();
   if (!wanted) {
     throw new Error(
       "No AI model is available — start Ollama or LM Studio, or add an API key (e.g. DEEPSEEK_API_KEY) to .env",
