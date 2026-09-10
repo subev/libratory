@@ -126,7 +126,9 @@ echo "Creating Python environment at .venv from uv.lock..."
 # uv.lock pins the whole graph, including three conflicts that pip only survived because the
 # packages were installed with --no-deps: mlx-audio wants transformers 5.x (breaks marker) and
 # huggingface_hub 1.x, and nanocodec-mlx wants mlx 0.29.2. pyproject states those as overrides.
-(cd "$REPO_DIR" && "$UV" sync --frozen)
+# Forced index: the lock's source builds resolve their build backends from whatever indexes are
+# configured, so a private registry in the user's own uv.toml fails the install (#19).
+(cd "$REPO_DIR" && UV_INDEX="https://pypi.org/simple" UV_DEFAULT_INDEX="https://pypi.org/simple" "$UV" sync --frozen)
 PY="$VENV_DIR/bin/python"
 
 echo ""

@@ -111,13 +111,22 @@ function pythonBin(home) {
   return path.join(home, "python", "bin", "python");
 }
 
+// UV_PROJECT_ENVIRONMENT puts the venv where we want it instead of beside pyproject.toml. PyPI is
+// forced because --frozen downloads from the lock but still resolves build backends for the source
+// builds in it (docopt, jieba, the mlx git dep) from the user's configured indexes — an employer's
+// registry answered those with 401 (#19). Both vars: UV_INDEX outranks the extra indexes a uv.toml
+// declares, UV_DEFAULT_INDEX replaces the one it marks `default`.
+function uvEnv(home) {
+  return {
+    UV_PROJECT_ENVIRONMENT: path.join(home, "python"),
+    UV_INDEX: "https://pypi.org/simple",
+    UV_DEFAULT_INDEX: "https://pypi.org/simple",
+  };
+}
+
 async function syncPython(home, onOutput) {
   const uv = await ensureUv(home, onOutput);
-  await sh(uv, ["sync", "--frozen", "--project", home], {
-    // uv puts the environment beside pyproject.toml by default; this puts it where we want it
-    env: { UV_PROJECT_ENVIRONMENT: path.join(home, "python") },
-    onOutput,
-  });
+  await sh(uv, ["sync", "--frozen", "--project", home], { env: uvEnv(home), onOutput });
   return pythonBin(home);
 }
 
@@ -128,4 +137,4 @@ async function fetchEssentialModels(python, home, onOutput) {
   });
 }
 
-module.exports = { missingTools, toolPath, stageRuntime, pythonBin, syncPython, fetchEssentialModels, failureMessage };
+module.exports = { missingTools, toolPath, stageRuntime, pythonBin, uvEnv, syncPython, fetchEssentialModels, failureMessage };

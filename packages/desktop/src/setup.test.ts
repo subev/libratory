@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { failureMessage, missingTools, stageRuntime, toolPath } from "./setup.cjs";
+import { failureMessage, missingTools, stageRuntime, toolPath, uvEnv } from "./setup.cjs";
 import pins from "../../../scripts/pins.json" with { type: "json" };
 
 const dirs: string[] = [];
@@ -110,6 +110,19 @@ describe("what a first run has to put in place before any step reads it", () => 
   });
 });
 
+// #19: the reporter's own uv.toml made their employer's registry the default index, and the
+// build backends for the lock's source builds were fetched from it — 401, on every install. A
+// registry declared as an extra index is queried first too, so the default alone is not enough.
+describe("the environment the python step gives uv", () => {
+  it("puts PyPI ahead of every index a user's own uv.toml declares", () => {
+    expect(uvEnv("/home/app").UV_INDEX).toBe("https://pypi.org/simple");
+    expect(uvEnv("/home/app").UV_DEFAULT_INDEX).toBe("https://pypi.org/simple");
+  });
+
+  it("still puts the environment where the app looks for it", () => {
+    expect(uvEnv("/home/app").UV_PROJECT_ENVIRONMENT).toBe("/home/app/python");
+  });
+});
 
 // #19 arrived as four lines of stack and nothing else: the setup step kept only the last line of the
 // failing command's output, and uv's last line is a hint, not the cause. These pin what a reader of
