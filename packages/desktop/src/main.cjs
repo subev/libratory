@@ -2,6 +2,7 @@
 const { app, BrowserWindow, Menu, shell, dialog, ipcMain } = require("electron");
 const { execFileSync, spawn } = require("node:child_process");
 const { createWriteStream, renameSync, statSync } = require("node:fs");
+const { readFile } = require("node:fs/promises");
 const { randomUUID } = require("node:crypto");
 
 const path = require("node:path");
@@ -335,7 +336,8 @@ async function runBoot() {
       return;
     }
   }
-  win?.loadURL(ctx.url);
+  appUrl = ctx.url;
+  win?.loadURL(pendingOpen ? `${ctx.url}/open` : ctx.url)?.catch(() => {});
   installUpdater();
 }
 
@@ -392,6 +394,30 @@ function menu(url) {
   ]);
 }
 
+// A synced EPUB double-clicked in Finder. macOS delivers it through open-file, which on a cold
+// launch fires before the app is ready and long before there is a server to serve /open from — so
+// the path is only ever queued here, and boot hands it over once the window is on the app. Only
+// the newest survives: opening four files means four events and one window.
+/** @type {string | null} */
+let pendingOpen = null;
+
+// Set when the window is showing the app rather than the first-run screen.
+/** @type {string | null} */
+let appUrl = null;
+
+function openInReader(filePath) {
+  pendingOpen = filePath;
+  // Opening four files at once fires four of these, and Chromium rejects each navigation the next
+  // one supersedes with ERR_ABORTED. Unhandled, that reaches crash.cjs's unhandledRejection and
+  // writes a crash record for an ordinary multi-select open, poisoning the log Report ships.
+  if (appUrl) win?.loadURL(`${appUrl}/open`)?.catch(() => {});
+}
+
+app.on("open-file", (event, filePath) => {
+  event.preventDefault();
+  openInReader(filePath);
+});
+
 crash.install(() => HOME || defaultHome());
 
 app.whenReady().then(() => {
@@ -421,6 +447,18 @@ app.whenReady().then(() => {
   win.webContents.once("did-finish-load", () => {
     win?.webContents.send("steps", STEPS.map(({ id, label }) => ({ id, label })));
     void boot();
+  });
+  ipcMain.handle("take-open-file", async () => {
+    const filePath = pendingOpen;
+    if (!filePath) return null;
+    // Cleared only once the bytes are in hand: a read that throws — the file moved, an iCloud
+    // volume that will not answer — rejects the invoke, the page says so, and the file is still
+    // queued for the reload rather than gone. A dropped file is sliced from disk as the reader
+    // asks for it; this one is a whole copy in each process, which is the cost of not having a
+    // path the renderer can open.
+    const opened = { name: path.basename(filePath), bytes: await readFile(filePath) };
+    pendingOpen = null;
+    return opened;
   });
   ipcMain.on("recheck", boot);
   ipcMain.on("open", (_e, url) => void shell.openExternal(url));

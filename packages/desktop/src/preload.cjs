@@ -12,4 +12,7 @@ contextBridge.exposeInMainWorld("setup", {
   report: (details) => ipcRenderer.send("report", details),
   // Progress for an update the user asked for. null ends it — downloaded, cancelled or failed.
   onUpdateProgress: (fn) => ipcRenderer.on("update-progress", (_e, progress) => fn(progress)),
+  // A file double-clicked in Finder. invoke, not on: the reader asks when it mounts, so nothing
+  // depends on a send landing after a lazy route has drawn.
+  takeOpenFile: () => ipcRenderer.invoke("take-open-file"),
 });

@@ -728,6 +728,12 @@ the state.
   brings up Postgres in Docker, applies the migrations, starts the compiled server. ~2.4 GB
   downloaded once, then the window loads it. Steps are a list in `main.cjs` sent to `first-run.html`
   so the window draws itself; the runner blocks the step that failed and marks the rest skipped.
+  A synced EPUB double-clicked in Finder arrives through `open-file` (declared as a `Viewer` at
+  `Alternate` rank, so Books.app keeps the default) and is queued rather than opened: on a cold
+  launch the event beats `ready`, and `/open` needs the server. Boot hands it over by loading
+  `/open`, where the reader claims it through `takeOpenFile` — a pull, because that route is lazy
+  and a push can land before it mounts. Ordinary EPUBs have no read-along layer and are refused
+  there by `containerSource`.
   `runtime.cjs` compares the bundle's `uv.lock` hash against `runtime-state.json` and skips whatever
   is already current — a launch with nothing to bring forward is ~1s. `updater.cjs` checks GitHub
   Releases *after* the window is up. `crash.cjs` turns an uncaught exception into a `crash.log` line

@@ -16,16 +16,33 @@ export function ReaderOpen() {
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const mounted = useRef(true);
 
   useEffect(() => () => source?.close(), [source]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
-  async function open(file: File) {
+  // Double-clicked in Finder: the shell queued it and this is where it is claimed. Only the
+  // desktop app has a shell, and only a launch that came from a file has anything waiting.
+  useEffect(() => {
+    void window.setup?.takeOpenFile?.()
+      .then((opened) => (opened ? open(new Blob([opened.bytes as BlobPart]), opened.name) : undefined))
+      .catch((err: Error) => setError(err.message));
+  }, []);
+
+  async function open(file: Blob, fileName: string) {
     setBusy(true);
     setError(null);
     try {
       const opened = await containerSource(file);
+      if (!mounted.current) {
+        opened.close();
+        return;
+      }
       setSource(opened);
-      setName(file.name);
+      setName(fileName);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -60,7 +77,7 @@ export function ReaderOpen() {
             e.preventDefault();
             setOver(false);
             const file = e.dataTransfer.files[0];
-            if (file) void open(file);
+            if (file) void open(file, file.name);
           }}
           className={`rounded-lg border-2 border-dashed p-8 text-center ${
             over ? "border-(--accent) bg-(--bg-drag)" : "border-(--border)"
@@ -86,7 +103,7 @@ export function ReaderOpen() {
             type="file"
             accept=".epub,application/epub+zip"
             className="hidden"
-            onChange={(e) => { const file = e.target.files?.[0]; if (file) void open(file); }}
+            onChange={(e) => { const file = e.target.files?.[0]; if (file) void open(file, file.name); }}
           />
           {error ? (
             <p className="mt-4 text-sm text-(--danger-text)" data-testid="reader-open-error">{error}</p>
