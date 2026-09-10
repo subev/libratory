@@ -82,5 +82,7 @@ describe("a page through the try path", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
-  }, 60_000);
+    // Two renders and two tesseract passes over a scanned page: 4s here, 37s on a green CI runner,
+    // and over 60s on a slow one, which is how this timed out on an unrelated commit.
+  }, 120_000);
 });
