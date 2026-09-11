@@ -21,25 +21,25 @@ describe("modelKeySchema", () => {
 });
 
 describe("canonicalKey", () => {
-  it("maps the retired DeepSeek Pro key onto the model that now serves it", () => {
-    expect(canonicalKey("pro")).toBe("flash");
+  it("maps an old key onto the model it named", () => {
+    expect(canonicalKey("pro")).toBe("deepseek:deepseek-v4-pro");
   });
 
   it("leaves every other key alone", () => {
-    for (const key of ["flash", "claude", "ollama:llama3.2", "lmstudio:qwen3-27b", "anything-else"]) {
+    for (const key of ["flash", "claude", "deepseek:deepseek-v4-pro", "ollama:llama3.2", "anything-else"]) {
       expect(canonicalKey(key)).toBe(key);
     }
   });
 });
 
 describe("resolveLlm", () => {
-  it("resolves a retired Pro pick to the Flash model rather than failing as unknown", async () => {
+  it("resolves a saved legacy key to the model it named rather than failing as unknown", async () => {
     const previous = env.DEEPSEEK_API_KEY;
     env.DEEPSEEK_API_KEY = "test-key";
     try {
       const { def } = await resolveLlm("pro");
-      expect(def.key).toBe("flash");
-      expect(def.modelId).toBe("deepseek-flash");
+      expect(def.key).toBe("deepseek:deepseek-v4-pro");
+      expect(def.modelId).toBe("deepseek-v4-pro");
     } finally {
       env.DEEPSEEK_API_KEY = previous;
     }

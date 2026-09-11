@@ -44,10 +44,10 @@ export const modelKeySchema = z.string().min(1).max(64).refine((k) => !/[\r\n]/.
 
 const DEEPSEEK_URL = "https://api.deepseek.com";
 
-// DeepSeek retired V4 Pro on 2026-09-14: requests naming it are served by, and billed as, V4.1
-// Flash. Picks saved in .env and job rows stored before that still name it, so the key resolves
-// to the model that actually answers rather than erroring as unknown.
-const LEGACY_MODEL_KEYS: Record<string, string> = { pro: "flash" };
+// Keys this project used to hand out, mapped to the model each one named. Only a migration for
+// values already saved in .env and job rows — deliberately no entry whose target depends on
+// anything a provider announced, because that is how a hardcoded fact goes stale unnoticed.
+const LEGACY_MODEL_KEYS: Record<string, string> = { pro: "deepseek:deepseek-v4-pro" };
 
 export function canonicalKey(key: string): string {
   return LEGACY_MODEL_KEYS[key] ?? key;
@@ -332,11 +332,6 @@ export async function localServers(refresh = false): Promise<LocalServer[]> {
   return servers;
 }
 
-// Ids this project has deliberately retired, provider:modelId. The provider may still serve one —
-// DeepSeek answers for V4 Pro until 2026-09-14 — but it is now the same model at the same price as
-// another pick, so offering it is a choice the user cannot act on, and it undoes the retirement.
-const RETIRED_MODEL_IDS = new Set(["deepseek:deepseek-v4-pro"]);
-
 async function discoveredModels(): Promise<LlmModelDef[]> {
   const [local, cloud] = await Promise.all([localServers(), cloudServers()]);
   const found = [...local.flatMap((s) => s.models), ...cloud.flatMap((s) => s.models)];
@@ -345,12 +340,10 @@ async function discoveredModels(): Promise<LlmModelDef[]> {
   // A pinned model is named twice — once by us, once by its provider's listing. The pin wins: it
   // carries the metadata the context guards were checked against.
   const named = new Set(pinned.map((m) => `${m.provider}|${m.modelId}`));
-  return found.filter(
-    (m) =>
-      !taken.has(`${m.baseUrl}|${m.modelId}`) &&
-      !named.has(`${m.provider}|${m.modelId}`) &&
-      !RETIRED_MODEL_IDS.has(`${m.provider}:${m.modelId}`),
-  );
+  // Whatever a provider lists is offered. Nothing is filtered out for having been announced as
+  // going away: a model that is still served is still a model, and a list of exceptions is the
+  // maintenance this discovery exists to remove.
+  return found.filter((m) => !taken.has(`${m.baseUrl}|${m.modelId}`) && !named.has(`${m.provider}|${m.modelId}`));
 }
 
 async function allModels(): Promise<LlmModelDef[]> {
