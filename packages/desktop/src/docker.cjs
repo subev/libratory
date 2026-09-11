@@ -41,7 +41,7 @@ async function detectDocker() {
   const cli = await firstExisting(CLI_CANDIDATES);
   if (!cli) return { kind: "missing" };
 
-  const env = await dockerEnv();
+  const env = await dockerEnv(cli);
   try {
     const { stdout } = await run(cli, ["version", "--format", "{{.Server.Version}}"], { timeout: 10_000, env });
     const version = stdout.trim();
@@ -51,11 +51,20 @@ async function detectDocker() {
   }
 }
 
+// Every registry call shells out to a credential helper sitting beside the CLI, and the minimal
+// PATH that hides the CLI hides docker-credential-osxkeychain too — so a pull died with "error
+// getting credentials", which reads as a broken login rather than a broken search path (#20). The
+// CLI's own directory comes first, so it answers with the helper shipped alongside it.
+function pathWithDocker(cli) {
+  const dirs = [path.dirname(cli), ...CLI_CANDIDATES.map((p) => path.dirname(p)), ...(process.env.PATH || "").split(":")];
+  return [...new Set(dirs.filter(Boolean))].join(":");
+}
+
 // Colima and Rancher Desktop never create /var/run/docker.sock, so without DOCKER_HOST every
 // `docker` call fails and the app tells a working machine that Docker is not running.
-async function dockerEnv() {
+async function dockerEnv(cli) {
   const socket = await firstExisting(SOCKET_CANDIDATES);
-  return { ...process.env, ...(socket ? { DOCKER_HOST: `unix://${socket}` } : {}) };
+  return { ...process.env, PATH: pathWithDocker(cli), ...(socket ? { DOCKER_HOST: `unix://${socket}` } : {}) };
 }
 
 // Two facts most people downloading an audiobook app do not have: what Docker is, and that it has
@@ -87,4 +96,4 @@ function dockerHelp(state) {
   return state.kind === "ready" ? null : DOCKER_HELP[state.kind];
 }
 
-module.exports = { CLI_CANDIDATES, SOCKET_CANDIDATES, firstExisting, detectDocker, dockerAdvice, dockerHelp };
+module.exports = { CLI_CANDIDATES, SOCKET_CANDIDATES, firstExisting, detectDocker, dockerEnv, dockerAdvice, dockerHelp };

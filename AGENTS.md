@@ -719,9 +719,12 @@ processes and opens a window. Everything with logic in it is plain Node with tes
 display is not available in CI. `tasks/desktop-app.md` has the reasoning, `packages/desktop/README.md`
 the state.
 
-- **`src/docker.ts` / `src/launch.ts`** — tested. Docker is found by probing install and socket
+- **`src/docker.cjs`** — tested. Docker is found by probing install and socket
   locations for Docker Desktop, OrbStack, Colima and Rancher, **never by `$PATH`**: a Finder-launched
   app gets `/usr/bin:/bin:/usr/sbin:/sbin`, so `which docker` reports nothing on a machine running it.
+  Each docker call is then handed a `PATH` built from those same install directories, because the CLI
+  resolves `docker-credential-osxkeychain` through it — on a machine with a credential store, a first
+  pull without that fails as "error getting credentials" instead of starting Postgres.
 - **`src/main.cjs` / `src/setup.cjs`** — the window and the first run. Stages `scripts/`,
   `pyproject.toml` and `uv.lock` out of the bundle into `~/Library/Application Support/Libratory`,
   fetches a checksummed `uv`, builds the Python environment from the lockfile, fetches Kokoro,

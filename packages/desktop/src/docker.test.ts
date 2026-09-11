@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { CLI_CANDIDATES, SOCKET_CANDIDATES, dockerAdvice, dockerHelp, firstExisting } from "./docker.cjs";
+import { CLI_CANDIDATES, SOCKET_CANDIDATES, dockerAdvice, dockerEnv, dockerHelp, firstExisting } from "./docker.cjs";
 
 const dirs: string[] = [];
 afterAll(async () => {
@@ -44,6 +44,23 @@ describe("finding Docker without $PATH", () => {
   it("returns null when none exist rather than guessing", async () => {
     const dir = await scratch();
     expect(await firstExisting([path.join(dir, "nope")])).toBeNull();
+  });
+
+  // Pulling an image shells out to docker-credential-osxkeychain, which sits beside the CLI in
+  // Docker.app, OrbStack's xbin and Homebrew alike. Handing docker the same bare PATH the app got
+  // is what made a first run die in the database step on a working machine, with docker blaming a
+  // missing credential helper rather than the search path (#20).
+  it("hands docker a PATH that reaches the credential helper", async () => {
+    const dir = await scratch();
+    const own = path.join(dir, "bin");
+    const env = await dockerEnv(path.join(own, "docker"));
+    const dirs = env.PATH?.split(":") ?? [];
+    expect(dirs).toEqual(expect.arrayContaining([
+      own,
+      "/Applications/Docker.app/Contents/Resources/bin",
+      "/opt/homebrew/bin",
+    ]));
+    expect(dirs[0]).toBe(own); // the CLI's own helper answers, not another install's
   });
 });
 
