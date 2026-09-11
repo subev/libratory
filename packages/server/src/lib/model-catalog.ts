@@ -104,32 +104,39 @@ export function catalogModel(provider: string, modelId: string): CatalogModel | 
   return cachedCatalog().get(provider)?.get(modelId);
 }
 
+async function loadCatalog(): Promise<Catalog> {
+  const disk = readDisk();
+  if (disk && Date.now() - disk.at < CATALOG_TTL_MS) {
+    memory = disk;
+    return disk.catalog;
+  }
+  const raw = await fetchRaw();
+  if (raw) {
+    const catalog = extract(raw);
+    memory = { at: Date.now(), catalog };
+    writeDisk(raw);
+    return catalog;
+  }
+  // Stale metadata beats none: an expired context window is still the right order of magnitude.
+  if (disk) {
+    memory = disk;
+    return disk.catalog;
+  }
+  return memory?.catalog ?? EMPTY;
+}
+
 export async function modelCatalog(): Promise<Catalog> {
   if (memory && Date.now() - memory.at < CATALOG_TTL_MS) return memory.catalog;
   if (inFlight) return inFlight;
-  inFlight = (async () => {
-    try {
-      const disk = readDisk();
-      if (disk && Date.now() - disk.at < CATALOG_TTL_MS) {
-        memory = disk;
-        return disk.catalog;
-      }
-      const raw = await fetchRaw();
-      if (raw) {
-        const catalog = extract(raw);
-        memory = { at: Date.now(), catalog };
-        writeDisk(raw);
-        return catalog;
-      }
-      // Stale metadata beats none: an expired context window is still the right order of magnitude.
-      if (disk) {
-        memory = disk;
-        return disk.catalog;
-      }
-      return memory?.catalog ?? EMPTY;
-    } finally {
-      inFlight = null;
-    }
-  })();
-  return inFlight;
+  // Clearing by identity, from out here, rather than from a finally inside the loader: the disk-hit
+  // path returns without ever awaiting, so a loader that cleared this itself would run before the
+  // assignment below and leave a settled promise in `inFlight` that every later call serves
+  // forever — the catalog would never refresh again in that process.
+  const pending = loadCatalog();
+  inFlight = pending;
+  try {
+    return await pending;
+  } finally {
+    if (inFlight === pending) inFlight = null;
+  }
 }

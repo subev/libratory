@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { env } from "../env.ts";
-import { extract, readDisk, writeDisk } from "./model-catalog.ts";
+import { extract, modelCatalog, readDisk, writeDisk } from "./model-catalog.ts";
 
 // The write and the read each used to run their own shape — the cache persisted the extracted map
 // and read it back through the extractor that expects the provider's payload — so a second run
@@ -58,5 +58,37 @@ describe("model catalog cache", () => {
   it("treats an unreadable or truncated cache as absent rather than throwing", () => {
     fs.writeFileSync(path.join(dir, "model-catalog.json"), "{ not json");
     expect(readDisk()).toBeNull();
+  });
+});
+
+// The disk-hit path returns without awaiting, so a loader that cleared its own in-flight marker
+// finished before the caller stored the promise — leaving a settled promise there that every later
+// call returned. The catalog then never refreshed again for the life of the process, quietly
+// serving stale context windows into the guards in workers/book-note.ts and workers/digest.ts.
+describe("model catalog refresh", () => {
+  it("fetches again once the cached copy ages past its ttl", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "libratory-catalog-"));
+    const previous = env.DATA_DIR;
+    env.DATA_DIR = dir;
+    try {
+      writeDisk({ deepseek: { models: { "model-from-cache": { name: "From cache", limit: { context: 1000 } } } } });
+      expect((await modelCatalog()).get("deepseek")?.has("model-from-cache")).toBe(true);
+
+      // Past the TTL the cached copy is no longer good enough
+      vi.setSystemTime(Date.now() + 25 * 60 * 60 * 1000);
+      vi.stubGlobal("fetch", async () => ({
+        ok: true,
+        json: async () => ({ deepseek: { models: { "model-from-network": { name: "From network", limit: { context: 2000 } } } } }),
+      }));
+
+      const refreshed = await modelCatalog();
+      expect(refreshed.get("deepseek")?.has("model-from-network")).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+      vi.useRealTimers();
+      env.DATA_DIR = previous;
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

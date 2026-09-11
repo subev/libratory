@@ -332,6 +332,11 @@ export async function localServers(refresh = false): Promise<LocalServer[]> {
   return servers;
 }
 
+// Ids this project has deliberately retired, provider:modelId. The provider may still serve one —
+// DeepSeek answers for V4 Pro until 2026-09-14 — but it is now the same model at the same price as
+// another pick, so offering it is a choice the user cannot act on, and it undoes the retirement.
+const RETIRED_MODEL_IDS = new Set(["deepseek:deepseek-v4-pro"]);
+
 async function discoveredModels(): Promise<LlmModelDef[]> {
   const [local, cloud] = await Promise.all([localServers(), cloudServers()]);
   const found = [...local.flatMap((s) => s.models), ...cloud.flatMap((s) => s.models)];
@@ -340,7 +345,12 @@ async function discoveredModels(): Promise<LlmModelDef[]> {
   // A pinned model is named twice — once by us, once by its provider's listing. The pin wins: it
   // carries the metadata the context guards were checked against.
   const named = new Set(pinned.map((m) => `${m.provider}|${m.modelId}`));
-  return found.filter((m) => !taken.has(`${m.baseUrl}|${m.modelId}`) && !named.has(`${m.provider}|${m.modelId}`));
+  return found.filter(
+    (m) =>
+      !taken.has(`${m.baseUrl}|${m.modelId}`) &&
+      !named.has(`${m.provider}|${m.modelId}`) &&
+      !RETIRED_MODEL_IDS.has(`${m.provider}:${m.modelId}`),
+  );
 }
 
 async function allModels(): Promise<LlmModelDef[]> {
@@ -428,9 +438,20 @@ function openAiCompatName(def: LlmModelDef): string {
   return def.provider === "deepseek" ? "deepseek" : def.key.replace(/[^A-Za-z0-9_-]/g, "_");
 }
 
+function isLocalKey(key: string): boolean {
+  return key.startsWith("ollama:") || key.startsWith("lmstudio:");
+}
+
+// Local ids say nothing about which port serves them, so they are the only ones that need a server
+// asked. Everything else this build can name — a pin, a custom endpoint, a cloud key — resolves
+// from the key alone.
+async function localDef(wanted: string): Promise<LlmModelDef | undefined> {
+  const servers = await localServers();
+  return servers.flatMap((s) => s.models).find((m) => m.key === wanted);
+}
+
 // Pinned entries and cloud keys resolve from the key alone: a cloud key names its own provider and
 // model id, so a running job is never made to wait on — or depend on — a listing that can fail.
-// Local ids say nothing about which port serves them, so those are the only ones worth probing.
 function offlineDef(wanted: string): LlmModelDef | undefined {
   const pinned = staticModels().find((m) => m.key === wanted);
   if (pinned) return pinned;
@@ -446,7 +467,10 @@ export async function resolveLlm(key?: string): Promise<{ model: LanguageModel; 
       "No AI model is available — start Ollama or LM Studio, or add an API key (e.g. DEEPSEEK_API_KEY) to .env",
     );
   }
-  const def = offlineDef(wanted) ?? (await discoveredModels()).find((m) => m.key === wanted);
+  // Deliberately not discoveredModels(): that now probes four providers over the network, and a
+  // local job has no reason to wait on any of them. Before cloud discovery existed this path only
+  // ever asked localhost.
+  const def = offlineDef(wanted) ?? (isLocalKey(wanted) ? await localDef(wanted) : undefined);
   if (!def) {
     throw new Error(
       wanted.startsWith("ollama:") || wanted.startsWith("lmstudio:")

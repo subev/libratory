@@ -1,5 +1,5 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { SHOW_ALL_MODELS, collapsibleModels, useDefaultModelKey, useLlmModels } from "../lib/use-llm-models.ts";
+import { memo, useEffect, useRef, useState } from "react";
+import { SHOW_ALL_MODELS, collapsibleModels, fallbackModelKey, useDefaultModelKey, useLlmModels } from "../lib/use-llm-models.ts";
 import { formatTokens } from "../lib/ai-presets.ts";
 import { Dropdown } from "./Dropdown.tsx";
 import type { LlmModel } from "../lib/use-llm-models.ts";
@@ -22,16 +22,9 @@ export const ModelPicker = memo(function ModelPicker({
   const models = useLlmModels();
   const { key: defaultKey, pending: defaultPending } = useDefaultModelKey();
   const [showAll, setShowAll] = useState(false);
-  const usable = useCallback(
-    (key: string) => {
-      const m = models.find((entry) => entry.key === key);
-      return m !== undefined && (!requireTools || m.supportsTools);
-    },
-    [models, requireTools],
-  );
-
   // Callers mount with value "" (unresolved): land on the default model, or the first usable one
-  // when the default is missing or can't do what this picker needs (e.g. chat tools).
+  // when the default is missing or can't do what this picker needs (e.g. chat tools). A picker
+  // that mounts with a value already in hand is left alone — see fallbackModelKey.
   //
   // `onChange` is deliberately not a dependency, and the emitted key is remembered. Callers pass an
   // inline arrow, so its identity changes every render; when the change is persisted through the
@@ -45,14 +38,17 @@ export const ModelPicker = memo(function ModelPicker({
   const emitted = useRef<string | null>(null);
 
   useEffect(() => {
-    if (models.length === 0 || defaultPending || usable(value)) return;
-    const fallback = defaultKey && usable(defaultKey) ? defaultKey : models.find((m) => !requireTools || m.supportsTools)?.key;
+    if (defaultPending) return;
+    const fallback = fallbackModelKey(models, value, defaultKey, requireTools);
     if (!fallback || emitted.current === fallback) return;
     emitted.current = fallback;
     latest.current(fallback);
-  }, [models, value, requireTools, defaultKey, defaultPending, usable]);
+  }, [models, value, requireTools, defaultKey, defaultPending]);
 
   const active = models.find((m) => m.key === value);
+  // A stored key the list does not carry still needs a row to sit on, or the trigger reads as
+  // unset while a model is very much stored. Shown, never emitted — see the effect above.
+  const stored = value !== "" && active === undefined ? value : null;
   const option = (m: LlmModel) => {
     const noTools = requireTools && !m.supportsTools;
     return {
@@ -69,6 +65,7 @@ export const ModelPicker = memo(function ModelPicker({
       value={active?.key ?? ""}
       onChange={(next) => (next === SHOW_ALL_MODELS ? setShowAll(true) : onChange(next))}
       options={[
+        ...(stored ? [{ value: stored, label: `${stored} (not available right now)`, group: "" }] : []),
         ...shown.map(option),
         ...(hidden > 0 ? [{ value: SHOW_ALL_MODELS, label: `Show all ${models.length} models`, group: "", keepOpen: true }] : []),
       ]}

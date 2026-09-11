@@ -47,7 +47,14 @@ export function parseCloudKey(key: string): { provider: LlmSecretProvider; model
   return known && modelId ? { provider: provider as LlmSecretProvider, modelId } : null;
 }
 
-export function cloudDef(provider: LlmSecretProvider, modelId: string, native?: CatalogModel): LlmModelDef {
+// Provider-native metadata from the last listing, keyed provider:modelId. resolveLlm rebuilds a
+// cloud def from its key alone and has no listing to consult, so without this the picker would show
+// the window the provider reported while every job resolved against the fallback — and a book that
+// fits would be refused with advice contradicting the number the user just read.
+const seenNative = new Map<string, CatalogModel>();
+
+export function cloudDef(provider: LlmSecretProvider, modelId: string, fromListing?: CatalogModel): LlmModelDef {
+  const native = fromListing ?? seenNative.get(cloudKey(provider, modelId));
   const known = catalogModel(provider, modelId);
   const pick = <T>(of: T | undefined, fallback: T): T => of ?? fallback;
   const label = native?.label ?? known?.label ?? modelId;
@@ -188,16 +195,27 @@ export type CloudDiscovery = { provider: LlmSecretProvider; source: string; runn
 // per-provider fallbacks, which only exist for models no catalog has caught up with yet.
 async function discoverProvider(provider: LlmSecretProvider): Promise<CloudDiscovery> {
   const server: CloudDiscovery = { provider, source: SOURCES[provider], running: false, models: [] };
-  if (!isConfigured(keyVar(provider)!)) return server;
+  const envVar = keyVar(provider);
+  if (!envVar || !isConfigured(envVar)) return server;
   await modelCatalog();
   const listed = await probe(provider);
   if (listed.length === 0) return server;
   server.running = true;
+  for (const m of listed) {
+    if (m.native) seenNative.set(cloudKey(provider, m.modelId), m.native);
+  }
   server.models = listed.map((m) => cloudDef(provider, m.modelId, m.native));
   return server;
 }
 
 let cache: { at: number; servers: CloudDiscovery[] } | null = null;
+
+// Saving a key is the moment its provider's catalogue becomes worth asking for. Without this the
+// array cached while the key was absent stands for the rest of the window, and a key the user just
+// pasted looks rejected because none of its models appear.
+export function invalidateCloudDiscovery(): void {
+  cache = null;
+}
 
 export async function cloudServers(refresh = false): Promise<CloudDiscovery[]> {
   if (!refresh && cache && Date.now() - cache.at < DISCOVERY_TTL_MS) return cache.servers;

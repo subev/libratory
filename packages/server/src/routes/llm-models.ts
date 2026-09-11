@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { router, publicProcedure } from "../trpc.ts";
-import { availableModels, llmStatus, modelChoice, modelKeySchema, setDefaultModelKey } from "../lib/llm.ts";
+import { availableModels, canonicalKey, llmStatus, modelChoice, modelKeySchema, setDefaultModelKey } from "../lib/llm.ts";
 import { startLocalServer } from "../lib/llm-server-control.ts";
 import { env } from "../env.ts";
 
@@ -24,9 +24,15 @@ export const llmModelsRouter = router({
   // chosen: what the user picked in Settings (null = automatic). The rest is what a request with
   // no explicit model actually runs on — the pickers preselect it, and `steppedOver` names the
   // pick that was unavailable, which only the server can label since `list` omits it.
+  //
+  // chosen is canonicalized like every other reader of the stored key. Returning it raw made a
+  // legacy `pro` pick look unavailable: it matches nothing in `list`, so Settings showed a phantom
+  // option and warned that requests ran elsewhere, when the pick resolves to Flash and runs exactly
+  // as chosen.
   getDefault: publicProcedure.query(async () => {
     const { key, label, steppedOver } = await modelChoice();
-    return { chosen: env.DEFAULT_LLM_MODEL ?? null, resolved: key, resolvedLabel: label, steppedOver: steppedOver ?? null };
+    const chosen = env.DEFAULT_LLM_MODEL ? canonicalKey(env.DEFAULT_LLM_MODEL) : null;
+    return { chosen, resolved: key, resolvedLabel: label, steppedOver: steppedOver ?? null };
   }),
 
   setDefault: publicProcedure
