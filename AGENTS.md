@@ -38,6 +38,15 @@ Ideas and planned features live as individual markdown files in `tasks/`. Each f
 - **After implementing a feature, check `tasks/` for any related task files and delete them.**
 - When starting work on a task, read the corresponding file first — it may contain design decisions or constraints.
 
+## Voice — how this project speaks in public
+
+There is no team behind this, so nothing written outward says "we". Leave the actor out where the
+sentence allows it — "this was a bug in Libratory", "the pull failed before Postgres started",
+"fixed in 26.911.0" — because in a bug report the subject is the code, not the person. "I" earns its
+place only where someone has to own the thing: an apology, a judgement call, a mistake the code did
+not make on its own. Never "we": a "we" that does not exist is a small lie told to the one person
+with no way to check it.
+
 ## Architecture
 
 pnpm monorepo with two packages:
