@@ -331,7 +331,10 @@ let localInFlight: Promise<LocalServer[]> | null = null;
 
 export async function localServers(refresh = false): Promise<LocalServer[]> {
   if (!refresh && discoveryCache && Date.now() - discoveryCache.at < DISCOVERY_TTL_MS) return discoveryCache.servers;
-  if (localInFlight) return localInFlight;
+  // Joining an in-flight round is what a rescan must not do: Settings' Rescan calls this with
+  // refresh, and the modal's own mount queries start a round in the same tick — so the click would
+  // hand back the very probe it was pressed to replace, and a server started since would not appear.
+  if (!refresh && localInFlight) return localInFlight;
   const pending = (async () => {
     const servers = await Promise.all([discoverOllama(), discoverLmStudio()]);
     discoveryCache = { at: Date.now(), servers };
@@ -431,8 +434,12 @@ async function fallbackModels(): Promise<LlmModelDef[]> {
 // another id for the same model, or a listing that is empty for the length of a cache window.
 // Reading availability off the listing reroutes every job that named no model to the default, and
 // tells the user a model they can still call is unavailable.
-function runnable(key: string): boolean {
-  const def = offlineDef(key);
+//
+// A local key has to ask its server, because nothing else knows whether it is still there — and
+// offlineDef cannot answer for it at all: it reads pinned keys and cloud keys, and an ollama: id is
+// neither. Skipping that branch would drop every local default on the floor and bill a cloud model.
+async function runnable(key: string): Promise<boolean> {
+  const def = offlineDef(key) ?? (isLocalKey(key) ? await localDef(key) : undefined);
   return def !== undefined && isAvailable(def);
 }
 
@@ -440,7 +447,7 @@ export async function defaultModelKey(known?: LlmModelDef[]): Promise<string | u
   // The user's pick (Settings → Default AI model) wins while it can actually run; a removed API key
   // or a stopped Ollama falls through to the automatic choice rather than erroring.
   const chosen = env.DEFAULT_LLM_MODEL ? canonicalKey(env.DEFAULT_LLM_MODEL) : undefined;
-  if (chosen && runnable(chosen)) return chosen;
+  if (chosen && (await runnable(chosen))) return chosen;
   const models = (known ?? (await fallbackModels())).filter(isAvailable);
   return (models.find((m) => m.key === "flash") ?? models[0])?.key;
 }

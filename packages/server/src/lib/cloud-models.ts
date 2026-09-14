@@ -290,6 +290,11 @@ async function discoverProvider(provider: LlmSecretProvider): Promise<CloudDisco
 
 let cache: { at: number; servers: CloudDiscovery[] } | null = null;
 let inFlight: Promise<CloudDiscovery[]> | null = null;
+// Bumped whenever the cached answer stops being the answer. A round started before the bump is
+// still awaited by whoever asked for it, but it must not write its result: saving a key while a
+// probe is in flight would otherwise repopulate the cache with servers that predate the key, and
+// the key the user just pasted would look rejected for the rest of the window.
+let generation = 0;
 
 // Saving a key is the moment its provider's catalogue becomes worth asking for. Without this the
 // array cached while the key was absent stands for the rest of the window, and a key the user just
@@ -302,6 +307,10 @@ let inFlight: Promise<CloudDiscovery[]> | null = null;
 export function invalidateCloudDiscovery(): void {
   cache = null;
   listings = null;
+  generation += 1;
+  // Dropped as well as bumped: this is what a caller joining the promise would otherwise be handed,
+  // and it is precisely the round that did not see the change.
+  inFlight = null;
 }
 
 export async function cloudServers(refresh = false): Promise<CloudDiscovery[]> {
@@ -310,10 +319,11 @@ export async function cloudServers(refresh = false): Promise<CloudDiscovery[]> {
   // llmModels.list and llmModels.getDefault together — and the cache is written after the await, so
   // without this both would run the full four-provider round. Same trap, same remedy as
   // model-catalog.ts: a promise the second caller joins rather than a second round it starts.
-  if (inFlight) return inFlight;
+  if (!refresh && inFlight) return inFlight;
+  const startedAt = generation;
   const pending = (async () => {
     const servers = await Promise.all(LLM_SECRETS.map((s) => discoverProvider(s.provider)));
-    cache = { at: Date.now(), servers };
+    if (startedAt === generation) cache = { at: Date.now(), servers };
     return servers;
   })();
   inFlight = pending;

@@ -100,6 +100,35 @@ describe("defaultModelKey", () => {
     }
   });
 
+  it("keeps a saved local pick while its server is running", async () => {
+    // A local key is neither pinned nor a cloud key, so nothing but the server can say whether it
+    // still runs. Judging it by what the pinned list carries drops it and bills a cloud model
+    // instead — the same reroute the listing was just removed from, one provider over.
+    restoreDataDir = useTempDataDir();
+    const previousDefault = env.DEFAULT_LLM_MODEL;
+    const previousDeepseek = env.DEEPSEEK_API_KEY;
+    // A configured cloud key, so the automatic choice is a real alternative the test can catch.
+    env.DEEPSEEK_API_KEY = "test-key";
+    env.DEFAULT_LLM_MODEL = "ollama:llama3.2";
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: Parameters<typeof globalThis.fetch>[0]) => {
+      const url = String(input);
+      const body = url.endsWith("/api/tags")
+        ? { models: [{ name: "llama3.2" }] }
+        : url.endsWith("/api/ps")
+          ? { models: [] }
+          : { capabilities: ["completion", "tools"], model_info: { "general.architecture": "llama" } };
+      return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+    try {
+      expect(await defaultModelKey()).toBe("ollama:llama3.2");
+    } finally {
+      globalThis.fetch = realFetch;
+      env.DEFAULT_LLM_MODEL = previousDefault;
+      env.DEEPSEEK_API_KEY = previousDeepseek;
+    }
+  });
+
   it("still falls through to the automatic choice when the pick cannot run", async () => {
     restoreDataDir = useTempDataDir();
     const previousDefault = env.DEFAULT_LLM_MODEL;
