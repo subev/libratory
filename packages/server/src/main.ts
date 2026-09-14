@@ -15,6 +15,7 @@ import { registerChatRoutes } from "./chat-routes.ts";
 import { registerTranslationStreamRoutes } from "./translation-stream-routes.ts";
 import { registerOcrTryRoutes } from "./lib/ocr-try-routes.ts";
 import { registerApiRoutes } from "./api-routes.ts";
+import { registerMcpRoutes } from "./mcp-routes.ts";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { registerScriptRunRoutes } from "./script-run-routes.ts";
 import { ensureDataDirs, outputDir, previewsDir } from "./lib/paths.ts";
@@ -90,6 +91,7 @@ async function main() {
   registerChatRoutes(fastify);
   registerTranslationStreamRoutes(fastify);
   registerApiRoutes(fastify);
+  registerMcpRoutes(fastify, trustedHosts);
   registerScriptRunRoutes(fastify);
 
   // Names what the browser saves from extensionless audio URLs (e.g. the <audio>

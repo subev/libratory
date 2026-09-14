@@ -36,7 +36,7 @@ It runs on your own machine: an Apple Silicon Mac, a Linux box (x86_64 or arm64,
 - **Read along** — narration over the original PDF page, each sentence highlighted where it is printed.
 - **Export** — selected chapters as PDF, EPUB, or a synced EPUB: one file holding the text *and* the narration, so a reader that supports it can highlight along as it plays.
 - **Library organization** — nested folders, drag & drop, cross-folder search, separate profiles per person.
-- **JSON API** — plain endpoints so scripts and other projects can create books straight to audio.
+- **JSON API and MCP** — plain endpoints so scripts can create books straight to audio, and an MCP server so an AI agent can run the whole library: hand it a PDF path, get an audiobook back.
 
 ![The library: a folder of classics, a book with 14 chapters and 14 narrated, its outputs and size](docs/images/library.png)
 
@@ -83,7 +83,15 @@ Library organization around it: nested folders with drag & drop, cross-folder se
 </details>
 
 <details>
-<summary><b>The JSON API — and turning Hacker News into a podcast</b></summary>
+<summary><b>The MCP server, the JSON API — and turning Hacker News into a podcast</b></summary>
+
+The server speaks [MCP](https://modelcontextprotocol.io) at `/mcp`, so any agent can drive the library over the same port the UI uses. One line adds it to Claude Code (Cursor, Codex and Claude Desktop take the same URL):
+
+```sh
+claude mcp add --transport http libratory http://localhost:3034/mcp
+```
+
+Then "turn ~/Downloads/dune.pdf into an audiobook" is a tool call: `upload_book` copies the file in and runs extraction, chapter detection, narration and assembly unattended, `wait_for_book` blocks until the M4B exists, and a dozen more tools cover chapters, text edits, re-narration, exports and library search. The tool list and the workflow are in [docs/mcp.md](docs/mcp.md).
 
 Plain JSON endpoints (`POST /api/books`, see [docs/synthetic-books-api.md](docs/synthetic-books-api.md)) let scripts and other projects create synthetic books and chapters, with optional straight-to-audio synthesis.
 

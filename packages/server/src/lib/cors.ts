@@ -44,3 +44,20 @@ export function isSameOrigin(origin: string, hostHeader: string | undefined, tru
 export function isAllowedOrigin(origin: string | undefined, hostHeader: string | undefined, trustedHosts: ReadonlySet<string>): boolean {
   return origin === undefined || isLocalOrigin(origin) || isSameOrigin(origin, hostHeader, trustedHosts);
 }
+
+// The MCP endpoint takes no Origin at all — agents are not browsers — so the rebinding question is
+// asked of Host alone, with the same answer as above: a literal, loopback, or a name on the list.
+export function isTrustedHost(hostHeader: string | undefined, trustedHosts: ReadonlySet<string>): boolean {
+  if (!hostHeader) return false;
+  try {
+    const { hostname } = new URL(`http://${hostHeader}`);
+    return (
+      hostname === "localhost" ||
+      isIpLiteral(hostname) ||
+      trustedHosts.has(hostHeader.toLowerCase()) ||
+      trustedHosts.has(hostname.toLowerCase())
+    );
+  } catch {
+    return false;
+  }
+}

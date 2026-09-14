@@ -486,6 +486,7 @@ packages/server/src/
   upload-routes.ts      POST /upload and /upload/:bookId (multipart) — always queues rawExtract; extract only when fullExtract
   translation-stream-routes.ts  GET /translations/:id/stream — SSE relay of live variant generation deltas
   api-routes.ts         External JSON API (/api/books…) for scripts creating synthetic books/chapters
+  mcp-routes.ts         MCP over Streamable HTTP at /mcp — stateless, one server per request, Host checked against lib/cors.ts
   script-run-routes.ts  GET /scripts/hn-top10/stream — spawns the HN script, streams output as SSE
   db.ts                 Drizzle postgres connection
   schema.ts             Drizzle table definitions (source of truth for DB schema)
@@ -537,6 +538,8 @@ packages/server/src/
     transform-presets.ts Rewrite presets (eli5, shorten, summary, enrich) — edit prompts here
     translate-live.ts   In-process pub/sub for live variant streaming (run-fenced sessions)
     api-books.ts        External-API core: create api books, append source-tagged chapters, status
+    pdf-books.ts        Create a PDF book from files already in its upload dir (shared by /upload and the MCP upload_book)
+    mcp-server.ts       The MCP tool set: a curated dozen over appRouter.createCaller, plus wait_for_book polling
     tts.ts              Voice registry + synthesis dispatch (kokoro / bg-mlx / mms / kugel)
     tts-chunks.ts       TTS text chunking: NARRATOR_CHUNKS packs to 250-320 chars for the fixed-length
                         Bulgarian narrator, SENTENCE_CHUNKS gives everything else a sentence per chunk
@@ -716,6 +719,7 @@ fixed zinc.
 - `GET /preview/:voiceId` — Voice preview M4A (generated on demand, cached in data/previews)
 - `GET /files/*` — Static mount of the whole output dir (chunk WAV previews, direct file access)
 - `POST /api/books` / `POST /api/books/:bookId/chapters` / `GET /api/books/:bookId` — External JSON API for scripts and other projects (`api-routes.ts` + `lib/api-books.ts`, full reference in `docs/synthetic-books-api.md`): create synthetic `kind:"api"` books, append source-tagged chapters to any book (rebuild-safe), poll synthesis status. Optional `synthesize: true` queues TTS per chapter (text is normalized inline at insert); optional `x-profile-id` scopes like the web app.
+- `POST /mcp` (also GET/DELETE, answered per the MCP spec) — MCP server over Streamable HTTP (`mcp-routes.ts` + `lib/mcp-server.ts`, tool reference in `docs/mcp.md`). Stateless: each request builds a `McpServer` and transport and tears them down on response close, so an app restart strands no session. Tools call the tRPC procedures in-process through `appRouter.createCaller({ profileId })` — the profile comes from the same `x-profile-id` header as everywhere else — so validation and behaviour are the router's, never a second copy; `upload_book` is the one tool with its own body, because it takes local paths (copied into the upload dir, then `lib/pdf-books.ts` like the multipart route). Every long job returns at once; `wait_for_book` polls `books.get` every 2s until a stage (`text`/`chapters`/`audio`/`output`) or its timeout, returning early on failure. No Origin exists to judge here, so `isTrustedHost` (loopback, any IP literal, or `TRUSTED_HOSTS`) is the whole rebinding check. Keep the tool count small — agents degrade past ~20 tools — and add one only with a description that says when to use it.
 - `GET /scripts/hn-top10/stream` — Runs `scripts/hn-top10.mjs` as a subprocess and streams its output as SSE (`script-run-routes.ts`); backs the "HN digest" button/modal on the home page. Validated query params (date/count/synthesize/folder/profile), single-flight lock, child survives client disconnect.
 - `GET /translations/:translationId/stream` — SSE live feed for a running variant generation (`translation-stream-routes.ts`): snapshot on connect, then `delta`/`thinking`/`status` events from the worker's in-process channel (`lib/translate-live.ts`). The modal's 1s polling stays as fallback.
 - `POST /chat` — Library-chat streaming endpoint (`chat-routes.ts`). Raw Fastify route because tRPC can't stream; AI SDK UI-message stream over `reply.hijack()` + `pipeUIMessageStreamToResponse`. Profile via `x-profile-id`. Scope accepts `folderId` (subtree) or `bookId` (single-book chat).
