@@ -10,7 +10,7 @@ import {
   type UIMessage,
 } from "ai";
 import { profileIdFromHeader } from "./trpc.ts";
-import { resolveLlm, modelKeySchema } from "./lib/llm.ts";
+import { contextExceeded, resolveLlm, modelKeySchema } from "./lib/llm.ts";
 import { describeError } from "./lib/errors.ts";
 import { buildChatTools, CitationCatalog, LIBRARY_CHAT_SYSTEM, type CitationSource } from "./lib/chat-tools.ts";
 import { verifySources } from "./lib/citations.ts";
@@ -124,7 +124,7 @@ export function registerChatRoutes(fastify: FastifyInstance) {
     }
 
     const tokens = estimateTokens(context.corpus) + estimateTokens(prompt);
-    if (tokens > llm.def.contextTokens) {
+    if (contextExceeded(llm.def, tokens)) {
       return reply.status(400).send({
         error: `Raw text (~${Math.round(tokens / 1000)}k tokens) exceeds the model's context — extract chapters and ask per-chapter instead`,
       });
