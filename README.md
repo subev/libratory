@@ -124,10 +124,10 @@ Install first: `ffmpeg`, `poppler`, `espeak-ng`, Python 3.12, Node >=22.22, pnpm
 ### Desktop app — macOS
 
 ```bash
-pnpm app        # build and install over /Applications (~15 s)
+brew install --cask subev/libratory/libratory   # or the DMG from get.libratory.dev/mac
 ```
 
-Signed and notarised; installs its own runtime, so a fresh clone needs nothing installed globally. Docker is the one thing it cannot install for you.
+Signed and notarised; installs its own runtime on first launch, so nothing else needs installing globally. Docker is the one thing it cannot install for you. From a checkout, `pnpm app` builds the same app and installs it over /Applications (~15 s).
 
 <details>
 <summary><b>Prerequisites in full</b></summary>
@@ -355,7 +355,7 @@ The database stores absolute paths to audio and PDFs, so both halves must use th
 
 A crash writes `crash.log` beside the app's data and offers to open a prefilled GitHub issue. Updates come from GitHub Releases via `electron-updater`, and the launch after one brings the Python environment forward to match — see `tasks/desktop-updates.md`.
 
-It is signed with a Developer ID certificate and notarised by Apple, so the download opens with no warning and the in-app updater can install what it finds. Releasing is a version bump and a `v*` tag; the steps are in [packages/desktop/README.md](packages/desktop/README.md#releasing). The public download link is [get.libratory.dev/mac](https://get.libratory.dev/mac), which redirects to the newest DMG and never needs updating; `node scripts/download-stats.mjs` reports how often it has been taken. `scripts/vm-verify.sh` runs the whole thing inside a fresh macOS VM, checking first that the VM has no Homebrew, no Python and no cached models — this machine has all three and hides bugs because of it.
+It is signed with a Developer ID certificate and notarised by Apple, so the download opens with no warning and the in-app updater can install what it finds. Releasing is a version bump and a `v*` tag; the steps are in [packages/desktop/README.md](packages/desktop/README.md#releasing). The public download link is [get.libratory.dev/mac](https://get.libratory.dev/mac), which redirects to the newest DMG and never needs updating; `node scripts/download-stats.mjs` reports how often it has been taken. `brew install --cask subev/libratory/libratory` installs the same zip from the [Homebrew tap](https://github.com/subev/homebrew-libratory), which `pnpm ship` rewrites from each release's checksum. `scripts/vm-verify.sh` runs the whole thing inside a fresh macOS VM, checking first that the VM has no Homebrew, no Python and no cached models — this machine has all three and hides bugs because of it.
 
 </details>
 
