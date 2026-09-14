@@ -1,4 +1,5 @@
 import { db } from "../db.ts";
+import { bestEffort } from "../lib/best-effort.ts";
 import { chapters, books } from "../schema.ts";
 import { eq, and, ne, notInArray } from "drizzle-orm";
 import { synthesize as ttsSynthesize, TtsAbortedError, voiceSupportsSpeed } from "../lib/tts.ts";
@@ -89,13 +90,15 @@ export async function synthesize(payload: SynthesizePayload, { addJob: _addJob }
       if (cancelCheckInFlight) return;
       cancelCheckInFlight = true;
       try {
-        const [latest] = await db
-          .select({ status: chapters.status })
-          .from(chapters)
-          .where(eq(chapters.id, chapterId));
-        if (latest?.status === "suspended") {
-          abortController.abort();
-        }
+        await bestEffort(`[chapter ${chapterId}] cancel poll`, async () => {
+          const [latest] = await db
+            .select({ status: chapters.status })
+            .from(chapters)
+            .where(eq(chapters.id, chapterId));
+          if (latest?.status === "suspended") {
+            abortController.abort();
+          }
+        });
       } finally {
         cancelCheckInFlight = false;
       }
@@ -110,7 +113,7 @@ export async function synthesize(payload: SynthesizePayload, { addJob: _addJob }
       chunkPreviewUrlBase,
       log: chLog,
       signal: abortController.signal,
-      onProgress: async (chunk, totalChunks) => {
+      onProgress: (chunk, totalChunks) => bestEffort(`[chapter ${chapterId}] progress write`, async () => {
         const updated = await db.update(chapters)
           .set({ progress: `${chunk}/${totalChunks}` })
           .where(and(eq(chapters.id, chapterId), ne(chapters.status, "suspended")))
@@ -118,7 +121,7 @@ export async function synthesize(payload: SynthesizePayload, { addJob: _addJob }
         if (updated.length === 0) {
           abortController.abort();
         }
-      },
+      }),
     });
 
     if (cancelPoll) {

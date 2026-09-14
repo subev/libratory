@@ -303,6 +303,12 @@ async function main() {
   process.on("SIGTERM", shutdown);
 }
 
+// A background job's stray rejection must not take the UI and every other job down with it.
+// Thrown errors still exit: those are bugs in the request path, and hiding them helps nobody.
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection (ignored):", reason instanceof Error ? reason.stack ?? reason.message : reason);
+});
+
 main().catch((err) => {
   console.error("Failed to start server:", err);
   process.exit(1);
