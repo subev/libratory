@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { getDb, resetDb, row } from "../test/setup.ts";
-import { books, bookFiles } from "./schema.ts";
+import { books, bookFiles, chapters } from "./schema.ts";
 import { eq } from "drizzle-orm";
 import path from "node:path";
 import os from "node:os";
@@ -31,6 +31,17 @@ vi.mock("./lib/paths.ts", async (importOriginal) => {
   const path = await import("node:path");
   return { ...actual, uploadsDir: path.join(os.tmpdir(), "libratory-test-mcp-uploads") };
 });
+
+vi.mock("./lib/model-bundles.ts", () => ({
+  listModelBundles: async () => [{ id: "extraction", label: "Marker/Surya", unlocks: "full extraction", approxMb: 5100, appleSiliconOnly: false, installed: true, downloading: false, progress: null, error: null }],
+  bundleInstalled: async () => true,
+  readCapabilities: async () => ({ mlx: true, cuda: false }),
+  startBundleDownload: () => ({ started: true }),
+}));
+
+vi.mock("./lib/cartesia.ts", () => ({ listCartesiaVoices: async () => [{ id: "abc123", name: "Sofia", language: "bg", gender: "feminine", tagline: "warm" }] }));
+vi.mock("./lib/elevenlabs.ts", () => ({ listElevenLabsVoices: async () => [] }));
+vi.mock("./lib/say-voices.ts", () => ({ listSayVoices: async () => [{ slug: "daria", name: "Daria", locale: "bg_BG", sample: "" }] }));
 
 import { registerMcpRoutes } from "./mcp-routes.ts";
 
@@ -95,17 +106,23 @@ describe("/mcp", () => {
     expect(tools.map((t) => t.name).sort()).toEqual([
       "assemble_book",
       "cancel_book",
+      "cleanup_chapters",
       "export_book",
-      "extract_chapters",
+      "extract_book",
       "get_book",
       "get_book_logs",
+      "get_book_text",
+      "get_capabilities",
       "get_chapter",
+      "inspect_pdf",
       "list_books",
+      "list_voices",
       "redetect_chapters",
       "search_library",
-      "set_chapter_text",
+      "set_book_settings",
+      "start_download",
       "synthesize_book",
-      "synthesize_chapter",
+      "update_chapter",
       "upload_book",
       "wait_for_book",
     ]);
@@ -165,6 +182,54 @@ describe("/mcp", () => {
 
     expect((await getDb().select().from(books)).length).toBe(before);
     expect(mockQuickAddJob).not.toHaveBeenCalled();
+  });
+
+  it("inspects a PDF before upload", async () => {
+    const client = await connect(await listen());
+    const fixture = path.resolve("../../e2e/fixtures/tiny-book.pdf");
+    const info = parse(await client.callTool({ name: "inspect_pdf", arguments: { path: fixture } }));
+    expect(info).toMatchObject({ pages: 3, hasTextLayer: true, scanned: false, language: "en" });
+    expect(info.words).toBeGreaterThan(50);
+    expect(info.sample).toMatch(/Chapter 1/);
+  });
+
+  it("lists voices across static and live engines and filters by language", async () => {
+    const client = await connect(await listen());
+    const all = parse(await client.callTool({ name: "list_voices", arguments: {} }));
+    const ids = all.map((v: { id: string }) => v.id);
+    expect(ids).toContain("kokoro:af_heart");
+    expect(ids).toContain("bg-mlx:narrator");
+    expect(ids).toContain("say:daria");
+    expect(ids).toContain("cartesia:abc123");
+
+    const bulgarian = parse(await client.callTool({ name: "list_voices", arguments: { language: "bg" } }));
+    const bgIds = bulgarian.map((v: { id: string }) => v.id);
+    expect(bgIds).toEqual(expect.arrayContaining(["bg-mlx:narrator", "bg-mms:bul", "kugel:default", "say:daria", "cartesia:abc123"]));
+    expect(bgIds).not.toContain("kokoro:af_heart");
+    expect(bulgarian.find((v: { id: string }) => v.id === "cartesia:abc123")).toMatchObject({ cloud: true, gender: "F", engine: "cartesia" });
+  });
+
+  it("reports capabilities an agent can act on", async () => {
+    const client = await connect(await listen());
+    const caps = parse(await client.callTool({ name: "get_capabilities", arguments: {} }));
+    expect(caps.hardware).toEqual({ mlx: true, cuda: false });
+    expect(caps.bundles[0]).toMatchObject({ id: "extraction", installed: true });
+    expect(caps.ocrEngines).toEqual([{ id: "tesseract", default: true, needsBundle: null }, { id: "surya", default: false, needsBundle: "extraction" }]);
+    expect(caps.ocrLanguages.find((l: { code: string }) => l.code === "eng")).toMatchObject({ name: "English", iso: "en", installed: true });
+    expect(caps.ocrLanguages.length).toBeLessThan(caps.ocrLanguagesAvailable);
+    expect(caps.cloudKeys.map((k: { envVar: string }) => k.envVar)).toContain("CARTESIA_API_KEY");
+    expect(JSON.stringify(caps)).not.toMatch(/keyHint|sk-/);
+  });
+
+  it("updates title, text and selection of a chapter in one call", async () => {
+    const client = await connect(await listen());
+    const uploaded = parse(await client.callTool({ name: "upload_book", arguments: { paths: [await samplePdf()] } }));
+    const [chapter] = await getDb().insert(chapters).values({ bookId: uploaded.id, index: 0, title: "Part 1", rawText: "Original", status: "suspended" }).returning();
+    await client.callTool({ name: "update_chapter", arguments: { id: chapter!.id, title: "ПРЕДГОВОР", text: "Edited", selected: false } });
+    const fetched = parse(await client.callTool({ name: "get_chapter", arguments: { id: chapter!.id } }));
+    expect(fetched).toMatchObject({ title: "ПРЕДГОВОР", text: "Edited", textSource: "custom", selected: false });
+    const nothing = await client.callTool({ name: "update_chapter", arguments: { id: chapter!.id } });
+    expect(nothing.isError).toBe(true);
   });
 
   it("wait_for_book returns at the timeout with the current state", async () => {
