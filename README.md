@@ -91,7 +91,7 @@ The server speaks [MCP](https://modelcontextprotocol.io) at `/mcp`, so any agent
 claude mcp add --transport http libratory http://localhost:3034/mcp
 ```
 
-Then "turn ~/Downloads/dune.pdf into an audiobook" is a tool call: `upload_book` copies the file in and runs extraction, chapter detection, narration and assembly unattended, `wait_for_book` blocks until the M4B exists, and a dozen more tools cover chapters, text edits, re-narration, exports and library search. The tool list and the workflow are in [docs/mcp.md](docs/mcp.md).
+Then "turn ~/Downloads/dune.pdf into an audiobook" is a tool call: `upload_book` copies the file in and runs extraction, chapter detection, narration and assembly unattended, `wait_for_book` blocks until the M4B exists, and the rest of the tools cover what is installed, voices, chapters, text repair, re-narration, exports and library search. The tool list and the workflow are in [docs/mcp.md](docs/mcp.md).
 
 Plain JSON endpoints (`POST /api/books`, see [docs/synthetic-books-api.md](docs/synthetic-books-api.md)) let scripts and other projects create synthetic books and chapters, with optional straight-to-audio synthesis.
 

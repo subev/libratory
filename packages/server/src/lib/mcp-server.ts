@@ -4,16 +4,25 @@ import { z } from "zod";
 import { appRouter } from "../router.ts";
 import { computeBookStatus } from "../routes/books.ts";
 import { db } from "../db.ts";
-import { books, chapters, OCR_ENGINES, type Chapter } from "../schema.ts";
+import { bookFiles, bookLogs, books, chapters, OCR_ENGINES, DEFAULT_OCR_ENGINE, type Chapter } from "../schema.ts";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { createPdfBook, ensurePdfDir, newPdfBookId, pdfFileName, MAX_LANGUAGE_CHARS } from "./pdf-books.ts";
 import { modelKeySchema } from "./llm.ts";
+import { listAllVoices } from "./voice-list.ts";
+import { bundleInstalled, listModelBundles, readCapabilities, startBundleDownload } from "./model-bundles.ts";
+import { SURYA_BUNDLE } from "./ocr-surya.ts";
+import { listOcrLanguages, packCodeSchema, startPackDownload } from "./tessdata.ts";
+import { listPocketLanguages } from "./pocket-languages.ts";
+import { secretStatus } from "./secrets.ts";
+import { detectLanguage } from "./detect-language.ts";
+import { countWords, extractPdfAuthor, extractPdfRawText, pdfHasTextLayer } from "./pdf-raw-text.ts";
+import { pdfPageCount } from "./ocr-tesseract.ts";
 import path from "node:path";
 import { copyFile, rm, stat } from "node:fs/promises";
 
-// The agent-facing surface: a curated dozen over the tRPC router, not the router itself. Every
-// long job returns at once with the book's state; wait_for_book is how a caller blocks on it.
-// Each tool call gets its own server (the transport is stateless), so this must stay cheap.
+// The agent-facing surface: about twenty curated tools over the tRPC router, not the router
+// itself. Every long job returns at once with the book's state; wait_for_book is how a caller
+// blocks on it. Each request gets its own server (the transport is stateless), so this must stay cheap.
 export function createMcpServer(profileId: string): McpServer {
   const caller = appRouter.createCaller({ profileId });
   const server = new McpServer({ name: "libratory", version: "1" });
@@ -26,12 +35,27 @@ export function createMcpServer(profileId: string): McpServer {
   const chapterId = z.string().uuid().describe("Chapter id");
 
   const getBook = async (id: string) => {
-    const [book, assemblies, documents] = await Promise.all([
+    const [book, assemblies, documents, [latestLog]] = await Promise.all([
       caller.books.get({ id }),
       caller.books.assemblies({ bookId: id }),
       caller.books.documents({ bookId: id }),
+      db
+        .select({ message: bookLogs.message, createdAt: bookLogs.createdAt })
+        .from(bookLogs)
+        .where(eq(bookLogs.bookId, id))
+        .orderBy(desc(bookLogs.createdAt))
+        .limit(1),
     ]);
-    return compactBook(book, assemblies, documents);
+    return compactBook(book, assemblies, documents, latestLog ?? null);
+  };
+
+  // The UI hides full extraction until the models are on disk; MCP has no such gate, and without
+  // this the Python step fails offline with an error that names nothing the caller can do.
+  const requireExtractionModels = async () => {
+    if (await bundleInstalled(SURYA_BUNDLE)) return;
+    throw new Error(
+      `Full extraction needs the "${SURYA_BUNDLE}" model bundle, which is not installed — call start_download { kind: "bundle", id: "${SURYA_BUNDLE}" } and watch get_capabilities until installed`,
+    );
   };
 
   server.registerTool(
@@ -73,34 +97,63 @@ export function createMcpServer(profileId: string): McpServer {
   );
 
   server.registerTool(
+    "inspect_pdf",
+    {
+      description:
+        "Look at a PDF on the machine running Libratory before uploading it: page count, whether it has a text layer or is a scan needing OCR, " +
+        "a language guess from the text, word count and author. Use it to choose language, voice and OCR engine up front.",
+      inputSchema: { path: z.string().min(1).describe("Absolute path to the PDF") },
+    },
+    async ({ path: pdfPath }) => {
+      await requirePdfPath(pdfPath);
+      const [pages, hasTextLayer, text, author, info] = await Promise.all([
+        pdfPageCount(pdfPath).catch(() => null),
+        pdfHasTextLayer(pdfPath),
+        extractPdfRawText(pdfPath),
+        extractPdfAuthor(pdfPath),
+        stat(pdfPath),
+      ]);
+      const words = text ? countWords(text) : 0;
+      return json({
+        path: pdfPath,
+        sizeBytes: info.size,
+        pages,
+        hasTextLayer,
+        scanned: hasTextLayer === false,
+        words,
+        language: text ? detectLanguage(text.slice(0, 20_000)) : null,
+        author,
+        sample: text ? text.replace(/\s+/g, " ").trim().slice(0, 300) : null,
+      });
+    },
+  );
+
+  server.registerTool(
     "upload_book",
     {
       description:
         "Create a book from PDF files already on the machine running Libratory (absolute paths; the files are copied). " +
         "By default the whole pipeline runs unattended — text extraction, chapter detection, narration of every chapter, and assembly into one M4B — " +
-        "so follow with wait_for_book until \"output\". Set fullExtract=false for an instant text-only book (readable and searchable in seconds, no chapters until extract_chapters), " +
-        "or skipSynthesis=true to detect chapters but leave narration for synthesize_book.",
+        "so follow with wait_for_book until \"output\". Set fullExtract=false for an instant text-only book (readable and searchable in seconds, no chapters until extract_book), " +
+        "or skipSynthesis=true to detect chapters but leave narration for synthesize_book. Scanned pages are read by OCR in the book's language, " +
+        "which needs that language's pack (see get_capabilities); pick voices with list_voices.",
       inputSchema: {
         paths: z.array(z.string().min(1)).min(1).max(50).describe("Absolute paths to PDF files, in reading order; several files make one book"),
         title: z.string().trim().min(1).max(500).optional().describe("Defaults to the first file's name"),
-        voice: z.string().optional().describe("Narrator voice id, e.g. kokoro:af_heart (default)"),
+        voice: z.string().optional().describe("Narrator voice id from list_voices, e.g. kokoro:af_heart (default)"),
         speed: z.number().min(0.5).max(2).optional(),
         language: z.string().trim().max(MAX_LANGUAGE_CHARS).optional().describe("Language code of the text, e.g. en, bg; detected from the text when omitted"),
         folderId: z.string().uuid().optional(),
         fullExtract: z.boolean().default(true),
         skipSynthesis: z.boolean().default(false),
-        llmChapterDetection: z.boolean().default(false).describe("Let an AI model read the table of contents to place chapters"),
+        llmChapterDetection: z.boolean().default(false).describe("Let an AI model read the table of contents to place and title chapters"),
         chapterModel: modelKeySchema.optional().describe("Model key for llmChapterDetection"),
-        ocrEngine: z.enum(OCR_ENGINES).optional().describe("OCR engine for scanned pages; tesseract when omitted"),
+        ocrEngine: z.enum(OCR_ENGINES).optional().describe(`OCR engine for scanned pages; ${DEFAULT_OCR_ENGINE} when omitted, surya reads photographed or faded pages better`),
       },
     },
     async (input) => {
-      for (const p of input.paths) {
-        if (!path.isAbsolute(p)) throw new Error(`Not an absolute path: ${p}`);
-        if (!p.toLowerCase().endsWith(".pdf")) throw new Error(`Not a PDF: ${p}`);
-        const info = await stat(p).catch(() => null);
-        if (!info?.isFile()) throw new Error(`No such file: ${p}`);
-      }
+      for (const p of input.paths) await requirePdfPath(p);
+      if (input.fullExtract) await requireExtractionModels();
       const { bookId: id, pdfDir } = newPdfBookId();
       await ensurePdfDir(pdfDir);
       try {
@@ -123,7 +176,7 @@ export function createMcpServer(profileId: string): McpServer {
   server.registerTool(
     "get_book",
     {
-      description: "A book's status, files, chapters (without text), assembled audiobooks and exported documents.",
+      description: "A book's status, latest log line, files, chapters (without text, with narration progress), assembled audiobooks and exported documents.",
       inputSchema: { id: bookId },
     },
     async ({ id }) => json(await getBook(id)),
@@ -156,7 +209,7 @@ export function createMcpServer(profileId: string): McpServer {
         // Clients that reset their timeout on progress can then wait the full timeoutSeconds.
         if (progressToken !== undefined) {
           await extra
-            .sendNotification({ method: "notifications/progress", params: { progressToken, progress: elapsedSeconds, total: timeoutSeconds, message: book.status } })
+            .sendNotification({ method: "notifications/progress", params: { progressToken, progress: elapsedSeconds, total: timeoutSeconds, message: book.latestLog?.message ?? book.status } })
             .catch(() => {});
         }
         await sleep(Math.min(POLL_MS, remaining), extra.signal);
@@ -167,10 +220,37 @@ export function createMcpServer(profileId: string): McpServer {
   server.registerTool(
     "get_book_logs",
     {
-      description: "The book's processing log, oldest first — what extraction, narration and assembly reported.",
+      description: "The book's processing log, oldest first — what extraction, OCR, narration and assembly reported, including page and chunk progress.",
       inputSchema: { id: bookId, after: z.string().datetime().optional().describe("Only entries after this ISO timestamp") },
     },
     async ({ id, after }) => json(await caller.books.logs({ bookId: id, after })),
+  );
+
+  server.registerTool(
+    "get_book_text",
+    {
+      description: "The raw text of one of the book's PDF files as extracted or OCR'd, before and independent of chapters — for checking OCR quality before narrating. Pages through offset/maxChars.",
+      inputSchema: {
+        id: bookId,
+        fileIndex: z.number().int().min(0).default(0),
+        offset: z.number().int().min(0).default(0),
+        maxChars: z.number().int().min(1).max(200_000).default(20_000),
+      },
+    },
+    async ({ id, fileIndex, offset, maxChars }) => {
+      const [file] = await db.select().from(bookFiles).where(and(eq(bookFiles.bookId, id), eq(bookFiles.index, fileIndex)));
+      if (!file) throw new Error("File not found");
+      const text = file.rawText ?? "";
+      return json({
+        bookId: id,
+        fileIndex,
+        filename: file.filename,
+        status: file.status,
+        ocrEngine: file.ocrEngine,
+        hasRawText: file.rawText !== null,
+        ...page(text, offset, maxChars),
+      });
+    },
   );
 
   server.registerTool(
@@ -201,31 +281,45 @@ export function createMcpServer(profileId: string): McpServer {
         hasAudio: chapter.audioPath !== null,
         error: chapter.error,
         textSource,
-        totalChars: text.length,
-        offset,
-        truncated: offset + maxChars < text.length,
-        text: text.slice(offset, offset + maxChars),
+        ...page(text, offset, maxChars),
       });
     },
   );
 
   server.registerTool(
-    "set_chapter_text",
+    "update_chapter",
     {
-      description: "Replace what the narrator reads for a chapter. The extracted text is kept; re-run synthesize_chapter for new audio.",
-      inputSchema: { id: chapterId, text: z.string().min(1) },
+      description: "Change a chapter's title, the text the narrator reads (the extracted text is kept), or whether it is selected for narration, assembly and export. Re-run synthesize_book for new audio after a text change.",
+      inputSchema: {
+        id: chapterId,
+        title: z.string().trim().min(1).optional(),
+        text: z.string().min(1).optional(),
+        selected: z.boolean().optional(),
+      },
     },
-    async ({ id, text }) => json(await caller.chapters.updateText({ id, customText: text })),
+    async ({ id, title, text, selected }) => {
+      if (title === undefined && text === undefined && selected === undefined) throw new Error("Nothing to change");
+      if (title !== undefined) await caller.chapters.rename({ id, title });
+      if (text !== undefined) await caller.chapters.updateText({ id, customText: text });
+      if (selected !== undefined) await caller.chapters.setSelected({ id, selected });
+      return json({ success: true });
+    },
   );
 
   server.registerTool(
-    "extract_chapters",
+    "extract_book",
     {
-      description: "Run the full extraction on a text-only book (uploaded with fullExtract=false): reads the pages thoroughly and detects chapters. Slow; then wait_for_book until \"chapters\".",
-      inputSchema: { id: bookId },
+      description:
+        "Run or redo the full extraction: OCR of scanned pages (in the book's language), a thorough page read and chapter detection. " +
+        "Pass ocrEngine to read the pages again with the other engine. Existing chapters and audio are replaced, and after a redo the new chapters wait suspended for synthesize_book. Slow; then wait_for_book until \"chapters\".",
+      inputSchema: { id: bookId, ocrEngine: z.enum(OCR_ENGINES).optional() },
     },
-    async ({ id }) => {
-      await caller.books.extractChapters({ id });
+    async ({ id, ocrEngine }) => {
+      await requireExtractionModels();
+      if (ocrEngine !== undefined) await caller.books.updateSettings({ id, ocrEngine });
+      const files = await db.select({ status: bookFiles.status }).from(bookFiles).where(eq(bookFiles.bookId, id));
+      if (files.length > 0 && files.every((f) => f.status === "raw")) await caller.books.extractChapters({ id });
+      else await caller.bookFiles.reExtractSelected({ bookId: id });
       return json(await getBook(id));
     },
   );
@@ -233,12 +327,13 @@ export function createMcpServer(profileId: string): McpServer {
   server.registerTool(
     "redetect_chapters",
     {
-      description: "Detect the chapters again from the extracted pages, optionally with an AI model reading the table of contents. Existing chapters and their audio are replaced.",
+      description:
+        "Detect the chapters again from the pages already extracted, optionally with an AI model reading the table of contents for real titles. " +
+        "Existing chapters and their audio are replaced. This does not read the pages again — use extract_book to change the OCR engine.",
       inputSchema: {
         id: bookId,
         llmChapterDetection: z.boolean().optional(),
         chapterModel: modelKeySchema.optional(),
-        ocrEngine: z.enum(OCR_ENGINES).nullable().optional(),
       },
     },
     async (input) => {
@@ -248,24 +343,31 @@ export function createMcpServer(profileId: string): McpServer {
   );
 
   server.registerTool(
-    "synthesize_book",
+    "cleanup_chapters",
     {
-      description: "Narrate every selected chapter with the book's voice (re-narrating ones that already have audio). Then wait_for_book until \"audio\", or assemble_book with waitForAll.",
-      inputSchema: { id: bookId },
+      description: "Have an AI model repair OCR artifacts in chapter text — split or joined words, stray hyphens, headers and page numbers — into an edited copy the narrator reads. Runs in the background; each chapter's cleanup status is in get_book.",
+      inputSchema: { bookId, chapterIds: z.array(chapterId).min(1).optional().describe("Only these chapters; omit for every selected chapter") },
     },
-    async ({ id }) => {
-      await caller.books.processSelected({ id });
-      return json(await getBook(id));
+    async ({ bookId: id, chapterIds }) => {
+      if (chapterIds) for (const chapter of chapterIds) await caller.chapters.queueCleanup({ id: chapter });
+      else await caller.chapters.cleanupSelected({ bookId: id });
+      return json({ queued: chapterIds?.length ?? "selected" });
     },
   );
 
   server.registerTool(
-    "synthesize_chapter",
+    "synthesize_book",
     {
-      description: "Narrate one chapter (again).",
-      inputSchema: { id: chapterId },
+      description:
+        "Narrate every selected chapter with the book's voice, re-narrating ones that already have audio; or only chapterIds, where resume=true continues an interrupted chapter from its finished chunks. " +
+        "Then wait_for_book until \"audio\", or assemble_book with waitForAll.",
+      inputSchema: { id: bookId, chapterIds: z.array(chapterId).min(1).optional(), resume: z.boolean().default(false) },
     },
-    async ({ id }) => json(await caller.chapters.queue({ id })),
+    async ({ id, chapterIds, resume }) => {
+      if (chapterIds) for (const chapter of chapterIds) await caller.chapters.queue({ id: chapter, resume });
+      else await caller.books.processSelected({ id });
+      return json(await getBook(id));
+    },
   );
 
   server.registerTool(
@@ -307,6 +409,96 @@ export function createMcpServer(profileId: string): McpServer {
   );
 
   server.registerTool(
+    "set_book_settings",
+    {
+      description: "Change a book after upload: narrator voice (from list_voices), speed, the language of its text, author, OCR engine, or AI chapter detection. Audio already narrated keeps the old voice until synthesize_book runs again.",
+      inputSchema: {
+        id: bookId,
+        voice: z.string().optional(),
+        speed: z.number().min(0.5).max(2).optional(),
+        language: z.string().max(MAX_LANGUAGE_CHARS).nullable().optional().describe("ISO code; null clears it"),
+        author: z.string().max(200).nullable().optional(),
+        ocrEngine: z.enum(OCR_ENGINES).nullable().optional(),
+        llmChapterDetection: z.boolean().optional(),
+        chapterModel: modelKeySchema.optional(),
+      },
+    },
+    async (input) => {
+      await caller.books.updateSettings(input);
+      return json(await getBook(input.id));
+    },
+  );
+
+  server.registerTool(
+    "list_voices",
+    {
+      description:
+        "Every narrator voice this installation can use, with the language each reads: local engines (Kokoro, Pocket TTS, the Bulgarian and multilingual MLX narrators, installed macOS voices) " +
+        "and cloud ones behind a configured key (Cartesia, ElevenLabs — metered). Filter by language code to find a voice for a book.",
+      inputSchema: {
+        language: z.string().trim().min(2).max(8).optional().describe("ISO code, e.g. en, bg"),
+        engine: z.enum(["kokoro", "narrators", "say", "cartesia", "elevenlabs", "pocket"]).optional(),
+      },
+    },
+    async (filter) => json(await listAllVoices(filter)),
+  );
+
+  server.registerTool(
+    "get_capabilities",
+    {
+      description:
+        "What this installation can do right now: hardware (MLX/CUDA), model bundles and whether each is installed or downloading, OCR engines and the language packs installed or downloading " +
+        "(any other language is fetched by ISO code with start_download), Pocket TTS languages, and which cloud keys are configured. Check before full extraction, OCR in a new language, or a cloud voice.",
+      inputSchema: {},
+    },
+    async () => {
+      const [hardware, bundles, ocrLanguages, pocketLanguages, secrets] = await Promise.all([
+        readCapabilities().catch(() => null),
+        listModelBundles().catch(() => []),
+        listOcrLanguages(),
+        listPocketLanguages().catch(() => []),
+        Promise.resolve(secretStatus()),
+      ]);
+      return json({
+        hardware,
+        bundles: bundles.map((b) => ({ id: b.id, label: b.label, unlocks: b.unlocks, approxMb: b.approxMb, appleSiliconOnly: b.appleSiliconOnly, installed: b.installed, downloading: b.downloading, progress: b.progress, error: b.error })),
+        ocrEngines: OCR_ENGINES.map((id) => ({ id, default: id === DEFAULT_OCR_ENGINE, needsBundle: id === "surya" ? SURYA_BUNDLE : null })),
+        ocrLanguages: ocrLanguages
+          .filter((l) => l.installed || l.download !== null)
+          .map((l) => ({ code: l.code, iso: l.iso, name: l.name, approxMb: Math.round(l.bytes / 1_000_000), installed: l.installed, downloading: l.download !== null && l.download.error === null, error: l.download?.error ?? null })),
+        ocrLanguagesAvailable: ocrLanguages.length,
+        pocketLanguages: pocketLanguages.map((l) => ({ code: l.code, label: l.label, approxMb: l.approxMb, installed: l.installed, downloading: l.downloading, error: l.error })),
+        cloudKeys: secrets.keys.map((k) => ({ envVar: k.envVar, label: k.label, kind: k.kind, configured: k.configured })),
+      });
+    },
+  );
+
+  server.registerTool(
+    "start_download",
+    {
+      description: "Download a missing model bundle, Tesseract OCR language pack, or Pocket TTS language. Returns at once; watch get_capabilities for installed/downloading/error.",
+      inputSchema: {
+        kind: z.enum(["bundle", "ocrLanguage", "pocketLanguage"]),
+        id: z.string().min(1).max(40).describe("Bundle id, Tesseract pack code or ISO language code (bul or bg), or Pocket language code from get_capabilities"),
+      },
+    },
+    async ({ kind, id }) => {
+      switch (kind) {
+        case "bundle":
+          return json(startBundleDownload(id));
+        case "ocrLanguage": {
+          const byIso = (await listOcrLanguages()).find((l) => l.iso === id.toLowerCase())?.code;
+          const code = packCodeSchema.safeParse(byIso ?? id);
+          if (!code.success) throw new Error(`No Tesseract language pack for "${id}" — pass a pack code or ISO code such as bul or bg`);
+          return json(startPackDownload(code.data));
+        }
+        case "pocketLanguage":
+          return json(await caller.pocketVoices.downloadLanguage({ code: id }));
+      }
+    },
+  );
+
+  server.registerTool(
     "search_library",
     {
       description: "Search the text of every book in the library. Results cite the book, chapter and page.",
@@ -324,6 +516,17 @@ export function createMcpServer(profileId: string): McpServer {
 }
 
 const POLL_MS = 2000;
+
+function page(text: string, offset: number, maxChars: number) {
+  return { totalChars: text.length, offset, truncated: offset + maxChars < text.length, text: text.slice(offset, offset + maxChars) };
+}
+
+async function requirePdfPath(p: string): Promise<void> {
+  if (!path.isAbsolute(p)) throw new Error(`Not an absolute path: ${p}`);
+  if (!p.toLowerCase().endsWith(".pdf")) throw new Error(`Not a PDF: ${p}`);
+  const info = await stat(p).catch(() => null);
+  if (!info?.isFile()) throw new Error(`No such file: ${p}`);
+}
 
 // The SDK hands the client's progress token over as `_meta`, a name the lint rules reject inline.
 function progressTokenOf(extra: { [key: string]: unknown }): string | number | undefined {
@@ -351,6 +554,7 @@ function compactBook(
   book: BookDetail,
   assemblies: Awaited<ReturnType<Caller["books"]["assemblies"]>>,
   documents: Awaited<ReturnType<Caller["books"]["documents"]>>,
+  latestLog: { message: string; createdAt: Date } | null,
 ) {
   return {
     id: book.id,
@@ -359,9 +563,11 @@ function compactBook(
     kind: book.kind,
     status: book.status,
     error: book.error,
+    latestLog,
     voice: book.voice,
     speed: book.speed,
     language: book.language,
+    ocrEngine: book.ocrEngine,
     folderId: book.folderId,
     totalWords: book.totalWords,
     totalDurationMs: book.totalDurationMs,
@@ -374,6 +580,7 @@ function compactBook(
       status: f.status,
       hasRawText: f.hasRawText,
       rawWords: f.rawWords,
+      ocrEngine: f.ocrEngine,
       error: f.error,
     })),
     chapters: book.chapters.map((c) => ({
@@ -381,12 +588,14 @@ function compactBook(
       index: c.index,
       title: c.title,
       status: c.status,
+      progress: c.progress,
       selected: c.selected,
       wordCount: c.wordCount,
       pageStart: c.pageStart,
       pageEnd: c.pageEnd,
       durationMs: c.durationMs,
       hasAudio: c.audioPath !== null,
+      cleanup: c.cleanup?.status ?? null,
       error: c.error,
     })),
     assemblies: assemblies.map((a) => ({ id: a.id, outputPath: a.outputPath, sizeBytes: a.sizeBytes, createdAt: a.createdAt, downloadUrl: `/download/assembly/${a.id}` })),
