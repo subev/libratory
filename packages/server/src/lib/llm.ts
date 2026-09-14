@@ -448,12 +448,18 @@ export async function defaultModelKey(known?: LlmModelDef[]): Promise<string | u
 // What a request will actually run on, and the Settings pick it had to step around. A stopped
 // LM Studio falls through to a cloud model silently, which is a bill and a different result.
 export async function modelChoice(key?: string): Promise<{ key: string | null; label: string; steppedOver?: string }> {
-  const models = await allModels();
-  const wanted = (key ? canonicalKey(key) : undefined) || (await defaultModelKey(models)) || null;
-  const label = (of: string) => models.find((m) => m.key === of)?.label ?? of;
+  // Resolved from the key alone, never from a listing: this is what Settings reads to say what a
+  // request will run on, and a provider probe that is slow or failing has no bearing on the answer.
+  const wanted = key ? canonicalKey(key) : (await defaultModelKey()) ?? null;
   const chosen = env.DEFAULT_LLM_MODEL ? canonicalKey(env.DEFAULT_LLM_MODEL) : undefined;
-  const steppedOver = !key && chosen && chosen !== wanted ? label(chosen) : undefined;
-  return { key: wanted, label: wanted ? label(wanted) : "no model", ...(steppedOver ? { steppedOver } : {}) };
+  // A local key's friendly name is the only one that needs its server asked; everything else this
+  // build can name carries its label, including the metadata of a model listed before a restart.
+  const label = async (of: string): Promise<string> => {
+    const def = offlineDef(of) ?? (isLocalKey(of) ? await localDef(of) : undefined);
+    return def?.label ?? of;
+  };
+  const steppedOver = !key && chosen && chosen !== wanted ? await label(chosen) : undefined;
+  return { key: wanted, label: wanted ? await label(wanted) : "no model", ...(steppedOver ? { steppedOver } : {}) };
 }
 
 // Must match the `name` given to createOpenAICompatible in resolveLlm — the AI SDK
