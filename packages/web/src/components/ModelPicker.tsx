@@ -62,7 +62,10 @@ export const ModelPicker = memo(function ModelPicker({
   const { shown, hidden } = collapsibleModels(models, value, showAll);
   return (
     <Dropdown
-      value={active?.key ?? ""}
+      // The raw value, not active?.key: when the list does not carry the stored key those two
+      // disagree, and passing "" leaves the trigger reading "Choose a model" — and the stored row
+      // unhighlighted — while a model is stored and jobs are running on it.
+      value={value}
       onChange={(next) => (next === SHOW_ALL_MODELS ? setShowAll(true) : onChange(next))}
       options={[
         ...(stored ? [{ value: stored, label: `${stored} (not available right now)`, group: "" }] : []),

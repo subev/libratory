@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Button } from "./Button.tsx";
 import { Menu, MenuItem } from "./Menu.tsx";
+import { sectionsOf } from "../lib/dropdown-sections.ts";
 import { IconChevronDown } from "./icons.tsx";
 
 export type DropdownOption = { value: string; label: string; hint?: string; disabled?: boolean; group?: string;
@@ -40,7 +41,7 @@ export function Dropdown({
   icon?: ReactNode;
 }) {
   const active = options.find((o) => o.value === value);
-  const groups = [...new Set(options.map((o) => o.group ?? ""))];
+  const sections = sectionsOf(options);
   return (
     <Menu
       testId={`${testId}-menu`}
@@ -68,10 +69,12 @@ export function Dropdown({
     >
       {(close) => (
         <div className="max-h-80 overflow-y-auto py-1" role="listbox">
-          {groups.map((group) => (
-            <div key={group}>
-              {group && <div className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-(--text-faint)">{group}</div>}
-              {options.filter((o) => (o.group ?? "") === group).map((o) => (
+          {sections.map((section, index) => (
+            // Keyed by position: two headerless sections are ordinary (a row above the groups and
+            // "Show all" below them), so the group name alone is not unique.
+            <div key={`${section.group}-${index}`}>
+              {section.group && <div className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-(--text-faint)">{section.group}</div>}
+              {section.options.map((o) => (
                 <MenuItem
                   key={o.value}
                   onClick={() => { onChange(o.value); if (!o.keepOpen) close(); }}
