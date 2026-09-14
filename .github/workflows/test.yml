@@ -80,6 +80,7 @@ jobs:
       - run: pnpm test
         env:
           DATABASE_URL: postgres://libratory:libratory@localhost:5433/libratory
+      - run: node --test scripts/cask.test.mjs
 
   # Everything above is the unit tiers. This drives the real app in a browser, in the shape a
   # package runs in — one port, the built bundle, no Vite — which is also the only shape where the

@@ -82,6 +82,8 @@ describe("what someone without Docker is told", () => {
     ]);
     // No jargon in the sentence that has to land with someone who has never heard of Docker
     expect(help.body).not.toMatch(/container|daemon|CLI|socket/i);
+    // …and the one-liner for someone who has, since the app itself may have come from Homebrew
+    expect(help.body).toContain("brew install --cask orbstack");
   });
 
   it("says nothing extra once Docker is answering", () => {

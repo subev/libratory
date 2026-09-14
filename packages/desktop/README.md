@@ -136,6 +136,13 @@ previous tag.
 **From GitHub:** Actions → **Release** → *Run workflow*. Same script, run on the runner, so a
 release needs no checkout at all.
 
+`ship` also rewrites the Homebrew cask. `scripts/cask.mjs` renders it from the version and the
+sha256 GitHub reports for the zip, and one API call puts it in
+[subev/homebrew-libratory](https://github.com/subev/homebrew-libratory) — no clone, and only when
+the release is the newest, so an old draft published late cannot roll `brew install` backwards.
+If that call fails the release stays published and the script prints the `node scripts/cask.mjs`
+line to paste by hand. The tap's own workflow runs `brew audit` and `brew style` on every push.
+
 Either way `scripts/release.mjs` picks the version, and it refuses to run from the wrong branch,
 with a dirty tree, or behind `origin/main` — each of which is otherwise discovered *after* the tag
 is pushed, which is the one point where undoing it means deleting a tag other people may have.

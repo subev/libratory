@@ -16,6 +16,8 @@ you mean to.
 
 Audio, uploads and exports live under `data/` inside the Application Support directory unless you pointed `dataDir` somewhere else — check `~/Library/Application Support/Libratory/config.json` before deleting anything, because that is where your finished audiobooks are.
 
+Installed with Homebrew? `brew uninstall --zap --cask libratory` trashes the app, the Application Support directory (Python runtime **and** `data/`), the caches and the preferences in one go. The Docker volume and the model caches are not Homebrew's, so the commands below still apply to them.
+
 ### Remove the app, keep the library
 
 Frees about 21 GB and leaves Postgres untouched, so a later reinstall finds every book where it was.
