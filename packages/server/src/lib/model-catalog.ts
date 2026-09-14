@@ -104,6 +104,16 @@ export function catalogModel(provider: string, modelId: string): CatalogModel | 
   return cachedCatalog().get(provider)?.get(modelId);
 }
 
+// Bringing the disk cache into memory before the server takes requests. The background warm-up in
+// main.ts is not awaited, which leaves a window where a job resolves against the per-provider
+// fallback while the real numbers sit on disk already — and if models.dev is unreachable that
+// window never closes, so every context window stays a guess for the life of the process.
+export function seedCatalogFromDisk(): void {
+  if (memory) return;
+  const disk = readDisk();
+  if (disk) memory = disk;
+}
+
 async function loadCatalog(): Promise<Catalog> {
   const disk = readDisk();
   if (disk && Date.now() - disk.at < CATALOG_TTL_MS) {

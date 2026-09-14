@@ -1,5 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { cloudDef, cloudKey, parseCloudKey } from "./cloud-models.ts";
+import { describe, it, expect, afterEach } from "vitest";
+import { cloudDef, cloudKey, cloudModelListed, parseCloudKey } from "./cloud-models.ts";
+import { useTempDataDir } from "../../test/data-dir.ts";
+
+let restoreDataDir: (() => void) | undefined;
+afterEach(() => {
+  restoreDataDir?.();
+  restoreDataDir = undefined;
+});
 
 describe("parseCloudKey", () => {
   it("reads a discovered key back into its provider and model id", () => {
@@ -41,5 +48,49 @@ describe("cloudDef", () => {
     expect(def.contextTokens).toBe(200_000);
     expect(def.supportsJsonFormat).toBe(true);
     expect(def.contextNote).toBeUndefined();
+  });
+
+  it("marks a window it had to guess at, so nothing downstream skips work on it", () => {
+    expect(cloudDef("deepseek", "deepseek-something-new").contextAssumed).toBe(true);
+  });
+
+  it("does not mark a window the provider reported", () => {
+    const def = cloudDef("anthropic", "claude-x", { label: "X", contextTokens: 200_000 });
+    expect(def.contextAssumed).toBe(false);
+  });
+
+  it("reads the window out of a listing a previous process fetched", () => {
+    restoreDataDir = useTempDataDir({
+      deepseek: {
+        at: Date.now(),
+        ids: ["deepseek-flash"],
+        meta: { "deepseek-flash": { label: "V4.1 Flash", contextTokens: 1_000_000 } },
+      },
+    });
+    // resolveLlm rebuilds this def from the key alone, with no listing in hand: without the cached
+    // one it would fall to DeepSeek's 128k convention and refuse a book that fits in the real 1M.
+    const def = cloudDef("deepseek", "deepseek-flash");
+    expect(def.contextTokens).toBe(1_000_000);
+    expect(def.contextAssumed).toBe(false);
+  });
+});
+
+describe("cloudModelListed", () => {
+  it("says nothing when no listing is cached, so a failed probe never refuses a key", () => {
+    restoreDataDir = useTempDataDir();
+    expect(cloudModelListed("deepseek", "deepseek-anything")).toBeUndefined();
+  });
+
+  it("answers for a model the provider listed", () => {
+    restoreDataDir = useTempDataDir({ deepseek: { at: Date.now(), ids: ["deepseek-flash"] } });
+    expect(cloudModelListed("deepseek", "deepseek-flash")).toBe(true);
+    expect(cloudModelListed("deepseek", "deepseek-typo")).toBe(false);
+  });
+
+  it("stops vouching for a listing old enough to predate a release", () => {
+    restoreDataDir = useTempDataDir({
+      deepseek: { at: Date.now() - 25 * 60 * 60 * 1000, ids: ["deepseek-flash"] },
+    });
+    expect(cloudModelListed("deepseek", "released-yesterday")).toBeUndefined();
   });
 });

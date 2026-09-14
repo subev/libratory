@@ -1,7 +1,7 @@
 import { db } from "../db.ts";
 import { books, type NoteJob } from "../schema.ts";
 import { eq } from "drizzle-orm";
-import { llmChat, resolveLlm, type LlmModelDef } from "../lib/llm.ts";
+import { contextExceeded, llmChat, resolveLlm, type LlmModelDef } from "../lib/llm.ts";
 import { describeError } from "../lib/errors.ts";
 import { getBookRawText } from "../lib/book-raw-text.ts";
 import { estimateTokens } from "../lib/token-estimate.ts";
@@ -52,10 +52,13 @@ export async function bookNote(payload: BookNotePayload) {
   if (!raw) return fail("No raw text available for this book");
 
   const tokens = estimateTokens(raw.text) + estimateTokens(prompt);
-  if (tokens > def.contextTokens) {
+  if (contextExceeded(def, tokens)) {
     return fail(
       `Raw text (~${Math.round(tokens / 1000)}k tokens) exceeds the model's context — extract chapters and ask per-chapter instead`
     );
+  }
+  if (def.contextAssumed && tokens > def.contextTokens) {
+    await log(`~${Math.round(tokens / 1000)}k tokens against ${def.label}'s unconfirmed context — trying it rather than refusing on a guess`);
   }
 
   const system = BOOK_RAW_SYSTEM;

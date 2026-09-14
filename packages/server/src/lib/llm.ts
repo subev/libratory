@@ -10,7 +10,7 @@ import { env, envFilePath } from "../env.ts";
 import { updateEnvFile } from "./env-file.ts";
 import { LLM_SECRETS, isConfigured, type SecretVar, type LlmSecretProvider } from "./secrets.ts";
 import { describeError } from "./errors.ts";
-import { cloudDef, cloudServers, parseCloudKey } from "./cloud-models.ts";
+import { cloudDef, cloudModelListed, cloudServers, parseCloudKey } from "./cloud-models.ts";
 
 // The cloud providers are whatever secrets.ts says they are; this adds the one that needs no key.
 export type LlmProviderKind = LlmSecretProvider | "openai-compatible";
@@ -26,6 +26,9 @@ export type LlmModelDef = {
   baseUrl?: string;
   apiKey?: string;
   contextTokens: number;
+  // True when contextTokens is a per-provider convention rather than a number the provider or the
+  // catalog reported. The context guards refuse to skip work on a guess — see contextExceeded.
+  contextAssumed?: boolean;
   // e.g. "capped at 4k by Ollama" / "loaded at 8k (max 131k)" — shown in settings and tooltips
   contextNote?: string;
   supportsTemperature: boolean;
@@ -324,12 +327,22 @@ async function discoverLmStudio(): Promise<LocalServer> {
 }
 
 let discoveryCache: { at: number; servers: LocalServer[] } | null = null;
+let localInFlight: Promise<LocalServer[]> | null = null;
 
 export async function localServers(refresh = false): Promise<LocalServer[]> {
   if (!refresh && discoveryCache && Date.now() - discoveryCache.at < DISCOVERY_TTL_MS) return discoveryCache.servers;
-  const servers = await Promise.all([discoverOllama(), discoverLmStudio()]);
-  discoveryCache = { at: Date.now(), servers };
-  return servers;
+  if (localInFlight) return localInFlight;
+  const pending = (async () => {
+    const servers = await Promise.all([discoverOllama(), discoverLmStudio()]);
+    discoveryCache = { at: Date.now(), servers };
+    return servers;
+  })();
+  localInFlight = pending;
+  try {
+    return await pending;
+  } finally {
+    if (localInFlight === pending) localInFlight = null;
+  }
 }
 
 async function discoveredModels(): Promise<LlmModelDef[]> {
@@ -403,12 +416,32 @@ export function setDefaultModelKey(key: string | null): void {
   env.DEFAULT_LLM_MODEL = key ?? undefined;
 }
 
+// The models a job may fall back to when it names none. Pins and configured endpoints answer with
+// no network call at all, localhost is asked only if those offer nothing, and cloud providers only
+// after that — a job that picked no model must not wait on four remote listings to start.
+async function fallbackModels(): Promise<LlmModelDef[]> {
+  const pinned = staticModels().filter(isAvailable);
+  if (pinned.length > 0) return pinned;
+  const local = (await localServers()).flatMap((s) => s.models);
+  return local.length > 0 ? local : availableModels();
+}
+
+// A saved pick is judged by whether it can run, not by whether a live listing happens to name it.
+// The two come apart in exactly the cases that matter: a probe that timed out, a provider reporting
+// another id for the same model, or a listing that is empty for the length of a cache window.
+// Reading availability off the listing reroutes every job that named no model to the default, and
+// tells the user a model they can still call is unavailable.
+function runnable(key: string): boolean {
+  const def = offlineDef(key);
+  return def !== undefined && isAvailable(def);
+}
+
 export async function defaultModelKey(known?: LlmModelDef[]): Promise<string | undefined> {
-  const models = known ? known.filter(isAvailable) : await availableModels();
-  // The user's pick (Settings → Default AI model) wins while its model is actually available;
-  // a stopped Ollama or a removed key falls through to the automatic choice rather than erroring.
+  // The user's pick (Settings → Default AI model) wins while it can actually run; a removed API key
+  // or a stopped Ollama falls through to the automatic choice rather than erroring.
   const chosen = env.DEFAULT_LLM_MODEL ? canonicalKey(env.DEFAULT_LLM_MODEL) : undefined;
-  if (chosen && models.some((m) => m.key === chosen)) return chosen;
+  if (chosen && runnable(chosen)) return chosen;
+  const models = (known ?? (await fallbackModels())).filter(isAvailable);
   return (models.find((m) => m.key === "flash") ?? models[0])?.key;
 }
 
@@ -449,7 +482,12 @@ function offlineDef(wanted: string): LlmModelDef | undefined {
   const pinned = staticModels().find((m) => m.key === wanted);
   if (pinned) return pinned;
   const parsed = parseCloudKey(wanted);
-  return parsed ? cloudDef(parsed.provider, parsed.modelId) : undefined;
+  if (!parsed) return undefined;
+  // A key is refused here only when a listing we still trust says the provider has no such model.
+  // With no listing to contradict it the key stands, so a typo is still caught — the difference is
+  // that we say so on the strength of something we read, never on the strength of a probe failing.
+  if (cloudModelListed(parsed.provider, parsed.modelId) === false) return undefined;
+  return cloudDef(parsed.provider, parsed.modelId);
 }
 
 export async function resolveLlm(key?: string): Promise<{ model: LanguageModel; def: LlmModelDef }> {
@@ -485,6 +523,14 @@ export async function resolveLlm(key?: string): Promise<{ model: LanguageModel; 
     case "google":
       return { model: createGoogleGenerativeAI({ apiKey: env.GOOGLE_GENERATIVE_AI_API_KEY })(def.modelId), def };
   }
+}
+
+// Whether a job is too big for the window its model reported. A window we only assumed never
+// refuses: that number is a per-provider convention standing in for metadata we could not read, and
+// skipping a book on it is worse than letting the provider answer with its real limit — the failure
+// then names the limit instead of contradicting the one the picker showed.
+export function contextExceeded(def: LlmModelDef, tokens: number): boolean {
+  return !def.contextAssumed && tokens > def.contextTokens;
 }
 
 const REQUEST_TIMEOUT_MS = 120_000;

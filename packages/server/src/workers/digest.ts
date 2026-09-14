@@ -1,7 +1,7 @@
 import { db } from "../db.ts";
 import { books, chapters, bookFiles, type DigestJob } from "../schema.ts";
 import { eq, and, isNotNull, sql } from "drizzle-orm";
-import { llmChat, resolveLlm, type LlmModelDef } from "../lib/llm.ts";
+import { contextExceeded, llmChat, resolveLlm, type LlmModelDef } from "../lib/llm.ts";
 import { describeError } from "../lib/errors.ts";
 import { getBookSummaryText } from "../lib/book-source-text.ts";
 import { estimateTokens } from "../lib/token-estimate.ts";
@@ -84,10 +84,13 @@ export async function digest(payload: DigestPayload) {
     }
 
     const tokens = estimateTokens(text) + estimateTokens(origin.prompt);
-    if (tokens > def.contextTokens) {
+    if (contextExceeded(def, tokens)) {
       failures++;
       await log(`Digest ${processed}/${total}: "${source.title}" exceeds the model's context (~${Math.round(tokens / 1000)}k tokens), skipping`);
       continue;
+    }
+    if (def.contextAssumed && tokens > def.contextTokens) {
+      await log(`Digest ${processed}/${total}: "${source.title}" may exceed the unconfirmed context of ${def.label} (~${Math.round(tokens / 1000)}k tokens) — trying it`);
     }
 
     await setJob({ progress: `${processed}/${total}` });
