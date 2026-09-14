@@ -155,9 +155,9 @@ It is idempotent — rerun it after failures. It works the same on Linux, minus 
 **For the AI features you need at least one model.**
 
 - *Offline-first (recommended)*: install [LM Studio](https://lmstudio.ai) or [Ollama](https://ollama.com) and download a chat model — a current ~27-30B reasoning model (e.g. Qwen3.8 27B, ~16 GB) is a strong offline pick on 32 GB+ Macs; use an 8B-class model on smaller machines. Running servers and their models are auto-discovered, zero config.
-- *Cloud*: add an API key for DeepSeek / OpenAI / Anthropic / Gemini.
+- *Cloud*: add an API key for DeepSeek / OpenAI / Anthropic / Gemini. Each key's models are read from the provider's own list at runtime, so models released after this build appear without a new one.
 
-The ⚙️ button on the home page opens Settings: it shows which local servers were detected (with each model's usable context size), can start a stopped server, and holds every API key — AI providers and the Cartesia/ElevenLabs cloud voices alike (written to `.env`, applied without a restart). Custom OpenAI-compatible servers (`mlx_lm.server`, llama.cpp) can be added via `LOCAL_LLM_URL` + `LOCAL_LLM_MODEL`. Every available model appears in the in-app model pickers.
+The ⚙️ button on the home page opens Settings: it shows which local servers were detected (with each model's usable context size), can start a stopped server, and holds every API key — AI providers and the Cartesia/ElevenLabs cloud voices alike (written to `.env`, applied without a restart). Custom OpenAI-compatible servers (`mlx_lm.server`, llama.cpp) can be added via `LOCAL_LLM_URL` + `LOCAL_LLM_MODEL`. Every available model appears in the in-app model pickers — the few we recommend come first, with the provider's full catalogue behind *Show all*.
 
 </details>
 

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { trpc } from "../trpc.ts";
 import type { RouterInputs } from "../../../server/src/router.ts";
 import { Modal, ModalHeader } from "./Modal.tsx";
-import { useLlmModels } from "../lib/use-llm-models.ts";
+import { SHOW_ALL_MODELS, collapsibleModels, useLlmModels } from "../lib/use-llm-models.ts";
 import { formatTokens } from "../lib/ai-presets.ts";
 import { Button } from "./Button.tsx";
 import { Dropdown } from "./Dropdown.tsx";
@@ -122,6 +122,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   // A chosen model that is not among the available ones (its server stopped, its key removed)
   // still needs an option to sit on — otherwise the select silently displays "Automatic".
   const chosenMissing = chosenDefault !== "" && !models.some((m) => m.key === chosenDefault);
+  const [showAllModels, setShowAllModels] = useState(false);
+  const { shown: shownModels, hidden: hiddenModels } = collapsibleModels(models, chosenDefault, showAllModels);
 
   const keyCard = (k: { envVar: SecretVar; label: string; note: string; configured: boolean; keyHint: string | null }) => (
     <KeyCard
@@ -156,13 +158,14 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
           <div className="rounded-md border border-(--border) p-3">
             <Dropdown
               value={chosenDefault}
-              onChange={(key) => setDefaultMutation.mutate({ key: key || null })}
+              onChange={(key) => (key === SHOW_ALL_MODELS ? setShowAllModels(true) : setDefaultMutation.mutate({ key: key || null }))}
               disabled={setDefaultMutation.isPending || (models.length === 0 && !chosenMissing)}
               fill
               options={[
                 { value: "", label: "Automatic — V4 Flash when configured, else the first available model" },
                 ...(chosenMissing ? [{ value: chosenDefault, label: `${defaultModel?.steppedOver ?? chosenDefault} (not available right now)` }] : []),
-                ...models.map((m) => ({ value: m.key, label: m.label, hint: `${m.hint} · ${formatTokens(m.contextTokens)} context`, group: m.source })),
+                ...shownModels.map((m) => ({ value: m.key, label: m.label, hint: `${m.hint} · ${formatTokens(m.contextTokens)} context`, group: m.source })),
+                ...(hiddenModels > 0 ? [{ value: SHOW_ALL_MODELS, label: `Show all ${models.length} models`, group: "", keepOpen: true }] : []),
               ]}
               testId="settings-default-model-select"
             />

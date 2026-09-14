@@ -28,6 +28,7 @@ import path from "node:path";
 import { access, readdir, unlink } from "node:fs/promises";
 import { createFastifyOptions } from "./fastify-config.ts";
 import { isUuid } from "./lib/uuid.ts";
+import { modelCatalog, seedCatalogFromDisk } from "./lib/model-catalog.ts";
 import { registerErrorHandler } from "./lib/error-handler.ts";
 import { PREVIEW_RATE_LIMIT } from "./lib/request-limits.ts";
 
@@ -275,6 +276,17 @@ async function main() {
   await migrate(db, { migrationsFolder: env.MIGRATIONS_DIR });
 
   await startWorker();
+
+  // Warm the model catalog in the background: resolveLlm reads it synchronously so a job never
+  // waits on a download, which means the first request after a restart would otherwise see the
+  // per-provider fallback context. Deliberately not awaited — the server should not wait on a
+  // 4.5 MB third-party download to come up.
+  //
+  // The disk cache is loaded first, and synchronously, because not awaiting leaves a window where
+  // a job resolves against those fallbacks while the real numbers are already on disk — the window
+  // the warm-up was meant to close. A local read is not the download the comment above rules out.
+  seedCatalogFromDisk();
+  void modelCatalog().catch(() => {});
 
   await fastify.listen({ port: PORT, host: env.HOST });
   console.log(`Server running on http://localhost:${PORT}`);

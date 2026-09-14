@@ -10,6 +10,7 @@ import { env, envFilePath } from "../env.ts";
 import { updateEnvFile } from "./env-file.ts";
 import { LLM_SECRETS, isConfigured, type SecretVar, type LlmSecretProvider } from "./secrets.ts";
 import { describeError } from "./errors.ts";
+import { cloudDef, cloudModelListed, cloudServers, parseCloudKey } from "./cloud-models.ts";
 
 // The cloud providers are whatever secrets.ts says they are; this adds the one that needs no key.
 export type LlmProviderKind = LlmSecretProvider | "openai-compatible";
@@ -25,10 +26,16 @@ export type LlmModelDef = {
   baseUrl?: string;
   apiKey?: string;
   contextTokens: number;
+  // True when contextTokens is a per-provider convention rather than a number the provider or the
+  // catalog reported. The context guards refuse to skip work on a guess — see contextExceeded.
+  contextAssumed?: boolean;
   // e.g. "capped at 4k by Ollama" / "loaded at 8k (max 131k)" — shown in settings and tooltips
   contextNote?: string;
   supportsTemperature: boolean;
   supportsTools: boolean;
+  // Curated here, or configured by the user (local server, custom endpoint). Everything else the
+  // pickers show was discovered from a provider's own listing and is hidden until asked for.
+  recommended?: boolean;
   // json_object mode is an OpenAI-compatible wire feature
   supportsJsonFormat: boolean;
 };
@@ -40,16 +47,23 @@ export const modelKeySchema = z.string().min(1).max(64).refine((k) => !/[\r\n]/.
 
 const DEEPSEEK_URL = "https://api.deepseek.com";
 
+// Keys this project used to hand out, mapped to the model each one named. Only a migration for
+// values already saved in .env and job rows — deliberately no entry whose target depends on
+// anything a provider announced, because that is how a hardcoded fact goes stale unnoticed.
+const LEGACY_MODEL_KEYS: Record<string, string> = { pro: "deepseek:deepseek-v4-pro" };
 
-const CLOUD_MODELS: LlmModelDef[] = [
+export function canonicalKey(key: string): string {
+  return LEGACY_MODEL_KEYS[key] ?? key;
+}
+
+// The models we recommend, and the only entries whose metadata is hand-checked. Everything else
+// the pickers offer is discovered from the provider at runtime — a model released this morning
+// shows up without a code change. Adding an entry here is a product decision ("this is the one to
+// start with"), not a maintenance chore, which is why it is safe for the list to be short.
+const PINNED_BASE: Omit<LlmModelDef, "recommended">[] = [
   {
-    key: "flash", source: "DeepSeek", label: "V4 Flash", hint: "Fast and cheap — good default",
-    provider: "deepseek", modelId: "deepseek-v4-flash", contextTokens: 1_000_000,
-    supportsTemperature: true, supportsTools: true, supportsJsonFormat: true,
-  },
-  {
-    key: "pro", source: "DeepSeek", label: "V4 Pro", hint: "Flagship reasoning model — slower, for harder questions",
-    provider: "deepseek", modelId: "deepseek-v4-pro", contextTokens: 1_000_000,
+    key: "flash", source: "DeepSeek", label: "V4.1 Flash", hint: "Fast and cheap — good default",
+    provider: "deepseek", modelId: "deepseek-flash", contextTokens: 1_000_000,
     supportsTemperature: true, supportsTools: true, supportsJsonFormat: true,
   },
   {
@@ -83,6 +97,7 @@ const CLOUD_MODELS: LlmModelDef[] = [
     supportsTemperature: true, supportsTools: true, supportsJsonFormat: false,
   },
 ];
+const PINNED_MODELS: LlmModelDef[] = PINNED_BASE.map((m) => ({ ...m, recommended: true }));
 
 function openAiCompatModel(def: {
   key: string;
@@ -101,6 +116,9 @@ function openAiCompatModel(def: {
     provider: "openai-compatible",
     supportsTemperature: true,
     supportsJsonFormat: true,
+    // A local server or a custom endpoint is something the user set up on purpose, so it always
+    // belongs in the picker's default view — unlike the provider catalogues, which are long.
+    recommended: true,
     ...def,
   };
 }
@@ -156,7 +174,7 @@ function localEnvModel(): LlmModelDef | undefined {
 function staticModels(): LlmModelDef[] {
   const extras = [localEnvModel(), ...configModels()].filter((m): m is LlmModelDef => m !== undefined);
   const overridden = new Set(extras.map((m) => m.key));
-  return [...CLOUD_MODELS.filter((m) => !overridden.has(m.key)), ...extras];
+  return [...PINNED_MODELS.filter((m) => !overridden.has(m.key)), ...extras];
 }
 
 // --- Local server auto-discovery: Ollama and LM Studio need no configuration ---
@@ -309,18 +327,39 @@ async function discoverLmStudio(): Promise<LocalServer> {
 }
 
 let discoveryCache: { at: number; servers: LocalServer[] } | null = null;
+let localInFlight: Promise<LocalServer[]> | null = null;
 
 export async function localServers(refresh = false): Promise<LocalServer[]> {
   if (!refresh && discoveryCache && Date.now() - discoveryCache.at < DISCOVERY_TTL_MS) return discoveryCache.servers;
-  const servers = await Promise.all([discoverOllama(), discoverLmStudio()]);
-  discoveryCache = { at: Date.now(), servers };
-  return servers;
+  // Joining an in-flight round is what a rescan must not do: Settings' Rescan calls this with
+  // refresh, and the modal's own mount queries start a round in the same tick — so the click would
+  // hand back the very probe it was pressed to replace, and a server started since would not appear.
+  if (!refresh && localInFlight) return localInFlight;
+  const pending = (async () => {
+    const servers = await Promise.all([discoverOllama(), discoverLmStudio()]);
+    discoveryCache = { at: Date.now(), servers };
+    return servers;
+  })();
+  localInFlight = pending;
+  try {
+    return await pending;
+  } finally {
+    if (localInFlight === pending) localInFlight = null;
+  }
 }
 
 async function discoveredModels(): Promise<LlmModelDef[]> {
-  const found = (await localServers()).flatMap((s) => s.models);
-  const taken = new Set(staticModels().map((m) => `${m.baseUrl}|${m.modelId}`));
-  return found.filter((m) => !taken.has(`${m.baseUrl}|${m.modelId}`));
+  const [local, cloud] = await Promise.all([localServers(), cloudServers()]);
+  const found = [...local.flatMap((s) => s.models), ...cloud.flatMap((s) => s.models)];
+  const pinned = staticModels();
+  const taken = new Set(pinned.map((m) => `${m.baseUrl}|${m.modelId}`));
+  // A pinned model is named twice — once by us, once by its provider's listing. The pin wins: it
+  // carries the metadata the context guards were checked against.
+  const named = new Set(pinned.map((m) => `${m.provider}|${m.modelId}`));
+  // Whatever a provider lists is offered. Nothing is filtered out for having been announced as
+  // going away: a model that is still served is still a model, and a list of exceptions is the
+  // maintenance this discovery exists to remove.
+  return found.filter((m) => !taken.has(`${m.baseUrl}|${m.modelId}`) && !named.has(`${m.provider}|${m.modelId}`));
 }
 
 async function allModels(): Promise<LlmModelDef[]> {
@@ -380,25 +419,54 @@ export function setDefaultModelKey(key: string | null): void {
   env.DEFAULT_LLM_MODEL = key ?? undefined;
 }
 
+// The models a job may fall back to when it names none. Pins and configured endpoints answer with
+// no network call at all, localhost is asked only if those offer nothing, and cloud providers only
+// after that — a job that picked no model must not wait on four remote listings to start.
+async function fallbackModels(): Promise<LlmModelDef[]> {
+  const pinned = staticModels().filter(isAvailable);
+  if (pinned.length > 0) return pinned;
+  const local = (await localServers()).flatMap((s) => s.models);
+  return local.length > 0 ? local : availableModels();
+}
+
+// A saved pick is judged by whether it can run, not by whether a live listing happens to name it.
+// The two come apart in exactly the cases that matter: a probe that timed out, a provider reporting
+// another id for the same model, or a listing that is empty for the length of a cache window.
+// Reading availability off the listing reroutes every job that named no model to the default, and
+// tells the user a model they can still call is unavailable.
+//
+// A local key has to ask its server, because nothing else knows whether it is still there — and
+// offlineDef cannot answer for it at all: it reads pinned keys and cloud keys, and an ollama: id is
+// neither. Skipping that branch would drop every local default on the floor and bill a cloud model.
+async function runnable(key: string): Promise<boolean> {
+  const def = offlineDef(key) ?? (isLocalKey(key) ? await localDef(key) : undefined);
+  return def !== undefined && isAvailable(def);
+}
+
 export async function defaultModelKey(known?: LlmModelDef[]): Promise<string | undefined> {
-  const models = known ? known.filter(isAvailable) : await availableModels();
-  // The user's pick (Settings → Default AI model) wins while its model is actually available;
-  // a stopped Ollama or a removed key falls through to the automatic choice rather than erroring.
-  if (env.DEFAULT_LLM_MODEL && models.some((m) => m.key === env.DEFAULT_LLM_MODEL)) {
-    return env.DEFAULT_LLM_MODEL;
-  }
+  // The user's pick (Settings → Default AI model) wins while it can actually run; a removed API key
+  // or a stopped Ollama falls through to the automatic choice rather than erroring.
+  const chosen = env.DEFAULT_LLM_MODEL ? canonicalKey(env.DEFAULT_LLM_MODEL) : undefined;
+  if (chosen && (await runnable(chosen))) return chosen;
+  const models = (known ?? (await fallbackModels())).filter(isAvailable);
   return (models.find((m) => m.key === "flash") ?? models[0])?.key;
 }
 
 // What a request will actually run on, and the Settings pick it had to step around. A stopped
 // LM Studio falls through to a cloud model silently, which is a bill and a different result.
 export async function modelChoice(key?: string): Promise<{ key: string | null; label: string; steppedOver?: string }> {
-  const models = await allModels();
-  const wanted = key || (await defaultModelKey(models)) || null;
-  const label = (of: string) => models.find((m) => m.key === of)?.label ?? of;
-  const chosen = env.DEFAULT_LLM_MODEL;
-  const steppedOver = !key && chosen && chosen !== wanted ? label(chosen) : undefined;
-  return { key: wanted, label: wanted ? label(wanted) : "no model", ...(steppedOver ? { steppedOver } : {}) };
+  // Resolved from the key alone, never from a listing: this is what Settings reads to say what a
+  // request will run on, and a provider probe that is slow or failing has no bearing on the answer.
+  const wanted = key ? canonicalKey(key) : (await defaultModelKey()) ?? null;
+  const chosen = env.DEFAULT_LLM_MODEL ? canonicalKey(env.DEFAULT_LLM_MODEL) : undefined;
+  // A local key's friendly name is the only one that needs its server asked; everything else this
+  // build can name carries its label, including the metadata of a model listed before a restart.
+  const label = async (of: string): Promise<string> => {
+    const def = offlineDef(of) ?? (isLocalKey(of) ? await localDef(of) : undefined);
+    return def?.label ?? of;
+  };
+  const steppedOver = !key && chosen && chosen !== wanted ? await label(chosen) : undefined;
+  return { key: wanted, label: wanted ? await label(wanted) : "no model", ...(steppedOver ? { steppedOver } : {}) };
 }
 
 // Must match the `name` given to createOpenAICompatible in resolveLlm — the AI SDK
@@ -409,16 +477,44 @@ function openAiCompatName(def: LlmModelDef): string {
   return def.provider === "deepseek" ? "deepseek" : def.key.replace(/[^A-Za-z0-9_-]/g, "_");
 }
 
+function isLocalKey(key: string): boolean {
+  return key.startsWith("ollama:") || key.startsWith("lmstudio:");
+}
+
+// Local ids say nothing about which port serves them, so they are the only ones that need a server
+// asked. Everything else this build can name — a pin, a custom endpoint, a cloud key — resolves
+// from the key alone.
+async function localDef(wanted: string): Promise<LlmModelDef | undefined> {
+  const servers = await localServers();
+  return servers.flatMap((s) => s.models).find((m) => m.key === wanted);
+}
+
+// Pinned entries and cloud keys resolve from the key alone: a cloud key names its own provider and
+// model id, so a running job is never made to wait on — or depend on — a listing that can fail.
+function offlineDef(wanted: string): LlmModelDef | undefined {
+  const pinned = staticModels().find((m) => m.key === wanted);
+  if (pinned) return pinned;
+  const parsed = parseCloudKey(wanted);
+  if (!parsed) return undefined;
+  // A key is refused here only when a listing we still trust says the provider has no such model.
+  // With no listing to contradict it the key stands, so a typo is still caught — the difference is
+  // that we say so on the strength of something we read, never on the strength of a probe failing.
+  if (cloudModelListed(parsed.provider, parsed.modelId) === false) return undefined;
+  return cloudDef(parsed.provider, parsed.modelId);
+}
+
 export async function resolveLlm(key?: string): Promise<{ model: LanguageModel; def: LlmModelDef }> {
-  // || not ??: a picker that has not resolved yet submits "", which means "the default", not a model
-  const wanted = key || (await defaultModelKey());
+  // "" not ??: a picker that has not resolved yet submits "", which means "the default", not a model
+  const wanted = key ? canonicalKey(key) : await defaultModelKey();
   if (!wanted) {
     throw new Error(
       "No AI model is available — start Ollama or LM Studio, or add an API key (e.g. DEEPSEEK_API_KEY) to .env",
     );
   }
-  // Static entries resolve without probing local servers
-  const def = staticModels().find((m) => m.key === wanted) ?? (await discoveredModels()).find((m) => m.key === wanted);
+  // Deliberately not discoveredModels(): that now probes four providers over the network, and a
+  // local job has no reason to wait on any of them. Before cloud discovery existed this path only
+  // ever asked localhost.
+  const def = offlineDef(wanted) ?? (isLocalKey(wanted) ? await localDef(wanted) : undefined);
   if (!def) {
     throw new Error(
       wanted.startsWith("ollama:") || wanted.startsWith("lmstudio:")
@@ -440,6 +536,14 @@ export async function resolveLlm(key?: string): Promise<{ model: LanguageModel; 
     case "google":
       return { model: createGoogleGenerativeAI({ apiKey: env.GOOGLE_GENERATIVE_AI_API_KEY })(def.modelId), def };
   }
+}
+
+// Whether a job is too big for the window its model reported. A window we only assumed never
+// refuses: that number is a per-provider convention standing in for metadata we could not read, and
+// skipping a book on it is worse than letting the provider answer with its real limit — the failure
+// then names the limit instead of contradicting the one the picker showed.
+export function contextExceeded(def: LlmModelDef, tokens: number): boolean {
+  return !def.contextAssumed && tokens > def.contextTokens;
 }
 
 const REQUEST_TIMEOUT_MS = 120_000;

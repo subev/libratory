@@ -15,6 +15,7 @@ import { quickAddJob } from "graphile-worker";
 import { rm } from "node:fs/promises";
 import { createCustomPocketVoice } from "./lib/pocket-voices.ts";
 import { UPLOAD_RATE_LIMIT } from "./lib/request-limits.ts";
+import { canonicalKey } from "./lib/llm.ts";
 
 const connectionString = env.DATABASE_URL;
 
@@ -78,7 +79,7 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
     const speed = parseFloat(fields.speed ?? "1.0");
     const ocrEngine = OCR_ENGINES.find((e) => e === fields.ocrEngine) ?? null;
     const llmChapterDetection = fields.llmChapterDetection === "true";
-    const chapterModel = fields.chapterModel?.trim().slice(0, 64) || null;
+    const chapterModel = canonicalKey(fields.chapterModel?.trim().slice(0, 64) ?? "") || null;
     const skipSynthesis = fields.skipSynthesis === "true";
     const fullExtract = fields.fullExtract === "true";
 
