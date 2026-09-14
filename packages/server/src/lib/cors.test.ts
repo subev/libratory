@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isAllowedOrigin, parseTrustedHosts } from "./cors.ts";
+import { isAllowedOrigin, parseTrustedHosts, isTrustedHost } from "./cors.ts";
 
 const NONE = parseTrustedHosts("");
 
@@ -43,5 +43,25 @@ describe("isAllowedOrigin", () => {
   it("refuses when there is no Host to judge against, or the Origin is unparseable", () => {
     expect(isAllowedOrigin("http://192.168.1.50:3034", undefined, NONE)).toBe(false);
     expect(isAllowedOrigin("null", "192.168.1.50:3034", NONE)).toBe(false);
+  });
+});
+
+describe("isTrustedHost", () => {
+  const trusted = new Set(["mac.tailnet.ts.net"]);
+
+  it("accepts loopback, IP literals and listed names", () => {
+    expect(isTrustedHost("localhost:3034", trusted)).toBe(true);
+    expect(isTrustedHost("127.0.0.1:3034", trusted)).toBe(true);
+    expect(isTrustedHost("[::1]:3034", trusted)).toBe(true);
+    expect(isTrustedHost("192.168.1.20:3034", trusted)).toBe(true);
+    expect(isTrustedHost("mac.tailnet.ts.net:3034", trusted)).toBe(true);
+    expect(isTrustedHost("MAC.tailnet.ts.net", trusted)).toBe(true);
+  });
+
+  it("rejects a rebound name, a missing header and garbage", () => {
+    expect(isTrustedHost("attacker.com", trusted)).toBe(false);
+    expect(isTrustedHost("attacker.com:3034", trusted)).toBe(false);
+    expect(isTrustedHost(undefined, trusted)).toBe(false);
+    expect(isTrustedHost("not a host", trusted)).toBe(false);
   });
 });

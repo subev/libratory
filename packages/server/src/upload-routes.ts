@@ -1,8 +1,8 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { env } from "./env.ts";
 import { db } from "./db.ts";
-import { books, bookFiles, folders, OCR_ENGINES, type NoteJob } from "./schema.ts";
-import { eq, and, desc } from "drizzle-orm";
+import { books, bookFiles, OCR_ENGINES } from "./schema.ts";
+import { eq, desc } from "drizzle-orm";
 import { profileIdFromHeader } from "./trpc.ts";
 import { isUuid } from "./lib/uuid.ts";
 import { tmpDir, uploadsDir } from "./lib/paths.ts";
@@ -15,7 +15,7 @@ import { quickAddJob } from "graphile-worker";
 import { rm } from "node:fs/promises";
 import { createCustomPocketVoice } from "./lib/pocket-voices.ts";
 import { UPLOAD_RATE_LIMIT } from "./lib/request-limits.ts";
-import { canonicalKey } from "./lib/llm.ts";
+import { createPdfBook, ensurePdfDir, newPdfBookId, pdfFileName, PdfBookInputError } from "./lib/pdf-books.ts";
 
 const connectionString = env.DATABASE_URL;
 
@@ -31,7 +31,7 @@ async function saveUploadedFiles(request: FastifyRequest, pdfDir: string, startI
       if (!part.filename.toLowerCase().endsWith(".pdf")) continue;
       const idx = startIndex + files.length;
       // The display name is metadata; no client-controlled bytes belong in a filesystem path.
-      const safeName = `${String(idx).padStart(2, "0")}_${randomUUID()}.pdf`;
+      const safeName = pdfFileName(idx);
       const pdfPath = path.join(pdfDir, safeName);
       await pipeline(part.file, createWriteStream(pdfPath));
       files.push({ index: idx, filename: part.filename, pdfPath });
@@ -55,14 +55,12 @@ function parseNoteRequest(fields: Record<string, string>): { prompt: string; mod
 
 export function registerUploadRoutes(fastify: FastifyInstance) {
   fastify.post("/upload", { config: { rateLimit: UPLOAD_RATE_LIMIT } }, async (request, reply) => {
-    const bookId = randomUUID();
-    const pdfDir = path.join(uploadsDir, bookId);
-    await mkdir(pdfDir, { recursive: true });
+    const { bookId, pdfDir } = newPdfBookId();
+    await ensurePdfDir(pdfDir);
 
     const { files, fields } = await saveUploadedFiles(request, pdfDir, 0);
 
-    const [firstFile] = files;
-    if (!firstFile) {
+    if (files.length === 0) {
       return reply.code(400).send({ error: "No PDF files uploaded" });
     }
 
@@ -71,84 +69,32 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
       return reply.code(400).send({ error: note.error });
     }
 
-    const title = fields.title
-      || firstFile.filename.replace(/\.pdf$/i, "").replace(/[_-]/g, " ");
-    const voice = fields.voice ?? "kokoro:af_heart";
-    const { parseTtsVoice } = await import("./lib/tts.ts");
-    parseTtsVoice(voice);
-    const speed = parseFloat(fields.speed ?? "1.0");
-    const ocrEngine = OCR_ENGINES.find((e) => e === fields.ocrEngine) ?? null;
-    const llmChapterDetection = fields.llmChapterDetection === "true";
-    const chapterModel = canonicalKey(fields.chapterModel?.trim().slice(0, 64) ?? "") || null;
-    const skipSynthesis = fields.skipSynthesis === "true";
-    const fullExtract = fields.fullExtract === "true";
-
     const profileId = profileIdFromHeader(request.headers["x-profile-id"]);
-    // routes/books.ts bounds this with z.string().max(8), which rejects. Truncating here instead
-    // would store "portugue" for "portuguese" — a code matching no voice and no option.
-    const language = fields.language?.trim() || null;
-    if (language && language.length > 8) {
-      return reply.code(400).send({ error: "language must be at most 8 characters" });
-    }
-    const folderId = fields.folderId || null;
-    if (folderId) {
-      const [folder] = await db
-        .select()
-        .from(folders)
-        .where(and(eq(folders.id, folderId), eq(folders.profileId, profileId)));
-      if (!folder) return reply.code(400).send({ error: "Folder not found" });
-    }
 
-    const now = new Date().toISOString();
-    const noteJob: NoteJob | undefined = note
-      ? { status: "queued", prompt: note.prompt, model: note.model, createdAt: now, updatedAt: now }
-      : undefined;
-
-    const [book] = await db
-      .insert(books)
-      .values({
-        id: bookId,
-        title,
-        filename: firstFile.filename,
-        pdfPath: firstFile.pdfPath,
-        voice,
-        speed,
-        ocrEngine,
-        llmChapterDetection,
-        chapterModel,
-        skipSynthesis,
-        language,
-        folderId,
-        profileId,
-        ...(noteJob ? { noteJob } : {}),
-      })
-      .returning();
-
-    await db.insert(bookFiles).values(
-      files.map((f) => ({
+    try {
+      const book = await createPdfBook(
         bookId,
-        index: f.index,
-        filename: f.filename,
-        pdfPath: f.pdfPath,
-        skipSynthesis,
-        status: (fullExtract ? "pending" : "raw") as "pending" | "raw",
-      })),
-    );
-
-    await quickAddJob(
-      { connectionString },
-      "rawExtract",
-      { bookId, ...(note ? { note } : {}) },
-      { maxAttempts: 1 },
-    );
-    // Extraction does the OCR inline, per file, so queueing both would read every page twice.
-    if (fullExtract) {
-      await quickAddJob({ connectionString }, "extract", { bookId }, { maxAttempts: 1, jobKey: `extract:${bookId}`, jobKeyMode: "replace" });
-    } else {
-      await quickAddJob({ connectionString }, "ocrTextLayer", { bookId }, { maxAttempts: 1 });
+        {
+          files,
+          title: fields.title,
+          voice: fields.voice,
+          speed: fields.speed === undefined ? undefined : parseFloat(fields.speed),
+          ocrEngine: OCR_ENGINES.find((e) => e === fields.ocrEngine) ?? null,
+          llmChapterDetection: fields.llmChapterDetection === "true",
+          chapterModel: fields.chapterModel,
+          skipSynthesis: fields.skipSynthesis === "true",
+          fullExtract: fields.fullExtract === "true",
+          language: fields.language,
+          folderId: fields.folderId,
+          ...(note ? { note } : {}),
+        },
+        profileId,
+      );
+      return reply.send(book);
+    } catch (err) {
+      if (err instanceof PdfBookInputError) return reply.code(400).send({ error: err.message });
+      throw err;
     }
-
-    return reply.send(book);
   });
 
   fastify.post("/upload/:bookId", { config: { rateLimit: UPLOAD_RATE_LIMIT } }, async (request, reply) => {

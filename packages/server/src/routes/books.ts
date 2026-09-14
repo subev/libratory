@@ -69,16 +69,12 @@ async function hasQueuedAssembleJob(bookId: string): Promise<boolean> {
   return rows.length > 0;
 }
 
-function computeBookStatus(
-  book: Book,
-  chapterList: Pick<Chapter, "status">[],
-): string {
+export function computeBookStatus(book: Book, statuses: readonly Chapter["status"][]): string {
   if (book.status === "extracting" || book.status === "assembling") return book.status;
-  if (chapterList.length === 0) {
+  if (statuses.length === 0) {
     if (book.status === "failed") return "failed";
     return book.status;
   }
-  const statuses = chapterList.map((c) => c.status);
   if (statuses.some((s) => s === "synthesizing" || s === "normalizing")) return "synthesizing";
   if (statuses.some((s) => s === "pending")) return "synthesizing";
   if (statuses.every((s) => s === "done")) return "done";
@@ -395,7 +391,7 @@ export const booksRouter = router({
 
       const totalWords = chaptersWithStats.reduce((sum, ch) => sum + ch.wordCount, 0);
       const totalDurationMs = allChapters.reduce((sum, ch) => sum + (ch.durationMs ?? 0), 0);
-      const status = computeBookStatus(book, allChapters);
+      const status = computeBookStatus(book, allChapters.map((c) => c.status));
 
       // rawText can be megabytes and this query is polled — never ship it
       const files = await db
