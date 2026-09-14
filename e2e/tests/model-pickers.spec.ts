@@ -38,3 +38,15 @@ test("a book's stored model still reads as set when no listing carries it", asyn
   await expect(trigger).toHaveAttribute("data-value", STORED);
   await expect(trigger).toContainText("(not available right now)");
 });
+
+test("a legacy model key reads as the model it names, not as an unavailable one", async ({ page, request, fakeLlm: _fakeLlm }) => {
+  await uploadFixtureBook(page);
+  const bookId = page.url().split("/books/")[1] ?? "";
+  // `pro` is a key this app used to hand out and resolves to the model it named, so a picker
+  // showing "pro (not available right now)" labels a model that runs exactly as chosen as missing.
+  await trpcMutation(request, "books.updateSettings", { id: bookId, llmChapterDetection: true, chapterModel: "pro" });
+
+  await page.reload();
+  await page.getByTestId("extract-chapters").click();
+  await expect(page.getByTestId("extract-chapter-model")).toHaveAttribute("data-value", "deepseek:deepseek-v4-pro");
+});

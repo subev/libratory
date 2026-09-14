@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { modelKeySchema } from "../lib/llm.ts";
+import { canonicalKey, modelKeySchema } from "../lib/llm.ts";
 import { router, publicProcedure } from "../trpc.ts";
 import { db } from "../db.ts";
 import { books, bookFiles, chapters, bookLogs, assemblies, documents, chapterVariants, folders, DEFAULT_PROFILE_ID, OCR_ENGINES } from "../schema.ts";
@@ -429,7 +429,9 @@ export const booksRouter = router({
         ...f,
         ocrGarbled: isGarbled(f.ocrEngine, f.ocrLowConfidenceFraction),
       }));
-      return { ...book, status, chapters: chaptersWithStats, totalWords, totalDurationMs, files: filesWithAdvice, rawTextTotalWords, assembleQueued, folderPath };
+      // Canonicalized like every other reader of a stored model key: a legacy `pro` resolves to the
+      // model it named, and shipping it raw made the picker label a working model unavailable.
+      return { ...book, chapterModel: book.chapterModel ? canonicalKey(book.chapterModel) : book.chapterModel, status, chapters: chaptersWithStats, totalWords, totalDurationMs, files: filesWithAdvice, rawTextTotalWords, assembleQueued, folderPath };
     }),
 
   logs: publicProcedure
@@ -484,7 +486,7 @@ export const booksRouter = router({
       if (input.speed !== undefined) updates.speed = input.speed;
       if (input.ocrEngine !== undefined) updates.ocrEngine = input.ocrEngine;
       if (input.llmChapterDetection !== undefined) updates.llmChapterDetection = input.llmChapterDetection;
-      if (input.chapterModel !== undefined) updates.chapterModel = input.chapterModel;
+      if (input.chapterModel !== undefined) updates.chapterModel = canonicalKey(input.chapterModel);
       if (input.language !== undefined) updates.language = input.language || null;
       if (input.author !== undefined) updates.author = input.author?.trim() || null;
       await db.update(books).set(updates).where(eq(books.id, input.id));
@@ -578,7 +580,7 @@ export const booksRouter = router({
       if (input.speed) updates.speed = input.speed;
       if (input.ocrEngine !== undefined) updates.ocrEngine = input.ocrEngine;
       if (input.llmChapterDetection !== undefined) updates.llmChapterDetection = input.llmChapterDetection;
-      if (input.chapterModel !== undefined) updates.chapterModel = input.chapterModel;
+      if (input.chapterModel !== undefined) updates.chapterModel = canonicalKey(input.chapterModel);
 
       await db.update(books).set(updates).where(eq(books.id, input.id));
       await rm(bookOutputDir(input.id), { recursive: true, force: true }).catch(() => {});
@@ -764,7 +766,7 @@ export const booksRouter = router({
       };
       if (input.ocrEngine !== undefined) updates.ocrEngine = input.ocrEngine;
       if (input.llmChapterDetection !== undefined) updates.llmChapterDetection = input.llmChapterDetection;
-      if (input.chapterModel !== undefined) updates.chapterModel = input.chapterModel;
+      if (input.chapterModel !== undefined) updates.chapterModel = canonicalKey(input.chapterModel);
       await db.update(books).set(updates).where(eq(books.id, input.id));
 
       await appendLog(input.id, "Queued chapter re-detection");
@@ -847,7 +849,7 @@ export const booksRouter = router({
         .update(books)
         .set({
           chapterProposal: { status: "running", method: input.method, createdAt: new Date().toISOString() },
-          ...(input.model !== undefined ? { chapterModel: input.model } : {}),
+          ...(input.model !== undefined ? { chapterModel: canonicalKey(input.model) } : {}),
           updatedAt: new Date(),
         })
         .where(eq(books.id, input.id));
