@@ -71,6 +71,14 @@ if [ ! -d "$DESKTOP/resources/bin" ] || [ ! -d "$DESKTOP/resources/tessdata" ]; 
     exit 1
   }
 fi
+# Apple Vision word boxes for the AI OCR engine (scripts/vision-words.swift): compiled here rather
+# than shipped in the tools tarball, since the Swift toolchain is on every build Mac and the source
+# is the pin. Without it the engine falls back to Tesseract's boxes.
+if [ ! -x "$DESKTOP/resources/bin/vision-words" ] || [ scripts/vision-words.swift -nt "$DESKTOP/resources/bin/vision-words" ]; then
+  echo "==> compiling vision-words"
+  bash scripts/build-vision-words.sh "$DESKTOP/resources/bin/vision-words" \
+    || echo "    no Swift toolchain — the AI OCR engine will place words with Tesseract's boxes instead" >&2
+fi
 [ -f "$DESKTOP/build/icon.icns" ] || { echo "==> rendering the icon"; bash scripts/make-icon.sh; }
 
 echo "==> building the web bundle"

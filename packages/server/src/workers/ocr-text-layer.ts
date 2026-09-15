@@ -6,7 +6,7 @@ import { books, bookFiles, DEFAULT_OCR_ENGINE } from "../schema.ts";
 import { clearExtractAbort, registerExtractAbort } from "../lib/extract-registry.ts";
 import { appendLog } from "../lib/log.ts";
 import { ExtractAbortedError } from "../lib/marker.ts";
-import { ensureTextLayer } from "../lib/ocr-text-layer.ts";
+import { ensureTextLayer, textLayerDone } from "../lib/ocr-text-layer.ts";
 import { pdfHasTextLayer } from "../lib/pdf-raw-text.ts";
 
 export type OcrTextLayerPayload = {
@@ -31,8 +31,9 @@ export async function ocrTextLayer(payload: OcrTextLayerPayload, { addJob }: { a
     .orderBy(asc(bookFiles.index));
   const needs: { file: (typeof files)[number]; hasTextLayer?: boolean | null }[] = [];
   for (const file of files) {
-    if (force && file.searchablePdfPath) needs.push({ file });
-    else if (!file.searchablePdfPath) {
+    const done = await textLayerDone(bookId, file);
+    if (force && done) needs.push({ file });
+    else if (!done) {
       const hasTextLayer = await pdfHasTextLayer(file.pdfPath);
       if (hasTextLayer === false) needs.push({ file, hasTextLayer });
     }
@@ -48,7 +49,7 @@ export async function ocrTextLayer(payload: OcrTextLayerPayload, { addJob }: { a
     for (const { file, hasTextLayer } of needs) {
       const fileLog = (msg: string) => appendLog(bookId, msg, file.index);
       if (!book.ocrEngine) await fileLog(`No text layer in "${file.filename}" — reading it with Tesseract by default; change the engine under "About this book" in Extract…`);
-      const produced = await ensureTextLayer({ bookId, file, engine, language: book.language, force, hasTextLayer, log: fileLog, signal: abort.signal });
+      const produced = await ensureTextLayer({ bookId, file, engine, language: book.language, ocrModel: book.ocrModel, force, hasTextLayer, log: fileLog, signal: abort.signal });
       if (produced) written++;
     }
 

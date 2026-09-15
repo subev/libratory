@@ -4,7 +4,7 @@ import { router, publicProcedure } from "../trpc.ts";
 import { db } from "../db.ts";
 import { books, bookFiles, chapters, bookLogs, assemblies, documents, chapterVariants, folders, DEFAULT_PROFILE_ID, OCR_ENGINES } from "../schema.ts";
 import type { Book, Chapter } from "../schema.ts";
-import { eq, desc, asc, gt, and, ne, inArray, ilike, isNotNull, sql } from "drizzle-orm";
+import { eq, desc, asc, gt, and, or, ne, inArray, ilike, isNotNull, sql } from "drizzle-orm";
 import { uploadsDir, bookOutputDir } from "../lib/paths.ts";
 import { deleteBook } from "../lib/delete-book.ts";
 import { folderAncestors } from "../lib/folders.ts";
@@ -19,7 +19,7 @@ import { measureBookDiskUsage, measureDirs, removeDirs, bookTotalSizeCached, fil
 import { chapterChunkPreviewDir } from "../lib/chunk-previews.ts";
 import { translationChunkPreviewDir } from "../workers/synthesize-translation.ts";
 import { insertSuspendedChapters, resetChaptersKeepingInserted } from "../lib/insert-chapters.ts";
-import { isGarbled } from "../lib/ocr-text-layer.ts";
+import { isGarbled, replaceFileWords } from "../lib/ocr-text-layer.ts";
 import { countAsciiNonAscii } from "../lib/token-estimate.ts";
 import { assembleJobKey, documentJobKey, inFlightInputs } from "../lib/output-readiness.ts";
 import { randomUUID } from "node:crypto";
@@ -427,7 +427,7 @@ export const booksRouter = router({
       }));
       // Canonicalized like every other reader of a stored model key: a legacy `pro` resolves to the
       // model it named, and shipping it raw made the picker label a working model unavailable.
-      return { ...book, chapterModel: book.chapterModel ? canonicalKey(book.chapterModel) : book.chapterModel, status, chapters: chaptersWithStats, totalWords, totalDurationMs, files: filesWithAdvice, rawTextTotalWords, assembleQueued, folderPath };
+      return { ...book, chapterModel: book.chapterModel ? canonicalKey(book.chapterModel) : book.chapterModel, ocrModel: book.ocrModel ? canonicalKey(book.ocrModel) : book.ocrModel, status, chapters: chaptersWithStats, totalWords, totalDurationMs, files: filesWithAdvice, rawTextTotalWords, assembleQueued, folderPath };
     }),
 
   logs: publicProcedure
@@ -468,6 +468,8 @@ export const booksRouter = router({
       ocrEngine: z.enum(OCR_ENGINES).nullable().optional(),
       llmChapterDetection: z.boolean().optional(),
       chapterModel: modelKeySchema.optional(),
+      // The vision model the "llm" OCR engine reads with; null = the Settings default
+      ocrModel: modelKeySchema.nullable().optional(),
       // ISO-639-1 of the book's own text; "" clears it back to unknown
       language: z.string().max(8).nullable().optional(),
       // "" clears it, so a wrong guess from the PDF can be taken back rather than only corrected
@@ -481,6 +483,7 @@ export const booksRouter = router({
       }
       if (input.speed !== undefined) updates.speed = input.speed;
       if (input.ocrEngine !== undefined) updates.ocrEngine = input.ocrEngine;
+      if (input.ocrModel !== undefined) updates.ocrModel = input.ocrModel ? canonicalKey(input.ocrModel) : null;
       if (input.llmChapterDetection !== undefined) updates.llmChapterDetection = input.llmChapterDetection;
       if (input.chapterModel !== undefined) updates.chapterModel = canonicalKey(input.chapterModel);
       if (input.language !== undefined) updates.language = input.language || null;
@@ -540,6 +543,7 @@ export const booksRouter = router({
         voice: z.string().optional(),
         speed: z.number().min(0.5).max(2.0).optional(),
         ocrEngine: z.enum(OCR_ENGINES).nullable().optional(),
+        ocrModel: modelKeySchema.nullable().optional(),
         forgetTextLayer: z.boolean().optional(),
         llmChapterDetection: z.boolean().optional(),
         chapterModel: modelKeySchema.optional(),
@@ -559,7 +563,7 @@ export const booksRouter = router({
         await db
           .update(bookFiles)
           .set({ searchablePdfPath: null, ocrEngine: null, ocrConfidence: null, ocrLowConfidenceFraction: null, rawText: null, rawWords: null })
-          .where(and(eq(bookFiles.bookId, input.id), isNotNull(bookFiles.searchablePdfPath)));
+          .where(and(eq(bookFiles.bookId, input.id), or(isNotNull(bookFiles.searchablePdfPath), eq(bookFiles.ocrEngine, "llm"))));
       }
 
       const updates: Record<string, unknown> = {
@@ -575,6 +579,7 @@ export const booksRouter = router({
       }
       if (input.speed) updates.speed = input.speed;
       if (input.ocrEngine !== undefined) updates.ocrEngine = input.ocrEngine;
+      if (input.ocrModel !== undefined) updates.ocrModel = input.ocrModel ? canonicalKey(input.ocrModel) : null;
       if (input.llmChapterDetection !== undefined) updates.llmChapterDetection = input.llmChapterDetection;
       if (input.chapterModel !== undefined) updates.chapterModel = canonicalKey(input.chapterModel);
 
@@ -741,6 +746,7 @@ export const booksRouter = router({
       z.object({
         id: z.string().uuid(),
         ocrEngine: z.enum(OCR_ENGINES).nullable().optional(),
+        ocrModel: modelKeySchema.nullable().optional(),
         llmChapterDetection: z.boolean().optional(),
         chapterModel: modelKeySchema.optional(),
       })
@@ -761,6 +767,7 @@ export const booksRouter = router({
         updatedAt: new Date(),
       };
       if (input.ocrEngine !== undefined) updates.ocrEngine = input.ocrEngine;
+      if (input.ocrModel !== undefined) updates.ocrModel = input.ocrModel ? canonicalKey(input.ocrModel) : null;
       if (input.llmChapterDetection !== undefined) updates.llmChapterDetection = input.llmChapterDetection;
       if (input.chapterModel !== undefined) updates.chapterModel = canonicalKey(input.chapterModel);
       await db.update(books).set(updates).where(eq(books.id, input.id));
@@ -1187,6 +1194,23 @@ export const booksRouter = router({
       const freed = await removeDirs(await cleanableChunkDirs(input.bookId));
       await appendLog(input.bookId, `Cleaned up WAV chunks of finished chapters — freed ${(freed / 1e9).toFixed(2)} GB`);
       return { freed };
+    }),
+
+  // Places an AI-read book's words on its pages again from the saved transcription — a newer
+  // local reader or alignment, no model call — and refreshes the copy and the chapters' block
+  // polygons in place, so nothing synthesized has to be redone.
+  replaceWords: publicProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ input }) => {
+      const [book] = await db.select().from(books).where(eq(books.id, input.id));
+      if (!book) throw new Error("Book not found");
+      if (await extractionRunning(input.id)) throw new Error("Extraction is running for this book — wait for it to finish");
+      const files = await db.select().from(bookFiles).where(and(eq(bookFiles.bookId, input.id), eq(bookFiles.ocrEngine, "llm")));
+      if (files.length === 0) throw new Error("No file of this book was read by the AI engine");
+      const log = (message: string) => appendLog(input.id, message);
+      const results = [];
+      for (const file of files) results.push({ fileIndex: file.index, ...(await replaceFileWords({ bookId: input.id, file, language: book.language, log })) });
+      return results;
     }),
 
   cancel: publicProcedure

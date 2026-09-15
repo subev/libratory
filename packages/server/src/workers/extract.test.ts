@@ -16,6 +16,7 @@ vi.mock("../lib/log.ts", () => ({
 
 vi.mock("../lib/paths.ts", () => ({
   bookTmpDir: (bookId: string) => `/tmp/test-${bookId}`,
+  bookFileOutDir: (bookId: string, fileIndex: number) => `/tmp/test-${bookId}/file_${fileIndex}`,
 }));
 
 // Redirect the db import to our test database

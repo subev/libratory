@@ -1,6 +1,9 @@
+import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { medianBodyPt, pageLayout, type GeometryLine, type GeometryPage } from "./page-geometry.ts";
+import { ensureSourceGeometry, medianBodyPt, pageLayout, removeSourceGeometry, type GeometryLine, type GeometryPage } from "./page-geometry.ts";
 
 function line(x0: number, x1: number, top: number, height = 10): GeometryLine {
   return { b: [x0, top, x1, top + height], t: "x".repeat(Math.round((x1 - x0) / 5)) };
@@ -64,5 +67,23 @@ describe("medianBodyPt", () => {
 
   it("returns null for a page with no text", () => {
     expect(medianBodyPt([page([])])).toBeNull();
+  });
+});
+
+describe("removeSourceGeometry", () => {
+  it("drops the sidecar and the parsed copy of it, so the next read is not the old text layer's", async () => {
+    const outDir = await mkdtemp(path.join(tmpdir(), "geometry-"));
+    const target = path.join(outDir, "geometry.json");
+    const stale = { version: 4, pages: [{ i: 0, w: 100, h: 100, rot: 0, cropOffset: [0, 0], lines: [] }] };
+    await writeFile(target, JSON.stringify(stale));
+    // Served as is, and now held in memory
+    const source = { fileIndex: 0, filename: "x.pdf", pdfPath: "/nowhere.pdf", outDir };
+    expect((await ensureSourceGeometry(source))?.pages).toHaveLength(1);
+
+    await removeSourceGeometry(outDir);
+    expect(await stat(target).then(() => true, () => false)).toBe(false);
+    await expect(readFile(target)).rejects.toThrow();
+    // A second removal of nothing is not an error
+    await removeSourceGeometry(outDir);
   });
 });

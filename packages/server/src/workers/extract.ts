@@ -5,10 +5,10 @@ import { eq, ne, and, asc, max } from "drizzle-orm";
 import { extractPdf, ExtractAbortedError } from "../lib/marker.ts";
 import { registerExtractAbort, clearExtractAbort } from "../lib/extract-registry.ts";
 import { ensureTextLayer } from "../lib/ocr-text-layer.ts";
+import { removeLlmLayout } from "../lib/ocr-llm.ts";
 import { readablePdfPath } from "../lib/pdf-raw-text.ts";
-import { bookTmpDir } from "../lib/paths.ts";
+import { bookFileOutDir, bookTmpDir } from "../lib/paths.ts";
 import { appendLog } from "../lib/log.ts";
-import path from "node:path";
 import { assembleJobKey } from "../lib/output-readiness.ts";
 import { queueIndexBook } from "../lib/search-index.ts";
 
@@ -98,10 +98,12 @@ async function extractSinglePdf(
   sourceFileIndex: number | null,
   skipSynthesis: boolean,
   signal?: AbortSignal,
+  prebuiltLayout = false,
 ) {
   const { chapters: extractedChapters, method } = await extractPdf(book.pdfPath, tmpOut, log, {
     llmChapterDetection: book.llmChapterDetection,
     chapterModel: book.chapterModel ?? undefined,
+    prebuiltLayout,
     signal,
   });
 
@@ -189,6 +191,7 @@ async function extractMultipleFiles(
         file,
         engine,
         language: book.language,
+        ocrModel: book.ocrModel,
         log: fileLog,
         signal: abort.signal,
       });
@@ -204,7 +207,11 @@ async function extractMultipleFiles(
           .where(eq(bookFiles.id, file.id));
         if (refreshed) source = refreshed;
       }
-      const tmpOut = path.join(bookTmpDir(book.id), `file_${file.index}`);
+      const tmpOut = bookFileOutDir(book.id, file.index);
+      // A file the AI engine read has its layout in tmpOut already and no text layer for Marker;
+      // any other engine runs Marker, which must not find a stale AI layout there first.
+      const aiRead = engine === "llm" && (produced || file.ocrEngine === "llm");
+      if (!aiRead) await removeLlmLayout(tmpOut);
       const count = await extractSinglePdf(
         { ...book, pdfPath: readablePdfPath(source) },
         tmpOut,
@@ -214,6 +221,7 @@ async function extractMultipleFiles(
         file.index,
         file.skipSynthesis,
         abort.signal,
+        aiRead,
       );
       chapterOffset += count;
       filesSucceeded++;

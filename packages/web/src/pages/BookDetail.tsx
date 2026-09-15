@@ -942,6 +942,7 @@ export function BookDetail() {
               bookId={book.id}
               isProcessing={isProcessing}
               ocrEngine={book.ocrEngine}
+              ocrModel={book.ocrModel ?? null}
               llmChapterDetection={book.llmChapterDetection}
               chapterModel={book.chapterModel ?? null}
               language={book.language ?? null}

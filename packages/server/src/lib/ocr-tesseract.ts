@@ -97,16 +97,87 @@ export function statsFromConfidences(confidences: number[]): OcrStats {
   return { confidence: sum / confidences.length / 100, lowConfidenceFraction: low / confidences.length };
 }
 
-function statsFromTsv(tsv: string): OcrStats {
-  const confidences: number[] = [];
-  for (const line of tsv.split("\n").slice(1)) {
-    const columns = line.split("\t");
-    if (columns[0] !== "5") continue;
-    const conf = Number(columns[10]);
-    if (!Number.isFinite(conf) || conf < 0) continue;
-    confidences.push(conf);
+export type OcrWord = {
+  text: string;
+  /** [x0, y0, x1, y1] in pixels of the image Tesseract read */
+  box: [number, number, number, number];
+  conf: number;
+  /** Running index of the printed line the word sits on */
+  line: number;
+};
+
+export type OcrPage = {
+  words: OcrWord[];
+  /** What `tesseract … txt` would have printed: words joined by spaces, a line per printed line, a blank line per paragraph */
+  text: string;
+  /** The image size, from the page row; null when the TSV has none */
+  width: number | null;
+  height: number | null;
+};
+
+// Tesseract's TSV has one row per level, 1 page to 5 word, with the columns level, page, block,
+// paragraph, line, word, left, top, width, height, conf, text. Only word rows carry text and a
+// 0–100 confidence; the rest carry -1.
+export function parseTsv(tsv: string): OcrPage {
+  const words: OcrWord[] = [];
+  let text = "";
+  let width: number | null = null;
+  let height: number | null = null;
+  let line = -1;
+  let lineKey = "";
+  let paragraphKey = "";
+  for (const row of tsv.split("\n").slice(1)) {
+    const c = row.split("\t");
+    if (c[0] === "1") {
+      width = Number(c[8]) || null;
+      height = Number(c[9]) || null;
+      continue;
+    }
+    if (c[0] !== "5") continue;
+    const conf = Number(c[10]);
+    const word = (c[11] ?? "").trim();
+    if (!Number.isFinite(conf) || conf < 0 || !word) continue;
+    const paragraph = c.slice(1, 4).join(":");
+    const key = c.slice(1, 5).join(":");
+    if (key !== lineKey) {
+      if (line >= 0) text += paragraph === paragraphKey ? "\n" : "\n\n";
+      lineKey = key;
+      paragraphKey = paragraph;
+      line++;
+    } else {
+      text += " ";
+    }
+    text += word;
+    const [left, top, w, h] = c.slice(6, 10).map(Number) as [number, number, number, number];
+    words.push({ text: word, box: [left, top, left + w, top + h], conf, line });
   }
-  return statsFromConfidences(confidences);
+  return { words, text: text ? `${text}\n` : "", width, height };
+}
+
+function statsFromTsv(tsv: string): OcrStats {
+  return statsFromConfidences(parseTsv(tsv).words.map((w) => w.conf));
+}
+
+export type PdfPageSize = { width: number; height: number };
+
+// Each page as displayed, in PDF points. pdfinfo reports the crop box before /Rotate while
+// pdftoppm and pdfium apply it, so a page rotated a quarter turn has its sides swapped here.
+export async function pdfPageSizes(pdfPath: string): Promise<PdfPageSize[]> {
+  const pages = await pdfPageCount(pdfPath);
+  const { stdout } = await execFileAsync("pdfinfo", ["-f", "1", "-l", String(pages), pdfPath], { timeout: 60_000, maxBuffer: 64 * 1024 * 1024 });
+  const sizes = new Map<number, PdfPageSize>();
+  for (const m of stdout.matchAll(/^Page\s+(\d+)\s+size:\s+([\d.]+) x ([\d.]+) pts/gm)) {
+    sizes.set(Number(m[1]), { width: Number(m[2]), height: Number(m[3]) });
+  }
+  for (const m of stdout.matchAll(/^Page\s+(\d+)\s+rot:\s+(\d+)/gm)) {
+    const size = sizes.get(Number(m[1]));
+    if (size && (Number(m[2]) === 90 || Number(m[2]) === 270)) sizes.set(Number(m[1]), { width: size.height, height: size.width });
+  }
+  return Array.from({ length: pages }, (_, i) => {
+    const size = sizes.get(i + 1);
+    if (!size) throw new Error(`pdfinfo gave no size for page ${i + 1} of "${path.basename(pdfPath)}"`);
+    return size;
+  });
 }
 
 export async function detectScript(png: string): Promise<string | null> {

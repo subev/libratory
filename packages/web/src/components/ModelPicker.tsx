@@ -8,6 +8,7 @@ export const ModelPicker = memo(function ModelPicker({
   value,
   onChange,
   requireTools = false,
+  requireVision = false,
   testId,
   placement,
 }: {
@@ -15,6 +16,8 @@ export const ModelPicker = memo(function ModelPicker({
   onChange: (key: string) => void;
   // library chat needs tool calling; models without it stay visible but disabled
   requireTools?: boolean;
+  // the AI OCR engine needs image input; only a model known not to have it is disabled
+  requireVision?: boolean;
   testId: string;
   // A picker in a modal's footer opens upward: the panel clips whatever hangs below it
   placement?: "below" | "above";
@@ -39,11 +42,11 @@ export const ModelPicker = memo(function ModelPicker({
 
   useEffect(() => {
     if (defaultPending) return;
-    const fallback = fallbackModelKey(models, value, defaultKey, requireTools);
+    const fallback = fallbackModelKey(models, value, defaultKey, requireTools, requireVision);
     if (!fallback || emitted.current === fallback) return;
     emitted.current = fallback;
     latest.current(fallback);
-  }, [models, value, requireTools, defaultKey, defaultPending]);
+  }, [models, value, requireTools, requireVision, defaultKey, defaultPending]);
 
   const active = models.find((m) => m.key === value);
   // A stored key the list does not carry still needs a row to sit on, or the trigger reads as
@@ -51,11 +54,12 @@ export const ModelPicker = memo(function ModelPicker({
   const stored = value !== "" && active === undefined ? value : null;
   const option = (m: LlmModel) => {
     const noTools = requireTools && !m.supportsTools;
+    const noVision = requireVision && m.vision === false;
     return {
       value: m.key,
-      label: `${m.label}${noTools ? " (no chat tools)" : ""}`,
+      label: `${m.label}${noTools ? " (no chat tools)" : noVision ? " (cannot read images)" : ""}`,
       hint: `${m.hint} · ${formatTokens(m.contextTokens)} context`,
-      disabled: noTools,
+      disabled: noTools || noVision,
       group: m.source,
     };
   };

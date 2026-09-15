@@ -35,6 +35,7 @@ export function BookFilesSection({
   bookId,
   isProcessing,
   ocrEngine,
+  ocrModel,
   llmChapterDetection,
   chapterModel,
   language,
@@ -56,13 +57,14 @@ export function BookFilesSection({
   bookId: string;
   isProcessing: boolean;
   ocrEngine: OcrEngine | null;
+  ocrModel: string | null;
   llmChapterDetection: boolean;
   chapterModel: string | null;
   language: string | null;
   extractOpen: boolean;
   onExtractOpenChange: (open: boolean) => void;
   onStartExtraction: (scope: ExtractScope) => void;
-  onUpdateExtractionSettings: (settings: { ocrEngine?: OcrEngine | null; llmChapterDetection?: boolean; chapterModel?: string; language?: string | null }) => void;
+  onUpdateExtractionSettings: (settings: { ocrEngine?: OcrEngine | null; ocrModel?: string | null; llmChapterDetection?: boolean; chapterModel?: string; language?: string | null }) => void;
   onSetSelected: (id: string, selected: boolean) => void;
   onSetAllSelected: (selected: boolean) => void | Promise<unknown>;
   onSetSelectedBatch: (ids: string[], selected: boolean) => void | Promise<unknown>;
@@ -72,8 +74,10 @@ export function BookFilesSection({
   onCancel: (id: string) => void;
   onFilesAdded: () => void;
 }) {
-  const scanned = files.filter((f) => !f.hasRawText || f.hasSearchablePdf);
-  const scanEngines = new Set(scanned.filter((f) => f.hasSearchablePdf).map((f) => f.ocrEngine ?? null));
+  // A file the AI engine read has its text, and a searchable copy only where a Tesseract pack placed its words; either way it is a scan that was read
+  const wasRead = (f: BookFileRow) => Boolean(f.hasSearchablePdf) || f.ocrEngine === "llm";
+  const scanned = files.filter((f) => !f.hasRawText || wasRead(f));
+  const scanEngines = new Set(scanned.filter(wasRead).map((f) => f.ocrEngine ?? null));
   const scanConfidences = scanned.map((f) => f.ocrConfidence).filter((c): c is number => typeof c === "number");
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   // Selection is fire-and-forget from the checkboxes; the banner reports a failure, this only
@@ -335,10 +339,11 @@ export function BookFilesSection({
           isProcessing={isProcessing}
           bookId={bookId}
           ocrEngine={ocrEngine}
+          ocrModel={ocrModel}
           canSetOcr={scanned.length > 0}
           tryFileIndex={scanned[0]?.index ?? 0}
           scan={{
-            read: scanned.length > 0 && scanned.every((f) => f.hasSearchablePdf),
+            read: scanned.length > 0 && scanned.every(wasRead),
             engine: scanEngines.size === 1 ? [...scanEngines][0] ?? null : null,
             confidence: scanConfidences.length > 0 ? Math.min(...scanConfidences) : null,
             garbled: scanned.some((f) => f.ocrGarbled),

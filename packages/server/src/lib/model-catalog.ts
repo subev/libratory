@@ -17,6 +17,8 @@ export type CatalogModel = {
   supportsTools?: boolean;
   supportsJsonFormat?: boolean;
   supportsTemperature?: boolean;
+  // modalities.input names "image"
+  vision?: boolean;
 };
 
 // provider id -> native model id -> metadata
@@ -27,6 +29,11 @@ const EMPTY: Catalog = new Map();
 // The payload is 4.5 MB of third-party data covering 213 providers, and we read six fields out of
 // it. Hand-walking with typeof guards keeps the parse cheap and tolerates their shape drifting;
 // a schema here would reject the whole catalog over one provider we do not use.
+function inputModalities(modalities: unknown): string[] | undefined {
+  const input = (modalities as Record<string, unknown> | null)?.input;
+  return Array.isArray(input) ? input.filter((m): m is string => typeof m === "string") : undefined;
+}
+
 export function extract(raw: unknown): Catalog {
   const catalog: Catalog = new Map();
   if (typeof raw !== "object" || raw === null) return catalog;
@@ -46,6 +53,7 @@ export function extract(raw: unknown): Catalog {
         supportsTools: flag(model.tool_call),
         supportsJsonFormat: flag(model.structured_output),
         supportsTemperature: flag(model.temperature),
+        vision: inputModalities(model.modalities)?.includes("image"),
       });
     }
     catalog.set(providerId, byId);

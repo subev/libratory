@@ -40,6 +40,7 @@ export function ExtractModal({
   isProcessing,
   bookId,
   ocrEngine,
+  ocrModel,
   canSetOcr,
   tryFileIndex,
   scan,
@@ -57,13 +58,14 @@ export function ExtractModal({
   isProcessing: boolean;
   bookId: string;
   ocrEngine: OcrEngine | null;
+  ocrModel: string | null;
   canSetOcr: boolean;
   tryFileIndex: number;
   scan: { read: boolean; engine: OcrEngine | null; confidence: number | null; garbled: boolean };
   llmChapterDetection: boolean;
   chapterModel: string | null;
   language: string | null;
-  onUpdateBook: (settings: { ocrEngine?: OcrEngine | null; llmChapterDetection?: boolean; chapterModel?: string; language?: string | null }) => void;
+  onUpdateBook: (settings: { ocrEngine?: OcrEngine | null; ocrModel?: string | null; llmChapterDetection?: boolean; chapterModel?: string; language?: string | null }) => void;
   onStart: (scope: ExtractScope) => void;
   onClose: () => void;
 }) {
@@ -139,11 +141,16 @@ export function ExtractModal({
               value={ocrEngine}
               used={scan.engine}
               onChange={(engine) => onUpdateBook({ ocrEngine: engine })}
+              model={ocrModel}
+              onModelChange={(key) => onUpdateBook({ ocrModel: key })}
+              pageCount={suggestion.data?.pageCount ?? null}
               tryHref={`/books/${bookId}/ocr?file=${tryFileIndex}`}
               status={scan.read
                 ? scan.garbled
-                  ? <><strong className="text-(--warning-text)">Tesseract struggled here.</strong> It read the pages in the background but doubted many of its words — the sign of photographed, curled or faded pages. That is what Surya is for: pick it below, and the pages are read again.</>
-                  : <><strong className="text-(--success-text)">Already done.</strong> The pages are pictures, and {scan.engine === "surya" ? "Surya" : scan.engine === "tesseract" ? "Tesseract" : "Tesseract and Surya between them"} read them in the background{scan.confidence !== null ? `, ${Math.round(scan.confidence * 100)}% sure of its words` : ""} — a good result. Keep it. Only switch if the text you see looks wrong, which happens with photographed, curled or faded pages.</>
+                  ? <><strong className="text-(--warning-text)">Tesseract struggled here.</strong> It read the pages in the background but doubted many of its words — the sign of photographed, curled or faded pages. That is what Surya and the AI model are for: pick one below, and the pages are read again.</>
+                  : scan.engine === "llm"
+                    ? <><strong className="text-(--success-text)">Already done.</strong> The pages are pictures, and the AI model read them{scan.confidence !== null ? `, recovering ${Math.round(scan.confidence * 100)}% of the words a local OCR saw` : ""}. Keep it unless the text you see looks wrong.</>
+                    : <><strong className="text-(--success-text)">Already done.</strong> The pages are pictures, and {scan.engine === "surya" ? "Surya" : scan.engine === "tesseract" ? "Tesseract" : "more than one engine between them"} read them in the background{scan.confidence !== null ? `, ${Math.round(scan.confidence * 100)}% sure of its words` : ""} — a good result. Keep it. Only switch if the text you see looks wrong, which happens with photographed, curled or faded pages.</>
                 : isProcessing
                   ? "The pages are pictures. They are being read in the background right now; extraction picks up the result."
                   : "The pages are pictures. Extraction reads them first, with the engine below, into a copy kept beside the original."}

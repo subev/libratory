@@ -58,12 +58,14 @@ export function fallbackModelKey(
   value: string,
   defaultKey: string | null,
   requireTools: boolean,
+  requireVision = false,
 ): string | undefined {
   if (value !== "" || models.length === 0) return undefined;
+  const fits = (model: LlmModel) => (!requireTools || model.supportsTools) && (!requireVision || model.vision !== false);
   const usable = (key: string) => {
     const model = models.find((entry) => entry.key === key);
-    return model !== undefined && (!requireTools || model.supportsTools);
+    return model !== undefined && fits(model);
   };
   if (defaultKey && usable(defaultKey)) return defaultKey;
-  return models.find((m) => !requireTools || m.supportsTools)?.key;
+  return models.find(fits)?.key;
 }

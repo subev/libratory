@@ -1,8 +1,9 @@
 # LLM extraction — plan and handoff
 
-> Status (September 2026): not started. Written after the first agent-driven run on a scanned
-> Bulgarian book, whose narration carried OCR damage that no later stage could repair. Facts
-> below were checked on 2026-09-14; prices move, re-check them before quoting.
+> Status (2026-09-15): **built.** The engine is `lib/ocr-llm.ts`, selected as `ocrEngine: "llm"`
+> with an optional `ocrModel`; the plan below is kept as written, and the outcome is at the end.
+> Written after the first agent-driven run on a scanned Bulgarian book, whose narration carried OCR
+> damage that no later stage could repair. Prices were checked on 2026-09-14; they move.
 
 ## The problem
 
@@ -73,3 +74,50 @@ Two consequences to accept and document:
 - Batch size: one page per call is simplest and most faithful; test whether 4–5 pages per call with markers is as faithful, since it cuts the per-call overhead.
 - Whether to run the LLM engine over the text layer of a *non-scanned* PDF too, for books whose text layer is itself bad (old scans with a poor embedded OCR layer). The plumbing is the same; the trigger is different.
 - Whether the fidelity comparison should use Tesseract in the book's language (needs the pack) or `eng` only for overlap counting. Overlap on Cyrillic against an English pack is meaningless; the comparison needs the right pack or a script-agnostic measure such as character-count and line-count ratios.
+
+## Outcome
+
+Measured on the 19-page Bulgarian typescript scan (2400 × 3658 pt photographs from a phone) with
+DeepSeek V4.1 Flash, one page per call, four calls in flight:
+
+| | Proof of concept (`scripts/llm-extract-poc.ts`) | Engine in the app |
+| --- | --- | --- |
+| Wall time | 81 s | 86 s including chapter detection |
+| Tokens | 27k in, 31k out (≈1,450 + 1,630 a page) | 32k in, 35k out (two anchored retries) |
+| Cost at $0.15 / $0.60 per million | $0.023 | $0.027 |
+| Recall of the reference's words | 95.7% against Surya | 93% against Tesseract `bul` |
+| Pages flagged after the second look | none | 5 and 7 (Tesseract's own misreads share the blame) |
+
+A 300-page book is therefore around 40 cents and 20 minutes at this concurrency, against Marker's
+half hour with no reading at all.
+
+What the numbers taught, all of it now in the engine:
+
+- **The model skips an opening fragment.** Page 19 begins mid-sentence and the model started at the
+  first indented paragraph in every run, dropping half the page. No prompt wording fixed it. A
+  second call carrying the local OCR's first and last lines as anchors recovered it every time. That
+  is the fidelity check's job: recall under 0.88 triggers one anchored retry; pages still short are
+  named in the log.
+- **Vocabulary drifts.** `text` for `paragraph`, `content` for `text`, `level: null`, a stray
+  top-level key echoing the response format. A strict enum failed half the pages three times each;
+  a loose shape plus normalisation failed none.
+- **"Joined" hyphens are soft hyphens.** Asked to join `зна-харките`, the model wrote a U+00AD
+  between the halves. Stripped before anything reads the text.
+- **The reference lies too.** Surya read the bleed-through on the last page as English and Chinese,
+  a hundred words the page never had. Only reference words in the model text's dominant script count.
+- **Page size, not DPI.** These scans are stored 33 inches tall, so 150 DPI was a 12 MB PNG. The
+  engine renders 1600 px on the long edge — DeepSeek resamples anything above ~1.69 M pixels — as
+  WebP when `cwebp` exists (about 250 KB) and JPEG otherwise (about 400 KB); same tokens either way.
+- **A wedged provider looks like slowness.** DeepSeek's Flash lane held every request open with
+  keep-alives for over an hour while Pro answered in a second and the status page stayed green.
+  One failing call aborts the whole run rather than retrying into a bill.
+
+Word positions, the one thing the model cannot give, came the same day from the Tesseract read
+the fidelity check already pays for: `docs/llm-ocr-word-alignment-plan.md` has the method and its
+numbers. With them the engine writes the same searchable copy the local engines do, so the "no
+searchable copy" consequence above no longer holds where a Tesseract pack exists for the language.
+
+Not built, still open: the cost preview in the picker uses DeepSeek Flash prices for every
+provider; "Try one page" compares Tesseract and Surya only; batching several pages per call was
+not measured; a non-scanned PDF with a bad embedded text layer cannot be sent through this engine.
+

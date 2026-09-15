@@ -13,7 +13,7 @@ import { bundleInstalled, listModelBundles, readCapabilities, startBundleDownloa
 import { SURYA_BUNDLE } from "./ocr-surya.ts";
 import { listOcrLanguages, packCodeSchema, startPackDownload } from "./tessdata.ts";
 import { listPocketLanguages } from "./pocket-languages.ts";
-import { secretStatus } from "./secrets.ts";
+import { LLM_SECRETS, isConfigured, secretStatus } from "./secrets.ts";
 import { detectLanguage } from "./detect-language.ts";
 import { countWords, extractPdfAuthor, extractPdfRawText, pdfHasTextLayer } from "./pdf-raw-text.ts";
 import { pdfPageCount } from "./ocr-tesseract.ts";
@@ -148,7 +148,8 @@ export function createMcpServer(profileId: string): McpServer {
         skipSynthesis: z.boolean().default(false),
         llmChapterDetection: z.boolean().default(false).describe("Let an AI model read the table of contents to place and title chapters"),
         chapterModel: modelKeySchema.optional().describe("Model key for llmChapterDetection"),
-        ocrEngine: z.enum(OCR_ENGINES).optional().describe(`OCR engine for scanned pages; ${DEFAULT_OCR_ENGINE} when omitted, surya reads photographed or faded pages better`),
+        ocrEngine: z.enum(OCR_ENGINES).optional().describe(`OCR engine for scanned pages; ${DEFAULT_OCR_ENGINE} when omitted, surya reads photographed or faded pages better, llm sends page images to a cloud vision model (needs an AI provider key; see get_capabilities)`),
+        ocrModel: modelKeySchema.optional().describe("Vision model key for ocrEngine llm; the default model when omitted"),
       },
     },
     async (input) => {
@@ -311,12 +312,12 @@ export function createMcpServer(profileId: string): McpServer {
     {
       description:
         "Run or redo the full extraction: OCR of scanned pages (in the book's language), a thorough page read and chapter detection. " +
-        "Pass ocrEngine to read the pages again with the other engine. Existing chapters and audio are replaced, and after a redo the new chapters wait suspended for synthesize_book. Slow; then wait_for_book until \"chapters\".",
-      inputSchema: { id: bookId, ocrEngine: z.enum(OCR_ENGINES).optional() },
+        "Pass ocrEngine to read the pages again with another engine (tesseract, surya, or llm for a cloud vision model). Existing chapters and audio are replaced, and after a redo the new chapters wait suspended for synthesize_book. Slow; then wait_for_book until \"chapters\".",
+      inputSchema: { id: bookId, ocrEngine: z.enum(OCR_ENGINES).optional(), ocrModel: modelKeySchema.optional() },
     },
-    async ({ id, ocrEngine }) => {
+    async ({ id, ocrEngine, ocrModel }) => {
       await requireExtractionModels();
-      if (ocrEngine !== undefined) await caller.books.updateSettings({ id, ocrEngine });
+      if (ocrEngine !== undefined || ocrModel !== undefined) await caller.books.updateSettings({ id, ocrEngine, ocrModel });
       const files = await db.select({ status: bookFiles.status }).from(bookFiles).where(eq(bookFiles.bookId, id));
       if (files.length > 0 && files.every((f) => f.status === "raw")) await caller.books.extractChapters({ id });
       else await caller.bookFiles.reExtractSelected({ bookId: id });
@@ -419,6 +420,7 @@ export function createMcpServer(profileId: string): McpServer {
         language: z.string().max(MAX_LANGUAGE_CHARS).nullable().optional().describe("ISO code; null clears it"),
         author: z.string().max(200).nullable().optional(),
         ocrEngine: z.enum(OCR_ENGINES).nullable().optional(),
+        ocrModel: modelKeySchema.nullable().optional().describe("Vision model for the llm OCR engine; null = default"),
         llmChapterDetection: z.boolean().optional(),
         chapterModel: modelKeySchema.optional(),
       },
@@ -462,7 +464,8 @@ export function createMcpServer(profileId: string): McpServer {
       return json({
         hardware,
         bundles: bundles.map((b) => ({ id: b.id, label: b.label, unlocks: b.unlocks, approxMb: b.approxMb, appleSiliconOnly: b.appleSiliconOnly, installed: b.installed, downloading: b.downloading, progress: b.progress, error: b.error })),
-        ocrEngines: OCR_ENGINES.map((id) => ({ id, default: id === DEFAULT_OCR_ENGINE, needsBundle: id === "surya" ? SURYA_BUNDLE : null })),
+        // llm is the cloud engine: page images go to a vision model, so it needs a provider key rather than a bundle
+        ocrEngines: OCR_ENGINES.map((id) => ({ id, default: id === DEFAULT_OCR_ENGINE, needsBundle: id === "surya" ? SURYA_BUNDLE : null, cloud: id === "llm", available: id !== "llm" || LLM_SECRETS.some((s) => isConfigured(s.envVar)) })),
         ocrLanguages: ocrLanguages
           .filter((l) => l.installed || l.download !== null)
           .map((l) => ({ code: l.code, iso: l.iso, name: l.name, approxMb: Math.round(l.bytes / 1_000_000), installed: l.installed, downloading: l.download !== null && l.download.error === null, error: l.download?.error ?? null })),

@@ -38,6 +38,9 @@ export type LlmModelDef = {
   recommended?: boolean;
   // json_object mode is an OpenAI-compatible wire feature
   supportsJsonFormat: boolean;
+  // Reads page images (the "llm" OCR engine). Undefined when nothing reported either way — a local
+  // server's model, say — and the provider then answers for itself.
+  vision?: boolean;
 };
 
 // A key is written to .env as DEFAULT_LLM_MODEL, and applyEnvEdit writes `KEY=value` verbatim, so
@@ -64,37 +67,37 @@ const PINNED_BASE: Omit<LlmModelDef, "recommended">[] = [
   {
     key: "flash", source: "DeepSeek", label: "V4.1 Flash", hint: "Fast and cheap — good default",
     provider: "deepseek", modelId: "deepseek-flash", contextTokens: 1_000_000,
-    supportsTemperature: true, supportsTools: true, supportsJsonFormat: true,
+    supportsTemperature: true, supportsTools: true, supportsJsonFormat: true, vision: true,
   },
   {
     key: "gpt", source: "OpenAI", label: "GPT-5.1", hint: "OpenAI flagship reasoning model",
     provider: "openai", modelId: "gpt-5.1", contextTokens: 256_000,
-    supportsTemperature: false, supportsTools: true, supportsJsonFormat: false,
+    supportsTemperature: false, supportsTools: true, supportsJsonFormat: false, vision: true,
   },
   {
     key: "gpt-mini", source: "OpenAI", label: "GPT-5 Mini", hint: "OpenAI — fast and cheap",
     provider: "openai", modelId: "gpt-5-mini", contextTokens: 256_000,
-    supportsTemperature: false, supportsTools: true, supportsJsonFormat: false,
+    supportsTemperature: false, supportsTools: true, supportsJsonFormat: false, vision: true,
   },
   {
     key: "claude", source: "Anthropic", label: "Claude Opus 5", hint: "Anthropic flagship reasoning model",
     provider: "anthropic", modelId: "claude-opus-5", contextTokens: 1_000_000,
-    supportsTemperature: false, supportsTools: true, supportsJsonFormat: false,
+    supportsTemperature: false, supportsTools: true, supportsJsonFormat: false, vision: true,
   },
   {
     key: "claude-haiku", source: "Anthropic", label: "Claude Haiku 4.5", hint: "Anthropic — fast and cheap",
     provider: "anthropic", modelId: "claude-haiku-4-5", contextTokens: 200_000,
-    supportsTemperature: true, supportsTools: true, supportsJsonFormat: false,
+    supportsTemperature: true, supportsTools: true, supportsJsonFormat: false, vision: true,
   },
   {
     key: "gemini", source: "Google Gemini", label: "Gemini 2.5 Pro", hint: "Google flagship reasoning model",
     provider: "google", modelId: "gemini-2.5-pro", contextTokens: 1_000_000,
-    supportsTemperature: true, supportsTools: true, supportsJsonFormat: false,
+    supportsTemperature: true, supportsTools: true, supportsJsonFormat: false, vision: true,
   },
   {
     key: "gemini-flash", source: "Google Gemini", label: "Gemini 2.5 Flash", hint: "Google — fast and cheap",
     provider: "google", modelId: "gemini-2.5-flash", contextTokens: 1_000_000,
-    supportsTemperature: true, supportsTools: true, supportsJsonFormat: false,
+    supportsTemperature: true, supportsTools: true, supportsJsonFormat: false, vision: true,
   },
 ];
 const PINNED_MODELS: LlmModelDef[] = PINNED_BASE.map((m) => ({ ...m, recommended: true }));

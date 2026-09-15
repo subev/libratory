@@ -48,3 +48,8 @@ export function bookOutputDir(bookId: string) {
 export function bookTmpDir(bookId: string) {
   return path.join(tmpDir, bookId);
 }
+
+// Where one file's layout output (Marker's, or the AI engine's) lives; every later reader looks here.
+export function bookFileOutDir(bookId: string, fileIndex: number) {
+  return path.join(bookTmpDir(bookId), `file_${fileIndex}`);
+}

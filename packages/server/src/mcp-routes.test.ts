@@ -214,7 +214,12 @@ describe("/mcp", () => {
     const caps = parse(await client.callTool({ name: "get_capabilities", arguments: {} }));
     expect(caps.hardware).toEqual({ mlx: true, cuda: false });
     expect(caps.bundles[0]).toMatchObject({ id: "extraction", installed: true });
-    expect(caps.ocrEngines).toEqual([{ id: "tesseract", default: true, needsBundle: null }, { id: "surya", default: false, needsBundle: "extraction" }]);
+    expect(caps.ocrEngines).toEqual([
+      { id: "tesseract", default: true, needsBundle: null, cloud: false, available: true },
+      { id: "surya", default: false, needsBundle: "extraction", cloud: false, available: true },
+      // available follows whichever AI keys the machine running the suite has
+      { id: "llm", default: false, needsBundle: null, cloud: true, available: expect.any(Boolean) },
+    ]);
     expect(caps.ocrLanguages.find((l: { code: string }) => l.code === "eng")).toMatchObject({ name: "English", iso: "en", installed: true });
     expect(caps.ocrLanguages.length).toBeLessThan(caps.ocrLanguagesAvailable);
     expect(caps.cloudKeys.map((k: { envVar: string }) => k.envVar)).toContain("CARTESIA_API_KEY");

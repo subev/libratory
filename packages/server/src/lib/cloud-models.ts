@@ -144,6 +144,7 @@ export function cloudDef(provider: LlmSecretProvider, modelId: string, fromListi
     supportsTemperature: pick(native?.supportsTemperature, pick(known?.supportsTemperature, PROVIDER_DEFAULTS[provider].supportsTemperature ?? false)),
     supportsTools: pick(native?.supportsTools, pick(known?.supportsTools, PROVIDER_DEFAULTS[provider].supportsTools ?? false)),
     supportsJsonFormat: pick(native?.supportsJsonFormat, pick(known?.supportsJsonFormat, PROVIDER_DEFAULTS[provider].supportsJsonFormat ?? false)),
+    vision: native?.vision ?? known?.vision,
   };
 }
 

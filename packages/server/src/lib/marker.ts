@@ -456,6 +456,8 @@ function runMarkerSingle(pdfPath: string, outDir: string, device: "mps" | "cuda"
 export type ExtractOptions = {
   llmChapterDetection?: boolean;
   chapterModel?: string;
+  // The "llm" OCR engine already wrote the layout into outDir (lib/ocr-llm.ts): read it, skip Marker
+  prebuiltLayout?: boolean;
   signal?: AbortSignal;
 };
 
@@ -561,6 +563,11 @@ async function detectChaptersFromMarkerJsonPath(markerJsonPath: string, pdfPath:
 
 export async function extractPdf(pdfPath: string, outDir: string, log: LogFn = noopLog, options: ExtractOptions = {}): Promise<DetectionResult> {
   await mkdir(outDir, { recursive: true });
+
+  if (options.prebuiltLayout) {
+    await log("Detecting chapters from the AI model's page layout");
+    return detectChaptersFromMarkerJsonPath(await findMarkerJson(outDir), pdfPath, log, options);
+  }
 
   // Marker only passes a text layer through, so a scan without one fails after a pointless half-minute.
   if ((await pdfHasTextLayer(pdfPath)) === false) {

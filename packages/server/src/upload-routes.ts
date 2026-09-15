@@ -82,6 +82,7 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
           ocrEngine: OCR_ENGINES.find((e) => e === fields.ocrEngine) ?? null,
           llmChapterDetection: fields.llmChapterDetection === "true",
           chapterModel: fields.chapterModel,
+          ocrModel: fields.ocrModel,
           skipSynthesis: fields.skipSynthesis === "true",
           fullExtract: fields.fullExtract === "true",
           language: fields.language,

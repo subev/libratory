@@ -27,6 +27,7 @@ export type CreatePdfBookInput = {
   ocrEngine?: OcrEngine | null;
   llmChapterDetection?: boolean;
   chapterModel?: string | null;
+  ocrModel?: string | null;
   skipSynthesis?: boolean;
   fullExtract?: boolean;
   language?: string | null;
@@ -59,6 +60,7 @@ export async function createPdfBook(bookId: string, input: CreatePdfBookInput, p
   parseTtsVoice(voice);
   const speed = input.speed ?? 1.0;
   const chapterModel = canonicalKey(input.chapterModel?.trim().slice(0, 64) ?? "") || null;
+  const ocrModel = canonicalKey(input.ocrModel?.trim().slice(0, 64) ?? "") || null;
   const skipSynthesis = input.skipSynthesis ?? false;
   const fullExtract = input.fullExtract ?? false;
 
@@ -96,6 +98,7 @@ export async function createPdfBook(bookId: string, input: CreatePdfBookInput, p
         ocrEngine: input.ocrEngine ?? null,
         llmChapterDetection: input.llmChapterDetection ?? false,
         chapterModel,
+        ocrModel,
         skipSynthesis,
         language,
         folderId,

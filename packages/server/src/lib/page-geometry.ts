@@ -1,12 +1,11 @@
 import { spawn } from "node:child_process";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, rm, stat } from "node:fs/promises";
 import path from "node:path";
 
 import { env } from "../env.ts";
 import { describeError } from "./errors.ts";
 import type { MarkerSource } from "./marker-sources.ts";
 
-const GEOMETRY_SCRIPT = scriptPath("page_geometry.py");
 const GEOMETRY_FILE = "geometry.json";
 
 export type { Rect } from "./reader-format.ts";
@@ -75,6 +74,16 @@ export async function ensureSourceGeometry(source: MarkerSource): Promise<Source
 
 const unupgradable = new Set<string>();
 
+// A sidecar describes one text layer. When the file's searchable copy is written, replaced or
+// forgotten, the lines it holds are the old copy's — or none, for a sidecar built before any OCR —
+// and the next reader request must build it again from the copy that is current.
+export async function removeSourceGeometry(outDir: string): Promise<void> {
+  const target = path.join(outDir, GEOMETRY_FILE);
+  await rm(target, { force: true }).catch(() => {});
+  parsed.delete(target);
+  unupgradable.delete(target);
+}
+
 // One run per sidecar however many readers ask for it at once
 function regenerate(source: MarkerSource, target: string): Promise<void> {
   let run = running.get(target);
@@ -110,7 +119,7 @@ function generate(pdfPath: string, target: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const proc = spawn(
       path.join(env.CONDA_ENV_PATH, "python"),
-      [GEOMETRY_SCRIPT, "--pdf", pdfPath, "--out", target],
+      [scriptPath("page_geometry.py"), "--pdf", pdfPath, "--out", target],
       { env: { ...process.env, HF_HUB_OFFLINE: "1", PATH: `${env.CONDA_ENV_PATH}:${process.env.PATH}` } },
     );
 

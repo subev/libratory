@@ -260,6 +260,13 @@
       "when": 1788811389555,
       "tag": "0036_structure_confirmed",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1789444930077,
+      "tag": "0037_ocr_model",
+      "breakpoints": true
     }
   ]
 }

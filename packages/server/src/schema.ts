@@ -127,7 +127,8 @@ export const folders = pgTable("folders", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("folders_parent_id_idx").on(t.parentId), index("folders_profile_id_idx").on(t.profileId)]);
 
-export const OCR_ENGINES = ["tesseract", "surya"] as const;
+// "llm" is the cloud engine: a vision model reads each page image (lib/ocr-llm.ts); its words are placed by a local Tesseract read
+export const OCR_ENGINES = ["tesseract", "surya", "llm"] as const;
 export type OcrEngine = (typeof OCR_ENGINES)[number];
 export const DEFAULT_OCR_ENGINE: OcrEngine = "tesseract";
 
@@ -151,6 +152,8 @@ export const books = pgTable("books", {
   llmChapterDetection: boolean("llm_chapter_detection").notNull().default(false),
   // null = default model; registry key from lib/llm.ts
   chapterModel: text("chapter_model"),
+  // The vision model the "llm" OCR engine reads pages with; null = default model
+  ocrModel: text("ocr_model"),
   chapterDetection: text("chapter_detection").$type<"llm" | "numbered-headings" | "heading-levels" | "word-split" | "manual">(),
   chapterProposal: jsonb("chapter_proposal").$type<ChapterProposal>(),
   translationLanguage: text("translation_language"),
