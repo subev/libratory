@@ -28,3 +28,6 @@ docker-compose.override.yml
 # wrangler local state (get/)
 .wrangler/
 /vivliostyle/
+
+# Book-sized OCR fixtures captured from real scans (scripts/capture-ocr-fixture.ts): not for a public repo
+packages/server/test/fixtures/private/
