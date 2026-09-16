@@ -121,6 +121,6 @@ describe("pdfPageSizes", () => {
     const dir = await mkdtemp(path.join(tmpdir(), "rot-"));
     dirs.push(dir);
     await execFileAsync("qpdf", ["--rotate=+90", FIXTURE, path.join(dir, "r90.pdf")]);
-    expect(await pdfPageSizes(path.join(dir, "r90.pdf"))).toEqual([{ width: 1754, height: 1241 }]);
+    expect(await pdfPageSizes(path.join(dir, "r90.pdf"))).toEqual([{ width: 1754, height: 1241, rotation: 90 }]);
   });
 });

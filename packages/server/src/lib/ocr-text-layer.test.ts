@@ -1,10 +1,76 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { eq } from "drizzle-orm";
+
+import { getDb, resetDb, row } from "../../test/setup.ts";
+import { books, bookFiles } from "../schema.ts";
+import { runLlmOcr } from "./ocr-llm.ts";
+import { pdfHasTextLayer } from "./pdf-raw-text.ts";
+
+vi.mock("../db.ts", async () => {
+  const { getDb } = await import("../../test/setup.ts");
+  return { get db() { return getDb(); } };
+});
+vi.mock("./ocr-llm.ts", async (original) => ({
+  ...await original<typeof import("./ocr-llm.ts")>(), runLlmOcr: vi.fn(),
+}));
+vi.mock("./pdf-raw-text.ts", async (original) => ({
+  ...await original<typeof import("./pdf-raw-text.ts")>(), pdfHasTextLayer: vi.fn(),
+}));
 
 import type { FlatBlock, SourceBlock } from "./marker.ts";
-import { matchBlockPolygons } from "./ocr-text-layer.ts";
+import { ensureTextLayer, matchBlockPolygons } from "./ocr-text-layer.ts";
 
 const fresh = (page: number, text: string, polygon?: number[][]): FlatBlock => ({ type: "Text", text, hierarchy: null, page, included: true, ...(polygon ? { polygon } : {}) });
 const source = (page: number, text: string, polygon?: number[][]): SourceBlock => ({ type: "Text", text, page, included: true, ...(polygon ? { polygon } : {}) });
+
+describe("replacing imported PDF text", () => {
+  beforeEach(async () => {
+    await resetDb(getDb());
+    vi.mocked(pdfHasTextLayer).mockReset().mockResolvedValue(true);
+    vi.mocked(runLlmOcr).mockReset().mockResolvedValue({
+      pages: 2, inputTokens: 100, outputTokens: 100, meanRecall: 1, lowRecallFraction: 0,
+      flaggedPages: [], meanPlaced: 1, searchableCopy: true, rawText: "New transcription from every page.",
+    });
+  });
+
+  async function importedFile() {
+    const book = row(await getDb().insert(books).values({ title: "Imported scan", language: "en" }).returning());
+    const file = row(await getDb().insert(bookFiles).values({
+      bookId: book.id, index: 0, filename: "scan.pdf", pdfPath: "/tmp/imported-scan.pdf", rawText: "Bad imported OCR",
+    }).returning());
+    return { bookId: book.id, file, engine: "llm" as const, language: "en", log: vi.fn(async () => {}) };
+  }
+
+  it("keeps the ordinary skip but explicitly re-reads a PDF with imported text", async () => {
+    const input = await importedFile();
+    expect(await ensureTextLayer(input)).toBe(false);
+    expect(runLlmOcr).not.toHaveBeenCalled();
+
+    expect(await ensureTextLayer({ ...input, ignoreTextLayer: true })).toBe(true);
+    expect(runLlmOcr).toHaveBeenCalledWith(expect.objectContaining({ pdfPath: input.file.pdfPath }));
+    const file = row(await getDb().select().from(bookFiles).where(eq(bookFiles.id, input.file.id)));
+    expect(file).toMatchObject({ ocrEngine: "llm", searchablePdfPath: "/tmp/imported-scan.ocr.pdf", rawText: "New transcription from every page." });
+  });
+
+  it("bypasses an existing Libratory copy too", async () => {
+    const input = await importedFile();
+    input.file.searchablePdfPath = "/tmp/imported-scan.ocr.pdf";
+    input.file.ocrEngine = "llm";
+    expect(await ensureTextLayer({ ...input, ignoreTextLayer: true })).toBe(true);
+    expect(runLlmOcr).toHaveBeenCalledOnce();
+  });
+
+  it("fails rather than silently returning to the imported layer when replacement fails", async () => {
+    const input = await importedFile();
+    vi.mocked(runLlmOcr).mockResolvedValue({
+      pages: 2, inputTokens: 100, outputTokens: 100, meanRecall: null, lowRecallFraction: null,
+      flaggedPages: [], meanPlaced: null, searchableCopy: false, rawText: "Saved AI text",
+    });
+    await expect(ensureTextLayer({ ...input, ignoreTextLayer: true })).rejects.toThrow("could not replace the PDF text layer");
+    const file = row(await getDb().select().from(bookFiles).where(eq(bookFiles.id, input.file.id)));
+    expect(file).toMatchObject({ searchablePdfPath: null, rawText: "Bad imported OCR" });
+  });
+});
 
 describe("matchBlockPolygons", () => {
   it("gives each chapter block the polygon of the same block in the new layout, by page and text", () => {

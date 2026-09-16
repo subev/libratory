@@ -135,7 +135,7 @@ export const bookFilesRouter = router({
     }),
 
   reExtractSelected: publicProcedure
-    .input(z.object({ bookId: z.string().uuid() }))
+    .input(z.object({ bookId: z.string().uuid(), ignoreTextLayer: z.boolean().default(false) }))
     .mutation(async ({ input }) => {
       const [book] = await db.select().from(books).where(eq(books.id, input.bookId));
       if (!book) throw new Error("Book not found");
@@ -159,7 +159,10 @@ export const bookFilesRouter = router({
 
       for (const file of selectedFiles) {
         await deleteChaptersForFile(input.bookId, file.index);
-        await rm(path.join(bookTmpDir(input.bookId), `file_${file.index}`), { recursive: true, force: true }).catch(() => {});
+        // Failed AI runs keep paid transcriptions for a local-output retry or partial resume.
+        if (file.status !== "failed") {
+          await rm(path.join(bookTmpDir(input.bookId), `file_${file.index}`), { recursive: true, force: true }).catch(() => {});
+        }
 
         await db
           .update(bookFiles)
@@ -174,7 +177,10 @@ export const bookFilesRouter = router({
 
       await updateBookTotalChapters(input.bookId);
       await appendLog(input.bookId, `Re-extracting ${selectedFiles.length} selected file(s)`);
-      await quickAddJob({ connectionString }, "extract", { bookId: input.bookId }, { maxAttempts: 1, jobKey: `extract:${input.bookId}`, jobKeyMode: "replace" });
+      await quickAddJob({ connectionString }, "extract", {
+        bookId: input.bookId,
+        ...(input.ignoreTextLayer ? { ignoreTextLayerFileIds: selectedFiles.map((file) => file.id) } : {}),
+      }, { maxAttempts: 1, jobKey: `extract:${input.bookId}`, jobKeyMode: "replace" });
 
       return { success: true };
     }),

@@ -61,7 +61,7 @@ describe.skipIf(!present)("the Bulgarian scan", () => {
     for (const s of vision) expect(s).toBeGreaterThan(0.7);
     // Page 7 is small-type footnotes, page 17 is tilted and clipped at the left edge
     for (const page of [7, 17]) expect(vision[page - 1]).toBeGreaterThan(tesseract[page - 1]!);
-  });
+  }, 30_000);
 
   it("keeps every placed box inside the page", async () => {
     const f = await load();
@@ -78,22 +78,13 @@ describe.skipIf(!present)("the Bulgarian scan", () => {
     }
   });
 
-  // Tesseract read only the right half of page 17's last lines; the model's "От тази категория
-  // информаторки заслужава да се" then has no partner and must start that line, not hang off the
-  // end of the poem above it.
-  it("puts a line beginning the reader skipped at the start of that line", async () => {
+  it("leaves the clipped beginning of a line unlocated instead of borrowing another line", async () => {
     const f = await load();
     const reader = f.tesseract[16]!;
-    const anchor = reader.words.find((w) => w.text.startsWith("споменат"))!;
-    expect(reader.words.some((w) => w.text === "категория")).toBe(false);
     const placed = placeBlocks(texts(f.pages[16]), reader.words, bounds(reader));
-    const from = placed.words.find((w) => w.text === "От" && placed.words[placed.words.indexOf(w) + 1]?.text === "тази")!;
-    expect(from.matched).toBe(false);
-    expect(from.box![2]).toBeLessThan(anchor.box[0]);
-    expect(Math.abs(from.box![1] - anchor.box[1])).toBeLessThan(anchor.box[3] - anchor.box[1]);
-    // Vision read the line, so with its words the same fragment is matched, not guessed
-    const withVision = placeBlocks(texts(f.pages[16]), f.vision[16]!.words, bounds(f.vision[16]!));
-    expect(withVision.words.find((w) => w.text === "категория")?.matched).toBe(true);
+    const from = placed.words.find((w, i) => w.text === "От" && placed.words[i + 1]?.text === "тази");
+    expect(from).toMatchObject({ matched: false, box: null });
+    expect(placed.words.find((w) => w.text === "категория")).toMatchObject({ matched: false, box: null });
   });
 
   it("keeps a paragraph that runs onto the next page as two blocks, joining only a hyphen-split word", async () => {
@@ -109,7 +100,7 @@ describe.skipIf(!present)("the Bulgarian scan", () => {
     }
   });
 
-  it.skipIf(!existsSync(python))("gives the reader line rects for nearly every sentence, through the real copy and geometry", async () => {
+  it.skipIf(!existsSync(python))("gives the reader line rects for nearly every sentence, from native OCR geometry", async () => {
     const f = await load();
     const dir = await mkdtemp(path.join(tmpdir(), "bg-scan-"));
     dirs.push(dir);
@@ -119,11 +110,10 @@ describe.skipIf(!present)("the Bulgarian scan", () => {
     await execFileAsync(python, ["-c", "import json,sys\nfrom pypdf import PdfWriter\nw=PdfWriter()\nfor s in json.load(open(sys.argv[1])): w.add_blank_page(width=s['width'], height=s['height'])\nw.write(sys.argv[2])", path.join(dir, "sizes.json"), blank]);
     const outDir = path.join(dir, "out");
     const outPdfPath = path.join(dir, "blank.ocr.pdf");
-    let index = 0;
     const stats = await makeLlmOcrRunner({
       transcribe: async ({ pageNumber }) => ({ page: f.pages[pageNumber - 1] as unknown as RawLlmPage, inputTokens: 0, outputTokens: 0 }),
-      reference: async (_image, pageNumber): Promise<Reference> => ({ ...f.vision[pageNumber - 1]!, text: f.tesseract[pageNumber - 1]!.text }),
-    })({ pdfPath: blank, outDir, outPdfPath, language: "bg", workDir: path.join(dir, "work"), log: async () => { index++; } });
+      reference: async (_image, pageNumber): Promise<Reference> => f.tesseract[pageNumber - 1]!,
+    })({ pdfPath: blank, outDir, outPdfPath, language: "bg", workDir: path.join(dir, "work"), log: async () => {} });
     expect(stats.searchableCopy).toBe(true);
 
     const geometry = (await ensureSourceGeometry({ fileIndex: 0, filename: "blank.ocr.pdf", pdfPath: outPdfPath, outDir }))!;

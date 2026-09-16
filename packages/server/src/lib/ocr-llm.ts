@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { NoObjectGeneratedError, Output, generateText, type LanguageModel } from "ai";
@@ -7,26 +7,19 @@ import { z } from "zod";
 
 import { resolveLlm, type LlmModelDef } from "./llm.ts";
 import { ExtractAbortedError } from "./marker.ts";
-import { detectScript, pdfPageSizes, parseTsv, type OcrPage, type OcrWord, type PdfPageSize } from "./ocr-tesseract.ts";
-import { readVisionWords, visionBinary, visionLanguage } from "./ocr-vision.ts";
+import { detectScript, pdfPageSizes, parseTsv, type OcrPage, type PdfPageSize } from "./ocr-tesseract.ts";
 import { pdfHasTextLayer } from "./pdf-raw-text.ts";
 import { writeTextLayer, type TextLayerPage, type TextLayerWriter } from "./pdf-text-layer.ts";
 import { packsForScript, tesseractLanguage } from "./tesseract-languages.ts";
 import { ensureTessdata, installedPacks, tesseractEnv } from "./tessdata.ts";
-import { placeBlocks, type Box } from "./word-alignment.ts";
+import type { Box } from "./word-alignment.ts";
+import { placeOcrPage, reconcileNativeBlocks } from "./ocr-geometry.ts";
+import { OCR_GEOMETRY_FILE, type GeometryPage, type SourceGeometry } from "./page-geometry.ts";
 
 const execFileAsync = promisify(execFile);
 
-// The third OCR engine: a vision model reads each page image and returns paragraphs and headings.
-// It writes a Marker-compatible layout JSON into the file's outDir, so chapter detection, the
-// structure view, proposals and re-detection run on it unchanged. The model gives no positions;
-// Tesseract, run on every page for the fidelity check anyway, gives a box per word it saw, and
-// aligning the two (lib/word-alignment.ts) puts the model's words on the page — as block polygons
-// in the layout and as an invisible text layer on a searchable copy, the same copy the local
-// engines leave, so in-PDF search and word highlighting work for these books too. Measured on a
-// 19-page Bulgarian typescript scan (docs/llm-extraction-plan.md): 95% of the local OCR's words
-// recovered, 81 s, 2.3 cents; 92–99% of the model's words placed on pages Tesseract read cleanly.
-
+// The model supplies transcription and structure. Tesseract supplies measured word positions.
+// The native geometry and searchable PDF are parallel outputs of the same text-to-word mapping.
 export const LLM_LAYOUT_FILE = "llm-layout.json";
 export const LLM_LAYOUT_META_FILE = "llm-layout_meta.json";
 // The model's pages as read, before joining and placement: what the paid call bought, kept so the
@@ -329,8 +322,8 @@ export function makeLlmTranscriber(model: LanguageModel, def: LlmModelDef): Tran
   };
 }
 
-/** One page's local reading: the text for the fidelity check, the word boxes for placement, and any other reader's boxes to try as well. */
-export type Reference = { text: string; words: OcrWord[]; width: number | null; height: number | null; alternates?: OcrPage[] };
+/** One local reading supplies both the fidelity check and the measured positions. */
+export type Reference = OcrPage;
 /** null when no pack can read the page. */
 export type ReferenceReader = (image: string, pageNumber: number) => Promise<Reference | null>;
 
@@ -347,7 +340,7 @@ async function renderPages(pdfPath: string, workDir: string, pages: number, log:
   for (let first = 1; first <= pages; first += RENDER_CHUNK_PAGES) {
     const last = Math.min(first + RENDER_CHUNK_PAGES - 1, pages);
     await log(`Rendering pages ${first}–${last} of ${pages}`);
-    await run("pdftoppm", ["-scale-to", String(LLM_PAGE_EDGE), "-jpeg", "-jpegopt", "quality=85", "-gray", "-f", String(first), "-l", String(last), pdfPath, path.join(workDir, "pg")], signal, 600_000);
+    await run("pdftoppm", ["-cropbox", "-scale-to", String(LLM_PAGE_EDGE), "-jpeg", "-jpegopt", "quality=85", "-gray", "-f", String(first), "-l", String(last), pdfPath, path.join(workDir, "pg")], signal, 600_000);
   }
   const rendered = (await readdir(workDir)).filter((f) => f.startsWith("pg-") && f.endsWith(".jpg")).sort();
   if (rendered.length !== pages) throw new Error(`Rendered ${rendered.length} of ${pages} pages before reading them`);
@@ -388,97 +381,38 @@ async function chooseReferencePack(language: string | null, script: string | nul
   return pack;
 }
 
-/** One page's reference: the text the fidelity check compares against and the boxes the words are placed on. */
-export function combineReadings(text: OcrPage | null, boxes: OcrPage | null): Reference | null {
-  const source = boxes ?? text;
-  if (!source) return null;
-  return { text: text?.text ?? "", words: source.words, width: source.width, height: source.height, ...(text && boxes && text !== boxes ? { alternates: [text] } : {}) };
-}
-
-// Two local readers with different strengths, chosen once per file. Vision's boxes follow skewed
-// and clipped lines Tesseract drops, so they place the words wherever Vision runs; Tesseract's
-// text in the book's own language is what the fidelity check compares against, because that
-// check counts exact words and Vision reads a language it lacks in a neighbour's spelling. Vision
-// in a language it has natively serves both. Nothing usable means no check and no placement.
-async function makeReference(language: string | null, firstImage: string, log: LlmOcrInput["log"], signal?: AbortSignal): Promise<ReferenceReader> {
+async function makeReference(language: string | null, firstImage: string, pdfPath: string, workDir: string, log: LlmOcrInput["log"], signal?: AbortSignal): Promise<ReferenceReader> {
   const script = language ? null : await detectScript(firstImage);
-  const binary = await visionBinary();
-  const vision = binary ? visionLanguage(language, script) : null;
-  const pack = vision?.native ? null : await chooseReferencePack(language, script, log);
-  const tesseract = pack
-    ? async (image: string) => parseTsv((await run("tesseract", [image, "-", "-l", pack, "tsv"], signal, 300_000)).stdout)
-    : null;
-  // Vision failing on this machine costs the boxes, never the paid run: Tesseract's reading, when
-  // there is one, places the words instead, and the log says so once.
-  let visionFailed = false;
-  const visionRead = vision && binary
-    ? async (image: string) => {
-      try {
-        return await readVisionWords(binary, image, vision.code, signal);
-      } catch (err) {
-        if (err instanceof ExtractAbortedError || signal?.aborted) throw err;
-        if (!visionFailed) {
-          visionFailed = true;
-          await log(`Vision could not read the pages (${err instanceof Error ? err.message.slice(0, 120) : String(err)}) — words are placed with Tesseract's boxes where it has a pack`);
-        }
-        return null;
-      }
-    }
-    : null;
-  if (!tesseract && !visionRead) {
-    await log("The AI's reading is not checked against a local one and its words are not placed on the page");
+  const pack = await chooseReferencePack(language, script, log);
+  if (!pack) {
+    await log("No local OCR pack: the AI text is kept without page positions");
     return async () => null;
   }
-  await log(`Local reading: ${[visionRead ? `Vision (${vision!.code}) for word positions${vision!.native ? " and the fidelity check" : ""}` : null, tesseract ? `Tesseract (${pack}) for the fidelity check${visionRead ? "" : " and word positions"}` : null].filter(Boolean).join(", ")}`);
-  return async (image) => {
-    const [text, boxes] = await Promise.all([
-      tesseract ? tesseract(image) : Promise.resolve(null),
-      visionRead ? visionRead(image) : Promise.resolve(null),
-    ]);
-    return combineReadings(text ?? (vision?.native ? boxes : null), boxes);
+  await log(`Local reading: Tesseract (${pack}) for text comparison and measured word positions`);
+  return async (_image, pageNumber) => {
+    const base = path.join(workDir, `native-${pageNumber}`);
+    const image = `${base}.png`;
+    try {
+      // Phone scans can report pixel dimensions as PDF points; bound the raster to A4 at 300 dpi.
+      await run("pdftoppm", ["-cropbox", "-scale-to", "3508", "-png", "-gray", "-singlefile", "-f", String(pageNumber), "-l", String(pageNumber), pdfPath, base], signal, 300_000);
+      return parseTsv((await run("tesseract", [image, "-", "-l", pack, "tsv"], signal, 300_000)).stdout);
+    } finally {
+      await rm(image, { force: true });
+    }
   };
 }
 
-function scaleBox(box: Box, scale: number, bounds: Box): Box {
-  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-  return [clamp(box[0] * scale, bounds[0], bounds[2]), clamp(box[1] * scale, bounds[1], bounds[3]), clamp(box[2] * scale, bounds[0], bounds[2]), clamp(box[3] * scale, bounds[1], bounds[3])];
-}
-
-// The share of a word box's height the text layer's string occupies, centred. Vision boxes span
-// the whole line, and on a skewed page one row's boxes touch the next row's, which the geometry
-// script reads as one tall line and the reader then cannot match; a band the size of the ink,
-// which is what Tesseract's boxes are, leaves the rows apart.
-export const LAYER_BAND = 0.6;
-
-function band(box: Box): Box {
-  const inset = ((box[3] - box[1]) * (1 - LAYER_BAND)) / 2;
-  return [box[0], box[1] + inset, box[2], box[3] - inset];
-}
-
-type PlacedPage = { page: LlmPage; words: TextLayerPage["words"]; placed: number | null; doubtful: string[] };
-
-// Every word of the page's blocks on a local reader's boxes, scaled from the image's pixels to
-// the page's points and kept inside it: the block polygons for the layout and the words for the
-// text layer. Each reader that read the page is tried and the placement that matched most is
-// kept — Tesseract placed 7 of the POC book's 19 pages better than Vision, by up to five points,
-// and a reader that returns next to nothing on a page must not win it by default.
-function placePage(page: LlmPage, reference: Reference, pageSize: { width: number; height: number }): PlacedPage {
-  const texts = page.blocks.map((b) => b.text);
-  const readings: OcrPage[] = [{ words: reference.words, width: reference.width, height: reference.height, text: reference.text }, ...(reference.alternates ?? [])];
-  let best: { placement: ReturnType<typeof placeBlocks>; scale: number } | null = null;
-  for (const reading of readings) {
-    if (!reading.width || reading.words.length === 0) continue;
-    const placement = placeBlocks(texts, reading.words, { width: reading.width, height: reading.height ?? Number.POSITIVE_INFINITY });
-    if (!best || (placement.matchedShare ?? 0) > (best.placement.matchedShare ?? 0)) best = { placement, scale: pageSize.width / reading.width };
-  }
-  if (!best) return { page, words: [], placed: page.blocks.length ? 0 : null, doubtful: [] };
-  const { placement, scale } = best;
-  const bounds: Box = [0, 0, pageSize.width, pageSize.height];
+function placePage(page: LlmPage, reference: Reference | null, size: PdfPageSize, index: number) {
+  const placed = placeOcrPage(page.blocks.map((b) => b.text), reference, size, index);
   return {
-    page: { ...page, blocks: page.blocks.map((b, k) => { const box = placement.blockBoxes[k]; return box ? { ...b, polygon: scaleBox(box, scale, bounds) } : b; }) },
-    words: placement.words.flatMap((w) => (w.box ? [{ text: w.text, bbox: band(scaleBox(w.box, scale, bounds)) }] : [])),
-    placed: placement.matchedShare,
-    doubtful: placement.doubtful,
+    page: { ...page, blocks: page.blocks.map(({ polygon: _old, ...block }, i) => {
+      const polygon = placed.boxes[i];
+      return polygon ? { ...block, polygon } : block;
+    }) },
+    geometry: placed.geometry,
+    words: placed.layer,
+    placed: reference ? placed.placement.matchedShare : null,
+    doubtful: placed.placement.doubtful,
   };
 }
 
@@ -500,8 +434,7 @@ async function pool<T>(items: T[], n: number, fn: (item: T, index: number) => Pr
 
 type Prepared = { sizes: PdfPageSize[]; images: string[]; reference: ReferenceReader };
 
-// The pages rendered once for the model and the local readers alike, and the readers chosen for
-// the file, in a work directory that is gone again when the run is.
+// The model gets compact images; native OCR renders losslessly at 300 dpi for measured positions.
 async function withPreparedPages<T>(
   { pdfPath, workDir, language, log, signal }: Pick<LlmOcrInput, "pdfPath" | "workDir" | "language" | "log" | "signal">,
   reference: ReferenceReader | undefined,
@@ -512,7 +445,9 @@ async function withPreparedPages<T>(
   try {
     const sizes = await pdfPageSizes(pdfPath);
     const images = await renderPages(pdfPath, workDir, sizes.length, log, signal);
-    return await fn({ sizes, images, reference: reference ?? await makeReference(language, images[0]!, log, signal) });
+    const firstImage = images[0];
+    if (!firstImage) throw new Error("No rendered pages for OCR");
+    return await fn({ sizes, images, reference: reference ?? await makeReference(language, firstImage, pdfPath, workDir, log, signal) });
   } finally {
     await rm(workDir, { recursive: true, force: true }).catch(() => {});
   }
@@ -520,22 +455,22 @@ async function withPreparedPages<T>(
 
 // The model's pages as read, before joining and placement. Written as pages land, so a run that
 // fails or is cancelled keeps what it paid for and the next one reads only the rest.
-type SavedPages = { engine: "llm"; model: string; complete: boolean; pages: (LlmPage | null)[] };
+type SavedPages = { engine: "llm"; model: string; complete: boolean; outputFailed?: boolean; pages: (LlmPage | null)[] };
 
 async function readSavedPages(outDir: string): Promise<SavedPages | null> {
   const raw = await readFile(path.join(outDir, LLM_PAGES_FILE), "utf-8").catch(() => null);
   if (!raw) return null;
   const saved = JSON.parse(raw) as Partial<SavedPages> & { pages: (LlmPage | null)[] };
-  return { engine: "llm", model: saved.model ?? "llm", complete: saved.complete !== false, pages: saved.pages };
+  return { engine: "llm", model: saved.model ?? "llm", complete: saved.complete !== false, outputFailed: saved.outputFailed === true, pages: saved.pages };
 }
 
 // Writes are serialised and land whole: pages finish concurrently, and a run killed mid-write
 // must not leave a file the next run cannot read.
-function savedPagesWriter(outDir: string, model: string, pages: (LlmPage | null)[]): (complete: boolean) => Promise<void> {
+function savedPagesWriter(outDir: string, model: string, pages: (LlmPage | null)[]): (complete: boolean, outputFailed?: boolean) => Promise<void> {
   const target = path.join(outDir, LLM_PAGES_FILE);
   let queue = Promise.resolve();
-  return (complete) => (queue = queue.then(async () => {
-    await writeFile(`${target}.part`, JSON.stringify({ engine: "llm", model, complete, pages } satisfies SavedPages));
+  return (complete, outputFailed = false) => (queue = queue.then(async () => {
+    await writeFile(`${target}.part`, JSON.stringify({ engine: "llm", model, complete, outputFailed, pages } satisfies SavedPages));
     await rename(`${target}.part`, target);
   }));
 }
@@ -593,7 +528,7 @@ export function makeLlmOcrRunner(deps: { transcribe: Transcriber; reference?: Re
     const total = sizes.length;
     const model = deps.modelLabel ?? "llm";
     const earlier = await readSavedPages(outDir);
-    const raw: (LlmPage | null)[] = earlier && !earlier.complete && earlier.model === model && earlier.pages.length === total
+    const raw: (LlmPage | null)[] = earlier && (!earlier.complete || earlier.outputFailed) && earlier.model === model && earlier.pages.length === total
       ? earlier.pages
       : Array.from({ length: total }, () => null);
     const reused = raw.filter(Boolean).length;
@@ -606,6 +541,7 @@ export function makeLlmOcrRunner(deps: { transcribe: Transcriber; reference?: Re
     const placedShares: (number | null)[] = Array.from({ length: total }, () => null);
     const doubtful: Record<number, string[]> = {};
     const layer: TextLayerPage[] = [];
+    const geometry: GeometryPage[] = sizes.map((size, i) => placeOcrPage([], null, size, i).geometry);
     let inputTokens = 0;
     let outputTokens = 0;
     // One failing call ends the run: retrying into a provider error is retrying into a bill.
@@ -634,8 +570,11 @@ export function makeLlmOcrRunner(deps: { transcribe: Transcriber; reference?: Re
         }
         let placed: number | null = null;
         let doubt = "";
-        if (ref) {
-          const placement = placePage(page, ref, sizes[i]!);
+        {
+          const size = sizes[i];
+          if (!size) throw new Error(`No dimensions for page ${pageNumber}`);
+          const placement = placePage(page, ref, size, i);
+          geometry[i] = placement.geometry;
           page = placement.page;
           placed = placement.placed;
           if (placement.words.length) layer.push({ page: pageNumber, words: placement.words });
@@ -654,8 +593,9 @@ export function makeLlmOcrRunner(deps: { transcribe: Transcriber; reference?: Re
       }
     });
     if (signal?.aborted) throw new ExtractAbortedError();
-    await save(true);
-    const { joined, meanPlaced, searchableCopy } = await writeOutputs({ pdfPath, outDir, outPdfPath, workDir, pages, layer, placedShares, doubtful, model, writer: deps.writeTextLayer, log, signal });
+    await save(true, true);
+    const { joined, meanPlaced, searchableCopy } = await writeOutputs({ pdfPath, outDir, outPdfPath, workDir, pages, layer, geometry, placedShares, doubtful, model, writer: deps.writeTextLayer, log, signal });
+    await save(true, Boolean(outPdfPath) && !searchableCopy);
 
     const scored = recalls.filter((r): r is number => r !== null);
     const flaggedPages = recalls.flatMap((r, i) => (r !== null && r < RETRY_BELOW_RECALL ? [i + 1] : []));
@@ -684,36 +624,53 @@ type Outputs = {
   workDir: string;
   pages: (LlmPage | null)[];
   layer: TextLayerPage[];
+  geometry: GeometryPage[];
   placedShares: (number | null)[];
   doubtful: Record<number, string[]>;
   model: string;
   writer?: TextLayerWriter;
+  requireCopy?: boolean;
   log: LlmOcrInput["log"];
   signal?: AbortSignal;
 };
 
 // Everything after the pages are placed: the joined layout, and the copy with the words in it.
-async function writeOutputs({ pdfPath, outDir, outPdfPath, workDir, pages, layer, placedShares, doubtful, model, writer, log, signal }: Outputs): Promise<{ joined: (LlmPage | null)[]; meanPlaced: number | null; searchableCopy: boolean }> {
+async function writeOutputs({ pdfPath, outDir, outPdfPath, workDir, pages, layer, geometry, placedShares, doubtful, model, writer, requireCopy = false, log, signal }: Outputs): Promise<{ joined: (LlmPage | null)[]; meanPlaced: number | null; searchableCopy: boolean }> {
   const joined = joinContinuations(pages);
+  reconcileNativeBlocks(geometry, joined.map((p) => p?.blocks.map((b) => b.text) ?? []));
   const placedScores = placedShares.filter((p): p is number => p !== null);
   const meanPlaced = placedScores.length ? placedScores.reduce((a, p) => a + p, 0) / placedScores.length : null;
-  await writeLayout(outDir, joined, model, meanPlaced, doubtful);
 
   // The copy is a bonus on top of the reading, which is paid for by now: a writer that fails
   // is named in the log and the book goes on without in-PDF search, as it did before the copy.
   let searchableCopy = false;
   if (outPdfPath && layer.length > 0) {
     layer.sort((a, b) => a.page - b.page);
+    const pending = `${outPdfPath}.pending.pdf`;
     try {
-      await (writer ?? writeTextLayer)({ pdfPath, outPdfPath, pages: layer, workDir, signal });
-      if ((await pdfHasTextLayer(outPdfPath)) !== true) throw new Error("the copy has no readable text layer");
+      await (writer ?? writeTextLayer)({ pdfPath, outPdfPath: pending, pages: layer, workDir, signal });
+      if ((await pdfHasTextLayer(pending)) !== true) throw new Error("the copy has no readable text layer");
+      if (signal?.aborted) throw new ExtractAbortedError();
+      await rename(pending, outPdfPath);
       searchableCopy = true;
     } catch (err) {
       if (err instanceof ExtractAbortedError || signal?.aborted) throw new ExtractAbortedError();
-      await rm(outPdfPath, { force: true }).catch(() => {});
       await log(`No searchable copy for the AI's reading — ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      await rm(pending, { force: true }).catch(() => {});
+      await rm(`${pending}.part`, { force: true }).catch(() => {});
     }
   }
+  if (requireCopy && !searchableCopy) throw new Error("Could not replace the searchable PDF; the previous copy and layout are kept. Check the OCR log and retry placement.");
+  await writeLayout(outDir, joined, model, meanPlaced, doubtful);
+  const geometryPdf = searchableCopy && outPdfPath ? outPdfPath : pdfPath;
+  const fingerprint = await stat(geometryPdf);
+  const outputSizes = await pdfPageSizes(geometryPdf);
+  geometry.forEach((page, i) => { page.rot = outputSizes[i]?.rotation ?? 0; });
+  const native: SourceGeometry = { version: 4, pages: geometry, pdf: { path: geometryPdf, size: fingerprint.size, mtimeMs: fingerprint.mtimeMs } };
+  const geometryPath = path.join(outDir, OCR_GEOMETRY_FILE);
+  await writeFile(`${geometryPath}.part`, JSON.stringify(native));
+  await rename(`${geometryPath}.part`, geometryPath);
   return { joined, meanPlaced, searchableCopy };
 }
 
@@ -733,13 +690,16 @@ export async function replaceWords(input: Omit<LlmOcrInput, "modelKey">, deps: {
     const placedShares: (number | null)[] = pages.map(() => null);
     const doubtful: Record<number, string[]> = {};
     const layer: TextLayerPage[] = [];
+    const geometry: GeometryPage[] = sizes.map((size, i) => placeOcrPage([], null, size, i).geometry);
     await log(`Placing the AI's words on ${sizes.length} page${sizes.length === 1 ? "" : "s"} again`);
     await pool(images, CONCURRENCY, async (image, i) => {
       const page = pages[i];
       if (!page) return;
       const ref = await reference(image, i + 1);
-      if (!ref) return;
-      const placement = placePage(page, ref, sizes[i]!);
+      const size = sizes[i];
+      if (!size) throw new Error(`No dimensions for page ${i + 1}`);
+      const placement = placePage(page, ref, size, i);
+      geometry[i] = placement.geometry;
       pages[i] = placement.page;
       placedShares[i] = placement.placed;
       if (placement.words.length) layer.push({ page: i + 1, words: placement.words });
@@ -748,7 +708,7 @@ export async function replaceWords(input: Omit<LlmOcrInput, "modelKey">, deps: {
     if (signal?.aborted) throw new ExtractAbortedError();
     // A machine with no reader must not trade the copy and polygons it has for nothing
     if (layer.length === 0 && pages.some((p) => p?.blocks.length)) throw new Error("No local reader could place the AI's words on this machine — the layout and the searchable copy are unchanged");
-    const { meanPlaced, searchableCopy } = await writeOutputs({ pdfPath, outDir, outPdfPath, workDir, pages, layer, placedShares, doubtful, model: saved.model, writer: deps.writeTextLayer, log, signal });
+    const { meanPlaced, searchableCopy } = await writeOutputs({ pdfPath, outDir, outPdfPath, workDir, pages, layer, geometry, placedShares, doubtful, model: saved.model, writer: deps.writeTextLayer, requireCopy: Boolean(outPdfPath), log, signal });
     return { pages: sizes.length, meanPlaced, searchableCopy };
   });
 }

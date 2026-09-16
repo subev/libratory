@@ -15,8 +15,7 @@ import json
 import os
 import sys
 
-from pypdf import PdfReader, PdfWriter
-
+from pdf_image_copy import copy_without_text
 from ocr_surya import add_glyphless_font, add_text_layer, glyphless_font_bytes
 
 
@@ -30,8 +29,7 @@ def main() -> int:
 
     with open(args.words, encoding="utf-8") as f:
         pages = json.load(f)
-    reader = PdfReader(args.pdf)
-    writer = PdfWriter(clone_from=reader)
+    writer = copy_without_text(args.pdf)
     font_ref = add_glyphless_font(writer, glyphless_font_bytes(args.tessdata))
     count = len(writer.pages)
     written = 0

@@ -35,7 +35,7 @@ describe("placement, copy, geometry and rects", () => {
     const dir = await mkdtemp(path.join(tmpdir(), "placement-"));
     dirs.push(dir);
     // Tesseract's full reading is the "model" text; the reference the engine sees has lost the
-    // first line's opening words, so those are guessed.
+    // first line's opening words, so those must remain unlocated.
     await execFileAsync("pdftoppm", ["-scale-to", "1600", "-jpeg", "-gray", FIXTURE, path.join(dir, "pg")]);
     const image = path.join(dir, (await readdir(dir)).find((f) => f.endsWith(".jpg"))!);
     const full = parseTsv((await execFileAsync("tesseract", [image, "-", "-l", "eng", "tsv"], { env: tesseractEnv(), maxBuffer: 64 * 1024 * 1024 })).stdout);
@@ -59,13 +59,13 @@ describe("placement, copy, geometry and rects", () => {
     // Every line the reader's geometry sees is inside the page
     const geometry = await ensureSourceGeometry({ fileIndex: 0, filename: "page.ocr.pdf", pdfPath: outPdfPath, outDir });
     const page = geometry?.pages[0];
+    if (!page?.native) throw new Error("Expected native OCR geometry");
     expect(page?.lines.length).toBeGreaterThan(3);
     for (const line of page!.lines) {
       expect(line.b[0]).toBeGreaterThanOrEqual(0);
       expect(line.b[1]).toBeGreaterThanOrEqual(0);
       expect(line.b[2]).toBeLessThanOrEqual(page!.w + 1);
       expect(line.b[3]).toBeLessThanOrEqual(page!.h + 1);
-      expect(line.xs).toBeDefined();
     }
 
     // The reader's own rect resolution over the chapter this layout would cut
@@ -75,15 +75,14 @@ describe("placement, copy, geometry and rects", () => {
     const { text, spans } = normalizeBlocks(blocks);
     const context = { cleanText: text, textMap: { version: 1 as const, spans }, blocks, page: () => ({ index: 0, geometry: page! }) };
 
-    // The first sentence, whose opening words were guessed: line rects, not the block's box
+    // The opening "Chapter 1." was entirely skipped; the rest keeps its measured lines.
     const firstSentenceEnd = text.search(/[.!?]/) + 1;
-    const rects = rectsForRange(context, 0, firstSentenceEnd, { linesOnly: true });
+    expect(rectsForRange(context, 0, firstSentenceEnd, { linesOnly: true })).toEqual([]);
+    const rects = rectsForRange(context, firstSentenceEnd, text.length, { linesOnly: true });
     expect(rects.length).toBeGreaterThan(0);
     for (const rect of rects) expect(rect[4]).toBeLessThan(600);
-    // The guessed words themselves sit on the first line, at its start
+    // Missing words have no fabricated first-line position.
     const firstWord = rectsForRange(context, 0, skipped[0]!.length, { linesOnly: true });
-    expect(firstWord).toHaveLength(1);
-    expect(firstWord[0]![2]).toBeCloseTo(rects[0]![2], -2);
-    expect(firstWord[0]![1]).toBeLessThan(rects[0]![1] + rects[0]![3]);
+    expect(firstWord).toEqual([]);
   }, 180_000);
 });

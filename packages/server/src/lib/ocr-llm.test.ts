@@ -1,7 +1,10 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { copyFile, mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { copyFile, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { env } from "../env.ts";
 
 import { collectBlocksFromMarkerOutput, detectBoundaryIndices } from "./marker.ts";
 import {
@@ -12,7 +15,6 @@ import {
   RETRY_BELOW_RECALL,
   anchorHint,
   cleanText,
-  combineReadings,
   estimateLlmOcrCostUsd,
   fidelity,
   hasLlmLayout,
@@ -29,7 +31,7 @@ import {
   type Reference,
   type Transcriber,
 } from "./ocr-llm.ts";
-import type { TextLayerWriter } from "./pdf-text-layer.ts";
+import { writeTextLayer, type TextLayerWriter } from "./pdf-text-layer.ts";
 
 const FIXTURE = path.resolve(import.meta.dirname, "../../test/fixtures/scanned-page.pdf");
 const SOFT_HYPHEN = String.fromCharCode(0xad);
@@ -206,30 +208,31 @@ describe("anchorHint", () => {
   });
 });
 
-describe("placement with two readers", () => {
-  it("keeps whichever reader placed more of the page, and names the words they disagree on", async () => {
-    const dir = await scratch();
-    // Vision-like boxes that read the page as noise, Tesseract-like text that read it well
-    const noise = { ...ref("xx yy zz"), width: 1133, height: 1600 };
-    const good = ref(REFERENCE);
-    const reference = combineReadings(good, noise)!;
-    expect(reference.alternates).toEqual([good]);
-    const logs: string[] = [];
-    const stats = await makeLlmOcrRunner({ transcribe: async () => ({ page: { ...voyage, blocks: [voyage.blocks[0]!, { type: "text", text: "The ship left the harbor at dawn, its sails catching the first light of morning." }] }, inputTokens: 1, outputTokens: 1 }), reference: async () => reference })({
-      pdfPath: FIXTURE, outDir: path.join(dir, "out"), language: "en", workDir: path.join(dir, "work"), log: async (m) => { logs.push(m); },
-    });
-    expect(stats.meanPlaced).toBe(1);
-    const disagreeing = combineReadings(ref("Chapter 1. The Voyage Begins\nThe ship left the harbar at dawn, its sails catching the first light of morning."), null)!;
-    const flagged = await makeLlmOcrRunner({ transcribe: async () => ({ page: voyage, inputTokens: 1, outputTokens: 1 }), reference: async () => disagreeing })({
-      pdfPath: FIXTURE, outDir: path.join(dir, "out2"), language: "en", workDir: path.join(dir, "work2"), log: async (m) => { logs.push(m); },
-    });
-    expect(flagged.meanPlaced).toBe(1);
-    expect(logs.some((l) => l.includes("1 word the readers disagree on (harbor)"))).toBe(true);
-    expect(JSON.parse(await readFile(path.join(dir, "out2", LLM_LAYOUT_META_FILE), "utf-8")).doubtful).toEqual({ 1: ["harbor"] });
-  });
-});
-
 describe("replaceWords", () => {
+  it("renders the displayed crop rather than squeezing the full media box into its coordinates", async () => {
+    const dir = await scratch();
+    const exec = promisify(execFile);
+    const python = path.join(env.CONDA_ENV_PATH, "python");
+    const cropped = path.join(dir, "cropped.pdf");
+    await exec(python, ["-c", `
+import sys
+from pypdf import PdfWriter
+w = PdfWriter(clone_from=sys.argv[1])
+w.pages[0].cropbox.lower_left = (100, 200)
+w.pages[0].cropbox.upper_right = (1000, 1200)
+w.write(sys.argv[2])
+`, FIXTURE, cropped]);
+    const run = makeLlmOcrRunner({
+      transcribe: async () => ({ page: page([{ type: "paragraph", text: "Some text." }]), inputTokens: 0, outputTokens: 0 }),
+      reference: async (image) => {
+        const { stdout } = await exec(python, ["-c", "from PIL import Image; import sys; print(*Image.open(sys.argv[1]).size)", image]);
+        expect(stdout.trim()).toBe("1440 1600");
+        return ref("Some text.");
+      },
+    });
+    await run({ pdfPath: cropped, outDir: path.join(dir, "out"), workDir: path.join(dir, "work"), language: "en", log: async () => {} });
+  });
+
   it("places the saved transcription again with a new reference and rewrites the layout and the copy", async () => {
     const dir = await scratch();
     const outDir = path.join(dir, "out");
@@ -240,14 +243,32 @@ describe("replaceWords", () => {
     const layers: Parameters<TextLayerWriter>[0]["pages"][] = [];
     const stats = await replaceWords(
       { pdfPath: FIXTURE, outDir, outPdfPath: path.join(dir, "page.ocr.pdf"), language: "en", workDir: path.join(dir, "work"), log: async () => {} },
-      { reference: async () => ref("Chapter 1. The Voyage Begins\nThe ship left the harbor at dawn."), writeTextLayer: async ({ pdfPath, outPdfPath, pages }) => { layers.push(pages); await copyFile(pdfPath, outPdfPath); } },
+      { reference: async () => ref("Chapter 1. The Voyage Begins\nThe ship left the harbor at dawn."), writeTextLayer: async (input) => { layers.push(input.pages); await writeTextLayer(input); } },
     );
-    expect(stats).toMatchObject({ pages: 1, meanPlaced: 1, searchableCopy: false });
+    expect(stats).toMatchObject({ pages: 1, meanPlaced: 1, searchableCopy: true });
     expect(layers[0]?.[0]?.words).toHaveLength(12);
     const blocks = await collectBlocksFromMarkerOutput(outDir);
     // The stale polygon is gone and the new one is in the page's points
-    expect(blocks[1]?.polygon?.[0]?.[1]).toBeCloseTo(130 * 1241 / 1133, 3);
+    expect(blocks[1]?.polygon?.[0]?.[1]).toBeCloseTo(130 * 1754 / 1600, 3);
     expect(JSON.parse(await readFile(path.join(outDir, LLM_LAYOUT_META_FILE), "utf-8"))).toMatchObject({ model: "Saved model", placed: 1 });
+  });
+
+  it("keeps the previous PDF and layout when replacement writes an invalid copy", async () => {
+    const dir = await scratch();
+    const { mkdir } = await import("node:fs/promises");
+    const outDir = path.join(dir, "out");
+    await mkdir(outDir);
+    await writeFile(path.join(outDir, LLM_PAGES_FILE), JSON.stringify({ model: "M", complete: true, pages: [page([{ type: "paragraph", text: "Some text." }])] }));
+    const outPdfPath = path.join(dir, "page.ocr.pdf");
+    await writeFile(outPdfPath, "previous PDF");
+    await writeFile(path.join(outDir, LLM_LAYOUT_FILE), "previous layout");
+    await expect(replaceWords({ pdfPath: FIXTURE, outDir, outPdfPath, language: "en", workDir: path.join(dir, "work"), log: async () => {} }, {
+      reference: async () => ref("Some text."),
+      writeTextLayer: async ({ outPdfPath: pending }) => { await copyFile(FIXTURE, pending); },
+    })).rejects.toThrow("Could not replace the searchable PDF");
+    expect(await readFile(outPdfPath, "utf-8")).toBe("previous PDF");
+    expect(await readFile(path.join(outDir, LLM_LAYOUT_FILE), "utf-8")).toBe("previous layout");
+    expect(await exists(`${outPdfPath}.pending.pdf`)).toBe(false);
   });
 
   it("leaves the copy alone when no reader could place anything", async () => {
@@ -271,21 +292,6 @@ describe("replaceWords", () => {
   });
 });
 
-describe("combineReadings", () => {
-  it("takes the boxes from the box reader and the text from the text reader, and copes with either missing", () => {
-    const text = ref("Chapter 1. The Voyage Begins");
-    const boxes = { ...ref("Chapter I. The Voyage Begins"), width: 1000, height: 1400 };
-    const both = combineReadings(text, boxes)!;
-    expect(both.text).toBe(text.text);
-    expect(both.words).toBe(boxes.words);
-    expect([both.width, both.height]).toEqual([1000, 1400]);
-    // Boxes only: nothing for the fidelity check to compare against, the words still get placed
-    expect(combineReadings(null, boxes)).toMatchObject({ text: "", width: 1000 });
-    expect(combineReadings(text, null)?.words).toBe(text.words);
-    expect(combineReadings(null, null)).toBeNull();
-  });
-});
-
 describe("estimateLlmOcrCostUsd", () => {
   it("prices a 300-page book in cents, not dollars", () => {
     expect(estimateLlmOcrCostUsd(300)).toBeCloseTo(0.3735, 3);
@@ -293,6 +299,24 @@ describe("estimateLlmOcrCostUsd", () => {
 });
 
 describe("runLlmOcr", () => {
+  it("reuses paid transcription after the output writer fails and keeps the previous PDF", async () => {
+    const dir = await scratch();
+    const input = { pdfPath: FIXTURE, outDir: path.join(dir, "out"), outPdfPath: path.join(dir, "page.ocr.pdf"), language: "en", workDir: path.join(dir, "work"), log: async () => {} };
+    await writeFile(input.outPdfPath, "previous PDF");
+    let calls = 0;
+    const run = makeLlmOcrRunner({
+      modelLabel: "M", reference: async () => ref(REFERENCE),
+      transcribe: async () => { calls++; return { page: voyage, inputTokens: 1, outputTokens: 1 }; },
+      writeTextLayer: async ({ outPdfPath }) => { await writeFile(outPdfPath, "partial PDF"); throw new Error("disk full"); },
+    });
+    expect((await run(input)).searchableCopy).toBe(false);
+    expect(await readFile(input.outPdfPath, "utf-8")).toBe("previous PDF");
+    expect(await exists(`${input.outPdfPath}.pending.pdf`)).toBe(false);
+    expect(JSON.parse(await readFile(path.join(input.outDir, LLM_PAGES_FILE), "utf-8"))).toMatchObject({ complete: true, outputFailed: true });
+    await run(input);
+    expect(calls).toBe(1);
+  });
+
   it("writes the layout the chapter pipeline reads, returns the raw text, and counts tokens", async () => {
     const dir = await scratch();
     const calls: { pageNumber: number; mediaType: string; hint: string; bytes: number }[] = [];
@@ -336,8 +360,8 @@ describe("runLlmOcr", () => {
     const blocks = await collectBlocksFromMarkerOutput(path.join(dir, "out"));
     expect(blocks.map((b) => b.type)).toEqual(["SectionHeader", "Text"]);
     // The heading's box: five words on the first line, scaled to points
-    expect(blocks[0]?.polygon?.[0]).toEqual([100 * 1241 / 1133, 100 * 1241 / 1133]);
-    expect(blocks[1]?.polygon?.[2]?.[1]).toBeCloseTo(150 * 1241 / 1133, 3);
+    expect(blocks[0]?.polygon?.[0]).toEqual([100 * 1241 / 1133, 100 * 1754 / 1600]);
+    expect(blocks[1]?.polygon?.[2]?.[1]).toBeCloseTo(150 * 1754 / 1600, 3);
     expect(detectBoundaryIndices(blocks)).toBeNull();
     expect(JSON.parse(await readFile(path.join(dir, "out", LLM_LAYOUT_META_FILE), "utf-8"))).toMatchObject({ engine: "llm", model: "Test model", pages: 1 });
     expect(logs.some((l) => l.includes("Reading 1 page with Test model"))).toBe(true);

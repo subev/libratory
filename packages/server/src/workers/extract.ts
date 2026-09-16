@@ -14,6 +14,7 @@ import { queueIndexBook } from "../lib/search-index.ts";
 
 export type ExtractPayload = {
   bookId: string;
+  ignoreTextLayerFileIds?: string[];
 };
 
 export async function extract(payload: ExtractPayload, { addJob }: { addJob: WorkerUtils["addJob"] }) {
@@ -46,7 +47,7 @@ export async function extract(payload: ExtractPayload, { addJob }: { addJob: Wor
     } else {
       // A run where every file was stopped by hand produced no chapters, which the check below
       // would report as "No chapters detected in any file" — a failure, for something deliberate.
-      const { cancelled } = await extractMultipleFiles(book, files, log, addJob);
+      const { cancelled } = await extractMultipleFiles(book, files, log, addJob, payload.ignoreTextLayerFileIds);
       if (cancelled) return;
     }
 
@@ -144,6 +145,7 @@ async function extractMultipleFiles(
   files: (typeof bookFiles.$inferSelect)[],
   log: (msg: string) => Promise<void>,
   addJob: WorkerUtils["addJob"],
+  ignoreTextLayerFileIds: string[] = [],
 ) {
   // Determine chapter offset from existing chapters (for append support)
   const [existing] = await db
@@ -192,6 +194,7 @@ async function extractMultipleFiles(
         engine,
         language: book.language,
         ocrModel: book.ocrModel,
+        ignoreTextLayer: ignoreTextLayerFileIds.includes(file.id),
         log: fileLog,
         signal: abort.signal,
       });

@@ -66,11 +66,12 @@ export function ExtractModal({
   chapterModel: string | null;
   language: string | null;
   onUpdateBook: (settings: { ocrEngine?: OcrEngine | null; ocrModel?: string | null; llmChapterDetection?: boolean; chapterModel?: string; language?: string | null }) => void;
-  onStart: (scope: ExtractScope) => void;
+  onStart: (scope: ExtractScope, ignoreTextLayer: boolean) => void;
   onClose: () => void;
 }) {
   const { languages: ocrLanguages } = useOcrLanguages();
-  const suggestion = trpc.ocrTry.page.useQuery({ bookId, fileIndex: tryFileIndex, page: 5 }, { enabled: canSetOcr, staleTime: Infinity });
+  const [ignoreTextLayer, setIgnoreTextLayer] = useState(false);
+  const suggestion = trpc.ocrTry.page.useQuery({ bookId, fileIndex: tryFileIndex, page: 5 }, { enabled: canSetOcr || ignoreTextLayer, staleTime: Infinity });
   const suggestedPack = ocrLanguages.find((l) => l.code === (suggestion.data?.candidates ?? [])[0]) ?? null;
   const pack = packForBookLanguage(ocrLanguages, language) ?? (language ? null : suggestedPack);
   const languageLabel = (iso: string) => BOOK_LANGUAGE_OPTIONS.find((o) => o.code === iso)?.label ?? iso;
@@ -92,6 +93,7 @@ export function ExtractModal({
   const confirmed = confirmedScope === scope;
   const blocked = disabledReason(scope) ?? (losing > 0 && !confirmed ? "Confirm the chapters you're replacing" : null);
   const usingTesseract = (ocrEngine ?? DEFAULT_OCR_ENGINE) === DEFAULT_OCR_ENGINE;
+  const replacingText = scope === "selected" && ignoreTextLayer;
 
   return (
     <Modal size="md" onClose={onClose} testId="extract-modal">
@@ -135,17 +137,37 @@ export function ExtractModal({
           </p>
         )}
 
-        {canSetOcr && (
+        {scope === "selected" && (
+          <label className="flex gap-2 border-t border-(--border) pt-3 text-xs text-(--text-muted)">
+            <input
+              type="checkbox"
+              checked={ignoreTextLayer}
+              onChange={(e) => setIgnoreTextLayer(e.target.checked)}
+              disabled={isProcessing || selectedCount === 0}
+              className="mt-0.5"
+              data-testid="extract-ignore-text-layer"
+            />
+            <span>
+              <span className="block text-(--text-secondary)">Ignore existing PDF text and run OCR again</span>
+              Use when a scanner’s text is incorrect, incomplete, or misplaced. Reads every page of the selected files
+              and replaces the text in a new PDF copy. The original is kept.
+            </span>
+          </label>
+        )}
+
+        {scope !== "chapters" && (canSetOcr || replacingText) && (
           <div className="space-y-2 border-t border-(--border) pt-3">
             <OcrEngineChoice
               value={ocrEngine}
-              used={scan.engine}
+              used={replacingText ? null : scan.engine}
               onChange={(engine) => onUpdateBook({ ocrEngine: engine })}
               model={ocrModel}
               onModelChange={(key) => onUpdateBook({ ocrModel: key })}
               pageCount={suggestion.data?.pageCount ?? null}
               tryHref={`/books/${bookId}/ocr?file=${tryFileIndex}`}
-              status={scan.read
+              status={replacingText
+                ? "Every selected page is read from its image with the engine below, even if the PDF already contains text. Choosing an AI model runs paid transcription again."
+                : scan.read
                 ? scan.garbled
                   ? <><strong className="text-(--warning-text)">Tesseract struggled here.</strong> It read the pages in the background but doubted many of its words — the sign of photographed, curled or faded pages. That is what Surya and the AI model are for: pick one below, and the pages are read again.</>
                   : scan.engine === "llm"
@@ -230,7 +252,7 @@ export function ExtractModal({
         <Button onClick={onClose}>Close</Button>
         <Button
           variant="primary"
-          onClick={() => onStart(scope)}
+          onClick={() => onStart(scope, replacingText)}
           disabled={!!blocked}
           title={blocked ?? undefined}
           data-testid="extract-start"

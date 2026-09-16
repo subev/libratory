@@ -63,7 +63,7 @@ export function BookFilesSection({
   language: string | null;
   extractOpen: boolean;
   onExtractOpenChange: (open: boolean) => void;
-  onStartExtraction: (scope: ExtractScope) => void;
+  onStartExtraction: (scope: ExtractScope, ignoreTextLayer: boolean) => void;
   onUpdateExtractionSettings: (settings: { ocrEngine?: OcrEngine | null; ocrModel?: string | null; llmChapterDetection?: boolean; chapterModel?: string; language?: string | null }) => void;
   onSetSelected: (id: string, selected: boolean) => void;
   onSetAllSelected: (selected: boolean) => void | Promise<unknown>;
@@ -341,7 +341,7 @@ export function BookFilesSection({
           ocrEngine={ocrEngine}
           ocrModel={ocrModel}
           canSetOcr={scanned.length > 0}
-          tryFileIndex={scanned[0]?.index ?? 0}
+          tryFileIndex={files.find((file) => file.selected)?.index ?? scanned[0]?.index ?? 0}
           scan={{
             read: scanned.length > 0 && scanned.every(wasRead),
             engine: scanEngines.size === 1 ? [...scanEngines][0] ?? null : null,
@@ -353,9 +353,9 @@ export function BookFilesSection({
           language={language}
           onUpdateBook={onUpdateExtractionSettings}
           onClose={() => onExtractOpenChange(false)}
-          onStart={(scope: ExtractScope) => {
+          onStart={(scope: ExtractScope, ignoreTextLayer: boolean) => {
             onExtractOpenChange(false);
-            onStartExtraction(scope);
+            onStartExtraction(scope, ignoreTextLayer);
           }}
         />
       )}

@@ -158,7 +158,7 @@ function statsFromTsv(tsv: string): OcrStats {
   return statsFromConfidences(parseTsv(tsv).words.map((w) => w.conf));
 }
 
-export type PdfPageSize = { width: number; height: number };
+export type PdfPageSize = { width: number; height: number; rotation?: number };
 
 // Each page as displayed, in PDF points. pdfinfo reports the crop box before /Rotate while
 // pdftoppm and pdfium apply it, so a page rotated a quarter turn has its sides swapped here.
@@ -171,7 +171,11 @@ export async function pdfPageSizes(pdfPath: string): Promise<PdfPageSize[]> {
   }
   for (const m of stdout.matchAll(/^Page\s+(\d+)\s+rot:\s+(\d+)/gm)) {
     const size = sizes.get(Number(m[1]));
-    if (size && (Number(m[2]) === 90 || Number(m[2]) === 270)) sizes.set(Number(m[1]), { width: size.height, height: size.width });
+    if (size && Number(m[2]) !== 0) {
+      const rotation = Number(m[2]);
+      sizes.set(Number(m[1]), rotation === 90 || rotation === 270
+        ? { width: size.height, height: size.width, rotation } : { ...size, rotation });
+    }
   }
   return Array.from({ length: pages }, (_, i) => {
     const size = sizes.get(i + 1);

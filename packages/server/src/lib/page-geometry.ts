@@ -10,6 +10,7 @@ const GEOMETRY_FILE = "geometry.json";
 
 export type { Rect } from "./reader-format.ts";
 import type { Rect } from "./reader-format.ts";
+import type { NativeOcr } from "./ocr-geometry.ts";
 import { scriptPath } from "./paths.ts";
 
 export type GeometryLine = {
@@ -26,6 +27,7 @@ export type GeometryPage = {
   rot: number;
   cropOffset: [number, number];
   lines: GeometryLine[];
+  native?: NativeOcr;
 };
 
 // 3 split pdftext lines that merged two printed rows; 4 grows a line box down to the ink so
@@ -34,7 +36,8 @@ export type GeometryPage = {
 const CURRENT_VERSION = 4;
 const OLDEST_USABLE_VERSION = 3;
 
-export type SourceGeometry = { version: number; pages: GeometryPage[] };
+export type SourceGeometry = { version: number; pages: GeometryPage[]; pdf?: { path: string; size: number; mtimeMs: number } };
+export const OCR_GEOMETRY_FILE = "ocr-geometry.json";
 
 export type PageLayout = { content: Rect; columns: Rect[] };
 
@@ -54,6 +57,11 @@ function geometryPath(source: MarkerSource): string {
 const running = new Map<string, Promise<void>>();
 
 export async function ensureSourceGeometry(source: MarkerSource): Promise<SourceGeometry | null> {
+  const native = await readGeometry(path.join(source.outDir, OCR_GEOMETRY_FILE));
+  if (native?.pdf?.path === source.pdfPath) {
+    const current = await stat(source.pdfPath).catch(() => null);
+    if (current && current.size === native.pdf.size && current.mtimeMs === native.pdf.mtimeMs) return native;
+  }
   const target = geometryPath(source);
   const existing = await readGeometry(target);
   if (existing) {

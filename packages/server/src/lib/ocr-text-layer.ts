@@ -42,6 +42,7 @@ export async function ensureTextLayer({
   language,
   ocrModel = null,
   force = false,
+  ignoreTextLayer = false,
   hasTextLayer,
   log,
   signal,
@@ -53,6 +54,7 @@ export async function ensureTextLayer({
   /** The "llm" engine's model key; the Settings default when null. */
   ocrModel?: string | null;
   force?: boolean;
+  ignoreTextLayer?: boolean;
   /** What pdfHasTextLayer already said, when the caller has asked. */
   hasTextLayer?: boolean | null;
   log: (msg: string) => Promise<void>;
@@ -61,15 +63,19 @@ export async function ensureTextLayer({
   // The book's engine is the truth: a read the other engine did is stale, not done.
   const done = await textLayerDone(bookId, file);
   const rereading = Boolean(done && file.ocrEngine && file.ocrEngine !== engine);
-  if (done && !force && !rereading) {
+  if (done && !force && !rereading && !ignoreTextLayer) {
     await log(file.searchablePdfPath ? `"${file.filename}" already has a searchable copy` : `"${file.filename}" was already read by the AI model`);
     return false;
   }
   if (rereading) await log(`"${file.filename}" was read by ${file.ocrEngine} — reading it again with ${engine}`);
 
   // null means pdftotext could not run at all — a machine fault, not a scan, so it must not force OCR.
-  const scanned = hasTextLayer === undefined ? await pdfHasTextLayer(file.pdfPath) : hasTextLayer;
-  if (scanned !== false) return false;
+  if (!ignoreTextLayer) {
+    const scanned = hasTextLayer === undefined ? await pdfHasTextLayer(file.pdfPath) : hasTextLayer;
+    if (scanned !== false) return false;
+  } else {
+    await log(`Ignoring existing PDF text in "${file.filename}" — reading every page image again`);
+  }
 
   const previous = file.searchablePdfPath;
   const outPdfPath = path.join(path.dirname(file.pdfPath), `${path.basename(file.pdfPath, ".pdf")}.ocr.pdf`);
@@ -95,6 +101,9 @@ export async function ensureTextLayer({
       // model's own text onto the row, and the words placed on Tesseract's boxes into the copy.
       // Without a pack to place with there is no copy, and one another engine left is stale now.
       const result = await runLlmOcr({ pdfPath: file.pdfPath, outDir: bookFileOutDir(bookId, file.index), outPdfPath, language, workDir, modelKey: ocrModel ?? undefined, log, signal });
+      if (ignoreTextLayer && !result.searchableCopy) {
+        throw new Error("The AI read the pages but could not replace the PDF text layer. Check the OCR log and language pack, then retry; the AI transcription is saved.");
+      }
       stats = { confidence: result.meanRecall, lowConfidenceFraction: result.lowRecallFraction };
       rawText = result.rawText.trim() ? result.rawText : null;
       searchablePdfPath = result.searchableCopy ? outPdfPath : null;

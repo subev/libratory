@@ -63,60 +63,40 @@ describe("alignWords", () => {
 });
 
 describe("placeBlocks", () => {
-  it("boxes every word, guesses the missing ones from their neighbours, and boxes each block", () => {
-    const ocr = [...ocrLine(0, "Глава", "първа"), ...ocrLine(1, "Беше", "нощ"), ...ocrLine(2, "и", "валеше")];
-    const placed = placeBlocks(["Глава първа", "Беше тъмна нощ и валеше сняг"], ocr);
-    const byText = Object.fromEntries(placed.words.map((w) => [w.text, w]));
-    expect(byText["Глава"]).toMatchObject({ block: 0, matched: true, box: [100, 0, 150, 20] });
-    // Between "Беше" (ends at 140) and "нощ" (starts at 150) on the same line
-    expect(byText["тъмна"]).toMatchObject({ matched: false });
-    expect(byText["тъмна"]!.box![0]).toBeGreaterThanOrEqual(140);
-    expect(byText["тъмна"]!.box![2]).toBeLessThanOrEqual(150);
-    expect(byText["тъмна"]!.box![1]).toBe(30);
-    // After the last placed word on its line, one letter's width per character
-    expect(byText["сняг"]).toMatchObject({ matched: false, box: [190, 60, 230, 80] });
-    expect(placed.blockBoxes).toEqual([[100, 0, 210, 20], [100, 30, 230, 80]]);
-    expect(placed.matchedShare).toBeCloseTo(6 / 8);
+  it("keeps missing words unlocated instead of guessing inside or beside another line", () => {
+    const placed = placeBlocks(["Беше тъмна нощ", "Ново заглавие"], ocrLine(0, "Беше", "нощ"));
+    expect(placed.words.filter((w) => !w.matched).map((w) => w.box)).toEqual([null, null, null]);
+    expect(placed.blockBoxes).toEqual([[100, 0, 180, 20], null]);
   });
 
-  it("places nothing when the OCR saw nothing, and reports no share for an empty page", () => {
-    const placed = placeBlocks(["Беше нощ"], []);
-    expect(placed.words.every((w) => w.box === null && !w.matched)).toBe(true);
-    expect(placed.blockBoxes).toEqual([null]);
-    expect(placed.matchedShare).toBe(0);
-    expect(placeBlocks([], ocrLine(0, "12")).matchedShare).toBeNull();
+  it("aligns blocks independently when OCR reports columns in a different order", () => {
+    const left = ocrLine(0, "Left", "poem");
+    const right = ocrLine(1, "Right", "poem");
+    const placed = placeBlocks(["Right poem", "Left poem"], [...left, ...right]);
+    expect(placed.words.map((w) => w.indices)).toEqual([[2], [3], [0], [1]]);
+    expect(placed.matchedShare).toBe(1);
   });
 
-  it("squeezes a run that would hang past the page edge into the space left", () => {
-    const bounds = { width: 300, height: 100 };
-    const right = placeBlocks(["нощ и валеше сняг и вятър и дъжд"], ocrLine(0, "нощ"), bounds);
-    for (const w of right.words) expect(w.box![2]).toBeLessThanOrEqual(300);
-    expect(right.words.at(-1)!.box![2]).toBeCloseTo(300, 5);
-    const left = placeBlocks(["беше тъмна и студена нощ"], ocrLine(0, "нощ"), bounds);
-    for (const w of left.words) expect(w.box![0]).toBeGreaterThanOrEqual(0);
-    expect(left.words[0]!.box![0]).toBe(0);
-    // Room to spare: the natural width is kept
-    expect(placeBlocks(["нощ и"], ocrLine(0, "нощ"), bounds).words[1]!.box).toEqual([140, 0, 150, 20]);
+  it("places a spaced heading on measured heading words without rewriting the text", () => {
+    const placed = placeBlocks(["П Е С Н И Н А Ф И Л Е К"], ocrLine(2, "ПЕСНИ", "НА", "ФИЛЕК"));
+    expect(placed.words.map((w) => w.text)).toEqual(["П Е С Н И", "Н А", "Ф И Л Е К"]);
+    expect(placed.words.map((w) => w.indices)).toEqual([[0], [1], [2]]);
+    expect(placed.words.every((w) => w.box?.[1] === 60)).toBe(true);
   });
 
-  it("puts a run the OCR skipped at the start of the next placed word's line when there is room there", () => {
-    // Tesseract read the poem's last line and only the right half of the next line
-    const ocr = [...ocrLine(0, "за", "башат", "песнопойката!"), { text: "споменат:", box: [500, 30, 590, 50] as OcrWord["box"], conf: 90, line: 1 }];
-    const placed = placeBlocks(["за башат песнопойката!", "От тази категория заслужава да се споменат: Пагона"], ocr, { width: 800, height: 100 });
-    const byText = Object.fromEntries(placed.words.map((w) => [w.text, w]));
-    expect(byText["От"]!.box![1]).toBe(30);
-    expect(byText["От"]!.box![0]).toBeGreaterThanOrEqual(100);
-    expect(byText["се"]!.box![2]).toBeLessThan(500);
-    // No room on the next line: after the previous word instead
-    const tight = placeBlocks(["за башат песнопойката!", "От тази споменат:"], [...ocrLine(0, "за", "башат", "песнопойката!"), { text: "споменат:", box: [100, 30, 190, 50] as OcrWord["box"], conf: 90, line: 1 }], { width: 800, height: 100 });
-    expect(Object.fromEntries(tight.words.map((w) => [w.text, w]))["От"]!.box![1]).toBe(0);
+  it("keeps both measured halves when a joined word crosses a line", () => {
+    const placed = placeBlocks(["обособена част"], [...ocrLine(0, "обо-"), ...ocrLine(1, "собена", "част")]);
+    expect(placed.words[0]?.indices).toEqual([0, 1]);
   });
 
-  it("hangs words before the first placed one off its left edge", () => {
-    const placed = placeBlocks(["тъмна нощ"], ocrLine(0, "нощ"));
-    const dark = placed.words[0]!;
-    expect(dark.matched).toBe(false);
-    expect(dark.box![2]).toBeLessThanOrEqual(100);
-    expect(dark.box![1]).toBe(0);
+  it("does not reuse one printed occurrence for two separate blocks", () => {
+    const placed = placeBlocks(["same words", "same words"], ocrLine(0, "same", "words"));
+    expect(placed.words.filter((w) => w.block === 1).every((w) => w.box === null)).toBe(true);
+  });
+
+  it("keeps empty and invalid geometry unlocated", () => {
+    expect(placeBlocks(["Беше нощ"], []).blockBoxes).toEqual([null]);
+    expect(placeBlocks([], []).matchedShare).toBeNull();
+    expect(placeBlocks(["bad"], [{ text: "bad", conf: 90, line: 0, box: [0, 0, NaN, 10] }]).words[0]?.box).toBeNull();
   });
 });

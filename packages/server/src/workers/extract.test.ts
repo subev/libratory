@@ -27,6 +27,7 @@ vi.mock("../db.ts", async () => {
 
 import { extract } from "./extract.ts";
 import { extractPdf, ExtractAbortedError } from "../lib/marker.ts";
+import * as textLayer from "../lib/ocr-text-layer.ts";
 
 const mockExtractPdf = vi.mocked(extractPdf);
 
@@ -45,8 +46,28 @@ function fakeChapters(count: number) {
 
 describe("extract worker", () => {
   beforeEach(async () => {
+    vi.restoreAllMocks();
     await resetDb(getDb());
     mockExtractPdf.mockReset();
+  });
+
+  it("forces OCR only for the file IDs captured when extraction was requested", async () => {
+    const db = getDb();
+    const bookId = crypto.randomUUID();
+    await db.insert(books).values({ id: bookId, title: "Mixed files", skipSynthesis: true, ocrEngine: "llm" });
+    const files = await db.insert(bookFiles).values([
+      { bookId, index: 0, filename: "imported.pdf", pdfPath: "/tmp/imported.pdf", selected: false },
+      { bookId, index: 1, filename: "other.pdf", pdfPath: "/tmp/other.pdf", selected: true },
+    ]).returning();
+    const forced = row(files);
+    const ensure = vi.spyOn(textLayer, "ensureTextLayer").mockResolvedValue(false);
+    mockExtractPdf.mockResolvedValue(fakeChapters(1));
+
+    await extract({ bookId, ignoreTextLayerFileIds: [forced.id] }, { addJob: vi.fn() });
+
+    expect(ensure).toHaveBeenCalledWith(expect.objectContaining({ file: expect.objectContaining({ id: forced.id }), ignoreTextLayer: true }));
+    expect(ensure).toHaveBeenCalledWith(expect.objectContaining({ file: expect.objectContaining({ id: row(files, 1).id }), ignoreTextLayer: false }));
+    ensure.mockRestore();
   });
 
   it("extracts a legacy book (no book_files) using book.pdfPath", async () => {

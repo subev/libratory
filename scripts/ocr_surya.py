@@ -240,7 +240,9 @@ def main() -> int:
     pages = [args.page - 1] if args.page else list(range(page_count))
     emit("start", pages=len(pages))
 
-    writer = PdfWriter(clone_from=reader) if args.out else None
+    from pdf_image_copy import copy_without_text
+
+    writer = copy_without_text(args.pdf) if args.out else None
     font_ref = add_glyphless_font(writer, glyphless_font_bytes(args.tessdata)) if writer else None
 
     for page_index, lines, view_size in recognise(args.pdf, pages, args.stream_lines):

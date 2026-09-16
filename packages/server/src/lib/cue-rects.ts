@@ -1,5 +1,7 @@
 import type { ChapterTextMap } from "../schema.ts";
 import type { SourceBlock } from "./marker.ts";
+import { unionBox as cover } from "./ocr-geometry.ts";
+import type { NativeOcr } from "./ocr-geometry.ts";
 import type { GeometryLine, GeometryPage } from "./page-geometry.ts";
 
 // [page, x, y, w, h]: flat page index, then ten-thousandths of the page box, origin top-left
@@ -26,12 +28,22 @@ export function rectsForRange(
   { linesOnly = false } = {},
 ): CueRect[] {
   const perBlock: CueRect[][] = [];
+  let native = false;
 
   for (const span of context.textMap.spans) {
     if (span.end <= start || end <= span.start) continue;
     const block = context.blocks[span.block];
     const page = block ? context.page(block.page) : null;
     if (!block || !page) continue;
+
+    const geometry = page.geometry;
+    if (geometry?.native) {
+      native = true;
+      const rects = nativeRects(geometry.native, block, context.cleanText.slice(span.start, span.end),
+        Math.max(start, span.start) - span.start, Math.min(end, span.end) - span.start, linesOnly);
+      perBlock.push(rects.map((rect) => normalize(page.index, rect, geometry)));
+      continue;
+    }
 
     // Without the page's own size there is nothing to normalize against, so no rect is offered
     const box = polygonBox(block.polygon);
@@ -44,7 +56,58 @@ export function rectsForRange(
     if (rects) perBlock.push(rects.map((rect) => normalize(page.index, rect, page.geometry!)));
   }
 
-  return capRects(perBlock);
+  return native ? perBlock.flat() : capRects(perBlock);
+}
+
+function nativeRects(native: NativeOcr, source: SourceBlock, text: string, from: number, to: number, wordOnly: boolean): Box[] {
+  const key = project(source.text).value;
+  const exact = native.blocks.filter((b) => project(b.text).value === key);
+  const candidates = exact.length ? exact : native.blocks.filter((b) => {
+    const other = project(b.text).value;
+    return Math.min(key.length, other.length) >= 40 && key.slice(0, 40) === other.slice(0, 40);
+  });
+  const box = polygonBox(source.polygon);
+  const distance = (b: NativeOcr["blocks"][number]) => {
+    const boxes = b.words.flatMap((w) => w.indices.flatMap((i) => native.words[i] ? [native.words[i].box] : []));
+    const first = boxes[0];
+    if (!box || !first) return Number.POSITIVE_INFINITY;
+    const bound = boxes.reduce(cover, first);
+    return Math.abs(bound[0] + bound[2] - box[0] - box[2]) + Math.abs(bound[1] + bound[3] - box[1] - box[3]);
+  };
+  if (candidates.length > 1 && !box) return [];
+  const block = candidates.sort((a, b) => distance(a) - distance(b))[0];
+  if (!block) return [];
+  const projected = project(text);
+  const target = project(block.text);
+  const map = alignProjections(projected.value, target.value);
+  const selectedChars = new Set(map.slice(projectedIndex(projected.map, from), projectedIndex(projected.map, to))
+    .flatMap((i) => i >= 0 && target.map[i] !== undefined ? [target.map[i]] : []));
+  const selected = new Set(block.words.filter((word) => [...selectedChars].some((i) => word.start <= i && i < word.end))
+    .flatMap((word) => word.indices));
+  const lines = new Map<number, { index: number; box: Box; text: string }[]>();
+  native.words.forEach((word, index) => {
+    const line = lines.get(word.line) ?? [];
+    line.push({ ...word, index });
+    lines.set(word.line, line);
+  });
+  const result: Box[] = [];
+  for (const words of lines.values()) {
+    const first = words[0];
+    if (!first) continue;
+    const height = words.reduce((box, word) => cover(box, word.box), first.box);
+    let run: Box | null = null;
+    for (const word of words.sort((a, b) => a.box[0] - b.box[0])) {
+      if (selected.has(word.index)) {
+        const b: Box = wordOnly ? word.box : [word.box[0], height[1], word.box[2], height[3]];
+        run = run ? cover(run, b) : b;
+      } else if (/[\p{L}\p{N}]/u.test(word.text) && run) {
+        result.push(run);
+        run = null;
+      }
+    }
+    if (run) result.push(run);
+  }
+  return result;
 }
 
 type Box = [number, number, number, number];

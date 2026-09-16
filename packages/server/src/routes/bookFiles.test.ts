@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getDb, resetDb, row } from "../../test/setup.ts";
 import { bookFiles, books, chapters } from "../schema.ts";
 import { eq } from "drizzle-orm";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { bookFileOutDir, bookTmpDir } from "../lib/paths.ts";
 
 vi.mock("../db.ts", async () => {
   const { getDb } = await import("../../test/setup.ts");
@@ -12,6 +15,7 @@ vi.mock("../db.ts", async () => {
 vi.mock("graphile-worker", () => ({ quickAddJob: vi.fn(async () => {}) }));
 
 import { bookFilesRouter } from "./bookFiles.ts";
+import { quickAddJob } from "graphile-worker";
 
 const caller = bookFilesRouter.createCaller({});
 
@@ -37,6 +41,7 @@ async function bookRow(id: string) {
 
 beforeEach(async () => {
   await resetDb(getDb());
+  vi.mocked(quickAddJob).mockClear();
 });
 
 // books.pdfPath is the pre-book_files original, and the add-a-file route reads it as "the book's
@@ -103,5 +108,34 @@ describe("refusing to re-extract does not consume the files it got to first", ()
     await caller.reExtractSelected({ bookId: book.id });
 
     expect(await getDb().select().from(chapters).where(eq(chapters.bookId, book.id))).toEqual([]);
+  });
+
+  it("retains a failed file's saved transcription for retry", async () => {
+    const { book, rows } = await selectedBookWithChapters("done");
+    await getDb().update(bookFiles).set({ status: "failed" }).where(eq(bookFiles.id, row(rows).id));
+    const outDir = bookFileOutDir(book.id, 0);
+    const saved = path.join(outDir, "llm-pages.json");
+    await mkdir(outDir, { recursive: true });
+    await writeFile(saved, "paid transcription");
+    try {
+      await caller.reExtractSelected({ bookId: book.id, ignoreTextLayer: true });
+      expect(await readFile(saved, "utf-8")).toBe("paid transcription");
+    } finally {
+      await rm(bookTmpDir(book.id), { recursive: true, force: true });
+    }
+  });
+
+  it("limits forced OCR to the selected files and preserves the other chapters", async () => {
+    const { book, rows } = await selectedBookWithChapters("done");
+    const selected = row(rows);
+    await getDb().update(bookFiles).set({ selected: false }).where(eq(bookFiles.id, row(rows, 1).id));
+
+    await caller.reExtractSelected({ bookId: book.id, ignoreTextLayer: true });
+
+    expect(quickAddJob).toHaveBeenCalledWith(expect.anything(), "extract", {
+      bookId: book.id, ignoreTextLayerFileIds: [selected.id],
+    }, expect.objectContaining({ maxAttempts: 1 }));
+    const remaining = await getDb().select().from(chapters).where(eq(chapters.bookId, book.id));
+    expect(remaining.map((ch) => ch.sourceFileIndex)).toEqual([1]);
   });
 });

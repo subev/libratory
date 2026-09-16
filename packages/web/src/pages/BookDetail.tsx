@@ -957,9 +957,9 @@ export function BookDetail() {
               }}
               extractOpen={extractOpen}
               onExtractOpenChange={setExtractOpen}
-              onStartExtraction={(scope) => {
+              onStartExtraction={(scope, ignoreTextLayer) => {
                 for (const m of [reExtractSelectedMutation, retryMutation, redetectMutation]) m.reset();
-                if (scope === "selected") reExtractSelectedMutation.mutate({ bookId: book.id });
+                if (scope === "selected") reExtractSelectedMutation.mutate({ bookId: book.id, ignoreTextLayer });
                 else if (scope === "book") retryMutation.mutate({ id: book.id });
                 else redetectMutation.mutate({ id: book.id });
               }}

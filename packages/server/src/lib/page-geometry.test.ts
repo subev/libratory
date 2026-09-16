@@ -87,3 +87,25 @@ describe("removeSourceGeometry", () => {
     await removeSourceGeometry(outDir);
   });
 });
+
+describe("native OCR sidecar", () => {
+  it("uses measured geometry while the PDF matches and ignores it after replacement", async () => {
+    const { rm } = await import("node:fs/promises");
+    const outDir = await mkdtemp(path.join(tmpdir(), "native-geometry-"));
+    const pdfPath = path.join(outDir, "scan.pdf");
+    try {
+      await writeFile(pdfPath, "first PDF");
+      const fingerprint = await stat(pdfPath);
+      const native = { version: 4, pdf: { path: pdfPath, size: fingerprint.size, mtimeMs: fingerprint.mtimeMs }, pages: [{ ...page([line(10, 20, 30)]), native: { words: [], blocks: [] } }] };
+      const fallback = { version: 4, pages: [page([line(100, 200, 300)])] };
+      await writeFile(path.join(outDir, "ocr-geometry.json"), JSON.stringify(native));
+      await writeFile(path.join(outDir, "geometry.json"), JSON.stringify(fallback));
+      const source = { pdfPath, outDir, filename: "scan.pdf", fileIndex: 0 };
+      expect(await ensureSourceGeometry(source)).toEqual(native);
+      await writeFile(pdfPath, "a different replacement PDF");
+      expect(await ensureSourceGeometry(source)).toEqual(fallback);
+    } finally {
+      await rm(outDir, { recursive: true, force: true });
+    }
+  });
+});

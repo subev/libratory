@@ -132,7 +132,49 @@ the voice is measured to the word and the page cannot show it. Give the same sca
 then reads the searchable copy Tesseract wrote. The reverse is just as common: a born-digital book
 narrated by the Bulgarian MLX narrator is `chunk` and `word`.
 
+## Replacing incorrect imported OCR
+
+In **Source files → Extract → Selected files**, enable **Ignore existing PDF text and run OCR
+again** when a scanner's embedded text is incomplete or misplaced. Choose the AI engine to use
+model transcription with the existing local word placement. This re-extracts only the selected
+files, replacing their extracted chapters, edits and audio; the dialog confirms that loss before
+starting. The original PDFs and other files' chapters are kept.
+
+The extraction job carries the selected file IDs, so changing the selection afterward cannot move
+the override to another file. It bypasses both the imported-text check and reuse of an existing
+searchable copy. AI and Surya output discard old text before adding the replacement: pages with
+existing text are rendered at 300 dpi with lossless image compression, preserving their visible
+content and displayed dimensions. Pages without text are copied directly. The derived PDF can be
+larger; the original is untouched. Tesseract already builds its output from rendered page images.
+
 ## How the rectangles are produced
+
+### AI-read scans: native OCR positions
+
+Tesseract's measured words and line IDs are saved in `ocr-geometry.json`, alongside a mapping
+from the model's block text to those words. The model remains the source of transcription and
+chapter structure. Placement uses one local OCR reading of a lossless 3,508-pixel render
+(A4 at 300 dpi), separate
+from the compact image sent to the model. There are no guessed boxes for unmatched text and
+no height-shrinking compensation.
+
+The searchable PDF and reader cues are separate outputs of that mapping. The PDF contains the
+model's words at measured positions; its text layer is not read back to generate highlights.
+The sidecar is used only while its PDF path, size and modification time match the current source,
+so replacing the PDF with another engine cannot leave old native positions active.
+
+A chunk or sentence uses one band per contiguous selected run in each OCR line. The horizontal
+bounds come from the selected words, the height from that line. Unselected printed words break
+a band, and separate lines stay separate regardless of count. Genuine word timings use the
+individual measured boxes as the stronger cue. Unmatched model text remains in the transcript
+and narration but has no fabricated highlight or PDF position.
+
+The existing `r` and `wr` cue fields carry these rectangles over HTTP and in synced EPUBs.
+Consumers need no new format to display them. A local **Re-place words** operation rebuilds the
+mapping and searchable copy from saved model pages without retranscription or synthesis.
+Existing exports retain their old rectangles until exported again.
+
+### Digital PDFs and older geometry
 
 1. `chapters.text_map` records where each source block starts and ends inside `cleanText`,
    written by the normalize worker (`lib/normalizer.ts`, `workers/normalize.ts`).
@@ -163,7 +205,7 @@ OEBPS/chNNN.xhtml, chNNN_overlay.smil   reflowed text and its media overlay
 OEBPS/audio/chNNN.m4a                   one copy, shared by both layers
 OEBPS/p2af/book.json                    the manifest, urls relative to itself
 OEBPS/p2af/cues/chNNN.json              one per narrated chapter
-OEBPS/p2af/source/NN.pdf                the original, untouched
+OEBPS/p2af/source/NN.pdf                the searchable copy when available, otherwise the original
 ```
 
 The extra entries are manifested in `package.opf` but kept out of the spine, so a reader that
