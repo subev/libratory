@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { makeOrderedReader } from "./ocr-line-order.ts";
+import { makeOrderedReader, OrderedReadError } from "./ocr-line-order.ts";
 import { STANDARD_EXTRACTION } from "./extraction-presets.ts";
 const model = vi.hoisted(() => ({ call: vi.fn() }));
 vi.mock("ai", async (original) => ({ ...await original<typeof import("ai")>(), generateText: model.call }));
@@ -53,4 +53,36 @@ it.each(["line", "stanza"] as const)("preserves an explicit %s boundary between 
   const result = await makeOrderedReader("test-model", STANDARD_EXTRACTION)(image, "image/png", lines, signal);
   const { pagesToRawText } = await import("./ocr-llm.ts");
   expect(pagesToRawText([result.page])).toBe(breakBefore === "line" ? "Left\nRight" : "Left\n\nRight");
+});
+
+it("splits separate footer items without moving or dropping line IDs", async () => {
+  const lines = [
+    { id: 1, text: "Verse", box: [100, 100, 300, 120] as [number, number, number, number] },
+    { id: 2, text: "Printer signature", box: [50, 940, 450, 960] as [number, number, number, number] },
+    { id: 3, text: "11", box: [900, 940, 940, 960] as [number, number, number, number] },
+  ];
+  model.call.mockResolvedValueOnce({ output: { groups: [
+    { section: 0, kind: "verse", breakBefore: "line", lineIds: [1] },
+    { section: 0, kind: "furniture", breakBefore: "paragraph", lineIds: [2, 3] },
+  ] }, usage: {} });
+  model.call.mockResolvedValueOnce({ output: { blocks: lines.map((line, group) => ({ group, type: "other", text: line.text })) }, usage: {} });
+  const result = await makeOrderedReader("test-model", STANDARD_EXTRACTION)(image, "image/png", lines, signal);
+  expect(result.page.lineGroups?.map((g) => g.map((l) => l.id))).toEqual([[1], [2], [3]]);
+  expect(result.page.blocks.map((b) => b.kind)).toEqual(["verse", "furniture", "furniture"]);
+  expect(result.page.blocks[0]?.breakBefore).toBeUndefined();
+  expect(model.call.mock.calls[1]?.[0].system).toContain("exactly 3 blocks");
+});
+
+it("retains the failed ordering response and stops before transcription for mixed body columns", async () => {
+  const lines = [
+    { id: 1, text: "Left", box: [50, 100, 150, 120] as [number, number, number, number] },
+    { id: 2, text: "Right", box: [600, 100, 700, 120] as [number, number, number, number] },
+  ];
+  const output = { groups: [{ section: 0, kind: "prose", breakBefore: "paragraph", lineIds: [1, 2] }] };
+  model.call.mockResolvedValueOnce({ output, text: JSON.stringify(output), usage: {} });
+  const result = makeOrderedReader("test-model", STANDARD_EXTRACTION)(image, "image/png", lines, signal);
+  await expect(result).rejects.toMatchObject({ diagnostic: { stage: "ordering", lines, order: output, response: JSON.stringify(output) } });
+  await expect(result).rejects.toBeInstanceOf(OrderedReadError);
+  await expect(result).rejects.toThrow("group 0: lines 1 and 2");
+  expect(model.call).toHaveBeenCalledOnce();
 });

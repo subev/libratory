@@ -1,7 +1,8 @@
 import { cleanText } from "./extracted-text.ts";
 import { STANDARD_EXTRACTION } from "./extraction-presets.ts";
 import { afterAll, describe, expect, it } from "vitest";
-import { copyFile, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { OrderedReadError } from "./ocr-line-order.ts";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
@@ -338,7 +339,7 @@ describe("runLlmOcr", () => {
       readOrdered: async () => {
         orderedCalls++;
         transcribed();
-        return { page: { blocks: [{ type: "other", text: "Echo" }], furniture: [], continues: false, lineGroups: [[line]] }, inputTokens: 7, outputTokens: 3 };
+        return { page: { blocks: [{ type: "other", text: "Echo" }], furniture: [], continues: false, lineGroups: [[line]] }, restoredLineIds: [], inputTokens: 7, outputTokens: 3 };
       },
     });
     const outDir = path.join(dir, "out");
@@ -350,6 +351,24 @@ describe("runLlmOcr", () => {
     expect(orderedCalls).toBe(1);
     expect(stats).toMatchObject({ inputTokens: 7, outputTokens: 3, meanPlaced: 1 });
     expect(JSON.parse(await readFile(path.join(outDir, LLM_PAGES_FILE), "utf-8")).pages[0].lineGroups).toEqual([[line]]);
+  });
+
+  it("saves rejected ordered responses with their page before failing without retries", async () => {
+    const dir = await scratch();
+    const line = { id: 1, text: "Echo", box: [100, 100, 180, 120] as [number, number, number, number] };
+    let calls = 0;
+    const run = makeLlmOcrRunner({
+      transcribe: async () => { throw new Error("Standard path must not run"); },
+      reference: async () => null,
+      readLines: async (_input, options) => { options.onPage(1, [line]); return new Map([[1, [line]]]); },
+      readOrdered: async () => { calls++; throw new OrderedReadError("ordering", new Error("Missing line 1"), [line], { groups: [] }, '{"groups":[]}'); },
+    });
+    const outDir = path.join(dir, "out");
+    await expect(run({ pdfPath: FIXTURE, outDir, language: "en", workDir: path.join(dir, "work"), log: async () => {}, extractionSettings: { ...STANDARD_EXTRACTION, lineOrdering: true } })).rejects.toThrow("page 1/1: ordering: Missing line 1");
+    const saved = (await readdir(outDir)).find((name) => name.startsWith("ocr-failure-page-1-"));
+    if (!saved) throw new Error("Missing diagnostic file");
+    expect(JSON.parse(await readFile(path.join(outDir, saved), "utf8"))).toMatchObject({ page: 1, stage: "ordering", response: '{"groups":[]}', lines: [line] });
+    expect(calls).toBe(1);
   });
 
   it("writes the layout the chapter pipeline reads, returns the raw text, and counts tokens", async () => {
@@ -533,6 +552,44 @@ describe("runLlmOcr", () => {
     expect(logs.some((l) => l.includes("1/2 pages cached"))).toBe(true);
     expect(JSON.parse(await readFile(path.join(outDir, LLM_PAGES_FILE), "utf-8")).complete).toBe(true);
     expect((await collectBlocksFromMarkerOutput(outDir)).map((b) => b.page)).toEqual([1, 1, 2, 2]);
+  });
+
+  it("finishes other ordered pages after a rejected response, then resumes only the rejected page", async () => {
+    const dir = await scratch();
+    const pdfPath = path.join(dir, "five.pdf");
+    await promisify(execFile)("qpdf", ["--empty", "--pages", ...Array.from({ length: 5 }, () => [FIXTURE, "1"]).flat(), "--", pdfPath]);
+    const outDir = path.join(dir, "out");
+    const base = { pdfPath, outDir, language: "en", workDir: path.join(dir, "work"), log: async () => {}, extractionSettings: { ...STANDARD_EXTRACTION, lineOrdering: true } };
+    const calls: number[] = [];
+    let fail = true;
+    const run = makeLlmOcrRunner({
+      reference: async () => null,
+      transcribe: async () => { throw new Error("Standard path must not run"); },
+      readLines: async (_input, options) => {
+        const pages = new Map(options.neededPages.map((page) => [page, [{ id: page, text: "Text", box: [100, 100, 200, 120] as [number, number, number, number] }]]));
+        for (const [page, lines] of pages) options.onPage(page, lines);
+        return pages;
+      },
+      readOrdered: async (_image, _mediaType, lines) => {
+        const line = lines[0];
+        if (!line) throw new Error("No line");
+        calls.push(line.id);
+        if (fail && line.id === 1) throw new OrderedReadError("ordering", new Error("Missing line 1"), lines, { groups: [] }, '{"groups":[]}');
+        return { page: { blocks: [{ type: "paragraph", text: "Text" }], furniture: [], continues: false, lineGroups: [lines] }, restoredLineIds: [], inputTokens: 1, outputTokens: 1 };
+      },
+    });
+    await expect(run(base)).rejects.toThrow("Pages requiring review: 1; 4/5 pages saved");
+    expect(calls.sort()).toEqual([1, 2, 3, 4, 5]);
+    const partial = JSON.parse(await readFile(path.join(outDir, LLM_PAGES_FILE), "utf8"));
+    expect(partial.complete).toBe(false);
+    expect(partial.pages[0]).toBeNull();
+    expect(partial.pages.slice(1).every(Boolean)).toBe(true);
+    expect(await hasLlmLayout(outDir)).toBe(false);
+    fail = false;
+    calls.length = 0;
+    await run(base);
+    expect(calls).toEqual([1]);
+    expect(await hasLlmLayout(outDir)).toBe(true);
   });
 });
 

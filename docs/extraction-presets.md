@@ -15,19 +15,51 @@ and separate running headers/page numbers from body text.
 1. Surya detects and reads fixed lines locally, using already-installed weights.
 2. The selected vision model orders groups of line IDs using your editable
    reading-order instructions. Code rejects missing/repeated/invented IDs and
-   groups combining side-by-side columns, plus obvious row-by-row column alternation.
+   row-by-row column alternation. Correctly sequenced verse can be split into
+   separate column groups locally without changing the ID sequence. Metadata
+   grouped across a clear column gap is split into left then right, retaining
+   each column's internal order and every line ID.
+   Footer items are separated individually; mixed prose columns still fail.
 3. The model transcribes the whole page into one block per ordered group. Every
    group is retained as evidence, including page numbers and notes; model labels
    alone never decide what to omit. Numeric page furniture is excluded from
    narration only when local lines confirm it is isolated at the page edge. The response cannot drop or reorder whole groups.
+   The validated ordering supplies each block's type, so a transcription label
+   such as `verse` or `footnote` cannot fail the page or change its classification.
 4. Measured Tesseract words are assigned to their detected lines and aligned only
    within each group. The reader geometry and searchable PDF use those positions.
 
 This mode needs the Marker/Surya model bundle. Each nonempty page makes two AI
 calls: ordering, then transcription. A page with no detected lines instead makes
 one blank-page check; visible text with no detected lines stops extraction.
-Errors stop extraction for review; ordered calls do not retry automatically.
+Rejected model responses flag their pages for review while the other pages finish
+and remain cached. A file with any rejected pages does not publish partial output;
+its error lists the pages requiring review. Network, provider and local processing
+errors still stop the run. Ordered calls do not retry automatically.
 Standard retains its existing parse retries and low-coverage second look.
+
+With **Remove margin verse counters** enabled, an omitted counter-bearing line
+can be restored before transcription when it fits uniquely between two measured
+verse lines, sits in the counter margin, and agrees with another printed counter
+at its exact verse-line distance. This retains the complete line for transcription;
+counter removal still happens later. Unnumbered, ambiguous and unmatched omissions
+remain errors. Standard extraction and presets without counter cleanup do not use
+this repair.
+
+Line-continuation markers apply only between adjacent verse groups in the same
+section. Elsewhere they become paragraph boundaries; a formatting marker alone
+does not fail an otherwise valid reading order. Returning to an earlier section
+or interrupting verse with metadata still fails. An empty transcription is
+accepted only when every OCR label in its group is also empty; its group and
+line evidence remain saved.
+
+Prose following source notes may introduce a new quoted verse passage in the same
+section. That is a new paragraph boundary, not a continuation of the earlier verse.
+
+Rejected ordered responses are saved in the extraction output directory as
+`ocr-failure-page-<page>-<time>.json`, including the stage, input lines, ordering,
+raw response and nested validation errors. Logs identify the file, offending IDs
+or groups, and schema fields when available. These diagnostics do not trigger retries.
 
 Surya checkpoints each completed page beside the source PDF in
 `<source.pdf>.surya-lines.json`. The cache checks the PDF's SHA-256 and page count.
@@ -89,8 +121,17 @@ The 2026-09-17 run used 30 page attempts across ten distinct samples while fixin
 the two-call contracts. The last five poetry samples all produced searchable PDFs
 with 95–98% word placement. Four omitted the counters; source page 35 of
 `147-281.pdf` still retained them. Prompt-only counter removal is therefore not a
-guarantee. The local cleanup described below now removes the nine residual counters from this saved sample. The book remains suspended because the saved ordering also puts metadata before a verse continuation.
+guarantee. The local cleanup described below removes the nine residual counters from this saved sample. At that stage the book was suspended because the saved ordering also put metadata before a verse continuation.
 Placement and local-OCR overlap are diagnostics, not text-accuracy scores.
+
+The subsequent four-file run completed all 278 pages and produced four searchable
+PDFs and 16 suspended chapters. Some rejected pages required reviewed recovery;
+this was not an unattended success across every page. Remaining counter and page
+furniture candidates are recorded under
+`data/recovery/extraction-review-2026-09-17/narration-cleanup-audit.json`.
+Completion does not certify narration-ready text. A manual recovery archive is
+at `data/exports/strandzha-extraction-2026-09-17.zip`; automatic import of that
+archive is not yet supported.
 
 The local comparison viewer is at
 `packages/server/data/review/extraction-2026-09-17/index.html`. It includes original

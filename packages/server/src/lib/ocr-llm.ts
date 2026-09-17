@@ -1,6 +1,6 @@
 import { cleanText, joinTextBlocks, formatExtractedText, TEXT_KINDS, type TextKind } from "./extracted-text.ts";
 import { createHash } from "node:crypto";
-import { readSuryaLines, makeOrderedReader, type LineGroups, type OcrLine } from "./ocr-line-order.ts";
+import { readSuryaLines, makeOrderedReader, OrderedReadError, type LineGroups, type OcrLine } from "./ocr-line-order.ts";
 import { placeOrderedPage } from "./ocr-ordered-placement.ts";
 import { cleanVerseCounters, type RemovedVerseCounter } from "./verse-counters.ts";
 import { STANDARD_EXTRACTION, type ExtractionSettings } from "./extraction-presets.ts";
@@ -583,10 +583,11 @@ export function makeLlmOcrRunner(deps: { transcribe: Transcriber; reference?: Re
     const geometry: GeometryPage[] = sizes.map((size, i) => placeOcrPage([], null, size, i).geometry);
     let inputTokens = 0;
     let outputTokens = 0;
-    // One failing call ends the run: retrying into a provider error is retrying into a bill.
+    // Provider failures stop the run; rejected page content stays flagged without cancelling peers.
     const failure = new AbortController();
     const runSignal = signal ? AbortSignal.any([signal, failure.signal]) : failure.signal;
     let firstFailure: { error: unknown } | null = null;
+    const rejectedPages: { page: number; error: Error }[] = [];
     let done = 0;
     let savedCount = reused;
 
@@ -626,6 +627,7 @@ export function makeLlmOcrRunner(deps: { transcribe: Transcriber; reference?: Re
                 await log(`AI ordering page ${pageNumber}/${total}`);
                 const result = await deps.readOrdered(data, mediaType, lines, AbortSignal.any([runSignal, AbortSignal.timeout(CALL_TIMEOUT_MS)]),
                   () => log(`AI transcribing page ${pageNumber}/${total}`));
+                if (result.restoredLineIds?.length) await log(`Restored ${result.restoredLineIds.length} omitted counter-bearing verse line(s) on page ${pageNumber}/${total} using measured position and counter sequence`);
                 return { ...result, recall: ref ? fidelity(pageText(result.page), ref.text).recall : null, anchored: false };
               })()
               : await readPage(deps.transcribe, { image: data, mediaType, pageNumber, referenceText: ref?.text || null, signal: runSignal });
@@ -659,7 +661,22 @@ export function makeLlmOcrRunner(deps: { transcribe: Transcriber; reference?: Re
           done++;
           log(`AI read page ${pageNumber}/${total}${recall !== null ? ` — ${Math.round(recall * 100)}% of the local OCR's words${anchored ? ", after a second look" : ""}` : ""}${placed !== null ? `, ${Math.round(placed * 100)}% placed on the page` : ""}${doubt} (${savedCount}/${total} saved; ${done}/${total} placed)`).catch(() => {});
         } catch (err) {
-          firstFailure ??= { error: new Error(`AI reading page ${pageNumber}/${total}: ${err instanceof Error ? err.message : String(err)}`, { cause: err }) };
+          const pageError = new Error(`AI reading page ${pageNumber}/${total}: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
+          if (err instanceof OrderedReadError) {
+            const filename = `ocr-failure-page-${pageNumber}-${Date.now()}.json`;
+            try {
+              await writeFile(path.join(outDir, filename), JSON.stringify({ page: pageNumber, model, settingsKey, ...err.diagnostic }, null, 2), { mode: 0o600 });
+              await log(`Saved rejected AI response for page ${pageNumber}/${total}: ${filename}`);
+            } catch (saveError) {
+              await log(`Could not save rejected AI response: ${saveError instanceof Error ? saveError.message : String(saveError)}`).catch(() => {});
+            }
+            if (err.diagnostic.response && !runSignal.aborted) {
+              rejectedPages.push({ page: pageNumber, error: pageError });
+              await log(`Page ${pageNumber}/${total} needs review: ${err.message}. Continuing other pages without retrying this page.`);
+              return;
+            }
+          }
+          firstFailure ??= { error: pageError };
           failure.abort();
           if (signal?.aborted) throw new ExtractAbortedError();
           throw firstFailure.error;
@@ -671,6 +688,11 @@ export function makeLlmOcrRunner(deps: { transcribe: Transcriber; reference?: Re
       await lineTask.catch(() => {});
     }
     if (signal?.aborted) throw new ExtractAbortedError();
+    const rejected = rejectedPages.sort((a, b) => a.page - b.page)[0];
+    if (rejected) {
+      await save(false);
+      throw new Error(`${rejected.error.message}. Pages requiring review: ${rejectedPages.map((entry) => entry.page).join(", ")}; ${savedCount}/${total} pages saved.`, { cause: rejected.error });
+    }
     await save(true, true);
     const { joined, meanPlaced, searchableCopy } = await writeOutputs({ pdfPath, outDir, outPdfPath, workDir, pages, layer, geometry, placedShares, doubtful, model, writer: deps.writeTextLayer, log, signal, removedCounters });
     await save(true, Boolean(outPdfPath) && !searchableCopy);

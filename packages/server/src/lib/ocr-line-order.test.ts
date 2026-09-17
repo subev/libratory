@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { orderedTranscription, validateLineOrder, type OcrLine } from "./ocr-line-order.ts";
+import { orderedTranscription, splitOrderedColumns, validateLineOrder, type OcrLine } from "./ocr-line-order.ts";
 import { placeOrderedPage } from "./ocr-ordered-placement.ts";
 
 const lines: OcrLine[] = [
@@ -66,4 +66,76 @@ it("rejects metadata before a verse continuation but allows it between songs", a
   const { validateSemanticOrder } = await import("./ocr-line-order.ts");
   expect(() => validateSemanticOrder([{ section: 0, kind: "verse" }, { section: 0, kind: "metadata" }, { section: 0, kind: "verse" }])).toThrow("interrupts verse");
   expect(() => validateSemanticOrder([{ section: 0, kind: "verse" }, { section: 0, kind: "metadata" }, { section: 1, kind: "verse" }])).not.toThrow();
+});
+
+it("allows prose after source notes to introduce a new quoted verse passage", async () => {
+  const { validateSemanticOrder } = await import("./ocr-line-order.ts");
+  const groups = [
+    { section: 0, kind: "verse" as const, breakBefore: "paragraph" as const },
+    { section: 0, kind: "metadata" as const, breakBefore: "paragraph" as const },
+    { section: 0, kind: "prose" as const, breakBefore: "paragraph" as const },
+  ];
+  expect(() => validateSemanticOrder([...groups, { section: 0, kind: "verse", breakBefore: "paragraph" }])).not.toThrow();
+  expect(() => validateSemanticOrder([...groups, { section: 0, kind: "verse", breakBefore: "line" }])).toThrow("interrupts verse");
+});
+
+it("normalizes inapplicable line boundaries without changing semantic order", async () => {
+  const { validateSemanticOrder } = await import("./ocr-line-order.ts");
+  for (const kind of ["heading", "prose"] as const) {
+    const groups = [
+      { section: 0, kind, breakBefore: "paragraph" as const },
+      { section: 0, kind: "verse" as const, breakBefore: "line" as const },
+      { section: 0, kind: "verse" as const, breakBefore: "line" as const },
+      { section: 0, kind: "verse" as const, breakBefore: "stanza" as const },
+    ];
+    expect(validateSemanticOrder(groups).map((g) => g.breakBefore)).toEqual(["paragraph", "paragraph", "line", "stanza"]);
+    expect(groups[1]?.breakBefore).toBe("line");
+  }
+  expect(validateSemanticOrder([{ section: 0, kind: "verse", breakBefore: "line" }])[0]?.breakBefore).toBe("paragraph");
+  expect(validateSemanticOrder([{ section: 0, kind: "verse" }, { section: 1, kind: "verse", breakBefore: "line" }])[1]?.breakBefore).toBe("paragraph");
+  expect(validateSemanticOrder([{ section: 0, kind: "heading", breakBefore: "line" }, { section: 0, kind: "metadata", breakBefore: "line" }]).map((g) => g.breakBefore)).toEqual(["paragraph", "paragraph"]);
+  expect(() => validateSemanticOrder([{ section: 1, kind: "verse" }, { section: 0, kind: "verse" }])).toThrow("earlier section");
+  expect(() => validateSemanticOrder([{ section: 0, kind: "metadata" }, { section: 0, kind: "verse", breakBefore: "line" }])).toThrow();
+});
+
+it("accepts an empty detection only when its transcription and every OCR label are empty", () => {
+  const blank = { id: 1, text: "", box: [10, 10, 20, 20] as [number, number, number, number] };
+  expect(orderedTranscription([[blank]], [{ group: 0, type: "other", text: "" }]).lineGroups).toEqual([[blank]]);
+  expect(() => orderedTranscription([[blank, { ...blank, id: 2, text: "Real words" }]], [{ group: 0, type: "other", text: "" }])).toThrow("group 0 with recognized text");
+  expect(orderedTranscription([[blank]], [{ group: 0, type: "other", text: "Text missed by OCR" }]).blocks[0]?.text).toBe("Text missed by OCR");
+});
+
+it("splits a correctly sequenced verse or metadata group at a measured column boundary", () => {
+  const input: OcrLine[] = [
+    { id: 1, text: "Left first", box: [50, 100, 200, 120] },
+    { id: 2, text: "Right first", box: [600, 100, 800, 120] },
+    { id: 3, text: "Left second", box: [50, 125, 200, 145] },
+    { id: 4, text: "Right second", box: [600, 125, 800, 145] },
+  ];
+  for (const kind of ["verse", "metadata"] as const) {
+    const group = { section: 0, kind, breakBefore: "paragraph" as const, lineIds: [1, 3, 2, 4] };
+    const split = splitOrderedColumns(input, [group]);
+    expect(split.map((g) => g.lineIds)).toEqual([[1, 3], [2, 4]]);
+    expect(split[1]?.breakBefore).toBe(kind === "verse" ? "line" : "paragraph");
+    expect(group.lineIds).toEqual([1, 3, 2, 4]);
+    if (kind === "verse") {
+      expect(() => splitOrderedColumns(input, [{ ...group, lineIds: [1, 2, 3, 4] }])).toThrow("returns to the left");
+      expect(() => splitOrderedColumns(input, [{ ...group, lineIds: [2, 4, 1, 3] }])).toThrow("returns to the left");
+    } else {
+      for (const lineIds of [[1, 2, 3, 4], [2, 4, 1, 3]]) {
+        expect(splitOrderedColumns(input, [{ ...group, lineIds }]).map((g) => g.lineIds)).toEqual([[1, 3], [2, 4]]);
+      }
+    }
+    expect(() => validateLineOrder(input, splitOrderedColumns(input, [{ ...group, lineIds: [1, 3, 2] }]).map((g) => g.lineIds))).toThrow("omitted");
+    expect(() => validateLineOrder(input, splitOrderedColumns(input, [{ ...group, lineIds: [1, 3, 2, 2, 4] }]).map((g) => g.lineIds))).toThrow("repeats");
+  }
+});
+
+it("does not repartition metadata across a line spanning the proposed column gap", () => {
+  const input: OcrLine[] = [
+    { id: 1, text: "Date", box: [50, 100, 200, 120] },
+    { id: 2, text: "Contributor", box: [600, 100, 800, 120] },
+    { id: 3, text: "Spanning note", box: [50, 125, 800, 145] },
+  ];
+  expect(() => splitOrderedColumns(input, [{ section: 0, kind: "metadata", breakBefore: "paragraph", lineIds: [2, 1, 3] }])).toThrow("returns to the left");
 });
