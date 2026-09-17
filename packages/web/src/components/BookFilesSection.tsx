@@ -1,3 +1,4 @@
+import type { ExtractionSettings } from "../../../server/src/lib/extraction-presets.ts";
 import { useState, useRef } from "react";
 import { ExtractModal, type ExtractScope } from "./ExtractModal.tsx";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
@@ -36,6 +37,7 @@ export function BookFilesSection({
   isProcessing,
   ocrEngine,
   ocrModel,
+  extractionSettings,
   llmChapterDetection,
   chapterModel,
   language,
@@ -58,6 +60,7 @@ export function BookFilesSection({
   isProcessing: boolean;
   ocrEngine: OcrEngine | null;
   ocrModel: string | null;
+  extractionSettings?: ExtractionSettings | null;
   llmChapterDetection: boolean;
   chapterModel: string | null;
   language: string | null;
@@ -340,6 +343,7 @@ export function BookFilesSection({
           bookId={bookId}
           ocrEngine={ocrEngine}
           ocrModel={ocrModel}
+          extractionSettings={extractionSettings}
           canSetOcr={scanned.length > 0}
           tryFileIndex={files.find((file) => file.selected)?.index ?? scanned[0]?.index ?? 0}
           scan={{

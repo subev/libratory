@@ -1,3 +1,5 @@
+import { ExtractionPresetEditor } from "./ExtractionPresetEditor.tsx";
+import type { ExtractionSettings } from "../../../server/src/lib/extraction-presets.ts";
 import { useState } from "react";
 
 import { BOOK_LANGUAGE_OPTIONS } from "../lib/languages.ts";
@@ -41,6 +43,7 @@ export function ExtractModal({
   bookId,
   ocrEngine,
   ocrModel,
+  extractionSettings,
   canSetOcr,
   tryFileIndex,
   scan,
@@ -59,6 +62,7 @@ export function ExtractModal({
   bookId: string;
   ocrEngine: OcrEngine | null;
   ocrModel: string | null;
+  extractionSettings?: ExtractionSettings | null;
   canSetOcr: boolean;
   tryFileIndex: number;
   scan: { read: boolean; engine: OcrEngine | null; confidence: number | null; garbled: boolean };
@@ -70,6 +74,8 @@ export function ExtractModal({
   onClose: () => void;
 }) {
   const { languages: ocrLanguages } = useOcrLanguages();
+  const [draft, setDraft] = useState<ExtractionSettings | null>(extractionSettings ?? null);
+  const saveSettings = trpc.books.updateSettings.useMutation();
   const [ignoreTextLayer, setIgnoreTextLayer] = useState(false);
   const suggestion = trpc.ocrTry.page.useQuery({ bookId, fileIndex: tryFileIndex, page: 5 }, { enabled: canSetOcr || ignoreTextLayer, staleTime: Infinity });
   const suggestedPack = ocrLanguages.find((l) => l.code === (suggestion.data?.candidates ?? [])[0]) ?? null;
@@ -91,7 +97,7 @@ export function ExtractModal({
   // The tick is against one scope's count, so changing the scope withdraws it
   const [confirmedScope, setConfirmedScope] = useState<ExtractScope | null>(null);
   const confirmed = confirmedScope === scope;
-  const blocked = disabledReason(scope) ?? (losing > 0 && !confirmed ? "Confirm the chapters you're replacing" : null);
+  const blocked = saveSettings.isPending ? "Saving extraction instructions" : scope !== "chapters" && ocrEngine === "llm" && draft && !draft.prompt.trim() ? "Enter transcription instructions" : disabledReason(scope) ?? (losing > 0 && !confirmed ? "Confirm the chapters you're replacing" : null);
   const usingTesseract = (ocrEngine ?? DEFAULT_OCR_ENGINE) === DEFAULT_OCR_ENGINE;
   const replacingText = scope === "selected" && ignoreTextLayer;
 
@@ -161,6 +167,7 @@ export function ExtractModal({
               value={ocrEngine}
               used={replacingText ? null : scan.engine}
               onChange={(engine) => onUpdateBook({ ocrEngine: engine })}
+              lineOrdering={draft?.lineOrdering ?? false}
               model={ocrModel}
               onModelChange={(key) => onUpdateBook({ ocrModel: key })}
               pageCount={suggestion.data?.pageCount ?? null}
@@ -183,6 +190,8 @@ export function ExtractModal({
                   : "Read as English unless the language below says otherwise."
                 : undefined}
             />
+            {ocrEngine === "llm" && <ExtractionPresetEditor value={draft} onChange={setDraft} disabled={isProcessing} />}
+            {saveSettings.error && <p className="text-sm text-(--danger-text)">{saveSettings.error.message}</p>}
             {usingTesseract && pack && <OcrLanguagePackRow code={pack.code} />}
           </div>
         )}
@@ -228,7 +237,7 @@ export function ExtractModal({
             </select>
             <span className="min-w-0">Which voices come first, and how pictured pages are read. Filled from the text; change it if wrong.</span>
           </label>
-          <p className="text-xs text-(--text-faint)">Saved on the book as you change them.</p>
+          <p className="text-xs text-(--text-faint)">Language and model choices save as you change them. Prompt instructions save when extraction starts.</p>
         </div>
       </div>
 
@@ -252,7 +261,12 @@ export function ExtractModal({
         <Button onClick={onClose}>Close</Button>
         <Button
           variant="primary"
-          onClick={() => onStart(scope, replacingText)}
+          onClick={async () => {
+            try {
+              if (scope !== "chapters" && ocrEngine === "llm" && draft) await saveSettings.mutateAsync({ id: bookId, extractionSettings: draft });
+              onStart(scope, replacingText);
+            } catch { /* The mutation error stays visible in the modal. */ }
+          }}
           disabled={!!blocked}
           title={blocked ?? undefined}
           data-testid="extract-start"

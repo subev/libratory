@@ -1,3 +1,4 @@
+import { extractionPresetsRouter } from "./routes/extraction-presets.ts";
 import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 import { router } from "./trpc.ts";
 import { booksRouter } from "./routes/books.ts";
@@ -22,6 +23,7 @@ import { workersRouter } from "./routes/workers.ts";
 
 export const appRouter = router({
   books: booksRouter,
+  extractionPresets: extractionPresetsRouter,
   folders: foldersRouter,
   profiles: profilesRouter,
   chapters: chaptersRouter,

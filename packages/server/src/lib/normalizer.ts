@@ -1,4 +1,6 @@
-export function normalizeForTts(text: string): string {
+import { joinTextBlocks, type TextBlock } from "./extracted-text.ts";
+
+export function normalizeForTts(text: string, options: { preserveVerse?: boolean } = {}): string {
   let out = text;
 
   // Strip markdown bold/italic
@@ -26,7 +28,7 @@ export function normalizeForTts(text: string): string {
   out = out.replace(/<?https?:\/\/\S+/g, "");
 
   // Rejoin hyphenated line breaks: "con-\n" → "con"
-  out = out.replace(/(\w)-\n(\w)/g, "$1$2");
+  if (!options.preserveVerse) out = out.replace(/(\w)-\n(\w)/g, "$1$2");
 
   // Collapse multiple blank lines into one
   out = out.replace(/\n{3,}/g, "\n\n");
@@ -45,21 +47,7 @@ export function normalizeForTts(text: string): string {
 
 export type BlockSpan = { block: number; start: number; end: number };
 
-// The regexes above are block-local, so per-block output is identical to normalizing the join
-export function normalizeBlocks(blocks: { text: string; included: boolean }[]): { text: string; spans: BlockSpan[] } {
-  const parts: string[] = [];
-  const spans: BlockSpan[] = [];
-  let offset = 0;
-
-  for (const [block, source] of blocks.entries()) {
-    if (!source.included) continue;
-    const text = normalizeForTts(source.text);
-    if (!text) continue;
-    if (parts.length > 0) offset += 2;
-    parts.push(text);
-    spans.push({ block, start: offset, end: offset + text.length });
-    offset += text.length;
-  }
-
-  return { text: parts.join("\n\n"), spans };
+// Keep source indices while normalizing so reader offsets still point to the original blocks.
+export function normalizeBlocks(blocks: (TextBlock & { included: boolean })[]): { text: string; spans: BlockSpan[] } {
+  return joinTextBlocks(blocks.map((block) => ({ ...block, text: normalizeForTts(block.text, { preserveVerse: block.kind === "verse" }) })));
 }

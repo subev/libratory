@@ -1,3 +1,5 @@
+import { cleanText } from "./extracted-text.ts";
+import { STANDARD_EXTRACTION } from "./extraction-presets.ts";
 import { afterAll, describe, expect, it } from "vitest";
 import { copyFile, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -14,7 +16,6 @@ import {
   LlmPageParseError,
   RETRY_BELOW_RECALL,
   anchorHint,
-  cleanText,
   estimateLlmOcrCostUsd,
   fidelity,
   hasLlmLayout,
@@ -315,6 +316,40 @@ describe("runLlmOcr", () => {
     expect(JSON.parse(await readFile(path.join(input.outDir, LLM_PAGES_FILE), "utf-8"))).toMatchObject({ complete: true, outputFailed: true });
     await run(input);
     expect(calls).toBe(1);
+    await run({ ...input, extractionSettings: { ...STANDARD_EXTRACTION, prompt: "Keep dialect spelling" } });
+    expect(calls).toBe(2);
+  });
+
+  it("uses the ordered path and persists line groups for later geometry refresh", async () => {
+    const dir = await scratch();
+    const line = { id: 1, text: "Echo", box: [100, 100, 180, 120] as [number, number, number, number] };
+    const reading: Reference = { width: 1000, height: 1000, text: "Echo", words: [{ text: "Echo", box: line.box, conf: 99, line: 0 }] };
+    let orderedCalls = 0;
+    let transcribed: () => void = () => {};
+    const transcriptionDone = new Promise<void>((resolve) => { transcribed = resolve; });
+    const run = makeLlmOcrRunner({
+      reference: async () => reading,
+      transcribe: async () => { throw new Error("Standard path must not run"); },
+      readLines: async (_input, options) => {
+        options.onPage(1, [line]);
+        await transcriptionDone;
+        return new Map([[1, [line]]]);
+      },
+      readOrdered: async () => {
+        orderedCalls++;
+        transcribed();
+        return { page: { blocks: [{ type: "other", text: "Echo" }], furniture: [], continues: false, lineGroups: [[line]] }, inputTokens: 7, outputTokens: 3 };
+      },
+    });
+    const outDir = path.join(dir, "out");
+    const stats = await run({ pdfPath: FIXTURE, outDir, language: "en", workDir: path.join(dir, "work"), log: async () => {}, extractionSettings: { ...STANDARD_EXTRACTION, lineOrdering: true } });
+    const resumed = { pdfPath: FIXTURE, outDir, language: "en", workDir: path.join(dir, "work"), log: async () => {}, extractionSettings: { ...STANDARD_EXTRACTION, lineOrdering: true, omitVerseCounters: true } };
+    expect((await run(resumed)).inputTokens).toBe(0);
+    expect(JSON.parse(await readFile(path.join(outDir, LLM_PAGES_FILE), "utf-8")).omitVerseCounters).toBe(true);
+    expect((await run({ ...resumed, extractionSettings: { ...resumed.extractionSettings, omitVerseCounters: false } })).inputTokens).toBe(0);
+    expect(orderedCalls).toBe(1);
+    expect(stats).toMatchObject({ inputTokens: 7, outputTokens: 3, meanPlaced: 1 });
+    expect(JSON.parse(await readFile(path.join(outDir, LLM_PAGES_FILE), "utf-8")).pages[0].lineGroups).toEqual([[line]]);
   });
 
   it("writes the layout the chapter pipeline reads, returns the raw text, and counts tokens", async () => {
@@ -364,7 +399,7 @@ describe("runLlmOcr", () => {
     expect(blocks[1]?.polygon?.[2]?.[1]).toBeCloseTo(150 * 1754 / 1600, 3);
     expect(detectBoundaryIndices(blocks)).toBeNull();
     expect(JSON.parse(await readFile(path.join(dir, "out", LLM_LAYOUT_META_FILE), "utf-8"))).toMatchObject({ engine: "llm", model: "Test model", pages: 1 });
-    expect(logs.some((l) => l.includes("Reading 1 page with Test model"))).toBe(true);
+    expect(logs.some((l) => l.includes("0/1 pages cached; 1 remaining with Test model"))).toBe(true);
     expect(logs.some((l) => l.includes("100% placed on the page"))).toBe(true);
     expect(await exists(path.join(dir, "work"))).toBe(false);
 
@@ -483,6 +518,9 @@ describe("runLlmOcr", () => {
     expect(partial.complete).toBe(false);
     expect(partial.pages[0]?.blocks).toHaveLength(2);
     expect(partial.pages[1]).toBeNull();
+    // Files saved before presets existed have no settings hash and mean Standard.
+    delete partial.settingsKey;
+    await writeFile(path.join(outDir, LLM_PAGES_FILE), JSON.stringify(partial));
     expect(await hasLlmLayout(outDir)).toBe(false);
     await expect(replaceWords(base)).rejects.toThrow("incomplete");
 
@@ -492,8 +530,38 @@ describe("runLlmOcr", () => {
     const stats = await makeLlmOcrRunner({ transcribe: working, reference: async () => ref(REFERENCE), modelLabel: "M" })({ ...base, log: async (m) => { logs.push(m); } });
     expect(calls).toEqual([2]);
     expect(stats).toMatchObject({ pages: 2, inputTokens: 1 });
-    expect(logs.some((l) => l.includes("1 read by the run before"))).toBe(true);
+    expect(logs.some((l) => l.includes("1/2 pages cached"))).toBe(true);
     expect(JSON.parse(await readFile(path.join(outDir, LLM_PAGES_FILE), "utf-8")).complete).toBe(true);
     expect((await collectBlocksFromMarkerOutput(outDir)).map((b) => b.page)).toEqual([1, 1, 2, 2]);
   });
+});
+
+it("preserves semantic kinds and verse breaks through normalization and layout export", () => {
+  const page = normalizePage({ blocks: [
+    { type: "other", kind: "verse", text: "First verse\nsecond verse\n\nnew stanza" },
+    { type: "paragraph", kind: "prose", text: "A wrapped\nparagraph." },
+    { type: "other", kind: "footnote", text: "14 A footnote." },
+  ], furniture: [], continues: false });
+  expect(page.blocks.map((b) => b.text)).toEqual(["First verse\nsecond verse\n\nnew stanza", "A wrapped paragraph.", "14 A footnote."]);
+  const output = toMarkerJson([page]).children[0]?.children;
+  expect(output?.map((b) => b.text_kind)).toEqual(["verse", "prose", "footnote"]);
+});
+
+it("excludes only isolated numeric page furniture with local line evidence", async () => {
+  const { isPrintedPageNumber, pagesToRawText } = await import("./ocr-llm.ts");
+  const page: LlmPage = {
+    blocks: [{ type: "paragraph", kind: "verse", text: "35 Body" }, { type: "other", kind: "furniture", text: "181" }],
+    furniture: [], continues: false,
+    lineGroups: [[{ id: 1, text: "35 Body", box: [20, 200, 250, 220] }], [{ id: 2, text: "181", box: [850, 900, 900, 920] }]],
+  };
+  expect(isPrintedPageNumber(page, 1)).toBe(true);
+  expect(isPrintedPageNumber(page, 0)).toBe(false);
+  expect(isPrintedPageNumber({ ...page, lineGroups: undefined }, 1)).toBe(false);
+  const last = page.blocks[1];
+  const first = page.blocks[0];
+  if (!first || !last) throw Error("Missing fixture block");
+  expect(isPrintedPageNumber({ ...page, blocks: [first, { ...last, text: "A performance note" }] }, 1)).toBe(false);
+  last.narrationExcluded = true;
+  expect(pagesToRawText([page])).toBe("35 Body");
+  expect(toMarkerJson([page]).children[0]?.children[1]?.block_type).toBe("PageFooter");
 });

@@ -3,6 +3,7 @@ import { readdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 
 import { bookOutputDir } from "./paths.ts";
 import { readSyncMap } from "./sync-map.ts";
+import { joinTextBlocks } from "./extracted-text.ts";
 import type { SourceBlock } from "./marker.ts";
 import type { ChapterTextMap } from "../schema.ts";
 
@@ -189,7 +190,7 @@ export function locateChunks(
 
 /**
  * Map a character offset in a chapter's rawText to its PDF page. rawText was built at extraction
- * time as includedBlocks.map(b => b.text).join("\n\n"), so replaying that join recovers each
+ * time with joinTextBlocks, so replaying that join recovers each
  * block's offset range. If the stored blocks no longer reconstruct rawText exactly (older
  * extractions), the offset is scaled proportionally to stay approximately right.
  */
@@ -197,16 +198,16 @@ export function pageAtOffset(sourceBlocks: SourceBlock[], rawTextLength: number,
   const included = sourceBlocks.filter((b) => b.included);
   if (included.length === 0) return null;
 
-  const joinedLength = included.reduce((sum, b) => sum + b.text.length + 2, -2);
+  const joined = joinTextBlocks(included);
+  const joinedLength = joined.text.length;
   const scaled =
     joinedLength === rawTextLength || rawTextLength <= 0
       ? offset
       : (offset / rawTextLength) * joinedLength;
 
-  let pos = 0;
-  for (const block of included) {
-    pos += block.text.length + 2;
-    if (scaled < pos) return block.page;
+  for (const [i, span] of joined.spans.entries()) {
+    const next = joined.spans[i + 1];
+    if (scaled < (next?.start ?? span.end)) return included[span.block]?.page ?? null;
   }
   return included.at(-1)?.page ?? null;
 }

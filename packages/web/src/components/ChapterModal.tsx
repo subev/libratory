@@ -1,3 +1,5 @@
+import { StructuredText } from "./reader/StructuredText.tsx";
+import type { ReaderText } from "../lib/reader-doc.ts";
 import { useState, useRef, useEffect, useCallback, useMemo, memo, Fragment, type ReactNode } from "react";
 import { Link } from "react-router";
 import { trpc } from "../trpc.ts";
@@ -46,6 +48,7 @@ type ChapterModalProps = {
 type SourceBlock = {
   type: string;
   text: string;
+  document?: ReaderText;
   page: number;
   included: boolean;
   level?: number;
@@ -817,6 +820,7 @@ function ChapterModalBody({
                 lang={lang}
                 mark={mark}
                 text={paneBody}
+                document={!isVariant && originalChapter?.readerText?.text === paneBody ? originalChapter.readerText : undefined}
                 before={fullChapter.customText ? fullChapter.cleanText ?? fullChapter.rawText : fullChapter.rawText}
                 edited={!!fullChapter.customText}
                 viewMode={viewMode}
@@ -1199,6 +1203,7 @@ function paneText(chapter: { rawText: string; cleanText: string | null; customTe
 
 function TextPreview({
   text,
+  document,
   before,
   edited,
   viewMode,
@@ -1213,6 +1218,7 @@ function TextPreview({
 }: {
   /** The text this pane renders — the one the mark's offsets index */
   text: string;
+  document?: ReaderText;
   /** Compare's left pane: the text the spoken one was made from */
   before: string;
   edited: boolean;
@@ -1271,7 +1277,7 @@ function TextPreview({
             lang={lang}
             mark={mark}
           >
-            {marked(text, 0, text.length, mark, "spoken")}
+            {document?.blocks ? <StructuredText document={document} render={(start, end) => marked(text, start, end, mark, "spoken")} /> : marked(text, 0, text.length, mark, "spoken")}
           </TextBody>
         </div>
       </div>
@@ -1281,6 +1287,7 @@ function TextPreview({
   return (
     <ChunkedText
       text={text}
+      document={document}
       chunkRanges={chunkRanges}
       cueLive={cueLive}
       mark={mark}
@@ -1296,6 +1303,7 @@ function TextPreview({
 
 function ChunkedText({
   text,
+  document,
   chunkRanges,
   cueLive,
   mark,
@@ -1307,6 +1315,7 @@ function ChunkedText({
   lang,
 }: {
   text: string;
+  document?: ReaderText;
   chunkRanges: ChunkRange[];
   cueLive: boolean;
   mark: TextMark | null;
@@ -1331,7 +1340,7 @@ function ChunkedText({
   }, [selectedChunkUrl]);
 
   if (chunkRanges.length === 0) {
-    return <TextBody className={className} lang={lang} mark={mark}>{marked(text, 0, text.length, mark, "all")}</TextBody>;
+    return <TextBody className={className} lang={lang} mark={mark}>{document?.blocks ? <StructuredText document={document} render={(start, end) => marked(text, start, end, mark, "all")} /> : marked(text, 0, text.length, mark, "all")}</TextBody>;
   }
 
   // Sort by start and drop overlaps so segments tile the text cleanly.
@@ -1339,29 +1348,35 @@ function ChunkedText({
   // One band at a time: the pointer takes it while it is over the text, otherwise the selection
   // holds it — unless the cue is running, which is the coarsest marker yielding to the sentence.
   const bandUrl = hoveredChunkUrl ?? (cueLive ? null : selectedChunkUrl);
-  const parts: ReactNode[] = [];
-  let pos = 0;
-  ordered.forEach((range, i) => {
-    if (range.start < pos) return;
-    if (range.start > pos) parts.push(marked(text, pos, range.start, mark, `gap-${i}`));
-    const isSelected = range.url === selectedChunkUrl;
-    parts.push(
-      <span
-        key={`${range.url}-${i}`}
-        ref={isSelected ? selectedRef : undefined}
-        onClick={() => onSelectChunk(range.url)}
-        onMouseEnter={() => onHoverChunk(range.url)}
-        onMouseLeave={() => onHoverChunk(null)}
-        className={`cursor-pointer rounded-sm transition-colors ${range.url === bandUrl ? "bg-(--accent)/18" : ""}`}
-      >
-        {marked(text, range.start, range.end, mark, `chunk-${i}`)}
-      </span>,
-    );
-    pos = range.end;
-  });
-  if (pos < text.length) parts.push(marked(text, pos, text.length, mark, "tail"));
+  const renderRange = (start: number, end: number) => {
+    const parts: ReactNode[] = [];
+    let pos = start;
+    ordered.forEach((range, i) => {
+      if (range.end <= start || range.start >= end) return;
+      const firstSegment = range.start >= start;
+      range = { ...range, start: Math.max(start, range.start), end: Math.min(end, range.end) };
+      if (range.start < pos) return;
+      if (range.start > pos) parts.push(marked(text, pos, range.start, mark, `gap-${i}`));
+      const isSelected = range.url === selectedChunkUrl;
+      parts.push(
+        <span
+          key={`${range.url}-${i}`}
+          ref={isSelected && firstSegment ? selectedRef : undefined}
+          onClick={() => onSelectChunk(range.url)}
+          onMouseEnter={() => onHoverChunk(range.url)}
+          onMouseLeave={() => onHoverChunk(null)}
+          className={`cursor-pointer rounded-sm transition-colors ${range.url === bandUrl ? "bg-(--accent)/18" : ""}`}
+        >
+          {marked(text, range.start, range.end, mark, `chunk-${i}`)}
+        </span>,
+      );
+      pos = range.end;
+    });
+    if (pos < end) parts.push(marked(text, pos, end, mark, "tail"));
+    return parts;
+  };
 
-  return <TextBody className={className} lang={lang} mark={mark}>{parts}</TextBody>;
+  return <TextBody className={className} lang={lang} mark={mark}>{document?.blocks ? <StructuredText document={document} render={renderRange} /> : renderRange(0, text.length)}</TextBody>;
 }
 
 function TextBody({
@@ -1385,7 +1400,7 @@ function TextBody({
   return (
     <div ref={ref} onScroll={onScroll} className={`${className} relative`} lang={lang}>
       {mark ? <WordSpotlight containerRef={ref} at={`${mark.start}:${mark.word?.start ?? -1}`} /> : null}
-      <span className="relative">{children}</span>
+      <div className="relative">{children}</div>
     </div>
   );
 }

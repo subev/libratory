@@ -274,7 +274,7 @@ describe("extract worker", () => {
     await expect(extract({ bookId }, { addJob } as any)).resolves.toBeUndefined();
 
     const book = row(await db.select().from(books).where(eq(books.id, bookId)));
-    expect(book.status).not.toBe("failed");
+    expect(book.status).toBe("suspended");
     const file = row(await db.select().from(bookFiles).where(eq(bookFiles.bookId, bookId)));
     expect(file.status).toBe("suspended");
     expect(file.error).toBeNull();

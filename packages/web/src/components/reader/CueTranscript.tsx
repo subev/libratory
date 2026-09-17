@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { StructuredText } from "./StructuredText.tsx";
+import { transcriptSegments, transcriptWordRange } from "../../lib/transcript-segments.ts";
+import type { ReaderText } from "../../lib/reader-doc.ts";
+import { useMemo, useState } from "react";
 
 import { cueIndexAt, wordIndexAt, type ReaderCue, type ReaderCues } from "../../lib/reader-doc.ts";
 
@@ -25,11 +28,31 @@ export function CueTranscript({
   empty?: string;
 }) {
   const [hoverCue, setHoverCue] = useState(-1);
+  const segmentsByStart = useMemo(() => new Map(cues?.text?.blocks?.map((block) => [block.start, transcriptSegments(block.start, block.end, cues.cues)])), [cues]);
   if (!cues) return <p className="text-sm text-(--text-muted)">{empty}</p>;
 
   const activeIndex = cueIndexAt(cues.cues, ms);
   const activeCue = activeIndex >= 0 ? cues.cues[activeIndex] : undefined;
   const activeWord = activeCue ? wordIndexAt(activeCue, ms) : -1;
+
+  const document = cues.text;
+  if (document?.blocks) {
+    const wordRange = transcriptWordRange(document.text, activeCue, activeWord);
+    return <article className={className} data-testid="reader-text-view">
+      <StructuredText document={document} render={(start) => (segmentsByStart.get(start) ?? []).map((segment) => {
+        const cue = segment.cue === null ? undefined : cues.cues[segment.cue];
+        const from = Math.max(segment.start, wordRange?.start ?? segment.end);
+        const to = Math.min(segment.end, wordRange?.end ?? segment.start);
+        const content = from < to ? <>{document.text.slice(segment.start, from)}<mark className="bg-(--accent)/60" data-testid="reader-word">{document.text.slice(from, to)}</mark>{document.text.slice(to, segment.end)}</> : document.text.slice(segment.start, segment.end);
+        return cue ? <span key={segment.start}
+          onClick={() => onSeek(cue.t[0])}
+          onMouseEnter={() => { setHoverCue(segment.cue ?? -1); onHoverCue?.(segment.cue); }}
+          onMouseLeave={() => { setHoverCue(-1); onHoverCue?.(null); }}
+          className={`cursor-pointer ${segment.cue === activeIndex ? "bg-(--accent)/35" : segment.cue === hoverCue ? "bg-(--accent)/22" : cue.c === hoverChunk ? "bg-(--accent-subtle)" : "hover:bg-(--bg-subtle)"}`}
+          data-testid={segment.cue === activeIndex ? "text-cue-active" : "text-cue"}>{content}</span> : <span key={segment.start}>{content}</span>;
+      })} />
+    </article>;
+  }
 
   return (
     <article className={className} data-testid="reader-text-view">
@@ -83,7 +106,8 @@ export function CueText({ cue, word }: { cue: ReaderCue; word: number }) {
 }
 
 // The same reading pane for a chapter with no narration: same styles, nothing to mark
-export function TextBody({ text, className = READING_PANE }: { text: string; className?: string }) {
+export function TextBody({ text, document, className = READING_PANE }: { text: string; document?: ReaderText; className?: string }) {
+  if (document?.blocks) return <article className={className} data-testid="reader-text-view"><StructuredText document={document} /></article>;
   return (
     <article className={className} data-testid="reader-text-view">
       {text.split(/\n\s*\n/).map((block) => block.trim()).filter(Boolean).map((block, i) => (

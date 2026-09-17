@@ -1,3 +1,4 @@
+import * as tessdata from "./lib/tessdata.ts";
 import Fastify from "fastify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -211,7 +212,12 @@ describe("/mcp", () => {
 
   it("reports capabilities an agent can act on", async () => {
     const client = await connect(await listen());
+    const languages = vi.spyOn(tessdata, "listOcrLanguages").mockResolvedValue([
+      { ...tessdata.manifestEntry("eng"), iso: "en", installed: true, download: null },
+      { ...tessdata.manifestEntry("bul"), iso: "bg", installed: false, download: null },
+    ]);
     const caps = parse(await client.callTool({ name: "get_capabilities", arguments: {} }));
+    languages.mockRestore();
     expect(caps.hardware).toEqual({ mlx: true, cuda: false });
     expect(caps.bundles[0]).toMatchObject({ id: "extraction", installed: true });
     expect(caps.ocrEngines).toEqual([

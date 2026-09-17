@@ -48,7 +48,10 @@ export async function extract(payload: ExtractPayload, { addJob }: { addJob: Wor
       // A run where every file was stopped by hand produced no chapters, which the check below
       // would report as "No chapters detected in any file" — a failure, for something deliberate.
       const { cancelled } = await extractMultipleFiles(book, files, log, addJob, payload.ignoreTextLayerFileIds);
-      if (cancelled) return;
+      if (cancelled) {
+        await db.update(books).set({ status: "suspended", error: null, updatedAt: new Date() }).where(eq(books.id, bookId));
+        return;
+      }
     }
 
     // Count total chapters
@@ -193,7 +196,7 @@ async function extractMultipleFiles(
         file,
         engine,
         language: book.language,
-        ocrModel: book.ocrModel,
+        ocrModel: book.ocrModel, extractionSettings: book.extractionSettings,
         ignoreTextLayer: ignoreTextLayerFileIds.includes(file.id),
         log: fileLog,
         signal: abort.signal,

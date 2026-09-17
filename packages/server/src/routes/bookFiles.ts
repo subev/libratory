@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { suryaCachePath } from "../lib/ocr-line-cache.ts";
 import { router, publicProcedure } from "../trpc.ts";
 import { db } from "../db.ts";
 import { books, bookFiles, chapters } from "../schema.ts";
@@ -126,6 +127,7 @@ export const bookFilesRouter = router({
       await db.delete(bookFiles).where(eq(bookFiles.id, input.id));
       await repointBookPdf(file.bookId);
       await unlink(file.pdfPath).catch(() => {});
+      await rm(suryaCachePath(file.pdfPath), { force: true });
       if (file.searchablePdfPath) await unlink(file.searchablePdfPath).catch(() => {});
       await rm(path.join(bookTmpDir(file.bookId), `file_${file.index}`), { recursive: true, force: true }).catch(() => {});
       await updateBookTotalChapters(file.bookId);
@@ -159,8 +161,8 @@ export const bookFilesRouter = router({
 
       for (const file of selectedFiles) {
         await deleteChaptersForFile(input.bookId, file.index);
-        // Failed AI runs keep paid transcriptions for a local-output retry or partial resume.
-        if (file.status !== "failed") {
+        // Resume keeps paid pages; completed AI layouts also survive a chapter-only rebuild.
+        if (file.status !== "failed" && file.status !== "suspended" && file.ocrEngine !== "llm") {
           await rm(path.join(bookTmpDir(input.bookId), `file_${file.index}`), { recursive: true, force: true }).catch(() => {});
         }
 

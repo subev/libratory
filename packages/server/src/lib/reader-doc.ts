@@ -12,6 +12,8 @@ import { ensureSourceGeometry, medianBodyPt, pageLayout, type GeometryPage } fro
 import { readSyncMap, type SyncWord } from "./sync-map.ts";
 import { chapterText } from "./chapter-text.ts";
 import type { SourceBlock } from "./marker.ts";
+import { joinTextBlocks } from "./extracted-text.ts";
+import { normalizeBlocks } from "./normalizer.ts";
 import {
   READER_FORMAT,
   type CueRect,
@@ -196,7 +198,18 @@ async function resolveRects(chapter: Chapter, cues: Cue[]): Promise<Resolved> {
 
 export function buildText(chapter: Chapter): ReaderText | null {
   const text = chapterText(chapter).trim();
-  return text ? { format: READER_FORMAT, text } : null;
+  if (!text) return null;
+  const plain = { format: READER_FORMAT, text };
+  if (chapter.customText !== null || !Array.isArray(chapter.sourceBlocks)) return plain;
+  const blocks = chapter.sourceBlocks as SourceBlock[];
+  const raw = joinTextBlocks(blocks);
+  if (raw.text !== chapter.rawText || !blocks.some((block) => block.kind)) return plain;
+  const joined = chapter.cleanText === null ? raw : normalizeBlocks(blocks);
+  if (joined.text !== text) return plain;
+  return { ...plain, blocks: joined.spans.map((span) => {
+    const block = blocks[span.block];
+    return { start: span.start, end: span.end, kind: block?.kind ?? "prose", ...(block?.breakBefore ? { breakBefore: block.breakBefore } : {}) };
+  }) };
 }
 
 export async function buildCues(chapter: Chapter): Promise<ReaderCues | null> {
@@ -206,15 +219,19 @@ export async function buildCues(chapter: Chapter): Promise<ReaderCues | null> {
 
   const { granularity, cues } = cuesFromSyncMap(map);
   const resolved = await resolveRects(chapter, cues);
+  const text = buildText(chapter);
+  const ranges = text?.blocks ? locateChunks(text.text, cues.map((cue) => cue.text)) : [];
 
   return {
     format: READER_FORMAT,
     totalMs: map.totalMs,
     granularity,
     marks: resolved.marks,
+    ...(text?.blocks ? { text } : {}),
     cues: cues.map((cue, i) => {
       const cueRects = resolved.perCue[i];
       return {
+        ...(ranges[i] ? { range: [ranges[i].start, ranges[i].end] as [number, number] } : {}),
         t: [cue.startMs, cue.endMs] as [number, number],
         s: cue.text,
         c: cue.chunk,

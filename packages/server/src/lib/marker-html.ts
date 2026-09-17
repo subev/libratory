@@ -7,5 +7,6 @@ const { document } = parseHTML("<html><body></body></html>");
 export function stripHtml(html: string): string {
   const fragment = document.createElement("div");
   fragment.innerHTML = html;
+  for (const br of fragment.querySelectorAll("br")) br.replaceWith("\n");
   return (fragment.textContent ?? "").replaceAll("\u00a0", " ").trim();
 }

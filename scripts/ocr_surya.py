@@ -194,7 +194,7 @@ def recognise(pdf_path: str, pages: list[int], stream_lines: bool):
         started = time.time()
         view_w, view_h = sizes[page_index]
         emit("page", page=page_index + 1, width=view_w, height=view_h)
-        log(f"OCR page {n}/{total}")
+        log(f"OCR page {page_index + 1}/{len(sizes)} ({n}/{total} requested)")
         (image,), _ = load_pdf(pdf_path, [page_index], dpi=settings.IMAGE_DPI)
         (highres,), _ = load_pdf(pdf_path, [page_index], dpi=settings.IMAGE_DPI_HIGHRES)
         sx, sy = view_w / image.width, view_h / image.height
@@ -228,6 +228,7 @@ def main() -> int:
     ap.add_argument("--pdf", required=True)
     ap.add_argument("--out")
     ap.add_argument("--page", type=int, help="1-based; only this page")
+    ap.add_argument("--pages", help="comma-separated 1-based pages to recognize")
     ap.add_argument("--stream-lines", action="store_true")
     ap.add_argument("--tessdata", help="directory holding pdf.ttf, used when glyphless.ttf is not beside the script")
     args = ap.parse_args()
@@ -237,7 +238,13 @@ def main() -> int:
     page_count = len(reader.pages)
     if args.page is not None and not 1 <= args.page <= page_count:
         raise SystemExit(f"page {args.page} is outside 1-{page_count}")
+    if args.page is not None and args.pages is not None:
+        raise SystemExit("Use either --page or --pages")
     pages = [args.page - 1] if args.page else list(range(page_count))
+    if args.pages is not None:
+        pages = [int(page) - 1 for page in args.pages.split(",")]
+        if not pages or len(set(pages)) != len(pages) or any(page < 0 or page >= page_count for page in pages):
+            raise SystemExit(f"pages must be unique and inside 1-{page_count}")
     emit("start", pages=len(pages))
 
     from pdf_image_copy import copy_without_text

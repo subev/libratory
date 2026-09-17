@@ -136,7 +136,8 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
   // A chapter nobody has narrated has no cues to reflow; its text is its own small document,
   // fetched only when text view is what will show it.
   const textUrl = view === "text" && (!cueUrl || cueError) ? chapter?.text ?? null : null;
-  const chapterText = useReaderDoc(textUrl, source.text).data?.text ?? null;
+  const textDocument = useReaderDoc(textUrl, source.text).data;
+  const chapterText = textDocument?.text ?? null;
 
   // The reader holds no database row by design, so a chapter narrated while it is open can only be
   // noticed by asking the manifest again — while there is something to wait for, and someone looking
@@ -382,7 +383,7 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
 
       <div ref={measurePages} className="mx-auto flex flex-col gap-4" style={maxWidth ? { maxWidth } : { maxWidth: "48rem" }}>
         {view === "text" ? (
-          !cues && chapterText ? <TextBody text={chapterText} /> : <CueTranscript cues={cues} ms={ms} onSeek={seek} />
+          !cues && chapterText ? <TextBody text={chapterText} document={textDocument ?? undefined} /> : <CueTranscript cues={cues} ms={ms} onSeek={seek} />
         ) : (
           <CuePages
             manifest={manifest}

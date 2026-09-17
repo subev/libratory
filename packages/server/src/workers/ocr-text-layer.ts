@@ -49,7 +49,7 @@ export async function ocrTextLayer(payload: OcrTextLayerPayload, { addJob }: { a
     for (const { file, hasTextLayer } of needs) {
       const fileLog = (msg: string) => appendLog(bookId, msg, file.index);
       if (!book.ocrEngine) await fileLog(`No text layer in "${file.filename}" — reading it with Tesseract by default; change the engine under "About this book" in Extract…`);
-      const produced = await ensureTextLayer({ bookId, file, engine, language: book.language, ocrModel: book.ocrModel, force, hasTextLayer, log: fileLog, signal: abort.signal });
+      const produced = await ensureTextLayer({ bookId, file, engine, language: book.language, ocrModel: book.ocrModel, extractionSettings: book.extractionSettings, force, hasTextLayer, log: fileLog, signal: abort.signal });
       if (produced) written++;
     }
 

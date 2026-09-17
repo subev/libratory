@@ -1,3 +1,4 @@
+import { extractionSettingsSchema } from "../lib/extraction-presets.ts";
 import { z } from "zod";
 import { canonicalKey, modelKeySchema } from "../lib/llm.ts";
 import { router, publicProcedure } from "../trpc.ts";
@@ -470,6 +471,7 @@ export const booksRouter = router({
       chapterModel: modelKeySchema.optional(),
       // The vision model the "llm" OCR engine reads with; null = the Settings default
       ocrModel: modelKeySchema.nullable().optional(),
+      extractionSettings: extractionSettingsSchema.nullable().optional(),
       // ISO-639-1 of the book's own text; "" clears it back to unknown
       language: z.string().max(8).nullable().optional(),
       // "" clears it, so a wrong guess from the PDF can be taken back rather than only corrected
@@ -483,6 +485,7 @@ export const booksRouter = router({
       }
       if (input.speed !== undefined) updates.speed = input.speed;
       if (input.ocrEngine !== undefined) updates.ocrEngine = input.ocrEngine;
+      if (input.extractionSettings !== undefined) updates.extractionSettings = input.extractionSettings;
       if (input.ocrModel !== undefined) updates.ocrModel = input.ocrModel ? canonicalKey(input.ocrModel) : null;
       if (input.llmChapterDetection !== undefined) updates.llmChapterDetection = input.llmChapterDetection;
       if (input.chapterModel !== undefined) updates.chapterModel = canonicalKey(input.chapterModel);
@@ -544,6 +547,7 @@ export const booksRouter = router({
         speed: z.number().min(0.5).max(2.0).optional(),
         ocrEngine: z.enum(OCR_ENGINES).nullable().optional(),
         ocrModel: modelKeySchema.nullable().optional(),
+        extractionSettings: extractionSettingsSchema.nullable().optional(),
         forgetTextLayer: z.boolean().optional(),
         llmChapterDetection: z.boolean().optional(),
         chapterModel: modelKeySchema.optional(),
@@ -579,6 +583,7 @@ export const booksRouter = router({
       }
       if (input.speed) updates.speed = input.speed;
       if (input.ocrEngine !== undefined) updates.ocrEngine = input.ocrEngine;
+      if (input.extractionSettings !== undefined) updates.extractionSettings = input.extractionSettings;
       if (input.ocrModel !== undefined) updates.ocrModel = input.ocrModel ? canonicalKey(input.ocrModel) : null;
       if (input.llmChapterDetection !== undefined) updates.llmChapterDetection = input.llmChapterDetection;
       if (input.chapterModel !== undefined) updates.chapterModel = canonicalKey(input.chapterModel);
@@ -747,6 +752,7 @@ export const booksRouter = router({
         id: z.string().uuid(),
         ocrEngine: z.enum(OCR_ENGINES).nullable().optional(),
         ocrModel: modelKeySchema.nullable().optional(),
+        extractionSettings: extractionSettingsSchema.nullable().optional(),
         llmChapterDetection: z.boolean().optional(),
         chapterModel: modelKeySchema.optional(),
       })
@@ -767,6 +773,7 @@ export const booksRouter = router({
         updatedAt: new Date(),
       };
       if (input.ocrEngine !== undefined) updates.ocrEngine = input.ocrEngine;
+      if (input.extractionSettings !== undefined) updates.extractionSettings = input.extractionSettings;
       if (input.ocrModel !== undefined) updates.ocrModel = input.ocrModel ? canonicalKey(input.ocrModel) : null;
       if (input.llmChapterDetection !== undefined) updates.llmChapterDetection = input.llmChapterDetection;
       if (input.chapterModel !== undefined) updates.chapterModel = canonicalKey(input.chapterModel);

@@ -1,3 +1,4 @@
+import { STANDARD_EXTRACTION, type ExtractionSettings } from "./extraction-presets.ts";
 import { and, eq } from "drizzle-orm";
 import { rm } from "node:fs/promises";
 import path from "node:path";
@@ -5,7 +6,7 @@ import path from "node:path";
 import { db } from "../db.ts";
 import { bookFiles, chapters, type BookFile, type OcrEngine } from "../schema.ts";
 import { collectBlocksFromMarkerOutput, type FlatBlock, type SourceBlock } from "./marker.ts";
-import { hasLlmLayout, replaceWords, runLlmOcr, type ReplaceStats } from "./ocr-llm.ts";
+import { hasLlmLayout, replaceWords, runLlmOcr, savedExtractionMatches, type ReplaceStats } from "./ocr-llm.ts";
 import { runSuryaOcr } from "./ocr-surya.ts";
 import { runTesseractOcr, type OcrStats } from "./ocr-tesseract.ts";
 import { adoptDetectedLanguage } from "./detect-language.ts";
@@ -41,6 +42,7 @@ export async function ensureTextLayer({
   engine,
   language,
   ocrModel = null,
+  extractionSettings = null,
   force = false,
   ignoreTextLayer = false,
   hasTextLayer,
@@ -53,6 +55,7 @@ export async function ensureTextLayer({
   language: string | null;
   /** The "llm" engine's model key; the Settings default when null. */
   ocrModel?: string | null;
+  extractionSettings?: ExtractionSettings | null;
   force?: boolean;
   ignoreTextLayer?: boolean;
   /** What pdfHasTextLayer already said, when the caller has asked. */
@@ -62,7 +65,9 @@ export async function ensureTextLayer({
 }): Promise<boolean> {
   // The book's engine is the truth: a read the other engine did is stale, not done.
   const done = await textLayerDone(bookId, file);
-  const rereading = Boolean(done && file.ocrEngine && file.ocrEngine !== engine);
+  const settingsChanged = engine === "llm" && file.ocrEngine === "llm"
+    && !await savedExtractionMatches(bookFileOutDir(bookId, file.index), extractionSettings ?? STANDARD_EXTRACTION);
+  const rereading = settingsChanged || Boolean(done && file.ocrEngine && file.ocrEngine !== engine);
   if (done && !force && !rereading && !ignoreTextLayer) {
     await log(file.searchablePdfPath ? `"${file.filename}" already has a searchable copy` : `"${file.filename}" was already read by the AI model`);
     return false;
@@ -70,7 +75,7 @@ export async function ensureTextLayer({
   if (rereading) await log(`"${file.filename}" was read by ${file.ocrEngine} — reading it again with ${engine}`);
 
   // null means pdftotext could not run at all — a machine fault, not a scan, so it must not force OCR.
-  if (!ignoreTextLayer) {
+  if (!ignoreTextLayer && !settingsChanged) {
     const scanned = hasTextLayer === undefined ? await pdfHasTextLayer(file.pdfPath) : hasTextLayer;
     if (scanned !== false) return false;
   } else {
@@ -100,7 +105,7 @@ export async function ensureTextLayer({
       // The layout goes to the file's outDir, where extraction reads it in place of Marker's, the
       // model's own text onto the row, and the words placed on Tesseract's boxes into the copy.
       // Without a pack to place with there is no copy, and one another engine left is stale now.
-      const result = await runLlmOcr({ pdfPath: file.pdfPath, outDir: bookFileOutDir(bookId, file.index), outPdfPath, language, workDir, modelKey: ocrModel ?? undefined, log, signal });
+      const result = await runLlmOcr({ pdfPath: file.pdfPath, outDir: bookFileOutDir(bookId, file.index), outPdfPath, language, workDir, modelKey: ocrModel ?? undefined, extractionSettings, log, signal });
       if (ignoreTextLayer && !result.searchableCopy) {
         throw new Error("The AI read the pages but could not replace the PDF text layer. Check the OCR log and language pack, then retry; the AI transcription is saved.");
       }

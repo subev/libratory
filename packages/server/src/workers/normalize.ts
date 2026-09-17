@@ -4,6 +4,7 @@ import { chapters, type ChapterTextMap } from "../schema.ts";
 import { and, eq, ne } from "drizzle-orm";
 import { normalizeForTts, normalizeBlocks } from "../lib/normalizer.ts";
 import type { SourceBlock } from "../lib/marker.ts";
+import { joinTextBlocks } from "../lib/extracted-text.ts";
 import { appendLog } from "../lib/log.ts";
 
 export type NormalizePayload = {
@@ -14,7 +15,7 @@ export type NormalizePayload = {
 // Blocks that no longer rebuild rawText would map offsets onto the wrong paragraph
 export function normalizeChapter(rawText: string, sourceBlocks: unknown): { cleanText: string; textMap: ChapterTextMap | null } {
   const blocks = Array.isArray(sourceBlocks) ? (sourceBlocks as SourceBlock[]) : [];
-  const rebuilt = blocks.filter((b) => b.included).map((b) => b.text).join("\n\n");
+  const rebuilt = joinTextBlocks(blocks).text;
   if (blocks.length === 0 || rebuilt !== rawText) return { cleanText: normalizeForTts(rawText), textMap: null };
 
   const { text, spans } = normalizeBlocks(blocks);

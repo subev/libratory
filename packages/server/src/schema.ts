@@ -1,3 +1,4 @@
+import type { ExtractionSettings } from "./lib/extraction-presets.ts";
 import { sql } from "drizzle-orm";
 import { fromStoredPath, toStoredPath } from "./lib/paths.ts";
 import { pgTable, uuid, text, real, integer, timestamp, boolean, jsonb, unique, index, vector, customType, type AnyPgColumn } from "drizzle-orm/pg-core";
@@ -154,6 +155,7 @@ export const books = pgTable("books", {
   chapterModel: text("chapter_model"),
   // The vision model the "llm" OCR engine reads pages with; null = default model
   ocrModel: text("ocr_model"),
+  extractionSettings: jsonb("extraction_settings").$type<ExtractionSettings>(),
   chapterDetection: text("chapter_detection").$type<"llm" | "numbered-headings" | "heading-levels" | "word-split" | "manual">(),
   chapterProposal: jsonb("chapter_proposal").$type<ChapterProposal>(),
   translationLanguage: text("translation_language"),
@@ -350,3 +352,9 @@ export type BookChunk = typeof bookChunks.$inferSelect;
 export type NewBookChunk = typeof bookChunks.$inferInsert;
 export type Folder = typeof folders.$inferSelect;
 export type Profile = typeof profiles.$inferSelect;
+
+export const extractionPresets = pgTable("extraction_presets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  settings: jsonb("settings").$type<ExtractionSettings>().notNull(),
+});

@@ -110,9 +110,9 @@ describe("refusing to re-extract does not consume the files it got to first", ()
     expect(await getDb().select().from(chapters).where(eq(chapters.bookId, book.id))).toEqual([]);
   });
 
-  it("retains a failed file's saved transcription for retry", async () => {
+  it.each(["failed", "suspended"] as const)("retains a %s file's saved transcription for retry", async (status) => {
     const { book, rows } = await selectedBookWithChapters("done");
-    await getDb().update(bookFiles).set({ status: "failed" }).where(eq(bookFiles.id, row(rows).id));
+    await getDb().update(bookFiles).set({ status }).where(eq(bookFiles.id, row(rows).id));
     const outDir = bookFileOutDir(book.id, 0);
     const saved = path.join(outDir, "llm-pages.json");
     await mkdir(outDir, { recursive: true });

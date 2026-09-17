@@ -1,3 +1,4 @@
+import { buildText } from "../lib/reader-doc.ts";
 import { z } from "zod";
 import { router, publicProcedure } from "../trpc.ts";
 import { db } from "../db.ts";
@@ -89,6 +90,7 @@ export const chaptersRouter = router({
 
       return {
         ...chapter,
+        readerText: buildText(chapter),
         chunkPreviews,
       };
     }),

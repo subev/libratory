@@ -45,6 +45,7 @@ export type ReaderManifest = {
 
 // `wr` is aligned with `w`: the rects for each word, so the page can mark the word being spoken
 export type ReaderCue = {
+  range?: [number, number];
   t: [number, number];
   s: string;
   c: number;
@@ -57,6 +58,7 @@ export type ReaderCue = {
 // give the aligner no lines to slice, so every cue falls back to the paragraph it sits in. Absent
 // means markable — what every container written before the field already assumed.
 export type ReaderCues = {
+  text?: ReaderText;
   format: string;
   totalMs: number;
   granularity: CueGranularity;
@@ -64,4 +66,8 @@ export type ReaderCues = {
   cues: ReaderCue[];
 };
 
-export type ReaderText = { format: string; text: string };
+export type ReaderText = {
+  format: string;
+  text: string;
+  blocks?: { start: number; end: number; kind: "prose" | "verse" | "heading" | "list" | "footnote" | "metadata" | "furniture"; breakBefore?: "line" }[];
+};

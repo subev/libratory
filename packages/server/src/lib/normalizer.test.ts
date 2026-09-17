@@ -99,3 +99,8 @@ describe("normalizeBlocks", () => {
     ]);
   });
 });
+
+it("does not join intentional verse lines ending in a hyphen", () => {
+  const verse = "First-\nsecond\n\nNext stanza";
+  expect(normalizeBlocks([{ text: verse, kind: "verse", included: true }]).text).toBe(verse);
+});

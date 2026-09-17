@@ -75,3 +75,22 @@ describe("printMarks", () => {
     expect(printMarks([printed(0)], { pageStart: null, pageEnd: null })).toBeUndefined();
   });
 });
+
+it("carries semantic blocks and normalized offsets to the reader, but drops stale structure for edited text", async () => {
+  const { buildText } = await import("./reader-doc.ts");
+  const { normalizeChapter } = await import("../workers/normalize.ts");
+  const sourceBlocks = [
+    { type: "Text", kind: "verse" as const, text: "Left verse", page: 1, included: true },
+    { type: "Text", kind: "verse" as const, breakBefore: "line" as const, text: "Right verse", page: 1, included: true },
+    { type: "Text", kind: "footnote" as const, text: "14 **Note**.", page: 1, included: true },
+  ];
+  const rawText = "Left verse\nRight verse\n\n14 **Note**.";
+  const normalized = normalizeChapter(rawText, sourceBlocks);
+  expect(normalized.textMap?.spans).toHaveLength(3);
+  const chapter = extracted({ rawText, sourceBlocks, ...normalized, customText: null });
+  const document = buildText(chapter);
+  expect(document?.text).toBe("Left verse\nRight verse\n\n14 Note.");
+  expect(document?.blocks?.map((b) => [b.kind, document.text.slice(b.start, b.end)])).toEqual([["verse", "Left verse"], ["verse", "Right verse"], ["footnote", "14 Note."]]);
+  expect(buildText({ ...chapter, customText: "Edited." })?.blocks).toBeUndefined();
+  expect(buildText({ ...chapter, cleanText: "Changed." })?.blocks).toBeUndefined();
+});

@@ -60,7 +60,7 @@ jobs:
           ls /etc/apt/sources.list.d
           sudo find /etc/apt/sources.list.d -type f -exec grep -lF dl.google.com {} + | sudo xargs -r rm -f
           sudo apt-get update || true
-          sudo apt-get install -y zip unzip poppler-utils tesseract-ocr tesseract-ocr-eng
+          sudo apt-get install -y zip unzip poppler-utils qpdf tesseract-ocr tesseract-ocr-eng
 
       - run: pnpm install --frozen-lockfile
 
@@ -72,6 +72,12 @@ jobs:
 
       # Server tsc is noEmit type-checking; the web build type-checks and bundles.
       - run: pnpm -r build
+
+      - name: Python PDF test dependencies
+        run: |
+          python3 -m venv "$RUNNER_TEMP/pdf-tests"
+          "$RUNNER_TEMP/pdf-tests/bin/pip" install pypdf==6.17.0 pypdfium2==4.30.0 pillow==12.3.0
+          echo "CONDA_ENV_PATH=$RUNNER_TEMP/pdf-tests/bin" >> "$GITHUB_ENV"
 
       # All three packages: the server suite clones its template database per file, web and
       # desktop are plain vitest. No model ever runs — the one Python the suite spawns is the Surya

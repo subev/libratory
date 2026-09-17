@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { stripHtml } from "./marker-html.ts";
+import { cleanText } from "./extracted-text.ts";
 
 describe("Marker reading text", () => {
+  it("reflows printed HTML line breaks without joining separate words", () => {
+    expect(cleanText(stripHtml("<p>Ordinary<br>prose with inter-<br>national words.</p>"))).toBe("Ordinary prose with international words.");
+  });
   it("decodes entities exactly once", () => {
     expect(stripHtml("<p>&amp;lt; &lt; &#39; &nbsp; &#x41;</p>")).toBe("&lt; < '   A");
   });

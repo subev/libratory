@@ -7,7 +7,7 @@ import { ModelPicker } from "./ModelPicker.tsx";
 const ENGINE_NAMES: Record<OcrEngine, string> = { tesseract: "Tesseract", surya: "Surya", llm: "the AI model" };
 
 // The one description of the three engines, shown wherever a scan is about to be read
-export function OcrEngineChoice({ value, onChange, model, onModelChange, pageCount = null, note, tryHref, status, used = null }: {
+export function OcrEngineChoice({ value, onChange, model, onModelChange, pageCount = null, note, tryHref, status, used = null, lineOrdering = false }: {
   value: OcrEngine | null;
   onChange: (engine: OcrEngine) => void;
   /** The vision model for the AI engine; "" or null = the Settings default. */
@@ -18,6 +18,7 @@ export function OcrEngineChoice({ value, onChange, model, onModelChange, pageCou
   tryHref?: string;
   status?: ReactNode;
   used?: OcrEngine | null;
+  lineOrdering?: boolean;
 }) {
   // From memory on the server, not llmModels.status, which probes every local server: the AI engine
   // only needs to know whether any cloud key exists, because that is the only way page images leave.
@@ -32,7 +33,7 @@ export function OcrEngineChoice({ value, onChange, model, onModelChange, pageCou
     {
       engine: "llm",
       name: "AI model (cloud)",
-      trade: "sends each page image to a vision model, which joins split words and leaves headers and page numbers out; minutes per book; its words are placed on the page by a local Tesseract read, so search and highlighting need the language pack",
+      trade: "sends page images to a vision model; the selected prompt controls transcription, and measured local OCR positions support search and highlighting",
       disabled: cloudKey === false ? "Add an AI provider key in Settings first — the page images have to go somewhere" : undefined,
     },
   ];
@@ -68,7 +69,7 @@ export function OcrEngineChoice({ value, onChange, model, onModelChange, pageCou
             <ModelPicker value={model ?? ""} onChange={onModelChange} requireVision testId="book-ocr-model" />
           </div>
           <span className="block">
-            Every page image leaves this machine for the model's provider. {pageCount !== null ? `${pageCount} page${pageCount === 1 ? "" : "s"} cost ${formatLlmOcrCost(pageCount)} at DeepSeek Flash prices` : "Roughly a tenth of a cent a page at DeepSeek Flash prices"}; other providers charge their own rates. Each page is checked against a local Tesseract read, and pages that come back short are read a second time.
+            {lineOrdering ? "Each page uses local Surya line detection and two AI calls: ordering and transcription. This costs more than Standard; provider pricing applies. Invalid order stops the run without automatic retries." : <>Every page image leaves this machine for the model's provider. {pageCount !== null ? `${pageCount} page${pageCount === 1 ? "" : "s"} cost ${formatLlmOcrCost(pageCount)} at DeepSeek Flash prices` : "Roughly a tenth of a cent a page at DeepSeek Flash prices"}; other providers charge their own rates. Each page is checked against a local Tesseract read, and pages that come back short are read a second time.</>}
           </span>
         </div>
       )}

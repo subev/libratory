@@ -267,6 +267,13 @@
       "when": 1789444930077,
       "tag": "0037_ocr_model",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1789600152521,
+      "tag": "0038_exotic_hobgoblin",
+      "breakpoints": true
     }
   ]
 }

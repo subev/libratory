@@ -31,3 +31,7 @@ docker-compose.override.yml
 
 # Book-sized OCR fixtures captured from real scans (scripts/capture-ocr-fixture.ts): not for a public repo
 packages/server/test/fixtures/private/
+
+# SwiftPM build for the standalone Vision helper
+.build/
+.swiftpm/

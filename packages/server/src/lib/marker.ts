@@ -1,3 +1,4 @@
+import { formatExtractedText, joinTextBlocks, type TextKind } from "./extracted-text.ts";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { readFile, readdir, mkdir, stat } from "node:fs/promises";
@@ -15,6 +16,8 @@ import { stripHtml } from "./marker-html.ts";
 const CONDA_BIN = env.CONDA_ENV_PATH;
 
 type MarkerBlock = {
+  text_kind?: TextKind;
+  break_before?: "line";
   id: string;
   block_type: string;
   html: string;
@@ -40,6 +43,8 @@ type MarkerOutput = {
 const NEEDS_OCR = 'set an OCR engine under "About this book" in Extract… and retry the file';
 
 export type SourceBlock = {
+  kind?: TextKind;
+  breakBefore?: "line";
   type: string;
   text: string;
   page: number;
@@ -72,6 +77,8 @@ const KEEP_BLOCK_TYPES = new Set([
 
 
 export type FlatBlock = {
+  kind?: TextKind;
+  breakBefore?: "line";
   type: string;
   text: string;
   hierarchy: Record<string, string> | null;
@@ -87,12 +94,14 @@ function collectAllBlocks(block: MarkerBlock, page: number, out: FlatBlock[]) {
       collectAllBlocks(child, page, out);
     }
   } else {
-    const text = stripHtml(block.html);
+    const text = formatExtractedText(stripHtml(block.html), block.text_kind);
     if (!text) return;
     const included = KEEP_BLOCK_TYPES.has(block.block_type);
     const level = block.block_type === "SectionHeader" ? (extractHeadingLevel(block.html) ?? undefined) : undefined;
     out.push({
       type: block.block_type,
+      ...(block.text_kind ? { kind: block.text_kind } : {}),
+      ...(block.break_before ? { breakBefore: block.break_before } : {}),
       text,
       hierarchy: block.section_hierarchy,
       level,
@@ -111,6 +120,8 @@ function extractHeadingLevel(html: string): number | null {
 function blocksToSourceBlocks(blocks: FlatBlock[]): SourceBlock[] {
   return blocks.map((b) => ({
     type: b.type,
+    ...(b.kind ? { kind: b.kind } : {}),
+    ...(b.breakBefore ? { breakBefore: b.breakBefore } : {}),
     text: b.text,
     page: b.page,
     included: b.included,
@@ -120,8 +131,7 @@ function blocksToSourceBlocks(blocks: FlatBlock[]): SourceBlock[] {
 }
 
 function chapterFromBlocks(title: string, blocks: FlatBlock[]): ExtractedChapter {
-  const includedBlocks = blocks.filter((b) => b.included);
-  const text = includedBlocks.map((b) => b.text).join("\n\n");
+  const text = joinTextBlocks(blocks).text;
   const allPages = blocks.map((b) => b.page);
   const pageStart = allPages.length > 0 ? Math.min(...allPages) : null;
   const pageEnd = allPages.length > 0 ? Math.max(...allPages) : null;
@@ -508,12 +518,14 @@ async function collectBlocksFromMarkerJson(markerJsonPath: string): Promise<Flat
       if (block.children) {
         collectAllBlocks(block, pageNum, allBlocks);
       } else {
-        const text = stripHtml(block.html);
+        const text = formatExtractedText(stripHtml(block.html), block.text_kind);
         if (!text) continue;
         const included = KEEP_BLOCK_TYPES.has(block.block_type);
         const level = block.block_type === "SectionHeader" ? (extractHeadingLevel(block.html) ?? undefined) : undefined;
         allBlocks.push({
           type: block.block_type,
+          ...(block.text_kind ? { kind: block.text_kind } : {}),
+          ...(block.break_before ? { breakBefore: block.break_before } : {}),
           text,
           hierarchy: block.section_hierarchy,
           level,

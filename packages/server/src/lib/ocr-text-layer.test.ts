@@ -3,7 +3,8 @@ import { eq } from "drizzle-orm";
 
 import { getDb, resetDb, row } from "../../test/setup.ts";
 import { books, bookFiles } from "../schema.ts";
-import { runLlmOcr } from "./ocr-llm.ts";
+import { runLlmOcr, savedExtractionMatches } from "./ocr-llm.ts";
+import { STANDARD_EXTRACTION } from "./extraction-presets.ts";
 import { pdfHasTextLayer } from "./pdf-raw-text.ts";
 
 vi.mock("../db.ts", async () => {
@@ -11,7 +12,7 @@ vi.mock("../db.ts", async () => {
   return { get db() { return getDb(); } };
 });
 vi.mock("./ocr-llm.ts", async (original) => ({
-  ...await original<typeof import("./ocr-llm.ts")>(), runLlmOcr: vi.fn(),
+  ...await original<typeof import("./ocr-llm.ts")>(), runLlmOcr: vi.fn(), savedExtractionMatches: vi.fn(async () => true),
 }));
 vi.mock("./pdf-raw-text.ts", async (original) => ({
   ...await original<typeof import("./pdf-raw-text.ts")>(), pdfHasTextLayer: vi.fn(),
@@ -26,6 +27,7 @@ const source = (page: number, text: string, polygon?: number[][]): SourceBlock =
 describe("replacing imported PDF text", () => {
   beforeEach(async () => {
     await resetDb(getDb());
+    vi.mocked(savedExtractionMatches).mockReset().mockResolvedValue(true);
     vi.mocked(pdfHasTextLayer).mockReset().mockResolvedValue(true);
     vi.mocked(runLlmOcr).mockReset().mockResolvedValue({
       pages: 2, inputTokens: 100, outputTokens: 100, meanRecall: 1, lowRecallFraction: 0,
@@ -57,6 +59,17 @@ describe("replacing imported PDF text", () => {
     input.file.searchablePdfPath = "/tmp/imported-scan.ocr.pdf";
     input.file.ocrEngine = "llm";
     expect(await ensureTextLayer({ ...input, ignoreTextLayer: true })).toBe(true);
+    expect(runLlmOcr).toHaveBeenCalledOnce();
+  });
+
+  it("treats null as Standard when comparing a completed custom extraction", async () => {
+    const input = await importedFile();
+    input.file.searchablePdfPath = "/tmp/imported-scan.ocr.pdf";
+    input.file.ocrEngine = "llm";
+    expect(await ensureTextLayer({ ...input, extractionSettings: null })).toBe(false);
+    expect(savedExtractionMatches).toHaveBeenLastCalledWith(expect.any(String), STANDARD_EXTRACTION);
+    vi.mocked(savedExtractionMatches).mockResolvedValue(false);
+    expect(await ensureTextLayer({ ...input, extractionSettings: null })).toBe(true);
     expect(runLlmOcr).toHaveBeenCalledOnce();
   });
 

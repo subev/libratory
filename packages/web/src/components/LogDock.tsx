@@ -3,11 +3,13 @@ import { trpc } from "../trpc.ts";
 import { formatLogTime } from "../lib/format.ts";
 import { useBodyScrollLock } from "../lib/use-body-scroll-lock.ts";
 import { IconChevronUp, IconClose } from "./icons.tsx";
+import { extractionProgress } from "../lib/extraction-progress.ts";
 
 // Docked above the app's modals (z-50) so activity stays visible while they're open
 export function LogDock({ bookId, isProcessing, files }: { bookId: string; isProcessing: boolean; files?: { index: number; filename: string }[] }) {
   const [open, setOpen] = useState(false);
   const [fileFilter, setFileFilter] = useState<string>("");
+  const [showDetails, setShowDetails] = useState(false);
   useBodyScrollLock(open);
   const utils = trpc.useUtils();
   const isMultiFile = files && files.length > 1;
@@ -38,10 +40,13 @@ export function LogDock({ bookId, isProcessing, files }: { bookId: string; isPro
   // appearing and disappearing would shift the scroll pane by 36px whenever a job starts.
   const idle = logs.length === 0 && !isProcessing;
 
-  const lastEntry = logs[logs.length - 1];
+  const summaryLogs = logs.filter((entry) => !/^(?:Recognizing Text|Detecting bboxes):\s+\d{1,3}%\|/.test(entry.message));
+  const lastEntry = summaryLogs.at(-1) ?? logs.at(-1);
+  const progress = isProcessing ? extractionProgress(summaryLogs) : null;
+  const visibleLogs = showDetails ? logs : summaryLogs;
   const filteredLogs = fileFilter
-    ? logs.filter((entry) => entry.fileIndex === Number(fileFilter))
-    : logs;
+    ? visibleLogs.filter((entry) => entry.fileIndex === Number(fileFilter))
+    : visibleLogs;
 
   return (
     <>
@@ -54,12 +59,12 @@ export function LogDock({ bookId, isProcessing, files }: { bookId: string; isPro
       >
         <span className="flex items-center gap-1.5 shrink-0 text-(--terminal-dim) font-sans font-medium">
           <span className={`w-2 h-2 rounded-full ${isProcessing ? "bg-(--success) animate-pulse" : "bg-(--terminal-dim)"}`} />
-          Logs ({logs.length})
+          Logs ({summaryLogs.length})
         </span>
         {lastEntry ? (
           <span className="truncate min-w-0 flex-1">
             <span className="text-(--terminal-dim) mr-2 select-none">{formatLogTime(String(lastEntry.createdAt))}</span>
-            {lastEntry.message}
+            {progress ?? lastEntry.message}
           </span>
         ) : (
           <span className="text-(--terminal-dim) flex-1">Waiting for logs...</span>
@@ -80,7 +85,7 @@ export function LogDock({ bookId, isProcessing, files }: { bookId: string; isPro
             <div className="flex items-center gap-3 px-4 py-2.5 border-b border-(--terminal-border) shrink-0">
               <span className="flex items-center gap-1.5 text-sm font-medium text-(--terminal-text)">
                 <span className={`w-2 h-2 rounded-full ${isProcessing ? "bg-(--success) animate-pulse" : "bg-(--terminal-dim)"}`} />
-                Logs ({filteredLogs.length}{fileFilter ? ` / ${logs.length}` : ""})
+                Logs ({filteredLogs.length}{filteredLogs.length !== logs.length ? ` / ${logs.length}` : ""})
               </span>
               {isMultiFile && (
                 <select
@@ -97,6 +102,10 @@ export function LogDock({ bookId, isProcessing, files }: { bookId: string; isPro
                 </select>
               )}
               <div className="flex-1" />
+              <label className="flex items-center gap-1.5 text-xs text-(--terminal-text)">
+                <input type="checkbox" checked={showDetails} onChange={(event) => setShowDetails(event.target.checked)} />
+                Show details
+              </label>
               {logs.length > 0 && (
                 <button
                   onClick={() => clearLogs.mutate({ bookId })}
@@ -113,6 +122,7 @@ export function LogDock({ bookId, isProcessing, files }: { bookId: string; isPro
                 <IconClose className="h-5 w-5" />
               </button>
             </div>
+            {progress && <p className="px-4 py-2 text-xs text-(--terminal-text) border-b border-(--terminal-border)">{progress}</p>}
             <LogScroller logs={filteredLogs} />
           </div>
         </div>
