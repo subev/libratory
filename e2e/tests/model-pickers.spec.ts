@@ -33,7 +33,8 @@ test("a book's stored model still reads as set when no listing carries it", asyn
   });
 
   await page.reload();
-  await page.getByTestId("extract-chapters").click();
+  await page.getByTestId("stage-tab-files").click();
+  await page.getByTestId("open-extract-modal").click();
   const trigger = page.getByTestId("extract-chapter-model");
   await expect(trigger).toHaveAttribute("data-value", STORED);
   await expect(trigger).toContainText("(not available right now)");
@@ -47,6 +48,7 @@ test("a legacy model key reads as the model it names, not as an unavailable one"
   await trpcMutation(request, "books.updateSettings", { id: bookId, llmChapterDetection: true, chapterModel: "pro" });
 
   await page.reload();
-  await page.getByTestId("extract-chapters").click();
+  await page.getByTestId("stage-tab-files").click();
+  await page.getByTestId("open-extract-modal").click();
   await expect(page.getByTestId("extract-chapter-model")).toHaveAttribute("data-value", "deepseek:deepseek-v4-pro");
 });
