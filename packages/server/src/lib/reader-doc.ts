@@ -1,3 +1,4 @@
+import { bookFileOrder } from "./book-file-order.ts";
 import { asc, eq } from "drizzle-orm";
 
 import { db } from "../db.ts";
@@ -38,7 +39,7 @@ export function chapterMode(chapter: Chapter): Pick<ReaderChapter, "mode" | "why
 }
 
 export async function buildManifest(book: Book): Promise<ReaderManifest> {
-  const files = await db.select().from(bookFiles).where(eq(bookFiles.bookId, book.id)).orderBy(asc(bookFiles.index));
+  const files = await db.select().from(bookFiles).where(eq(bookFiles.bookId, book.id)).orderBy(bookFileOrder, asc(bookFiles.index));
   const sources = await listMarkerSources(book);
 
   const pages: ReaderPage[] = [];

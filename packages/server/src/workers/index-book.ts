@@ -1,3 +1,4 @@
+import { bookFileOrder } from "../lib/book-file-order.ts";
 import { createHash } from "node:crypto";
 import type { WorkerUtils } from "graphile-worker";
 import { and, asc, eq, isNotNull, ne, or, sql } from "drizzle-orm";
@@ -85,7 +86,7 @@ export async function indexBook({ bookId }: IndexBookPayload, { addJob }: { addJ
       .select()
       .from(bookFiles)
       .where(and(eq(bookFiles.bookId, bookId), isNotNull(bookFiles.rawText)))
-      .orderBy(asc(bookFiles.index));
+      .orderBy(bookFileOrder, asc(bookFiles.index));
     for (const file of files) {
       units.push({
         key: { bookFileId: file.id },

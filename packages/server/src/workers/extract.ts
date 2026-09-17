@@ -1,3 +1,4 @@
+import { bookFileOrder } from "../lib/book-file-order.ts";
 import type { WorkerUtils } from "graphile-worker";
 import { db } from "../db.ts";
 import { books, bookFiles, chapters, DEFAULT_OCR_ENGINE } from "../schema.ts";
@@ -33,7 +34,7 @@ export async function extract(payload: ExtractPayload, { addJob }: { addJob: Wor
       .select()
       .from(bookFiles)
       .where(eq(bookFiles.bookId, bookId))
-      .orderBy(asc(bookFiles.index));
+      .orderBy(bookFileOrder, asc(bookFiles.index));
 
     if (files.length === 0) {
       // Legacy book without book_files rows — use book.pdfPath directly

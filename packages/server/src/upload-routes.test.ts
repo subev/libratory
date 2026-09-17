@@ -282,6 +282,18 @@ describe("POST /upload/:bookId (append)", () => {
     const jobNames = mockQuickAddJob.mock.calls.map((c: any[]) => c[1]);
     expect(jobNames).toEqual(["rawExtract", "extract"]);
   });
+
+  it("appends after a custom source position even when deleted files left a large gap", async () => {
+    const bookId = await insertBookWithFile("raw");
+    const db = getDb();
+    await db.update(bookFiles).set({ position: 20 }).where(eq(bookFiles.bookId, bookId));
+    const app = await createApp();
+    const { payload, headers } = multipartBody([{ name: "file", value: "%PDF-fake", filename: "next.pdf" }]);
+    const res = await app.inject({ method: "POST", url: `/upload/${bookId}`, payload, headers });
+    expect(res.statusCode).toBe(200);
+    const files = await db.select().from(bookFiles).where(eq(bookFiles.bookId, bookId)).orderBy(asc(bookFiles.index));
+    expect(files.map((file) => [file.index, file.position])).toEqual([[0, 20], [1, 21]]);
+  });
 });
 
 describe("POST /upload/:bookId on synthetic books", () => {

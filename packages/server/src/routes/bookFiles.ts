@@ -1,3 +1,4 @@
+import { bookFileOrder } from "../lib/book-file-order.ts";
 import { z } from "zod";
 import { suryaCachePath } from "../lib/ocr-line-cache.ts";
 import { router, publicProcedure } from "../trpc.ts";
@@ -40,7 +41,7 @@ async function repointBookPdf(bookId: string) {
     .select({ pdfPath: bookFiles.pdfPath, filename: bookFiles.filename })
     .from(bookFiles)
     .where(eq(bookFiles.bookId, bookId))
-    .orderBy(asc(bookFiles.index))
+    .orderBy(bookFileOrder, asc(bookFiles.index))
     .limit(1);
 
   await db
@@ -69,6 +70,32 @@ async function updateBookTotalChapters(bookId: string) {
 }
 
 export const bookFilesRouter = router({
+  reorder: publicProcedure
+    .input(z.object({ bookId: z.string().uuid(), fileIds: z.array(z.string().uuid()).min(1) }))
+    .mutation(async ({ input }) => {
+      await db.transaction(async (tx) => {
+        const [book] = await tx.select().from(books).where(eq(books.id, input.bookId)).for("update");
+        if (!book || book.kind !== "pdf") throw new Error("PDF book not found");
+        const files = await tx.select().from(bookFiles).where(eq(bookFiles.bookId, input.bookId)).for("update");
+        if (book.status === "extracting" || book.status === "assembling" || files.some((file) => file.status === "extracting" || file.status === "pending")) {
+          throw new Error("Wait for extraction or assembly to finish before reordering source files");
+        }
+        const byId = new Map(files.map((file) => [file.id, file]));
+        if (input.fileIds.length !== files.length || new Set(input.fileIds).size !== files.length || input.fileIds.some((id) => !byId.has(id))) {
+          throw new Error("Supply every source file exactly once");
+        }
+        const firstId = input.fileIds[0];
+        const first = firstId ? byId.get(firstId) : undefined;
+        if (!first) throw new Error("No source files to reorder");
+        for (const [position, id] of input.fileIds.entries()) {
+          await tx.update(bookFiles).set({ position }).where(and(eq(bookFiles.id, id), eq(bookFiles.bookId, input.bookId)));
+        }
+        await tx.update(books).set({ pdfPath: first.pdfPath, filename: first.filename, updatedAt: new Date() }).where(eq(books.id, input.bookId));
+      });
+      await appendLog(input.bookId, "Reordered source PDFs. Existing chapters, audio, searchable copies and page extraction are unchanged.");
+      return { success: true };
+    }),
+
   setSelected: publicProcedure
     .input(z.object({ id: z.string().uuid(), selected: z.boolean() }))
     .mutation(async ({ input }) => {

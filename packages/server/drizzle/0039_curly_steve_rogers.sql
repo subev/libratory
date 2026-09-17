@@ -1,0 +1,1 @@
+ALTER TABLE "book_files" ADD COLUMN "position" integer;

@@ -1,3 +1,4 @@
+import { bookFileOrder } from "./book-file-order.ts";
 import { db } from "../db.ts";
 import { bookFiles } from "../schema.ts";
 import { eq, asc } from "drizzle-orm";
@@ -13,7 +14,7 @@ export async function getBookRawText(bookId: string): Promise<BookRawText | null
     .select({ index: bookFiles.index, filename: bookFiles.filename, rawText: bookFiles.rawText })
     .from(bookFiles)
     .where(eq(bookFiles.bookId, bookId))
-    .orderBy(asc(bookFiles.index));
+    .orderBy(bookFileOrder, asc(bookFiles.index));
 
   const withText = files.filter((f) => f.rawText);
   if (withText.length === 0) return null;

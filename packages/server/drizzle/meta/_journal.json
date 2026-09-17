@@ -274,6 +274,13 @@
       "when": 1789600152521,
       "tag": "0038_exotic_hobgoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1789669325356,
+      "tag": "0039_curly_steve_rogers",
+      "breakpoints": true
     }
   ]
 }

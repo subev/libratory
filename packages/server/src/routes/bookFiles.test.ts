@@ -6,6 +6,9 @@ import { eq } from "drizzle-orm";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { bookFileOutDir, bookTmpDir } from "../lib/paths.ts";
+import { bookFileOrder } from "../lib/book-file-order.ts";
+import { getBookRawText } from "../lib/book-raw-text.ts";
+import { listMarkerSources } from "../lib/marker-sources.ts";
 
 vi.mock("../db.ts", async () => {
   const { getDb } = await import("../../test/setup.ts");
@@ -71,6 +74,51 @@ describe("removing a file keeps books.pdfPath describing a file that is still th
     await caller.remove({ id: row(rows, 1).id });
 
     expect(await bookRow(book.id)).toMatchObject({ pdfPath: "/uploads/00_one.pdf", filename: "one.pdf" });
+  });
+});
+
+describe("source file order is independent of extraction identity", () => {
+  it("reorders sources and raw text without changing chapters, PDFs or paid caches", async () => {
+    const db = getDb();
+    const { book, rows } = await twoFileBook();
+    const first = row(rows);
+    const second = row(rows, 1);
+    await db.update(bookFiles).set({ index: 7, searchablePdfPath: "/uploads/one.ocr.pdf", rawText: "first text" }).where(eq(bookFiles.id, first.id));
+    await db.update(bookFiles).set({ index: 12, searchablePdfPath: "/uploads/two.ocr.pdf", rawText: "second text" }).where(eq(bookFiles.id, second.id));
+    await db.insert(chapters).values({ bookId: book.id, index: 0, sourceFileIndex: 7, title: "Kept", rawText: "verse\nverse", customText: "edited", audioPath: "/tmp/kept.m4a", status: "done" });
+    const before = await db.select().from(chapters).where(eq(chapters.bookId, book.id));
+    const filesBefore = await db.select().from(bookFiles).where(eq(bookFiles.bookId, book.id));
+    const cache = path.join(bookFileOutDir(book.id, 7), "llm-pages.json");
+    await mkdir(path.dirname(cache), { recursive: true });
+    await writeFile(cache, "paid page results");
+    try {
+      await caller.reorder({ bookId: book.id, fileIds: [second.id, first.id] });
+      const files = await db.select().from(bookFiles).where(eq(bookFiles.bookId, book.id)).orderBy(bookFileOrder);
+      expect(files.map((file) => [file.id, file.index, file.position])).toEqual([[second.id, 12, 0], [first.id, 7, 1]]);
+      for (const file of files) expect(file).toEqual({ ...filesBefore.find((old) => old.id === file.id), position: file.position });
+      expect(await db.select().from(chapters).where(eq(chapters.bookId, book.id))).toEqual(before);
+      expect(await readFile(cache, "utf8")).toBe("paid page results");
+      expect(await bookRow(book.id)).toMatchObject({ filename: "two.pdf", pdfPath: "/uploads/01_two.pdf" });
+      expect((await listMarkerSources(await bookRow(book.id))).map((source) => source.fileIndex)).toEqual([12, 7]);
+      const raw = await getBookRawText(book.id);
+      expect(raw?.text.indexOf("second text")).toBeLessThan(raw?.text.indexOf("first text") ?? 0);
+      expect(quickAddJob).not.toHaveBeenCalled();
+    } finally {
+      await rm(bookTmpDir(book.id), { recursive: true, force: true });
+    }
+  });
+
+  it.each(["duplicate", "missing", "foreign", "extracting"])("rejects %s reorder requests without partial changes", async (scenario) => {
+    const db = getDb();
+    const { book, rows } = await twoFileBook();
+    const first = row(rows);
+    const second = row(rows, 1);
+    if (scenario === "extracting") await db.update(bookFiles).set({ status: "extracting" }).where(eq(bookFiles.id, second.id));
+    const before = await db.select().from(bookFiles).where(eq(bookFiles.bookId, book.id));
+    const fileIds = scenario === "duplicate" ? [first.id, first.id] : scenario === "missing" ? [first.id] : scenario === "foreign" ? [first.id, crypto.randomUUID()] : [second.id, first.id];
+    await expect(caller.reorder({ bookId: book.id, fileIds })).rejects.toThrow();
+    expect(await db.select().from(bookFiles).where(eq(bookFiles.bookId, book.id))).toEqual(before);
+    expect(quickAddJob).not.toHaveBeenCalled();
   });
 });
 

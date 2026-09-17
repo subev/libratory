@@ -169,6 +169,7 @@ export function BookDetail() {
   const setFileSelectedMutation = trpc.bookFiles.setSelected.useMutation({ onSuccess: invalidate });
   const setAllFilesSelectedMutation = trpc.bookFiles.setAllSelected.useMutation({ onSuccess: invalidate });
   const setFileSelectedBatchMutation = trpc.bookFiles.setSelectedBatch.useMutation({ onSuccess: invalidate });
+  const reorderFilesMutation = trpc.bookFiles.reorder.useMutation({ onSuccess: invalidate });
   const removeFileMutation = trpc.bookFiles.remove.useMutation({ onSuccess: invalidate });
   const reExtractSelectedMutation = trpc.bookFiles.reExtractSelected.useMutation({ onSuccess: invalidate });
   const cancelFileMutation = trpc.bookFiles.cancel.useMutation({ onSuccess: invalidate });
@@ -721,6 +722,7 @@ export function BookDetail() {
   };
 
   const startRefusal =
+    reorderFilesMutation.error ??
     reExtractSelectedMutation.error ??
     retryMutation.error ??
     redetectMutation.error ??
@@ -951,6 +953,8 @@ export function BookDetail() {
               onSetSelected={(fid, selected) => setFileSelectedMutation.mutate({ id: fid, selected })}
               onSetAllSelected={(selected) => setAllFilesSelectedMutation.mutateAsync({ bookId: book.id, selected })}
               onSetSelectedBatch={(ids, selected) => setFileSelectedBatchMutation.mutateAsync({ ids, selected })}
+              onReorder={(fileIds) => reorderFilesMutation.mutateAsync({ bookId: book.id, fileIds })}
+              reordering={reorderFilesMutation.isPending}
               onRemove={(fid) => removeFileMutation.mutate({ id: fid })}
               onRedoWithSurya={() => {
                 if (!confirm("Read every page again with Surya? Slower, but better on photographed pages. This replaces the chapters and deletes the audio and exports.")) return;

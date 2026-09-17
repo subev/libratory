@@ -2,7 +2,7 @@ import type { ExtractionSettings } from "../../../server/src/lib/extraction-pres
 import { useState, useRef } from "react";
 import { ExtractModal, type ExtractScope } from "./ExtractModal.tsx";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
-import { IconStop, IconRefresh, IconDelete } from "./icons.tsx";
+import { IconStop, IconRefresh, IconDelete, IconChevronUp, IconChevronDown } from "./icons.tsx";
 import { Button } from "./Button.tsx";
 import type { OcrEngine } from "../lib/ocr.ts";
 
@@ -48,6 +48,8 @@ export function BookFilesSection({
   onSetSelected,
   onSetAllSelected,
   onSetSelectedBatch,
+  onReorder,
+  reordering,
   onRemove,
   onRedoWithSurya,
   onCancelExtraction,
@@ -71,6 +73,8 @@ export function BookFilesSection({
   onSetSelected: (id: string, selected: boolean) => void;
   onSetAllSelected: (selected: boolean) => void | Promise<unknown>;
   onSetSelectedBatch: (ids: string[], selected: boolean) => void | Promise<unknown>;
+  onReorder: (ids: string[]) => Promise<unknown>;
+  reordering: boolean;
   onRemove: (id: string) => void;
   onRedoWithSurya: () => void;
   onCancelExtraction: () => void;
@@ -97,6 +101,22 @@ export function BookFilesSection({
   const selectedCount = files.filter((f) => f.selected).length;
   const allSelected = files.length > 0 && selectedCount === files.length;
   const noneSelected = selectedCount === 0;
+  const orderBlocked = isProcessing || reordering || files.some((file) => file.status === "pending" || file.status === "extracting");
+
+  async function moveFile(index: number, direction: -1 | 1) {
+    const ids = files.map((file) => file.id);
+    const moved = ids[index];
+    const target = ids[index + direction];
+    if (!moved || !target || orderBlocked) return;
+    ids[index] = target;
+    ids[index + direction] = moved;
+    try {
+      await onReorder(ids);
+      setLastClickedIndex(null);
+    } catch {
+      // The parent displays the mutation error.
+    }
+  }
 
   function chapterCountForFile(fileIndex: number) {
     return chapters.filter((ch) => ch.sourceFileIndex === fileIndex).length;
@@ -131,7 +151,7 @@ export function BookFilesSection({
         <div className="flex items-center gap-3">
           <h2 className="font-(family-name:--stack-display) text-base font-semibold text-(--text-primary)">Source files</h2>
           <span className="text-xs text-(--text-muted)">
-            Chapters are numbered in file order — reorder them in the Chapters tab.
+            Move PDFs to change source order. Existing chapters keep their order.
           </span>
           {extractingCount > 0 && (
             <span className="inline-flex items-center gap-1.5 text-xs font-medium text-(--accent-text)" data-testid="extracting-indicator">
@@ -201,7 +221,7 @@ export function BookFilesSection({
                     className="rounded"
                   />
                 </td>
-                <td className="px-3 py-2 text-xs font-mono text-(--text-muted)">{file.index + 1}</td>
+                <td className="px-3 py-2 text-xs font-mono text-(--text-muted)">{i + 1}</td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-2">
                     {/* Neutral, not red: red is destructive in this row, and Remove is four cells away */}
@@ -259,6 +279,16 @@ export function BookFilesSection({
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1.5">
+                    <Button variant="icon" size="sm" aria-label={`Move ${file.filename} up`}
+                      title={orderBlocked ? "Wait for processing to finish" : "Move PDF up; keep existing chapters and OCR"}
+                      disabled={orderBlocked || i === 0} onClick={() => void moveFile(i, -1)}>
+                      <IconChevronUp className="w-4 h-4" />
+                    </Button>
+                    <Button variant="icon" size="sm" aria-label={`Move ${file.filename} down`}
+                      title={orderBlocked ? "Wait for processing to finish" : "Move PDF down; keep existing chapters and OCR"}
+                      disabled={orderBlocked || i === files.length - 1} onClick={() => void moveFile(i, 1)}>
+                      <IconChevronDown className="w-4 h-4" />
+                    </Button>
                     <Button
                       variant="secondary"
                       size="sm"

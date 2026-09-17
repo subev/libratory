@@ -1,3 +1,4 @@
+import { bookFileOrder } from "../lib/book-file-order.ts";
 import type { WorkerUtils } from "graphile-worker";
 import { asc, eq } from "drizzle-orm";
 
@@ -28,7 +29,7 @@ export async function ocrTextLayer(payload: OcrTextLayerPayload, { addJob }: { a
     .select()
     .from(bookFiles)
     .where(eq(bookFiles.bookId, bookId))
-    .orderBy(asc(bookFiles.index));
+    .orderBy(bookFileOrder, asc(bookFiles.index));
   const needs: { file: (typeof files)[number]; hasTextLayer?: boolean | null }[] = [];
   for (const file of files) {
     const done = await textLayerDone(bookId, file);

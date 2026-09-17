@@ -2,7 +2,8 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { env } from "./env.ts";
 import { db } from "./db.ts";
 import { books, bookFiles, OCR_ENGINES } from "./schema.ts";
-import { eq, desc } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { bookFileOrder } from "./lib/book-file-order.ts";
 import { profileIdFromHeader } from "./trpc.ts";
 import { isUuid } from "./lib/uuid.ts";
 import { tmpDir, uploadsDir } from "./lib/paths.ts";
@@ -133,13 +134,12 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
       existingFiles.some((f) => f.status !== "raw") || existingFiles.length === 0 || book.totalChapters > 0;
 
     // Find the next file index
-    const lastFile = await db
-      .select({ index: bookFiles.index })
+    const [nextFile] = await db
+      .select({ index: sql<number>`coalesce(max(${bookFiles.index}), -1) + 1`, position: sql<number>`coalesce(max(${bookFileOrder}), -1) + 1` })
       .from(bookFiles)
-      .where(eq(bookFiles.bookId, bookId))
-      .orderBy(desc(bookFiles.index))
-      .limit(1);
-    const startIndex = lastFile[0] ? lastFile[0].index + 1 : 0;
+      .where(eq(bookFiles.bookId, bookId));
+    const startIndex = nextFile?.index ?? 0;
+    const startPosition = nextFile?.position ?? 0;
 
     const { files } = await saveUploadedFiles(request, pdfDir, startIndex);
 
@@ -148,9 +148,10 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
     }
 
     await db.insert(bookFiles).values(
-      files.map((f) => ({
+      files.map((f, i) => ({
         bookId,
         index: f.index,
+        position: startPosition + i,
         filename: f.filename,
         pdfPath: f.pdfPath,
         status: (usesFullExtraction ? "pending" : "raw") as "pending" | "raw",

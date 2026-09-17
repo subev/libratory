@@ -1,3 +1,4 @@
+import { bookFileOrder } from "../lib/book-file-order.ts";
 import { db } from "../db.ts";
 import { books, bookFiles, chapters, assemblies, documents } from "../schema.ts";
 import { eq, asc } from "drizzle-orm";
@@ -52,7 +53,7 @@ export async function redetect(payload: RedetectPayload) {
       .select()
       .from(bookFiles)
       .where(eq(bookFiles.bookId, bookId))
-      .orderBy(asc(bookFiles.index));
+      .orderBy(bookFileOrder, asc(bookFiles.index));
 
     let totalDetected = 0;
     let detectionMethod: typeof books.$inferSelect.chapterDetection = null;

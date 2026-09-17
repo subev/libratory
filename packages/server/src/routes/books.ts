@@ -1,3 +1,4 @@
+import { bookFileOrder } from "../lib/book-file-order.ts";
 import { extractionSettingsSchema } from "../lib/extraction-presets.ts";
 import { z } from "zod";
 import { canonicalKey, modelKeySchema } from "../lib/llm.ts";
@@ -416,7 +417,7 @@ export const booksRouter = router({
         })
         .from(bookFiles)
         .where(eq(bookFiles.bookId, input.id))
-        .orderBy(asc(bookFiles.index));
+        .orderBy(bookFileOrder, asc(bookFiles.index));
 
       const rawTextTotalWords = files.reduce((sum, f) => sum + (f.rawWords ?? 0), 0);
       const assembleQueued = await hasQueuedAssembleJob(input.id);

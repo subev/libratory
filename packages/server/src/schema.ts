@@ -250,6 +250,7 @@ export const bookFiles = pgTable("book_files", {
   id: uuid("id").primaryKey().defaultRandom(),
   bookId: uuid("book_id").notNull().references(() => books.id, { onDelete: "cascade" }),
   index: integer("index").notNull(),
+  position: integer("position"),
   filename: text("filename").notNull(),
   pdfPath: dataPath("pdf_path").notNull(),
   // "raw" = raw text only, marker extraction neither queued nor planned

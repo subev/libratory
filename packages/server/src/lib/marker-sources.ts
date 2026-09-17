@@ -1,3 +1,4 @@
+import { bookFileOrder } from "./book-file-order.ts";
 import { db } from "../db.ts";
 import { bookFiles, type Book } from "../schema.ts";
 import { eq, asc } from "drizzle-orm";
@@ -18,7 +19,7 @@ export async function listMarkerSources(book: Book): Promise<MarkerSource[]> {
     .select()
     .from(bookFiles)
     .where(eq(bookFiles.bookId, book.id))
-    .orderBy(asc(bookFiles.index));
+    .orderBy(bookFileOrder, asc(bookFiles.index));
 
   if (files.length === 0) {
     // Zero files means legacy single-PDF book — unless the book is synthetic, which has no PDF at all

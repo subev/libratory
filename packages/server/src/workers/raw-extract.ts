@@ -1,3 +1,4 @@
+import { bookFileOrder } from "../lib/book-file-order.ts";
 import type { WorkerUtils } from "graphile-worker";
 import { db } from "../db.ts";
 import { books, bookFiles } from "../schema.ts";
@@ -19,7 +20,7 @@ export async function rawExtract(payload: RawExtractPayload, { addJob }: { addJo
     .select()
     .from(bookFiles)
     .where(and(eq(bookFiles.bookId, bookId), isNull(bookFiles.rawText)))
-    .orderBy(asc(bookFiles.index));
+    .orderBy(bookFileOrder, asc(bookFiles.index));
 
   // Whatever the first PDF says about itself, once, and never over an answer someone gave by hand
   const [book] = await db.select().from(books).where(eq(books.id, bookId));
