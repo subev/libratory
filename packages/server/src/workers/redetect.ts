@@ -1,13 +1,14 @@
 import { db } from "../db.ts";
 import { books, bookFiles, chapters, assemblies, documents } from "../schema.ts";
 import { eq, asc } from "drizzle-orm";
-import { redetectChaptersFromExistingMarkerOutput } from "../lib/marker.ts";
+import { redetectChaptersFromExistingMarkerOutput, type ExtractedChapter } from "../lib/marker.ts";
 import { bookTmpDir, bookOutputDir } from "../lib/paths.ts";
 import { readablePdfPath } from "../lib/pdf-raw-text.ts";
 import { appendLog } from "../lib/log.ts";
 import { insertSuspendedChapters, resetChaptersKeepingInserted } from "../lib/insert-chapters.ts";
 import { rm } from "node:fs/promises";
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { queueIndexBook } from "../lib/search-index.ts";
 
 export type RedetectPayload = {
@@ -32,33 +33,20 @@ export async function redetect(payload: RedetectPayload) {
         title: chapters.title,
         pageStart: chapters.pageStart,
         pageEnd: chapters.pageEnd,
+        rawText: chapters.rawText,
+        sourceBlocks: chapters.sourceBlocks,
+        sourceFileIndex: chapters.sourceFileIndex,
+        source: chapters.source,
       })
       .from(chapters)
-      .where(eq(chapters.bookId, bookId));
+      .where(eq(chapters.bookId, bookId))
+      .orderBy(asc(chapters.index));
 
     const oldSignature = allChapters
       .map((c) => `${c.title}|${c.pageStart ?? ""}|${c.pageEnd ?? ""}`)
       .join("\n");
 
-    const bookAssemblies = await db
-      .select({ id: assemblies.id })
-      .from(assemblies)
-      .where(eq(assemblies.bookId, bookId));
-
-    const deletedAudioFiles = allChapters.filter((ch) => ch.audioPath).length;
-    await rm(bookOutputDir(bookId), { recursive: true, force: true }).catch(() => {});
-
-    await db.delete(assemblies).where(eq(assemblies.bookId, bookId));
-    await db.delete(documents).where(eq(documents.bookId, bookId));
-    const keptCount = await resetChaptersKeepingInserted(bookId);
-
-    await log("Re-detecting chapters from existing extraction output");
-    await log(
-      `Removed ${allChapters.length - keptCount} existing chapter${allChapters.length - keptCount === 1 ? "" : "s"}, ${bookAssemblies.length} assembl${bookAssemblies.length === 1 ? "y" : "ies"}, and ${deletedAudioFiles} chapter audio file${deletedAudioFiles === 1 ? "" : "s"}`
-    );
-    if (keptCount > 0) {
-      await log(`Kept ${keptCount} inserted chapter${keptCount === 1 ? "" : "s"} (moved to the front, audio reset)`);
-    }
+    await log("Re-detecting chapters from saved page extraction — no OCR or page transcription");
 
     const files = await db
       .select()
@@ -68,6 +56,7 @@ export async function redetect(payload: RedetectPayload) {
 
     let totalDetected = 0;
     let detectionMethod: typeof books.$inferSelect.chapterDetection = null;
+    const perFile: { fileIndex: number | null; detected: ExtractedChapter[] }[] = [];
 
     if (files.length === 0) {
       // Legacy single-file book
@@ -78,10 +67,9 @@ export async function redetect(payload: RedetectPayload) {
       });
       totalDetected = detected.length;
       detectionMethod = method;
-      await insertSuspendedChapters(bookId, detected, keptCount, null);
+      perFile.push({ fileIndex: null, detected });
     } else {
       // Multi-file book: re-detect per file
-      let chapterOffset = keptCount;
       for (const file of files) {
         const fileTmpDir = path.join(bookTmpDir(bookId), `file_${file.index}`);
         try {
@@ -89,19 +77,51 @@ export async function redetect(payload: RedetectPayload) {
             llmChapterDetection: book.llmChapterDetection,
             chapterModel: book.chapterModel ?? undefined,
           });
-          await insertSuspendedChapters(bookId, detected, chapterOffset, file.index);
-          chapterOffset += detected.length;
+          if (detected.length === 0) throw new Error("No chapters detected from existing extraction output");
+          perFile.push({ fileIndex: file.index, detected });
           totalDetected += detected.length;
           detectionMethod = method;
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
-          await log(`Re-detection failed for "${file.filename}": ${message}`);
+          throw new Error(`Re-detection failed for "${file.filename}": ${message}`, { cause: err });
         }
       }
     }
 
     if (totalDetected === 0) {
       throw new Error("No chapters detected from existing extraction output");
+    }
+
+    const extracted = allChapters.filter((chapter) => !chapter.source);
+    const proposed = perFile.flatMap(({ fileIndex, detected }) => detected.map((chapter) => ({ ...chapter, fileIndex })));
+    const unchanged = extracted.length === proposed.length && extracted.every((chapter, i) => {
+      const replacement = proposed[i];
+      return replacement && chapter.sourceFileIndex === replacement.fileIndex
+        && chapter.title === replacement.title && chapter.rawText === replacement.text
+        && chapter.pageStart === replacement.pageStart && chapter.pageEnd === replacement.pageEnd
+        && isDeepStrictEqual(chapter.sourceBlocks, replacement.sourceBlocks);
+    });
+    if (unchanged) {
+      await db.update(books).set({ chapterDetection: detectionMethod, status: "pending", updatedAt: new Date() }).where(eq(books.id, bookId));
+      await log("Chapter text and source mappings are unchanged — kept existing chapters, edits, translations, audio, and exports");
+      return;
+    }
+
+    // Validate every source before replacing chapters; a missing later file must not erase earlier work.
+    const bookAssemblies = await db.select({ id: assemblies.id }).from(assemblies).where(eq(assemblies.bookId, bookId));
+    const deletedAudioFiles = allChapters.filter((ch) => ch.audioPath).length;
+    await rm(bookOutputDir(bookId), { recursive: true, force: true }).catch(() => {});
+    await db.delete(assemblies).where(eq(assemblies.bookId, bookId));
+    await db.delete(documents).where(eq(documents.bookId, bookId));
+    const keptCount = await resetChaptersKeepingInserted(bookId);
+    await log(
+      `Removed ${allChapters.length - keptCount} existing chapter${allChapters.length - keptCount === 1 ? "" : "s"}, ${bookAssemblies.length} assembl${bookAssemblies.length === 1 ? "y" : "ies"}, and ${deletedAudioFiles} chapter audio file${deletedAudioFiles === 1 ? "" : "s"}`
+    );
+    if (keptCount > 0) await log(`Kept ${keptCount} inserted chapter${keptCount === 1 ? "" : "s"} (moved to the front, audio reset)`);
+    let chapterOffset = keptCount;
+    for (const { fileIndex, detected } of perFile) {
+      await insertSuspendedChapters(bookId, detected, chapterOffset, fileIndex);
+      chapterOffset += detected.length;
     }
 
     await log(`Detected ${totalDetected} chapters (${detectionMethod})`);
@@ -126,7 +146,7 @@ export async function redetect(payload: RedetectPayload) {
 
     await db
       .update(books)
-      .set({ totalChapters: keptCount + totalDetected, chapterDetection: detectionMethod, status: "pending", updatedAt: new Date() })
+      .set({ totalChapters: keptCount + totalDetected, chapterDetection: detectionMethod, status: "pending", outputPath: null, updatedAt: new Date() })
       .where(eq(books.id, bookId));
     await queueIndexBook(bookId);
   } catch (err) {

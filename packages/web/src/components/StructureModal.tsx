@@ -199,7 +199,7 @@ export function StructureModal({
       confirmMutation.mutate({ id: bookId });
       return;
     }
-    if (!confirm(`Re-slice the book into ${boundaries.length} chapters? Existing chapters, audio, and assemblies will be deleted.`)) return;
+    if (!confirm(`Rebuild chapters at ${boundaries.length} boundaries using the saved page extraction? OCR, AI page readings, and searchable PDFs are kept. Existing extracted chapters, text edits, translations, audio, and assemblies will be replaced.`)) return;
     applyMutation.mutate({ id: bookId, boundaries });
   }
 

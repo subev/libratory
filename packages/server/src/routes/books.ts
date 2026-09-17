@@ -769,7 +769,6 @@ export const booksRouter = router({
       const updates: Record<string, unknown> = {
         status: "extracting",
         error: null,
-        outputPath: null,
         updatedAt: new Date(),
       };
       if (input.ocrEngine !== undefined) updates.ocrEngine = input.ocrEngine;

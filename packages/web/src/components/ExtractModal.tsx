@@ -30,7 +30,7 @@ const SCOPES: { id: ExtractScope; label: string; detail: string }[] = [
   {
     id: "chapters",
     label: "Chapter boundaries only",
-    detail: "Re-splits text that's already extracted — no OCR — but still replaces the chapters, so audio and edits go with them.",
+    detail: "Uses saved page extraction without OCR or AI page reading. Identical results keep existing work. A changed result rebuilds all extracted chapters, replacing their edits, translations and audio.",
   },
 ];
 
@@ -91,8 +91,7 @@ export function ExtractModal({
   const [scope, setScope] = useState<ExtractScope>(() =>
     selectedCount > 0 ? "selected" : hasChapters ? "chapters" : "selected",
   );
-  // Every scope replaces chapters — and with them any edits, audio and assemblies. Spelling the
-  // count out and requiring a tick is the difference between reading a warning and acting on it.
+  // Re-detection can keep an identical result, but any changed result still needs consent to replace chapters.
   const losing = scope === "selected" ? chaptersForSelected : chaptersTotal;
   // The tick is against one scope's count, so changing the scope withdraws it
   const [confirmedScope, setConfirmedScope] = useState<ExtractScope | null>(null);
@@ -251,7 +250,7 @@ export function ExtractModal({
             data-testid="extract-confirm"
           />
           <span>
-            This replaces <strong>{losing} chapter{losing === 1 ? "" : "s"}</strong>, along with their synthesized
+            {scope === "chapters" ? "If the result changes, this replaces " : "This replaces "}<strong>{losing} chapter{losing === 1 ? "" : "s"}</strong>, along with their synthesized
             audio and any text you've edited. It can't be undone.
           </span>
         </label>
