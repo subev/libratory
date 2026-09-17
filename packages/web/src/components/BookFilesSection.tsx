@@ -259,6 +259,18 @@ export function BookFilesSection({
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      href={`/pdf/${file.id}`}
+                      download={`${file.filename.replace(/\.pdf$/i, "")}.ocr.pdf`}
+                      disabled={!file.hasSearchablePdf}
+                      title={file.hasSearchablePdf
+                        ? "Save the scanned pages with selectable text. Chapter structure and read-along data are not included."
+                        : "Available after a searchable PDF has been produced"}
+                    >
+                      Download searchable PDF
+                    </Button>
                     {/* Cancelling acts on a running job, not on the file — with no job there is
                         nothing to disable, so this one appears rather than greying out. */}
                     {(file.status === "extracting" || file.status === "pending") && (
