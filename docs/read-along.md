@@ -132,6 +132,35 @@ the voice is measured to the word and the page cannot show it. Give the same sca
 then reads the searchable copy Tesseract wrote. The reverse is just as common: a born-digital book
 narrated by the Bulgarian MLX narrator is `chunk` and `word`.
 
+### `text` and `range`
+
+Optional, and present together. A chapter whose text is still what extraction produced, and whose
+blocks were typed when they were read, carries that text with its structure:
+
+```jsonc
+{
+  "text": { "format": "p2af/1",
+            "text": "Such a study\nwould indeed\n\n1 A note.",
+            "blocks": [ { "start": 0,  "end": 25, "kind": "verse" },
+                        { "start": 27, "end": 36, "kind": "footnote" } ] },
+  "cues": [ { "range": [0, 25], "t": [0, 4210], "s": "Such a study would indeed", "c": 0 } ]
+}
+```
+
+- **`text.text`** is the chapter's text with its own line breaks: a single newline between the
+  lines of a verse, a blank line between blocks and between stanzas.
+- **`blocks`** are spans of it, in order and not overlapping. `kind` is one of `prose`, `verse`,
+  `heading`, `list`, `footnote`, `metadata`, `furniture`; a reader should treat a kind it does not
+  know as `prose`. `breakBefore: "line"` marks a verse block that continues the one before it.
+- **`range`** is `[start, end]` of the cue inside `text.text`. The cue is placed there by its
+  characters with all whitespace ignored, so `s` and the slice differ in whitespace and in nothing
+  else — which is how a word of `w`, found in `s`, can be carried across to the slice.
+- Offsets are UTF-16 code units, as a JavaScript string counts them.
+
+A reader that shows the reflowed text draws `text.text` and marks each cue at its `range`; one that
+ignores both fields joins the cues' `s` as before and loses only the line breaks. An edited chapter,
+or one read before blocks were typed, carries neither.
+
 ## Replacing incorrect imported OCR
 
 In **Source files → Extract → Selected files**, enable **Ignore existing PDF text and run OCR
