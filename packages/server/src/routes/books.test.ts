@@ -205,6 +205,7 @@ describe("booksRouter.applyChapterBoundaries", () => {
     expect(updated.totalChapters).toBe(2);
     expect(updated.chapterProposal).toBeNull();
     expect(updated.status).toBe("pending");
+    expect(mockQuickAddJob).toHaveBeenCalledWith(expect.any(Object), "indexBook", { bookId }, expect.objectContaining({ maxAttempts: 1, jobKey: `index:${bookId}` }));
   });
 
   it("applies proposal title overrides to the sliced chapters", async () => {
@@ -238,6 +239,7 @@ describe("booksRouter.applyChapterBoundaries", () => {
     const chs = await db.select().from(chapters).where(eq(chapters.bookId, bookId));
     expect(chs).toHaveLength(1);
     expect(chs[0]?.title).toBe("Chapter 1 Beginning");
+    expect(mockQuickAddJob).not.toHaveBeenCalled();
   });
 });
 

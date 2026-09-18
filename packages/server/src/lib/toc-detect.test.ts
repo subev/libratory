@@ -15,6 +15,7 @@ import {
   detectChaptersWithLlm,
   layoutText,
   mergePageTexts,
+  mergeHeadingOnlyStarts,
   parseResolveResponse,
   parseSelectionResponse,
   parseTierResponse,
@@ -304,7 +305,7 @@ describe("detectChaptersWithLlm", () => {
   ];
   const notFound = '{"found": false, "tocPages": [], "entries": []}';
 
-  it("runs toc and tier calls per file, placing chapters without asking when titles match", async () => {
+  it("places chapters from the contents without asking when titles match", async () => {
     mockChat
       .mockResolvedValueOnce('{"found": true, "tocPages": [2], "entries": [{"title": "Chapter 1", "page": 5, "level": 0}, {"title": "Chapter 2", "page": 9, "level": 0}]}')
       .mockResolvedValueOnce('{"chapters": [{"i": 0, "title": "Chapter One"}, {"i": 1, "title": "Chapter Two"}]}');
@@ -404,41 +405,79 @@ describe("detectChaptersWithLlm", () => {
 
     const result = await detectChaptersWithLlm([{ fileIndex: null, blocks }], noopLog);
     expect(result?.selected.get(null)?.map((s) => s.blockIndex)).toEqual([1, 3]);
-    expect(result?.toc[0]?.chapterEntries).toBe(0);
+    expect(result?.toc[0]?.chapterEntries).toBe(2);
     expect(mockChat.mock.calls[2]?.[1]).toContain("TABLE OF CONTENTS");
   });
 
-  it("records the table of contents only for files whose selection was kept", async () => {
-    const big = Array.from({ length: 25 }, (_, i) => heading(`H${i}`, i + 1));
+  it("uses the final PDF's contents to place chapters across nonsequential file indices", async () => {
     mockChat
       .mockResolvedValueOnce(notFound)
-      .mockResolvedValueOnce('{"ids": ["h_0001", "h_0003"]}')
-      .mockResolvedValueOnce('{"found": true, "tocPages": [], "entries": [{"title": "Chapter 1", "page": 5}, {"title": "Chapter 2", "page": 9}]}')
-      .mockResolvedValueOnce('{"chapters": []}')
-      .mockResolvedValueOnce(JSON.stringify({ ids: big.map((_, i) => `h_${String(i).padStart(4, "0")}`) }));
-
-    const result = await detectChaptersWithLlm([{ fileIndex: 0, blocks }, { fileIndex: 1, blocks: big }], noopLog);
-
-    expect(result?.selected.has(1)).toBe(false);
-    expect(result?.toc).toEqual([]);
+      .mockResolvedValueOnce('{"found":true,"tocPages":[29,30],"entries":[{"title":"Chapter 1","page":1},{"title":"Chapter 2","page":21}]}')
+      .mockResolvedValueOnce('{"chapters":[{"i":0,"title":"One"},{"i":1,"title":"Two"}]}');
+    const result = await detectChaptersWithLlm([
+      { fileIndex: 7, blocks: [heading("Chapter 1", 1), block({ text: "first file ends", page: 20 })] },
+      { fileIndex: 3, blocks: [heading("Chapter 2", 1), block({ text: "NOT A SAMPLE", page: 5 }), block({ text: "Contents start", page: 9 }), block({ text: "Contents end", page: 10 })] },
+    ], noopLog);
+    expect(mockChat).toHaveBeenCalledTimes(3);
+    expect(mockChat.mock.calls[0]?.[1]).not.toContain("Contents end");
+    expect(mockChat.mock.calls[1]?.[1]).toContain("p29:\nContents start");
+    expect(mockChat.mock.calls[1]?.[1]).not.toContain("NOT A SAMPLE");
+    expect(result?.selected.get(7)).toEqual([{ blockIndex: 0, title: "One", titleTranslated: null }]);
+    expect(result?.selected.get(3)).toEqual([{ blockIndex: 0, title: "Two", titleTranslated: null }]);
+    expect(result?.toc[0]).toMatchObject({ fileIndex: 3, pages: [9, 10], chapterEntries: 2 });
   });
 
-  it("runs a toc call per file and aggregates selections", async () => {
+  it("reads the continuation when front contents reaches page 15", async () => {
+    mockChat
+      .mockResolvedValueOnce('{"found":true,"tocPages":[15],"entries":[{"title":"Chapter 1","page":20},{"title":"Chapter 2","page":30}]}')
+      .mockResolvedValueOnce('{"found":true,"tocPages":[15,16],"entries":[{"title":"Chapter 1","page":20},{"title":"Chapter 2","page":30},{"title":"Chapter 3","page":40}]}')
+      .mockResolvedValueOnce('{"chapters":[{"i":0,"title":"Chapter 1"},{"i":1,"title":"Chapter 2"},{"i":2,"title":"Chapter 3"}]}');
+    const result = await detectChaptersWithLlm([{fileIndex:0,blocks:[...Array.from({ length: 14 }, (_, i) => block({ text: "Dense introduction. ".repeat(400), page: i + 1 })),block({text:"Contents",page:15}),block({text:"Third entry",page:16}),heading("Chapter 1",20),block({text:"one",page:20}),heading("Chapter 2",30),block({text:"two",page:30}),heading("Chapter 3",40)]}],noopLog);
+    expect(mockChat.mock.calls[0]?.[1]).toContain("p15:\nContents");
+    expect(mockChat.mock.calls[1]?.[1]).toContain("p16:\nThird entry");
+    expect(result?.selected.get(0)).toHaveLength(3);
+    expect(result?.toc[0]?.pages).toEqual([15,16]);
+  });
+
+  it("extends backwards when contents touches the edge, keeping its earlier entries", async () => {
     mockChat
       .mockResolvedValueOnce(notFound)
-      .mockResolvedValueOnce('{"ids": ["h_0001"]}')
-      .mockResolvedValueOnce(notFound)
-      .mockResolvedValueOnce('{"ids": ["h_0000"]}');
-
-    const result = await detectChaptersWithLlm(
-      [
-        { fileIndex: 0, blocks },
-        { fileIndex: 1, blocks: [heading("Part II", 1)] },
-      ],
-      noopLog
-    );
+      .mockResolvedValueOnce('{"found":true,"tocPages":[28,29],"entries":[{"title":"Chapter 2","page":5},{"title":"Chapter 3","page":9}]}')
+      .mockResolvedValueOnce('{"found":true,"tocPages":[27,28,29],"entries":[{"title":"Chapter 1","page":1},{"title":"Chapter 2","page":5},{"title":"Chapter 3","page":9}]}')
+      .mockResolvedValueOnce('{"chapters":[{"i":0,"title":"Chapter 1"},{"i":1,"title":"Chapter 2"},{"i":2,"title":"Chapter 3"}]}');
+    const result = await detectChaptersWithLlm([{ fileIndex: 0, blocks: [heading("Chapter 1",1),block({ text:"one",page:1 }),heading("Chapter 2",5),block({ text:"two",page:5 }),heading("Chapter 3",9),block({text:"Beginning of contents",page:27}),block({text:"End",page:30})] }], noopLog);
+    expect(result?.selected.get(0)).toHaveLength(3);
     expect(mockChat).toHaveBeenCalledTimes(4);
-    expect(result?.selected.get(0)).toEqual([{ blockIndex: 1, title: null, titleTranslated: null }]);
-    expect(result?.selected.get(1)).toEqual([{ blockIndex: 0, title: null, titleTranslated: null }]);
+    expect(mockChat.mock.calls[2]?.[1]).toContain("p27:\nBeginning of contents");
+  });
+
+  it("keeps headings near the end of a large book available for local matching", () => {
+    const many = Array.from({ length: 1600 }, (_, i) => heading(`Chapter ${i}`, i + 1));
+    expect(buildHeadingCatalog(many).at(-1)?.text).toBe("Chapter 1599");
+  });
+
+  it("uses one combined heading catalog when a short book has no contents", async () => {
+    mockChat.mockResolvedValueOnce(notFound).mockResolvedValueOnce('{"ids":["h_0001","h_0004"]}');
+    const result = await detectChaptersWithLlm([
+      { fileIndex: 0, blocks },
+      { fileIndex: 1, blocks: [heading("Part II", 1)] },
+    ], noopLog);
+    expect(mockChat).toHaveBeenCalledTimes(2);
+    expect(result?.selected.get(0)?.[0]?.blockIndex).toBe(1);
+    expect(result?.selected.get(1)?.[0]?.blockIndex).toBe(0);
+    expect(mockChat.mock.calls[1]?.[1]).toContain('h_0004 p10');
+  });
+});
+
+describe("mergeHeadingOnlyStarts", () => {
+  it("keeps grouping text with the first actual chapter without an empty chapter", () => {
+    const blocks = [heading("Part",1), block({text:"1",type:"PageHeader",included:false}), heading("Chapter",2), block({text:"body",page:2}), heading("Next",3)];
+    const result = mergeHeadingOnlyStarts(blocks, [{blockIndex:0,title:"Part",titleTranslated:null},{blockIndex:2,title:"Chapter",titleTranslated:"Translated"},{blockIndex:4,title:"Next",titleTranslated:null}]);
+    expect(result).toEqual([{blockIndex:0,title:"Chapter",titleTranslated:"Translated"},{blockIndex:4,title:"Next",titleTranslated:null}]);
+  });
+  it("keeps genuinely short chapters and parent introductions that have body text", () => {
+    const blocks = [heading("One",1),block({text:"A very short poem."}),heading("Two",1),block({text:"An introduction."}),heading("Three",2)];
+    const selections = [0,2,4].map((blockIndex) => ({blockIndex,title:null,titleTranslated:null}));
+    expect(mergeHeadingOnlyStarts(blocks,selections)).toEqual(selections);
   });
 });

@@ -64,4 +64,20 @@ describe("searchLibrary (keyword mode, real Postgres)", () => {
     expect(result.hits).toHaveLength(1);
     expect(result.hits[0]?.bookId).toBe(target);
   });
+  it("returns eight distinct passages from one file when the book is explicitly scoped", async () => {
+    const bookId = await insertBookWithChunk("Binary trees explained for interviews.");
+    const [first] = await getDb().select().from(bookChunks);
+    if (!first) throw new Error("Missing fixture chunk");
+    await getDb().insert(bookChunks).values(Array.from({ length: 7 }, (_, i) => ({
+      bookId, profileId: DEFAULT_PROFILE_ID, source: "raw" as const, bookFileId: first.bookFileId,
+      seq: i + 1, text: `Binary trees passage ${i + 1}.`, charStart: (i + 1) * 100,
+      charEnd: (i + 1) * 100 + 40, pageStart: i + 2, pageEnd: i + 2, sourceHash: "hash",
+    })));
+    const scoped = await searchLibrary({ profileId: DEFAULT_PROFILE_ID, bookId, query: "binary", limit: 8, mode: "keyword" });
+    expect(scoped.hits).toHaveLength(8);
+    expect(scoped.hits.every((hit) => hit.bookId === bookId)).toBe(true);
+    const library = await searchLibrary({ profileId: DEFAULT_PROFILE_ID, query: "binary", limit: 8, mode: "keyword" });
+    expect(library.hits).toHaveLength(2);
+  });
+
 });

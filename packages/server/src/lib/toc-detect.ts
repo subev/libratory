@@ -28,7 +28,6 @@ type ChosenEntry = { i: number; title: string; translated: string | null };
 const WINDOW_PAGES = 15;
 const MAX_PAGE_CHARS = 6000;
 const MAX_WINDOW_CHARS = 60_000;
-const MAX_CATALOG_ENTRIES = 1500;
 const MAX_TOC_ENTRIES = 400;
 const MIN_TOC_ENTRIES = 2;
 
@@ -108,22 +107,12 @@ export function mergePageTexts(
   return parts.join("\n\n");
 }
 
-async function buildTocWindowText(window: PageWindow, pdfPath: string | undefined): Promise<string> {
-  if (!pdfPath) return window.text;
-  const layerByPage = new Map<number, string>();
-  for (const { page } of window.entries) {
-    const layer = await readPdfPageText(pdfPath, page);
-    if (layer) layerByPage.set(page, layer);
-  }
-  return mergePageTexts(window.entries, layerByPage);
-}
 
 export function buildHeadingCatalog(blocks: FlatBlock[], excludePages: Set<number> = new Set()): HeadingCatalogEntry[] {
   const cum = cumulativeWords(blocks);
   const catalog: HeadingCatalogEntry[] = [];
   for (const [i, b] of blocks.entries()) {
     if (!b.included || b.type !== "SectionHeader" || excludePages.has(b.page)) continue;
-    if (catalog.length >= MAX_CATALOG_ENTRIES) break;
     catalog.push({
       id: `h_${String(i).padStart(4, "0")}`,
       blockIndex: i,
@@ -152,7 +141,7 @@ export function buildTocPrompt(frontText: string, backText: string): { system: s
       'Find the printed table of contents: a list of chapter or section titles, usually with page numbers, often titled "Contents", "Table of Contents", "Оглавление", "Съдържание", or similar. It may span several pages and may be at the front or the back of the book.',
       "Return JSON only, in this shape:",
       '{"found": true, "tocPages": [PDF page numbers the table of contents appears on], "entries": [{"title": "entry title as printed", "page": printed page number or null, "level": indentation depth}]}',
-      "level is the indentation depth as printed: 0 for the least indented entries, 1 for entries indented under them, and so on. An entry wrapped over two lines is one entry; its continuation line is indented further and usually carries the page number. Use null when a page number is missing or unreadable (roman numerals too). List entries in printed order; do not include running heads or the word Contents itself.",
+      "level is the indentation depth as printed: 0 for the least indented entries, 1 for entries indented under them, and so on. An entry wrapped over two lines is one entry; its continuation line is indented further and usually carries the page number. Use null when a page number is missing or unreadable (roman numerals too). List entries in printed order; do not include running heads, author/editor/compiler credits, explanatory notes, or the word Contents itself.",
       'If there is no table of contents, return {"found": false, "tocPages": [], "entries": []}.',
       `FRONT PAGES:\n${frontText}`,
       `BACK PAGES:\n${backText}`,
@@ -160,17 +149,19 @@ export function buildTocPrompt(frontText: string, backText: string): { system: s
   };
 }
 
-export function buildTierPrompt(toc: TocResult, opts: { translateTo?: string } = {}): { system: string; user: string } {
+export function buildTierPrompt(toc: TocResult, opts: { translateTo?: string; totalPages?: number; totalWords?: number } = {}): { system: string; user: string } {
   const lines = toc.entries.slice(0, MAX_TOC_ENTRIES).map((e, i) => `[${i}] L${e.level ?? "?"} "${e.title}"${e.page !== null ? ` p${e.page}` : ""}`);
   return {
     system: "You decide which table-of-contents entries of a book become audiobook chapters.",
     user: [
+      ...(opts.totalPages ? [`The whole book has ${opts.totalPages} PDF pages and approximately ${opts.totalWords ?? "unknown"} words. PDF file boundaries are not chapter boundaries.`] : []),
       "TABLE OF CONTENTS as extracted from the book (L = indentation level, p = printed page; titles may contain OCR errors):\n" + lines.join("\n"),
       [
         "Rules:",
         "- A chapter is a unit a listener would navigate to in an audiobook. Usually one level of the table of contents is the chapter level; use that level consistently through the whole book.",
         "- Parts, books and volumes are grouping labels: when a part contains chapters, select the chapters, not the part. Select a part heading only when it has no chapters of its own.",
-        "- In collections (tales, stories, essays, letters, poems), each piece is its own chapter.",
+        "- Follow the printed contents hierarchy. In collections, select individual pieces only when the contents presents them as chapter-level entries. A category covering many numbered songs, poems, or tales is one chapter when that is how the contents organizes the book; do not expand number ranges into individual chapters.",
+        "- Use gaps between printed start pages to judge section lengths relative to the whole book and its typical chapters. Avoid tiny standalone grouping labels immediately followed by their first child, duplicate starts, and isolated fragments. Genuine short chapters explicitly listed in the contents are valid; do not force uniform lengths or invent a fixed duration target.",
         "- Do NOT select sections inside a chapter, even when they have their own page numbers.",
         "- Also select substantial front and back matter a listener would want as its own chapter (introduction, preface, prologue, epilogue, afterword, appendices with prose). Do not select the index, bibliography, notes, or the table of contents itself.",
         "- For each selected entry, give a clean, readable title: fix OCR artifacts, broken spacing, and casing. Keep the book's original language — do not translate the title.",
@@ -217,7 +208,8 @@ export function buildSelectionPrompt(
       [
         "Rules:",
         "- A chapter is a unit a listener would navigate to in an audiobook. Aim for one selected heading per chapter-like table-of-contents entry.",
-        "- In collections (tales, stories, essays, letters), EACH numbered story or piece is its own chapter. Parts and volumes are grouping labels: when a part contains chapters, select the chapters, not just the part heading.",
+        "- When a table of contents exists, preserve its chapter-level granularity: a heading for a category of songs or tales need not become hundreds of numbered-piece chapters. Without contents, infer a consistent chapter level from the heading hierarchy and relative section lengths.",
+        "- Avoid duplicate starts and tiny standalone grouping labels. The +Nw value runs only to the next heading, which may be a subsection; assess chapter length through the next selected chapter. Keep genuine short chapters supported by the contents rather than imposing a fixed length.",
         "- Also select significant front/back matter (introduction, preface, epilogue, acknowledgments) when the table of contents lists it.",
         '- Do NOT select subsections inside a chapter, sub-questions, exercises, or repeated in-chapter headings (e.g. "Practice Questions", "Answers").',
         "- The +Nw figure is how many words follow a heading before the next heading. A chapter start is normally followed by substantial text; a heading followed by a handful of words is usually a label, a running head, or a part-title page.",
@@ -379,9 +371,10 @@ async function selectFromToc(
   log: LogFn,
   where: string,
   chatOpts: LlmChatOptions,
-  translateTo: string | undefined
+  translateTo: string | undefined,
+  size: { totalPages: number; totalWords: number }
 ): Promise<{ selections: HeadingSelection[]; chapterEntries: number; offsets: string | null } | null> {
-  const tierPrompt = buildTierPrompt(toc, { translateTo });
+  const tierPrompt = buildTierPrompt(toc, { translateTo, ...size });
   const chosen = parseTierResponse(await llmChat(tierPrompt.system, tierPrompt.user, chatOpts), toc);
   if (chosen.length === 0) {
     await log(`[AI] Could not tell chapters from sections in the table of contents${where}, selecting from headings instead`);
@@ -433,91 +426,167 @@ async function selectFromToc(
   };
 }
 
+export function mergeHeadingOnlyStarts(blocks: FlatBlock[], selections: HeadingSelection[]): HeadingSelection[] {
+  const merged: HeadingSelection[] = [];
+  for (const selection of [...selections].sort((a, b) => a.blockIndex - b.blockIndex)) {
+    const previous = merged.at(-1);
+    const between = previous ? blocks.slice(previous.blockIndex, selection.blockIndex) : [];
+    if (previous && between.length > 0 && between.every((b) => !b.included || !b.text.trim() || b.type === "SectionHeader")) {
+      merged[merged.length - 1] = { ...selection, blockIndex: previous.blockIndex };
+    } else {
+      merged.push(selection);
+    }
+  }
+  return merged;
+}
+
+type SourcePage = { fileIndex: number | null; page: number; pdfPath?: string };
+
+type CombinedBook = {
+  blocks: FlatBlock[];
+  origins: { fileIndex: number | null; blockIndex: number }[];
+  pages: Map<number, SourcePage>;
+};
+
+async function combineBook(files: SourceBlocks[]): Promise<CombinedBook> {
+  const blocks: FlatBlock[] = [];
+  const origins: CombinedBook["origins"] = [];
+  const pages: CombinedBook["pages"] = new Map();
+  let offset = 0;
+  for (const file of files) {
+    let pageCount = Math.max(0, ...file.blocks.map((b) => b.page));
+    if (file.pdfPath) {
+      try {
+        const { stdout } = await execFileAsync("pdfinfo", [file.pdfPath], { timeout: 15_000 });
+        const count = Number(stdout.match(/^Pages:\s+(\d+)/m)?.[1]);
+        if (Number.isInteger(count) && count > 0) pageCount = Math.max(pageCount, count);
+      } catch {
+        // Extracted page positions remain usable when the source PDF is unavailable.
+      }
+    }
+    for (let page = 1; page <= pageCount; page++) {
+      pages.set(offset + page, { fileIndex: file.fileIndex, page, pdfPath: file.pdfPath });
+    }
+    for (const [blockIndex, block] of file.blocks.entries()) {
+      blocks.push({ ...block, page: offset + block.page });
+      origins.push({ fileIndex: file.fileIndex, blockIndex });
+    }
+    offset += pageCount;
+  }
+  return { blocks, origins, pages };
+}
+
+async function findBookToc(book: CombinedBook, log: LogFn, chatOpts: LlmChatOptions): Promise<TocResult | null> {
+  const totalPages = book.pages.size;
+  const pageText = new Map<number, string[]>();
+  for (const block of book.blocks) {
+    const texts = pageText.get(block.page) ?? [];
+    texts.push(block.text);
+    pageText.set(block.page, texts);
+  }
+  const loaded = new Map<number, string>();
+  const readWindow = async (pages: number[]) => {
+    for (const page of pages) {
+      if (loaded.has(page)) continue;
+      const text = (pageText.get(page) ?? []).join("\n");
+      const source = book.pages.get(page);
+      const layer = source?.pdfPath ? await readPdfPageText(source.pdfPath, source.page) : null;
+      const dense = (s: string) => s.replace(/\s+/g, "").length;
+      loaded.set(page, ((layer && dense(layer) > dense(text)) ? layer : text).slice(0, MAX_PAGE_CHARS));
+    }
+    const pageBudget = Math.min(MAX_PAGE_CHARS, Math.floor(MAX_WINDOW_CHARS / Math.max(1, pages.length)) - 20);
+    return mergePageTexts(pages.map((page) => ({ page, text: (loaded.get(page) ?? "").slice(0, pageBudget) })), new Map());
+  };
+  const frontPages = Array.from({ length: Math.min(WINDOW_PAGES, totalPages) }, (_, i) => i + 1);
+  const search = async (pages: number[], side: "front" | "back") => {
+    const text = await readWindow(pages);
+    await log(`[AI] Looking for the book's contents in ${side} pages ${pages[0]}–${pages.at(-1)} (${text.length.toLocaleString()} characters)`);
+    const prompt = buildTocPrompt(side === "front" ? text : "", side === "back" ? text : "");
+    const toc = parseTocResponse(await llmChat(prompt.system, prompt.user, chatOpts));
+    if (!toc) throw new Error("Table-of-contents response was not valid JSON");
+    return { ...toc, tocPages: toc.tocPages.filter((page) => pages.includes(page)) };
+  };
+  let found: TocResult | null = null;
+  try {
+    let front = await search(frontPages, "front");
+    if (front.found && front.entries.length >= MIN_TOC_ENTRIES) {
+      let end = frontPages.at(-1) ?? 0;
+      const start = Math.min(...front.tocPages, end);
+      const maximum = Math.min(totalPages, end + WINDOW_PAGES);
+      while (front.tocPages.includes(end) && end < totalPages) {
+        if (end >= maximum) throw new Error("Front contents continues beyond the search allowance; refusing a partial contents list");
+        end = Math.min(end + 3, maximum);
+        front = await search(Array.from({ length: end - start + 1 }, (_, i) => start + i), "front");
+        if (!front.found || front.entries.length < MIN_TOC_ENTRIES) throw new Error("Could not confirm the complete front contents list");
+      }
+      return front;
+    }
+    const remaining = Math.min(WINDOW_PAGES, totalPages - frontPages.length);
+    for (let count = Math.min(3, remaining); count > 0; count = Math.min(count + 3, remaining)) {
+      const pages = Array.from({ length: count }, (_, i) => totalPages - count + i + 1);
+      const back = await search(pages, "back");
+      if (back.found && back.entries.length >= MIN_TOC_ENTRIES) {
+        found = back;
+        // A contents page at the window edge may continue onto the preceding page.
+        if (!back.tocPages.includes(pages[0] ?? 0)) return back;
+      }
+      if (count === remaining) break;
+    }
+  } catch (err) {
+    await log(`[AI] Contents search stopped: ${describeError(err)}`);
+  }
+  return found;
+}
+
 export async function detectChaptersWithLlm(
   files: SourceBlocks[],
   log: LogFn,
   opts: { translateTo?: string; model?: string } = {}
 ): Promise<LlmDetection | null> {
   const chatOpts: LlmChatOptions = { ...CHAT_OPTS, model: opts.model };
-  const selected = new Map<number | null, HeadingSelection[]>();
-  const tocs: ChapterProposalToc[] = [];
-  let total = 0;
-  let lastError: unknown = null;
-
-  // Each file is typically its own volume with its own printed TOC
-  for (const { fileIndex, blocks, pdfPath } of files) {
-    const where = files.length > 1 ? ` in file ${fileIndex ?? 0}` : "";
-    const front = buildPageWindow(blocks, "head");
-    const back = buildPageWindow(blocks, "tail");
-    await log(`[AI] Reading the first/last pages${where} to find a table of contents (takes a minute or two)...`);
-    const tocPrompt = buildTocPrompt(
-      await buildTocWindowText(front, pdfPath),
-      await buildTocWindowText(back, pdfPath)
-    );
-
-    // TOC evidence is best-effort — a failed call degrades to headings-alone selection
-    let toc: TocResult | null = null;
-    let tocCallError: string | null = null;
-    try {
-      toc = parseTocResponse(await llmChat(tocPrompt.system, tocPrompt.user, chatOpts));
-    } catch (err) {
-      tocCallError = describeError(err);
-    }
-
-    if (toc?.found) {
-      await log(`[AI] Found table of contents on page(s) ${toc.tocPages.join(", ") || "?"}${where}: ${toc.entries.length} entries`);
-    } else if (tocCallError) {
-      await log(`[AI] Table-of-contents call failed${where} (${tocCallError}), selecting from headings alone`);
-    } else if (toc === null) {
-      await log(`[AI] Table-of-contents response was not valid JSON${where}, selecting from headings alone`);
-    } else {
-      await log(`[AI] No table of contents found${where}, selecting from headings alone`);
-    }
-
-    const tocPageSet = new Set(toc?.tocPages ?? []);
-    const excludePages = new Set([...front.pages, ...back.pages].filter((p) => tocPageSet.has(p)));
-
-    const catalog = buildHeadingCatalog(blocks, excludePages);
-    if (catalog.length === 0) {
-      await log(`[AI] No headings${where}, skipping`);
-      continue;
-    }
-
-    const usableToc = toc?.found && toc.entries.length >= MIN_TOC_ENTRIES ? toc : null;
-    let selections: HeadingSelection[] | null = null;
-    let placement: { chapterEntries: number; offsets: string | null } | null = null;
-    try {
-      const guided = usableToc ? await selectFromToc(usableToc, catalog, log, where, chatOpts, opts.translateTo) : null;
-      if (guided && guided.selections.length >= 2) {
-        selections = guided.selections;
-        placement = guided;
-      } else {
-        if (guided) {
-          await log(`[AI] Only ${guided.selections.length} table-of-contents chapters could be placed${where}, selecting from headings instead`);
-        }
-        await log(`[AI] Choosing chapter starts among ${catalog.length} headings${where} (takes a few minutes)...`);
-        const prompt = buildSelectionPrompt(toc, catalog, { translateTo: opts.translateTo });
-        selections = parseSelectionResponse(await llmChat(prompt.system, prompt.user, chatOpts), catalog);
-      }
-    } catch (err) {
-      lastError = err;
-      await log(`[AI] Selection call failed${where}: ${describeError(err)}`);
-      continue;
-    }
-
-    if (selections === null) {
-      await log(`[AI] Selection covered nearly all ${catalog.length} headings${where}, treating as failure`);
-      continue;
-    }
-    await log(`[AI] Selected ${selections.length} of ${catalog.length} headings${where}`);
-    if (toc?.found) {
-      tocs.push({ fileIndex, pages: toc.tocPages, entries: toc.entries, chapterEntries: placement?.chapterEntries ?? 0, offsets: placement?.offsets ?? null });
-    }
-    selected.set(fileIndex, selections);
-    total += selections.length;
+  const book = await combineBook(files);
+  if (book.blocks.length === 0) return null;
+  await log(`[AI] Treating ${files.length} source file(s) as one book (${book.pages.size} pages)`);
+  const toc = await findBookToc(book, log, chatOpts);
+  await log(toc
+    ? `[AI] Found the book's contents on page(s) ${toc.tocPages.join(", ")}: ${toc.entries.length} entries`
+    : "[AI] No usable table of contents found; selecting from the book's combined headings");
+  const catalog = buildHeadingCatalog(book.blocks, new Set(toc?.tocPages ?? []));
+  if (catalog.length === 0) return null;
+  const guided = toc ? await selectFromToc(toc, catalog, log, " in the book", chatOpts, opts.translateTo, { totalPages: book.pages.size, totalWords: cumulativeWords(book.blocks).total }) : null;
+  let selections = guided?.selections ?? null;
+  if (!selections || selections.length < 2) {
+    await log(`[AI] Choosing chapter starts among ${catalog.length} headings across the whole book`);
+    const prompt = buildSelectionPrompt(toc, catalog, { translateTo: opts.translateTo });
+    selections = parseSelectionResponse(await llmChat(prompt.system, prompt.user, chatOpts), catalog);
   }
+  if (!selections || selections.length < 2) return null;
 
-  // A proposal with nothing but errors should fail visibly, not report "no chapters"
-  if (selected.size === 0 && lastError) throw lastError;
-  return total >= 2 ? { selected, toc: tocs } : null;
+  const merged = mergeHeadingOnlyStarts(book.blocks, selections);
+  if (merged.length !== selections.length) await log(`[AI] Folded ${selections.length - merged.length} title-only grouping labels into their following chapters`);
+  selections = merged;
+  const selected = new Map<number | null, HeadingSelection[]>();
+  for (const selection of selections) {
+    const origin = book.origins[selection.blockIndex];
+    if (!origin) continue;
+    const local = selected.get(origin.fileIndex) ?? [];
+    local.push({ ...selection, blockIndex: origin.blockIndex });
+    selected.set(origin.fileIndex, local);
+  }
+  const tocs: ChapterProposalToc[] = [];
+  if (toc) {
+    const sourcePages = new Map<number | null, number[]>();
+    for (const page of toc.tocPages) {
+      const source = book.pages.get(page);
+      if (!source) continue;
+      const pages = sourcePages.get(source.fileIndex) ?? [];
+      pages.push(source.page);
+      sourcePages.set(source.fileIndex, pages);
+    }
+    for (const [fileIndex, pages] of sourcePages) {
+      tocs.push({ fileIndex, pages, entries: toc.entries, chapterEntries: selections.length, offsets: guided?.offsets ?? null });
+    }
+  }
+  await log(`[AI] Selected ${selections.length} chapter starts from ${catalog.length} headings across the whole book`);
+  return { selected, toc: tocs };
 }

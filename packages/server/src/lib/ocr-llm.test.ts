@@ -1,5 +1,6 @@
 import { cleanText } from "./extracted-text.ts";
 import { STANDARD_EXTRACTION } from "./extraction-presets.ts";
+import { createRepairBudget, StageValidationError } from "./ocr-repair.ts";
 import { afterAll, describe, expect, it } from "vitest";
 import { copyFile, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { OrderedReadError } from "./ocr-line-order.ts";
@@ -241,7 +242,9 @@ w.write(sys.argv[2])
     const { mkdir, writeFile } = await import("node:fs/promises");
     await mkdir(outDir, { recursive: true });
     const saved = page([{ type: "heading", level: 1, text: "Chapter 1. The Voyage Begins" }, { type: "paragraph", text: "The ship left the harbor at dawn.", polygon: [1, 1, 2, 2] }]);
-    await writeFile(path.join(outDir, LLM_PAGES_FILE), JSON.stringify({ engine: "llm", model: "Saved model", pages: [saved] }));
+    const provenance = [{ model: "Saved model", settingsKey: "original", route: "standard" }];
+    const instructions = { original: STANDARD_EXTRACTION };
+    await writeFile(path.join(outDir, LLM_PAGES_FILE), JSON.stringify({ engine: "llm", model: "Saved model", provenance, instructions, pages: [saved] }));
     const layers: Parameters<TextLayerWriter>[0]["pages"][] = [];
     const stats = await replaceWords(
       { pdfPath: FIXTURE, outDir, outPdfPath: path.join(dir, "page.ocr.pdf"), language: "en", workDir: path.join(dir, "work"), log: async () => {} },
@@ -253,6 +256,7 @@ w.write(sys.argv[2])
     // The stale polygon is gone and the new one is in the page's points
     expect(blocks[1]?.polygon?.[0]?.[1]).toBeCloseTo(130 * 1754 / 1600, 3);
     expect(JSON.parse(await readFile(path.join(outDir, LLM_LAYOUT_META_FILE), "utf-8"))).toMatchObject({ model: "Saved model", placed: 1 });
+    expect(JSON.parse(await readFile(path.join(outDir, LLM_PAGES_FILE), "utf8"))).toMatchObject({ provenance, instructions });
   });
 
   it("keeps the previous PDF and layout when replacement writes an invalid copy", async () => {
@@ -318,7 +322,7 @@ describe("runLlmOcr", () => {
     await run(input);
     expect(calls).toBe(1);
     await run({ ...input, extractionSettings: { ...STANDARD_EXTRACTION, prompt: "Keep dialect spelling" } });
-    expect(calls).toBe(2);
+    expect(calls).toBe(1);
   });
 
   it("uses the ordered path and persists line groups for later geometry refresh", async () => {
@@ -554,7 +558,7 @@ describe("runLlmOcr", () => {
     expect((await collectBlocksFromMarkerOutput(outDir)).map((b) => b.page)).toEqual([1, 1, 2, 2]);
   });
 
-  it("finishes other ordered pages after a rejected response, then resumes only the rejected page", async () => {
+  it.each([false, true])("finishes other ordered pages after a rejected response, including empty=%s, then resumes only that page", async (empty) => {
     const dir = await scratch();
     const pdfPath = path.join(dir, "five.pdf");
     await promisify(execFile)("qpdf", ["--empty", "--pages", ...Array.from({ length: 5 }, () => [FIXTURE, "1"]).flat(), "--", pdfPath]);
@@ -574,7 +578,7 @@ describe("runLlmOcr", () => {
         const line = lines[0];
         if (!line) throw new Error("No line");
         calls.push(line.id);
-        if (fail && line.id === 1) throw new OrderedReadError("ordering", new Error("Missing line 1"), lines, { groups: [] }, '{"groups":[]}');
+        if (fail && line.id === 1) throw new OrderedReadError("ordering", empty ? new StageValidationError("Empty response", "", 100, 8192) : new Error("Missing line 1"), lines, { groups: [] }, empty ? "" : '{"groups":[]}');
         return { page: { blocks: [{ type: "paragraph", text: "Text" }], furniture: [], continues: false, lineGroups: [lines] }, restoredLineIds: [], inputTokens: 1, outputTokens: 1 };
       },
     });
@@ -590,6 +594,81 @@ describe("runLlmOcr", () => {
     await run(base);
     expect(calls).toEqual([1]);
     expect(await hasLlmLayout(outDir)).toBe(true);
+  });
+
+  it("keeps paid pages when routing, instructions and model change, including a completed rerun", async () => {
+    const dir = await scratch();
+    const pdfPath = path.join(dir, "two.pdf");
+    await promisify(execFile)("qpdf", ["--empty", "--pages", FIXTURE, "1", FIXTURE, "1", "--", pdfPath]);
+    const outDir = path.join(dir, "out");
+    const { mkdir } = await import("node:fs/promises");
+    await mkdir(outDir);
+    await writeFile(path.join(outDir, LLM_PAGES_FILE), JSON.stringify({ model: "Old model", settingsKey: "old-preset", complete: false, pages: [voyage, null] }));
+    const calls: number[] = [];
+    const run = makeLlmOcrRunner({ modelLabel: "New model", reference: async () => null,
+      transcribe: async ({ pageNumber }) => { calls.push(pageNumber); return { page: voyage, inputTokens: 1, outputTokens: 1 }; },
+      readLines: async () => { throw new Error("Explicit prose must not start Surya"); },
+    });
+    const input = { pdfPath, outDir, workDir: path.join(dir, "work"), language: null, log: async () => {},
+      extractionSettings: { ...STANDARD_EXTRACTION, prompt: "New instructions", lineOrdering: true, omitVerseCounters: true, pageRouting: "prose" as const },
+    };
+    await run(input);
+    expect(calls).toEqual([2]);
+    const checkpoint = JSON.parse(await readFile(path.join(outDir, LLM_PAGES_FILE), "utf8"));
+    expect(checkpoint.pages[0]).toEqual(voyage);
+    expect(checkpoint.provenance).toMatchObject([{ model: "Old model", settingsKey: "old-preset" }, { model: "New model", route: "standard" }]);
+    expect((await readdir(outDir)).some((name) => name.startsWith("llm-pages-before-resume-"))).toBe(true);
+    await run(input);
+    expect(calls).toEqual([2]);
+    await replaceWords(input, { reference: async () => ref(REFERENCE) });
+    expect(calls).toEqual([2]);
+    checkpoint.sourceHash = "different-pdf";
+    await writeFile(path.join(outDir, LLM_PAGES_FILE), JSON.stringify(checkpoint));
+    await expect(run(input)).rejects.toThrow("different source PDF");
+    expect(calls).toEqual([2]);
+  });
+
+  it("does not automatically buy another prose attempt after a rejected response", async () => {
+    const dir = await scratch();
+    let calls = 0;
+    const run = makeLlmOcrRunner({ reference: async () => null, transcribe: async () => {
+      calls++;
+      throw new LlmPageParseError(new Error("Invalid JSON"), 10, 10);
+    } });
+    await expect(run({ pdfPath: FIXTURE, outDir: path.join(dir, "out"), workDir: path.join(dir, "work"), language: null,
+      log: async () => {}, extractionSettings: { ...STANDARD_EXTRACTION, pageRouting: "prose" },
+    })).rejects.toThrow("Invalid JSON");
+    expect(calls).toBe(1);
+  });
+
+  it("repairs a prose response within the authorized budget and keeps accepted pages untouched", async () => {
+    const dir = await scratch();
+    const pdfPath = path.join(dir, "two.pdf");
+    await promisify(execFile)("qpdf", ["--empty", "--pages", FIXTURE, "1", FIXTURE, "1", "--", pdfPath]);
+    const outDir = path.join(dir, "out");
+    const { mkdir } = await import("node:fs/promises");
+    await mkdir(outDir);
+    await writeFile(path.join(outDir, LLM_PAGES_FILE), JSON.stringify({ model: "M", complete: false, pages: [voyage, null] }));
+    const calls: { page: number; hint: string }[] = [];
+    const run = makeLlmOcrRunner({ modelLabel: "M", reference: async () => null,
+      transcribe: async ({ pageNumber, hint }) => {
+        calls.push({ page: pageNumber, hint });
+        const page: RawLlmPage = hint ? voyage : JSON.parse('{"blocks":[{"text":22}]}');
+        return { page, inputTokens: 2, outputTokens: 1 };
+      },
+    });
+    const repairBudget = createRepairBudget(1);
+    const input = { pdfPath, outDir, workDir: path.join(dir, "work"), language: null, log: async () => {}, repairBudget,
+      extractionSettings: { ...STANDARD_EXTRACTION, pageRouting: "prose" as const },
+    };
+    const result = await run(input);
+    expect(result.inputTokens).toBe(4);
+    expect(calls.map((call) => call.page)).toEqual([2, 2]);
+    expect(calls[1]?.hint).toContain('"text":22');
+    expect(repairBudget.used).toBe(1);
+    expect(JSON.parse(await readFile(path.join(outDir, LLM_PAGES_FILE), "utf8")).pages[0]).toEqual(voyage);
+    await run(input);
+    expect(calls).toHaveLength(2);
   });
 });
 

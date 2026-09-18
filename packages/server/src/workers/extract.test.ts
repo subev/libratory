@@ -51,6 +51,41 @@ describe("extract worker", () => {
     mockExtractPdf.mockReset();
   });
 
+  it("shares one repair budget across source files instead of resetting the allowance per file", async () => {
+    const db = getDb();
+    const book = row(await db.insert(books).values({ title: "Bounded repair", ocrEngine: "llm", skipSynthesis: true }).returning());
+    await db.insert(bookFiles).values([
+      { bookId: book.id, index: 0, filename: "one.pdf", pdfPath: "/tmp/one.pdf", status: "pending" },
+      { bookId: book.id, index: 1, filename: "two.pdf", pdfPath: "/tmp/two.pdf", status: "pending" },
+    ]);
+    const allowed: boolean[] = [];
+    vi.spyOn(textLayer, "ensureTextLayer").mockImplementation(async ({ repairBudget }) => {
+      if (!repairBudget) throw new Error("Missing recovery budget");
+      allowed.push(repairBudget.take());
+      return false;
+    });
+    mockExtractPdf.mockResolvedValue(fakeChapters(1));
+    await extract({ bookId: book.id, repairLimit: 1 }, { addJob: vi.fn() });
+    expect(allowed).toEqual([true, false]);
+  });
+
+  it("does not silently restart stopped or failed files when another file is queued", async () => {
+    const db = getDb();
+    const book = row(await db.insert(books).values({ title: "Recovery scope", ocrEngine: "llm", skipSynthesis: true }).returning());
+    await db.insert(bookFiles).values([
+      { bookId: book.id, index: 0, filename: "queued.pdf", pdfPath: "/tmp/queued.pdf", status: "pending" },
+      { bookId: book.id, index: 1, filename: "stopped.pdf", pdfPath: "/tmp/stopped.pdf", status: "suspended" },
+      { bookId: book.id, index: 2, filename: "failed.pdf", pdfPath: "/tmp/failed.pdf", status: "failed" },
+    ]);
+    const ensure = vi.spyOn(textLayer, "ensureTextLayer").mockResolvedValue(false);
+    mockExtractPdf.mockResolvedValue(fakeChapters(1));
+    await extract({ bookId: book.id }, { addJob: vi.fn() });
+    expect(ensure).toHaveBeenCalledOnce();
+    expect(ensure).toHaveBeenCalledWith(expect.objectContaining({ file: expect.objectContaining({ filename: "queued.pdf" }) }));
+    const files = await db.select().from(bookFiles).where(eq(bookFiles.bookId, book.id)).orderBy(asc(bookFiles.index));
+    expect(files.map((file) => file.status)).toEqual(["done", "suspended", "failed"]);
+  });
+
   it("forces OCR only for the file IDs captured when extraction was requested", async () => {
     const db = getDb();
     const bookId = crypto.randomUUID();
@@ -230,6 +265,10 @@ describe("extract worker", () => {
     expect(files[0]?.status).toBe("done");
     expect(files[1]?.status).toBe("failed");
     expect(files[1]?.error).toContain("corrupt");
+    const book = row(await db.select().from(books).where(eq(books.id, bookId)));
+    expect(book.status).toBe("suspended");
+    expect(book.error).toContain("Extraction incomplete");
+    expect(addJob.mock.calls.some(([task]) => task === "assemble")).toBe(false);
   });
 
   it("fails the whole book when all files fail", async () => {

@@ -59,10 +59,25 @@ function charsOverlap(a: SearchHit, b: SearchHit): boolean {
   return a.charStart < b.charEnd && b.charStart < a.charEnd;
 }
 
+function sameSourcePassage(a: SearchHit, b: SearchHit): boolean {
+  const fileA = a.source === "raw" ? a.bookFileId : a.chapterFileId;
+  const fileB = b.source === "raw" ? b.bookFileId : b.chapterFileId;
+  if (a.bookId !== b.bookId || !fileA || fileA !== fileB || !pagesOverlap(a, b)) return false;
+  const words = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+  const left = words(a.text);
+  const right = words(b.text);
+  if (left.length > 0 && left.join(" ") === right.join(" ")) return true;
+  const shingles = (tokens: string[]) => new Set(tokens.slice(7).map((_, i) => tokens.slice(i, i + 8).join(" ")));
+  const first = shingles(left);
+  const second = shingles(right);
+  const common = [...first].filter((part) => second.has(part)).length;
+  return common >= 3 && common >= Math.min(first.size, second.size) * 0.6;
+}
+
 // The same passage can hit as original + N translations (and as raw + chapter
 // text of the same pages). Collapse near-duplicates, prefer the query's script
 // on close scores, and cap per-book dominance.
-export function groupHits(hits: SearchHit[], query: string, limit: number): SearchHit[] {
+export function groupHits(hits: SearchHit[], query: string, limit: number, scope: { bookId?: string } = {}): SearchHit[] {
   const queryCyrillic = cyrillicRatio(query) > 0.5;
   const sorted = [...hits].sort((a, b) => b.score - a.score);
 
@@ -74,7 +89,7 @@ export function groupHits(hits: SearchHit[], query: string, limit: number): Sear
       byGroup.set(key, [hit]);
       continue;
     }
-    if (group.length >= PER_GROUP) continue;
+    if (group.length >= (hit.bookId === scope.bookId ? limit : PER_GROUP)) continue;
     // A second hit from the same unit must be a different passage, not the
     // translated/cleaned twin of the first
     if (group.some((g) => (g.source === hit.source && g.language === hit.language ? charsOverlap(g, hit) : true))) continue;
@@ -102,32 +117,29 @@ export function groupHits(hits: SearchHit[], query: string, limit: number): Sear
 
   representatives.sort((a, b) => b.score - a.score);
 
-  // Raw-text hits duplicating an extracted chapter's pages lose to the chapter
-  // hit — which inherits the raw chunk's precise pages, since chapter chunks
-  // only carry the whole chapter's range
+  // Prefer the chapter only when text overlaps in the same source PDF; each hit
+  // keeps its own citation range, since both raw and chapter chunks map pages.
   const out: SearchHit[] = [];
   const perBook = new Map<string, number>();
   for (const hit of representatives) {
     const count = perBook.get(hit.bookId) ?? 0;
-    if (count >= PER_BOOK) continue;
     if (hit.source === "raw") {
-      const twinIdx = out.findIndex((o) => o.bookId === hit.bookId && o.source !== "raw" && pagesOverlap(o, hit));
+      const twinIdx = out.findIndex((o) => o.source === "chapter" && sameSourcePassage(o, hit));
       const twin = out[twinIdx];
       if (twin) {
-        out[twinIdx] = { ...twin, pageStart: hit.pageStart, pageEnd: hit.pageEnd };
         continue;
       }
-    } else {
-      const rawTwinIdx = out.findIndex((o) => o.bookId === hit.bookId && o.source === "raw" && pagesOverlap(o, hit));
+    } else if (hit.source === "chapter") {
+      const rawTwinIdx = out.findIndex((o) => o.source === "raw" && sameSourcePassage(o, hit));
       const raw = out[rawTwinIdx];
       if (raw) {
-        out[rawTwinIdx] = { ...hit, pageStart: raw.pageStart, pageEnd: raw.pageEnd, score: raw.score };
+        out[rawTwinIdx] = { ...hit, score: raw.score };
         continue;
       }
     }
+    if (count >= (hit.bookId === scope.bookId ? limit : PER_BOOK) || out.length >= limit) continue;
     out.push(hit);
     perBook.set(hit.bookId, count + 1);
-    if (out.length >= limit) break;
   }
   return out;
 }
@@ -227,7 +239,7 @@ export async function searchLibrary(opts: {
     score: Number(r.score),
   }));
 
-  return { hits: groupHits(hits, query, limit), mode };
+  return { hits: groupHits(hits, query, limit, { bookId: opts.bookId }), mode };
 }
 
 // Adjacent chunks of the same source unit, merged into one continuous passage

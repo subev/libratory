@@ -57,25 +57,25 @@ describe("groupHits", () => {
     expect(result[0]?.source).toBe("translation");
   });
 
-  it("drops raw hits whose pages duplicate an extracted chapter hit, keeping the raw pages", () => {
-    const chapterHit = hit({ chapterId: "ch-1", source: "chapter", score: 0.05, pageStart: 10, pageEnd: 14 });
+  it("drops raw hits whose pages duplicate an extracted chapter hit, keeping its own citation pages", () => {
+    const chapterHit = hit({ chapterId: "ch-1", source: "chapter", bookFileId: null, chapterFileId: "file-1", score: 0.05, pageStart: 10, pageEnd: 14 });
     const rawTwin = hit({ bookFileId: "file-1", source: "raw", score: 0.04, pageStart: 12, pageEnd: 13, charStart: 900, charEnd: 1000 });
     const result = groupHits([chapterHit, rawTwin], "wealth", 10);
     expect(result).toHaveLength(1);
     expect(result[0]?.source).toBe("chapter");
-    expect(result[0]?.pageStart).toBe(12);
-    expect(result[0]?.pageEnd).toBe(13);
+    expect(result[0]?.pageStart).toBe(10);
+    expect(result[0]?.pageEnd).toBe(14);
   });
 
-  it("swaps a raw hit for its lower-scored chapter twin, keeping the raw pages", () => {
+  it("swaps a raw hit for its lower-scored chapter twin, keeping its own citation pages", () => {
     const rawHit = hit({ bookFileId: "file-1", source: "raw", score: 0.05, pageStart: 12, pageEnd: 13, charStart: 900, charEnd: 1000 });
-    const chapterTwin = hit({ chapterId: "ch-1", source: "chapter", score: 0.04, pageStart: 10, pageEnd: 14 });
+    const chapterTwin = hit({ chapterId: "ch-1", source: "chapter", bookFileId: null, chapterFileId: "file-1", score: 0.04, pageStart: 10, pageEnd: 14 });
     const result = groupHits([rawHit, chapterTwin], "wealth", 10);
     expect(result).toHaveLength(1);
     expect(result[0]?.source).toBe("chapter");
     expect(result[0]?.chunkId).toBe(chapterTwin.chunkId);
-    expect(result[0]?.pageStart).toBe(12);
-    expect(result[0]?.pageEnd).toBe(13);
+    expect(result[0]?.pageStart).toBe(10);
+    expect(result[0]?.pageEnd).toBe(14);
   });
 
   it("caps hits per book", () => {
@@ -92,4 +92,17 @@ describe("groupHits", () => {
     );
     expect(groupHits(hits, "wealth", 4)).toHaveLength(4);
   });
+});
+
+it("keeps different PDFs and different passages on the same page distinct", () => {
+  const chapter = hit({ source:"chapter", chapterId:"ch", bookFileId:null, chapterFileId:"file-A", pageStart:10, pageEnd:10, score:0.05 });
+  const otherFile = hit({ bookFileId:"file-B", pageStart:10, pageEnd:10, score:0.04 });
+  expect(groupHits([chapter,otherFile],"wealth",10)).toHaveLength(2);
+  const otherPassage = hit({ bookFileId:"file-A", pageStart:10, pageEnd:10, text:"An entirely separate account about a different topic", score:0.04 });
+  expect(groupHits([chapter,otherPassage],"wealth",10)).toHaveLength(2);
+});
+it("honours the requested book-scoped limit while retaining library diversification", () => {
+  const hits = Array.from({length:8},(_,i)=>hit({source:"chapter",chapterId:`ch-${i}`,score:0.1-i*0.001}));
+  expect(groupHits(hits,"wealth",8,{bookId:"book-1"})).toHaveLength(8);
+  expect(groupHits(hits,"wealth",8)).toHaveLength(3);
 });

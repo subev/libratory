@@ -1,3 +1,4 @@
+import { createRepairBudget, type RepairBudget } from "../lib/ocr-repair.ts";
 import { bookFileOrder } from "../lib/book-file-order.ts";
 import type { WorkerUtils } from "graphile-worker";
 import { db } from "../db.ts";
@@ -16,6 +17,7 @@ import { queueIndexBook } from "../lib/search-index.ts";
 export type ExtractPayload = {
   bookId: string;
   ignoreTextLayerFileIds?: string[];
+  repairLimit?: number;
 };
 
 export async function extract(payload: ExtractPayload, { addJob }: { addJob: WorkerUtils["addJob"] }) {
@@ -48,7 +50,7 @@ export async function extract(payload: ExtractPayload, { addJob }: { addJob: Wor
     } else {
       // A run where every file was stopped by hand produced no chapters, which the check below
       // would report as "No chapters detected in any file" — a failure, for something deliberate.
-      const { cancelled } = await extractMultipleFiles(book, files, log, addJob, payload.ignoreTextLayerFileIds);
+      const { cancelled } = await extractMultipleFiles(book, files, log, addJob, payload.ignoreTextLayerFileIds, payload.repairLimit === undefined ? undefined : createRepairBudget(payload.repairLimit));
       if (cancelled) {
         await db.update(books).set({ status: "suspended", error: null, updatedAt: new Date() }).where(eq(books.id, bookId));
         return;
@@ -69,6 +71,16 @@ export async function extract(payload: ExtractPayload, { addJob }: { addJob: Wor
 
     if (totalChapters === 0) {
       throw new Error("No chapters detected in any file");
+    }
+
+    const unresolved = await db.select({ status: bookFiles.status }).from(bookFiles)
+      .where(and(eq(bookFiles.bookId, bookId), ne(bookFiles.status, "done"), ne(bookFiles.status, "raw")));
+    if (unresolved.length) {
+      const message = `Extraction incomplete: ${unresolved.length} source file(s) still need attention. Saved pages and existing chapters are kept.`;
+      await log(message);
+      await db.update(books).set({ status: "suspended", error: message, updatedAt: new Date() }).where(eq(books.id, bookId));
+      await queueIndexBook(bookId);
+      return;
     }
 
     if (book.skipSynthesis) {
@@ -150,6 +162,7 @@ async function extractMultipleFiles(
   log: (msg: string) => Promise<void>,
   addJob: WorkerUtils["addJob"],
   ignoreTextLayerFileIds: string[] = [],
+  repairBudget?: RepairBudget,
 ) {
   // Determine chapter offset from existing chapters (for append support)
   const [existing] = await db
@@ -164,11 +177,11 @@ async function extractMultipleFiles(
 
   for (const file of files) {
     // Skip already-done files (append support) and raw-only files (extraction not requested)
-    if (file.status === "done" || file.status === "raw") continue;
+    if (file.status !== "pending" && file.status !== "extracting") continue;
 
     // Re-read status to check for cancellation
     const [fresh] = await db.select({ status: bookFiles.status }).from(bookFiles).where(eq(bookFiles.id, file.id));
-    if (fresh?.status === "failed") {
+    if (fresh?.status !== "pending" && fresh?.status !== "extracting") {
       await log(`Skipping cancelled file "${file.filename}"`);
       filesFailed++;
       continue;
@@ -180,7 +193,7 @@ async function extractMultipleFiles(
     const [claimed] = await db
       .update(bookFiles)
       .set({ status: "extracting", error: null })
-      .where(and(eq(bookFiles.id, file.id), ne(bookFiles.status, "failed")))
+      .where(and(eq(bookFiles.id, file.id), eq(bookFiles.status, fresh.status)))
       .returning({ id: bookFiles.id });
     if (!claimed) {
       await fileLog(`Skipping cancelled file "${file.filename}"`);
@@ -197,7 +210,7 @@ async function extractMultipleFiles(
         file,
         engine,
         language: book.language,
-        ocrModel: book.ocrModel, extractionSettings: book.extractionSettings,
+        ocrModel: book.ocrModel, extractionSettings: book.extractionSettings, repairBudget,
         ignoreTextLayer: ignoreTextLayerFileIds.includes(file.id),
         log: fileLog,
         signal: abort.signal,

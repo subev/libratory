@@ -1,7 +1,7 @@
 import { bookFileOrder } from "../lib/book-file-order.ts";
 import { createHash } from "node:crypto";
 import type { WorkerUtils } from "graphile-worker";
-import { and, asc, eq, isNotNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
 import { db } from "../db.ts";
 import { books, bookFiles, bookChunks, chapters, chapterVariants, type Book, type SearchIndexJob, type NewBookChunk } from "../schema.ts";
 import { chunkPagedText, chunkPlainText, pageMapFromBlocks, type ChunkDraft, type PageBlock } from "../lib/search-chunks.ts";
@@ -11,8 +11,8 @@ export type IndexBookPayload = { bookId: string };
 
 const INSERT_BATCH = 200;
 
-function hash(text: string): string {
-  return createHash("sha256").update(text).digest("hex");
+export function indexSourceHash(text: string, drafts: ChunkDraft[]): string {
+  return createHash("sha256").update(JSON.stringify({ version: 2, text, drafts })).digest("hex");
 }
 
 async function setJob(bookId: string, current: SearchIndexJob | null, partial: Partial<SearchIndexJob>): Promise<SearchIndexJob> {
@@ -33,45 +33,49 @@ type Unit = {
   source: "raw" | "chapter" | "translation";
   language: string | null;
   text: string;
-  // Distinguishes chunkings of the same text (e.g. block-mapped pages) so the
-  // unit reindexes once when the chunking gains information
-  hashSalt?: string;
   chunk: (text: string) => ChunkDraft[];
 };
 
 async function reindexUnit(book: Book, unit: Unit): Promise<boolean> {
-  const sourceHash = hash((unit.hashSalt ?? "") + unit.text);
-  const [existing] = await db
-    .select({ sourceHash: bookChunks.sourceHash })
-    .from(bookChunks)
-    .where(eq(unit.keyColumn, unit.keyValue))
-    .limit(1);
-  if (existing?.sourceHash === sourceHash) return false;
-
   const drafts = unit.text.trim() ? unit.chunk(unit.text) : [];
-  const rows: NewBookChunk[] = drafts.map((d, seq) => ({
-    bookId: book.id,
-    profileId: book.profileId,
-    folderId: book.folderId,
-    source: unit.source,
-    language: unit.language,
-    seq,
-    text: d.text,
-    charStart: d.charStart,
-    charEnd: d.charEnd,
-    pageStart: d.pageStart,
-    pageEnd: d.pageEnd,
-    sourceHash,
-    ...unit.key,
-  }));
-
-  await db.transaction(async (tx) => {
-    await tx.delete(bookChunks).where(eq(unit.keyColumn, unit.keyValue));
+  const sourceHash = indexSourceHash(unit.text, drafts);
+  const scope = and(eq(unit.keyColumn, unit.keyValue), eq(bookChunks.source, unit.source));
+  return db.transaction(async (tx) => {
+    const existing = await tx.select({
+      id: bookChunks.id, seq: bookChunks.seq, text: bookChunks.text,
+      sourceHash: bookChunks.sourceHash, charStart: bookChunks.charStart,
+      charEnd: bookChunks.charEnd, pageStart: bookChunks.pageStart, pageEnd: bookChunks.pageEnd,
+    }).from(bookChunks).where(scope);
+    if (existing.length === drafts.length && existing.every((row) => {
+      const draft = drafts[row.seq];
+      return draft && row.sourceHash === sourceHash && row.text === draft.text &&
+        row.charStart === draft.charStart && row.charEnd === draft.charEnd &&
+        row.pageStart === draft.pageStart && row.pageEnd === draft.pageEnd;
+    })) return false;
+    const bySeq = new Map(existing.map((row) => [row.seq, row]));
+    const obsolete = existing.filter((row) => drafts[row.seq]?.text !== row.text);
+    if (obsolete.length) await tx.delete(bookChunks).where(inArray(bookChunks.id, obsolete.map((row) => row.id)));
+    const rows: NewBookChunk[] = [];
+    for (const [seq, draft] of drafts.entries()) {
+      const previous = bySeq.get(seq);
+      if (previous?.text === draft.text) {
+        if (previous.charStart !== draft.charStart || previous.charEnd !== draft.charEnd ||
+            previous.pageStart !== draft.pageStart || previous.pageEnd !== draft.pageEnd) {
+          await tx.update(bookChunks).set(draft).where(eq(bookChunks.id, previous.id));
+        }
+      } else {
+        rows.push({ bookId: book.id, profileId: book.profileId, folderId: book.folderId,
+          source: unit.source, language: unit.language, seq, ...draft, sourceHash, ...unit.key });
+      }
+    }
+    if (existing.some((row) => row.sourceHash !== sourceHash)) {
+      await tx.update(bookChunks).set({ sourceHash }).where(scope);
+    }
     for (let i = 0; i < rows.length; i += INSERT_BATCH) {
       await tx.insert(bookChunks).values(rows.slice(i, i + INSERT_BATCH));
     }
+    return true;
   });
-  return true;
 }
 
 export async function indexBook({ bookId }: IndexBookPayload, { addJob }: { addJob: WorkerUtils["addJob"] }) {
@@ -111,7 +115,6 @@ export async function indexBook({ bookId }: IndexBookPayload, { addJob }: { addJ
         source: "chapter",
         language: null,
         text,
-        hashSalt: pageOf ? "pages:v1\n" : undefined,
         chunk: (t) => chunkPlainText(t, ch.pageStart, ch.pageEnd, pageOf),
       });
     }

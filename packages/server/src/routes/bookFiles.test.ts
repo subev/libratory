@@ -47,6 +47,44 @@ beforeEach(async () => {
   vi.mocked(quickAddJob).mockClear();
 });
 
+describe("resuming saved AI pages", () => {
+  it("queues only chosen failed files without deleting completed chapters or checkpoints", async () => {
+    const { book, rows } = await twoFileBook();
+    const db = getDb();
+    const failed = row(rows, 1);
+    await db.update(books).set({ status: "suspended", ocrEngine: "llm" }).where(eq(books.id, book.id));
+    await db.update(bookFiles).set({ status: "failed" }).where(eq(bookFiles.id, failed.id));
+    const chapter = row(await db.insert(chapters).values({ bookId: book.id, index: 0, sourceFileIndex: 0, title: "Keep", rawText: "Original", customText: "Edited", status: "suspended" }).returning());
+    const outDir = bookFileOutDir(book.id, failed.index);
+    await mkdir(outDir, { recursive: true });
+    const saved = JSON.stringify({ complete: false, pages: [{ blocks: [] }, null] });
+    await writeFile(path.join(outDir, "llm-pages.json"), saved);
+    await expect(caller.resumeExtraction({ bookId: book.id, files: [{ id: failed.id, routing: "prose" }], repairLimit: 51 })).rejects.toThrow();
+    expect(quickAddJob).not.toHaveBeenCalled();
+    await caller.resumeExtraction({ bookId: book.id, files: [{ id: failed.id, routing: "prose" }], repairLimit: 5 });
+    expect(row(await db.select().from(chapters).where(eq(chapters.id, chapter.id))).customText).toBe("Edited");
+    expect(await readFile(path.join(outDir, "llm-pages.json"), "utf8")).toBe(saved);
+    expect((await bookRow(book.id)).extractionSettings?.fileRouting?.[failed.id]).toBe("prose");
+    expect(row(await db.select().from(bookFiles).where(eq(bookFiles.id, failed.id))).status).toBe("pending");
+    expect(quickAddJob).toHaveBeenCalledWith(expect.anything(), "extract", { bookId: book.id, repairLimit: 5 }, expect.objectContaining({ maxAttempts: 1 }));
+  });
+
+  it("refuses to change settings during a running job or replace chapters through resume", async () => {
+    const { book, rows } = await twoFileBook();
+    const db = getDb();
+    const file = row(rows, 1);
+    const input = { bookId: book.id, files: [{ id: file.id, routing: "auto" as const }] };
+    await db.update(books).set({ status: "extracting", ocrEngine: "llm" }).where(eq(books.id, book.id));
+    await db.update(bookFiles).set({ status: "failed" }).where(eq(bookFiles.id, file.id));
+    await expect(caller.resumeExtraction(input)).rejects.toThrow("running extraction");
+    await db.update(books).set({ status: "suspended" }).where(eq(books.id, book.id));
+    await db.insert(chapters).values({ bookId: book.id, index: 0, sourceFileIndex: file.index, title: "Keep", rawText: "Original", status: "suspended" });
+    await expect(caller.resumeExtraction(input)).rejects.toThrow("already has chapters");
+    expect(quickAddJob).not.toHaveBeenCalled();
+    expect((await bookRow(book.id)).extractionSettings).toBeNull();
+  });
+});
+
 // books.pdfPath is the pre-book_files original, and the add-a-file route reads it as "the book's
 // only PDF" whenever no rows remain. Left describing a deleted file, it puts that file back.
 describe("removing a file keeps books.pdfPath describing a file that is still there", () => {

@@ -35,7 +35,7 @@ export function ExtractionPresetEditor({ value, onChange, disabled }: {
       Order detected lines before transcription
     </label>
     {settings.lineOrdering && <>
-      <p className="text-xs text-(--text-muted)">Uses the installed Surya models and an extra AI call per page. Invalid ordering stops extraction for review. Original groups and notes are retained. Isolated page numbers confirmed at the page edge are excluded from narration.</p>
+      <p className="text-xs text-(--text-muted)">Uses the installed Surya models and an extra AI call for pages needing ordering. Saved pages are kept when instructions change; use Saved pages and recovery to choose layouts for unresolved files. Invalid ordering flags that page for review while others continue.</p>
       <label className="block text-sm text-(--text-secondary)">Reading-order instructions
         <textarea className="mt-1 w-full rounded border border-(--border) bg-(--bg-input) px-3 py-2 text-sm" rows={4} maxLength={10000}
           value={settings.orderingPrompt} onChange={(e) => onChange({ ...settings, orderingPrompt: e.target.value })} />

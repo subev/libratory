@@ -139,3 +139,57 @@ it("does not repartition metadata across a line spanning the proposed column gap
   ];
   expect(() => splitOrderedColumns(input, [{ section: 0, kind: "metadata", breakBefore: "paragraph", lineIds: [2, 1, 3] }])).toThrow("returns to the left");
 });
+
+it("repairs interleaved verse columns only when printed counters prove every line distance", async () => {
+  const { restoreCounterColumnOrder } = await import("./verse-order.ts");
+  const left = Array.from({ length: 10 }, (_, i): OcrLine => ({ id: i * 2 + 1,
+    text: `${i % 5 === 0 ? `${i + 20} ` : ""}Left verse`, box: [50, 100 + i * 25, 250, 120 + i * 25] }));
+  const right = left.map((line, i): OcrLine => ({ id: line.id + 1,
+    text: `${i % 5 === 0 ? `${i + 30} ` : ""}Right verse`, box: [600, 100 + i * 25, 800, 120 + i * 25] }));
+  const lines = [...left, ...right];
+  const group = { kind: "verse" as const, section: 0, breakBefore: "paragraph" as const,
+    lineIds: Array.from({ length: 20 }, (_, i) => i + 1) };
+  const restored = restoreCounterColumnOrder(lines, [group]);
+  expect(restored[0]?.lineIds).toEqual(lines.map((line) => line.id));
+  expect(validateLineOrder(lines, splitOrderedColumns(lines, restored).map((item) => item.lineIds))).toHaveLength(2);
+  expect(group.lineIds[1]).toBe(2);
+  const contradictory = lines.map((line) => line.id === 2 ? { ...line, text: "40 Right verse" } : line);
+  expect(restoreCounterColumnOrder(contradictory, [group])).toEqual([group]);
+  expect(restoreCounterColumnOrder(lines, [{ ...group, lineIds: group.lineIds.filter((id) => id !== 3) }])[0]?.lineIds)
+    .toEqual(group.lineIds.filter((id) => id !== 3));
+  expect(restoreCounterColumnOrder(lines, [{ ...group, kind: "prose" }])[0]?.lineIds).toEqual(group.lineIds);
+});
+
+
+it("keeps page furniture outside section sequencing and starts fresh after a heading", async () => {
+  const { validateSemanticOrder } = await import("./ocr-line-order.ts");
+  const groups = [
+    { section: 0, kind: "metadata" as const },
+    { section: 0, kind: "heading" as const },
+    { section: 0, kind: "verse" as const },
+    { section: 1, kind: "heading" as const },
+    { section: 1, kind: "verse" as const },
+    { section: 0, kind: "furniture" as const },
+  ];
+  expect(validateSemanticOrder(groups)).toEqual(groups);
+  expect(() => validateSemanticOrder([...groups, { section: 0, kind: "verse" }])).toThrow("earlier section");
+  expect(() => validateSemanticOrder([{ section: 0, kind: "metadata" },
+    { section: 0, kind: "furniture" }, { section: 0, kind: "verse" }])).toThrow("interrupts verse");
+});
+
+it("keeps a tiny scan-edge detection without treating it as a verse column", () => {
+  const input: OcrLine[] = [
+    { id: 1, text: "Verse above", box: [550, 200, 810, 220] },
+    { id: 2, text: "ı", box: [985, 200, 997, 220] },
+    { id: 3, text: "Verse below", box: [550, 225, 810, 245] },
+  ];
+  const split = splitOrderedColumns(input, [{ section: 0, kind: "verse", breakBefore: "line", lineIds: [1, 2, 3] }]);
+  expect(split.map((group) => [group.kind, group.lineIds])).toEqual([["verse", [1, 3]], ["furniture", [2]]]);
+  const groups = validateLineOrder(input, split.map((group) => group.lineIds));
+  expect(orderedTranscription(groups, [{ group: 0, type: "paragraph", text: "Verse above\nVerse below" },
+    { group: 1, type: "other", text: "" }]).lineGroups?.flat()).toHaveLength(3);
+  const bodyLetter: OcrLine = { id: 4, text: "I", box: [100, 100, 112, 120] };
+  expect(() => orderedTranscription([[bodyLetter]], [{ group: 0, type: "paragraph", text: "" }])).toThrow("recognized text");
+  const edgeWord: OcrLine = { id: 5, text: "Word", box: [975, 100, 997, 120] };
+  expect(() => orderedTranscription([[edgeWord]], [{ group: 0, type: "paragraph", text: "" }])).toThrow("recognized text");
+});

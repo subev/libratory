@@ -19,6 +19,8 @@ export const extractionSettingsSchema = z.object({
   lineOrdering: z.boolean(),
   orderingPrompt: z.string().trim().max(10000),
   omitVerseCounters: z.boolean().optional(),
+  pageRouting: z.enum(["preset", "auto", "prose"]).optional(),
+  fileRouting: z.record(z.string().uuid(), z.enum(["preset", "auto", "prose"])).optional(),
 });
 export type ExtractionSettings = z.infer<typeof extractionSettingsSchema>;
 export const STANDARD_EXTRACTION: ExtractionSettings = { prompt: STANDARD_EXTRACTION_PROMPT, lineOrdering: false, orderingPrompt: "" };

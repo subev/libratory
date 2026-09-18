@@ -50,3 +50,35 @@ export function restoreInteriorCounterLines<T extends Group>(lines: OcrLine[], g
   }
   return { groups: result, restored };
 }
+
+export function restoreCounterColumnOrder<T extends Group>(lines: OcrLine[], groups: T[]): T[] {
+  const byId = new Map(lines.map((line) => [line.id, line]));
+  return groups.map((group) => {
+    if (group.kind !== "verse") return group;
+    const measured = group.lineIds.map((id) => byId.get(id));
+    if (measured.some((line) => !line)) return group;
+    const present = measured.filter((line): line is OcrLine => line !== undefined);
+    const horizontal = [...present].sort((a, b) => a.box[0] - b.box[0]);
+    let edge = Number.NEGATIVE_INFINITY;
+    for (const line of horizontal) {
+      const cut = (edge + line.box[0]) / 2;
+      const gap = line.box[0] - edge;
+      edge = Math.max(edge, line.box[2]);
+      if (!Number.isFinite(cut) || gap <= 100) continue;
+      const left = present.filter((item) => item.box[2] <= cut).sort((a, b) => a.box[1] - b.box[1]);
+      const right = present.filter((item) => item.box[0] >= cut).sort((a, b) => a.box[1] - b.box[1]);
+      if (left.length + right.length !== present.length) continue;
+      if ([left, right].some((column) => column.filter((item) => counter(item) !== null).length < 2)) continue;
+      const ordered = [...left, ...right];
+      const anchors = ordered.flatMap((item, index) => {
+        const value = counter(item);
+        return value === null ? [] : [{ value, index }];
+      });
+      const first = anchors[0];
+      // Exact verse distances across both columns distinguish counters from dates or song numbers.
+      if (!first || anchors.some((anchor) => anchor.value - first.value !== anchor.index - first.index)) continue;
+      return { ...group, lineIds: ordered.map((item) => item.id) };
+    }
+    return group;
+  });
+}

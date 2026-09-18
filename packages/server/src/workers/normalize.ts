@@ -6,6 +6,7 @@ import { normalizeForTts, normalizeBlocks } from "../lib/normalizer.ts";
 import type { SourceBlock } from "../lib/marker.ts";
 import { joinTextBlocks } from "../lib/extracted-text.ts";
 import { appendLog } from "../lib/log.ts";
+import { queueIndexBook } from "../lib/search-index.ts";
 
 export type NormalizePayload = {
   chapterId: string;
@@ -60,6 +61,7 @@ export async function normalize(payload: NormalizePayload, { addJob }: { addJob:
       .set({ cleanText, textMap, status: "pending" })
       .where(eq(chapters.id, chapterId));
 
+    await queueIndexBook(bookId);
     await addJob("synthesize", { chapterId, bookId }, { maxAttempts: 1 });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -324,7 +324,7 @@ export const bookChunks = pgTable("book_chunks", {
   charEnd: integer("char_end").notNull(),
   pageStart: integer("page_start"),
   pageEnd: integer("page_end"),
-  // sha256 of the full source-unit text at chunking time; unchanged hash = skip reindex
+  // Hash of source text and chunk layout, including citation pages.
   sourceHash: text("source_hash").notNull(),
   tsv: tsvector("tsv").generatedAlwaysAs((): ReturnType<typeof sql> => sql`to_tsvector('simple', "text")`),
   embedding: vector("embedding", { dimensions: 1024 }),

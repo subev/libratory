@@ -1,4 +1,6 @@
 import { bookFileOrder } from "../lib/book-file-order.ts";
+import { extractionDiagnostics, extractionProgress } from "../lib/ocr-progress.ts";
+import { STANDARD_EXTRACTION } from "../lib/extraction-presets.ts";
 import { z } from "zod";
 import { suryaCachePath } from "../lib/ocr-line-cache.ts";
 import { router, publicProcedure } from "../trpc.ts";
@@ -6,13 +8,13 @@ import { db } from "../db.ts";
 import { books, bookFiles, chapters } from "../schema.ts";
 import { eq, and, asc, inArray } from "drizzle-orm";
 import { appendLog } from "../lib/log.ts";
-import { bookTmpDir } from "../lib/paths.ts";
+import { bookFileOutDir, bookTmpDir } from "../lib/paths.ts";
 import { quickAddJob } from "graphile-worker";
 import { env } from "../env.ts";
 import { unlink, rm } from "node:fs/promises";
 import path from "node:path";
 import { removeChapterArtifacts } from "../lib/chapter-artifacts.ts";
-import { abortExtract } from "../lib/extract-registry.ts";
+import { abortExtract, extractRunning } from "../lib/extract-registry.ts";
 
 const connectionString = env.DATABASE_URL;
 
@@ -70,6 +72,58 @@ async function updateBookTotalChapters(bookId: string) {
 }
 
 export const bookFilesRouter = router({
+  extractionReview: publicProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ input }) => {
+      const [file] = await db.select().from(bookFiles).where(eq(bookFiles.id, input.id));
+      if (!file) throw new Error("File not found");
+      const outDir = bookFileOutDir(file.bookId, file.index);
+      const progress = await extractionProgress(outDir);
+      const unresolved = new Set([...(progress?.reviewPages ?? []), ...(progress?.interruptedPages ?? [])]);
+      const diagnostics = (await extractionDiagnostics(outDir)).filter((entry) => unresolved.has(entry.page));
+      return { progress, diagnostics };
+    }),
+
+  resumeExtraction: publicProcedure
+    .input(z.object({ bookId: z.string().uuid(), files: z.array(z.object({
+      id: z.string().uuid(), routing: z.enum(["preset", "auto", "prose"]),
+    })).min(1), repairLimit: z.number().int().min(0).max(50).default(0) }))
+    .mutation(async ({ input }) => {
+      const ids = input.files.map((file) => file.id);
+      if (new Set(ids).size !== ids.length) throw new Error("Select each file once");
+      await db.transaction(async (tx) => {
+        const [book] = await tx.select().from(books).where(eq(books.id, input.bookId)).for("update");
+        if (!book || book.kind !== "pdf") throw new Error("PDF book not found");
+        const files = await tx.select().from(bookFiles).where(eq(bookFiles.bookId, input.bookId)).for("update");
+        if (book.ocrEngine !== "llm") throw new Error("Resume saved AI pages with the AI extraction engine");
+        if (book.status === "extracting" || book.status === "assembling" || extractRunning([book.id, ...files.map((file) => file.id)])
+          || files.some((file) => file.status === "pending" || file.status === "extracting")) {
+          throw new Error("Wait for the running extraction to finish; its settings and saved pages are unchanged");
+        }
+        const selected = files.filter((file) => ids.includes(file.id));
+        if (selected.length !== ids.length || selected.some((file) => file.status !== "failed" && file.status !== "suspended")) {
+          throw new Error("Resume only failed or stopped files from this book");
+        }
+        const existing = await tx.select({ fileIndex: chapters.sourceFileIndex }).from(chapters).where(eq(chapters.bookId, book.id));
+        for (const file of selected) {
+          if (existing.some((chapter) => chapter.fileIndex === file.index)) throw new Error(`"${file.filename}" already has chapters; resume will not replace their edits or audio`);
+          const progress = await extractionProgress(bookFileOutDir(book.id, file.index));
+          if (progress?.problem) throw new Error(progress.problem);
+        }
+        const settings = book.extractionSettings ?? STANDARD_EXTRACTION;
+        await tx.update(books).set({ status: "pending", error: null, skipSynthesis: true, updatedAt: new Date(),
+          extractionSettings: { ...settings, fileRouting: { ...settings.fileRouting,
+            ...Object.fromEntries(input.files.map((file) => [file.id, file.routing])),
+          } },
+        }).where(eq(books.id, book.id));
+        await tx.update(bookFiles).set({ status: "pending", error: null, skipSynthesis: true }).where(inArray(bookFiles.id, ids));
+      });
+      await quickAddJob({ connectionString }, "extract", { bookId: input.bookId, repairLimit: input.repairLimit },
+        { maxAttempts: 1, jobKey: `extract:${input.bookId}`, jobKeyMode: "replace" });
+      await appendLog(input.bookId, `Resuming ${ids.length} file(s); saved AI pages and existing chapters are kept. New instructions apply only to unresolved pages. Up to ${input.repairLimit} targeted repair calls authorized for this run.`);
+      return { success: true };
+    }),
+
   reorder: publicProcedure
     .input(z.object({ bookId: z.string().uuid(), fileIds: z.array(z.string().uuid()).min(1) }))
     .mutation(async ({ input }) => {

@@ -36,7 +36,9 @@ Rejected model responses flag their pages for review while the other pages finis
 and remain cached. A file with any rejected pages does not publish partial output;
 its error lists the pages requiring review. Network, provider and local processing
 errors still stop the run. Ordered calls do not retry automatically.
-Standard retains its existing parse retries and low-coverage second look.
+Standard outside recovery retains its existing parse retries and low-coverage second look.
+Recovery replaces both with explicit, bounded repair as described below. SDK-level
+provider retries are disabled for all page calls.
 
 With **Remove margin verse counters** enabled, an omitted counter-bearing line
 can be restored before transcription when it fits uniquely between two measured
@@ -49,7 +51,11 @@ this repair.
 Line-continuation markers apply only between adjacent verse groups in the same
 section. Elsewhere they become paragraph boundaries; a formatting marker alone
 does not fail an otherwise valid reading order. Returning to an earlier section
-or interrupting verse with metadata still fails. An empty transcription is
+or interrupting verse with metadata still fails. Page furniture does not participate
+in section sequencing, and a heading starts a new passage even when the model
+reuses the preceding section number. Printed counters can restore an interleaved
+verse group only when a measured column gap and exact counter-to-line distances
+across both columns agree. An empty transcription is
 accepted only when every OCR label in its group is also empty; its group and
 line evidence remain saved.
 
@@ -69,10 +75,12 @@ The temporary render/output directory can be removed without losing this cache.
 
 AI reading starts as local pages become ready, with up to four pages in flight.
 Completed AI pages retain their transcription and line groups for retries and
-later local geometry refreshes. Changing instructions invalidates reuse of AI
-pages read with different instructions, while retaining the local Surya cache.
+later local geometry refreshes. Changing instructions, routing or model keeps accepted
+pages; new instructions apply only to unresolved pages. Checkpoints record per-page
+model, route and instruction hash, plus instruction snapshots for new results. Older
+results retain their recorded provenance without inventing missing instructions.
 Settings are captured when a job starts; edit while stopped and resume to apply
-new instructions consistently. There is no prompt replacement inside a running job.
+new instructions to unresolved pages. There is no prompt replacement inside a running job.
 Older Standard checkpoints without a settings key remain reusable as Standard.
 
 The log dock shows saved local and AI page counts. Detailed OCR progress bars are
@@ -85,8 +93,8 @@ make the model supply highlight coordinates.
 The poetry experiment supports the constrained ordering approach; it does not
 make line detection infallible. Overlapping or garbled Surya lines can still harm
 results, and preserving groups is not proof that every word was transcribed
-correctly. Inspect the result before synthesizing. No automatic page-complexity
-selection is performed.
+correctly. Inspect the result before synthesizing. Recovery offers conservative
+local layout routing, described below.
 
 ```mermaid
 flowchart TD
@@ -161,7 +169,7 @@ cleanup rather than guessing positions.
 records removals, source line IDs, original text offsets and measured boxes in
 `verse-counter-cleanup.json`. Word alignment runs again after removal, so the final
 text, searchable PDF and reader offsets agree. Changing only this option reuses
-paid pages; changing prompts still requires new AI reading. Turning cleanup off
+paid pages; changing prompts applies only to unresolved pages; accepted readings remain saved. Turning cleanup off
 restores the raw saved reading, including any counters the model retained.
 
 Local replay on the five saved poetry pages removed nine counters from source page
@@ -222,3 +230,94 @@ It never queues the full source file or replaces existing chapters/audio.
 
 Final local verification: 886 tests, lint, typecheck and the production build pass.
 No full E2E suite or full-book DeepSeek run was started.
+
+
+## Saved pages and recovery
+
+The Source files stage shows saved/total AI page counts and unresolved recovery
+pages per file, including files that failed. **Saved pages and recovery** opens
+automated recovery controls. Saved diagnostics beside the source PDF are optional
+inspection details, not a required manual correction step. Page numbers there are positions in the
+PDF, not printed page numbers. Successful pages suppress obsolete rejection
+messages. Unreadable checkpoints show an error and block recovery instead of
+being treated as absent. Progress reads are cached by checkpoint/directory stat.
+
+Recovery selects failed or stopped files without deleting their extraction
+artifacts. Files with existing chapters are refused so their edits and audio
+cannot be replaced accidentally. Running/queued extraction blocks recovery.
+Unselected failed or stopped files stay stopped. A mixed result reports extraction
+incomplete, keeps usable chapters, and does not announce completion or queue
+unattended assembly from a partial book.
+
+Each selected file has one routing choice, stored by file UUID in the book's
+existing extraction settings (no database migration):
+
+- **Automatic** uses the book's local line detection when ordered mode is enabled.
+  Clear flowing single-column prose bypasses the ordering call. Short lines,
+  columns, counters or insufficient evidence keep the ordering preset. This is a
+  conservative heuristic, not a quality guarantee or a paid classification call.
+- **Prose** uses Standard's transcription instructions and reads each unresolved
+  page directly from the image without Surya ordering. Paragraphs, verse and
+  footnotes remain part of the transcription contract. This is an explicit
+  section override, not an assumption that all prose has simple geometry.
+- **Book preset** keeps the chosen book instructions and ordering mode.
+
+The recovery preview counts saved pages separately from unresolved pages and
+shows an upper bound on new page-reading calls: one per prose page, up to two per
+ordered page, plus the selected repair allowance. Reusable stages lower this bound. It is not a dollar quote;
+provider token charges vary and rejected attempts may be billed. Chapter detection
+is a separate possible cost. Connection/provider failures stop without automatic
+retry. Content validation failures may use the explicitly authorized repair budget.
+
+A successful ordering is saved before transcription in `ordering-checkpoints/`,
+keyed by source fingerprint, page, model, ordering instructions and detected lines.
+Changing only transcription instructions reuses that ordering. Older saved
+transcription-failure diagnostics can also supply ordering when the model,
+instruction hash and detected lines match; all recovered ordering is revalidated.
+
+Before resume changes a page checkpoint, it saves a uniquely named
+`llm-pages-before-resume-*.json` copy. Newly written checkpoints include a source
+SHA-256; mismatched sources or page counts stop rather than overwrite paid work.
+Local word-placement rebuilds preserve provenance. Legacy checkpoints without a
+source fingerprint retain the existing source-file identity assumption.
+
+## Automatic repair
+
+**Repair and resume** first revalidates saved ordering and transcription responses
+locally, including older compatible attempts and legacy failure diagnostics. A response that now passes
+validation is promoted to a checkpoint without an AI call. Valid ordering is never
+bought again just because transcription failed. Accepted pages remain untouched.
+
+If local validation still fails, a corrective request includes the scanned page,
+fixed line/group evidence, the previous response and the exact validation error.
+DeepSeek ordering corrections enable low-effort reasoning with an 16,384-token
+output limit; ordinary ordering and transcription keep reasoning disabled.
+The same coverage, ordering and transcription validators must accept the correction;
+repair does not relax them or silently drop text. Ordinary extraction does not
+implicitly authorize repair. The recovery action captures a limit in its job payload:
+zero by default for API callers, ten selected in the UI, and fifty maximum.
+
+At most one corrective call is allowed per failed stage per recovery run, with one
+shared allowance across all selected files and concurrent pages. Exhausted allowance
+leaves unresolved pages saved and reported; other independent pages can finish.
+The preview includes this extra allowance. A call limit is not a dollar cap.
+
+Both stages persist successful outputs and immutable attempt records under
+`ordering-checkpoints/` and `transcription-checkpoints/`. Attempts retain raw
+responses, validation errors, whether the call was a correction, and token usage
+when supplied. Missing usage is null, never an invented zero charge. A failed
+provider call does not discard earlier usable evidence. Prompt/group/source changes
+prevent incompatible stage reuse; page-level accepted results remain preserved.
+
+Manual correction is not part of the required recovery workflow. If a bounded run
+still cannot resolve a page, another recovery attempt requires an explicit action.
+The source scan and saved evidence remain available for inspection.
+
+Verse-counter cleanup follows each saved page’s route. Standard/prose pages do not
+require ordered line evidence, including when rebuilding their local word geometry
+alongside previously saved verse pages.
+
+Narrow, isolated single-character detections at the extreme physical page edge
+are kept in separate furniture groups so scan marks cannot create a false verse
+column. Their line IDs and OCR evidence remain saved; transcription may leave
+them empty only when the scan contains no readable character.

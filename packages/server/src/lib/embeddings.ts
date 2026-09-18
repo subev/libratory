@@ -65,6 +65,10 @@ function ensureProcess(): Promise<void> {
     const reader = createInterface({ input: child.stdout });
     rl = reader;
     let isReady = false;
+    const startupTimer = setTimeout(() => {
+      reject(new Error("Embedding process startup timed out"));
+      if (proc === child) shutdown("Embedding process startup timed out");
+    }, BATCH_TIMEOUT_MS);
     reader.on("line", (line) => {
       let msg: { type?: string; id?: number; vectors?: number[][]; error?: string };
       try {
@@ -73,7 +77,9 @@ function ensureProcess(): Promise<void> {
         return;
       }
       if (msg.type === "ready") {
+        clearTimeout(startupTimer);
         isReady = true;
+        touchIdleTimer();
         resolve();
         return;
       }
@@ -85,10 +91,12 @@ function ensureProcess(): Promise<void> {
       else p.reject(new Error(msg.error ?? "Embedding failed"));
     });
     child.on("error", (err) => {
+      clearTimeout(startupTimer);
       if (!isReady) reject(err);
-      shutdown(`Embedding process error: ${err.message}`);
+      if (proc === child) shutdown(`Embedding process error: ${err.message}`);
     });
     child.on("close", (code) => {
+      clearTimeout(startupTimer);
       const reason = `Embedding process exited (code ${code}): ${stderrBuf.trim().slice(-500)}`;
       if (!isReady) reject(new Error(reason));
       if (proc === child) {
@@ -102,28 +110,41 @@ function ensureProcess(): Promise<void> {
 
 export async function embedTexts(texts: string[], timeoutMs = BATCH_TIMEOUT_MS): Promise<number[][]> {
   if (texts.length === 0) return [];
-  await ensureProcess();
-  const child = proc;
-  if (!child) throw new Error("Embedding process is not running");
   const id = nextId++;
-  const result = new Promise<number[][]>((resolve, reject) => {
+  return new Promise<number[][]>((resolve, reject) => {
+    let settled = false;
     const timer = setTimeout(() => {
-      if (pending.delete(id)) reject(new Error(`Embedding timed out after ${Math.round(timeoutMs / 1000)}s`));
+      settled = true;
+      pending.delete(id);
+      reject(new Error(`Embedding timed out after ${Math.round(timeoutMs / 1000)}s`));
     }, timeoutMs);
-    pending.set(id, {
-      resolve: (v) => {
+    const request: Pending = {
+      resolve: (vectors) => {
+        settled = true;
         clearTimeout(timer);
-        resolve(v);
+        resolve(vectors);
+        touchIdleTimer();
       },
-      reject: (e) => {
+      reject: (err) => {
+        settled = true;
         clearTimeout(timer);
-        reject(e);
+        reject(err);
       },
+    };
+    void ensureProcess().then(() => {
+      if (settled) return;
+      const child = proc;
+      if (!child) throw new Error("Embedding process is not running");
+      pending.set(id, request);
+      child.stdin.write(JSON.stringify({ id, texts }) + "\n", (err) => {
+        if (err && pending.delete(id)) request.reject(err);
+      });
+      touchIdleTimer();
+    }).catch((err: unknown) => {
+      pending.delete(id);
+      if (!settled) request.reject(err instanceof Error ? err : new Error(String(err)));
     });
   });
-  child.stdin.write(JSON.stringify({ id, texts }) + "\n");
-  touchIdleTimer();
-  return result;
 }
 
 // Chat path: never blocks a search on a broken embedder — callers fall back to FTS-only

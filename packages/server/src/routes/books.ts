@@ -1,4 +1,5 @@
 import { bookFileOrder } from "../lib/book-file-order.ts";
+import { extractionProgress } from "../lib/ocr-progress.ts";
 import { extractionSettingsSchema } from "../lib/extraction-presets.ts";
 import { z } from "zod";
 import { canonicalKey, modelKeySchema } from "../lib/llm.ts";
@@ -7,11 +8,12 @@ import { db } from "../db.ts";
 import { books, bookFiles, chapters, bookLogs, assemblies, documents, chapterVariants, folders, DEFAULT_PROFILE_ID, OCR_ENGINES } from "../schema.ts";
 import type { Book, Chapter } from "../schema.ts";
 import { eq, desc, asc, gt, and, or, ne, inArray, ilike, isNotNull, sql } from "drizzle-orm";
-import { uploadsDir, bookOutputDir } from "../lib/paths.ts";
+import { uploadsDir, bookOutputDir, bookFileOutDir } from "../lib/paths.ts";
 import { deleteBook } from "../lib/delete-book.ts";
 import { folderAncestors } from "../lib/folders.ts";
 import { bookFilterState } from "../lib/book-filter.ts";
 import { appendLog } from "../lib/log.ts";
+import { queueIndexBook } from "../lib/search-index.ts";
 import { parseTtsVoice } from "../lib/tts.ts";
 import { collectBlocksFromMarkerOutput, sliceChaptersAtIndices, type ExtractedChapter } from "../lib/marker.ts";
 import { listMarkerSources } from "../lib/marker-sources.ts";
@@ -423,10 +425,11 @@ export const booksRouter = router({
       const assembleQueued = await hasQueuedAssembleJob(input.id);
       const folderPath = book.folderId ? await folderAncestors(book.folderId) : [];
 
-      const filesWithAdvice = files.map((f) => ({
+      const filesWithAdvice = await Promise.all(files.map(async (f) => ({
         ...f,
+        extractionProgress: await extractionProgress(bookFileOutDir(input.id, f.index)),
         ocrGarbled: isGarbled(f.ocrEngine, f.ocrLowConfidenceFraction),
-      }));
+      })));
       // Canonicalized like every other reader of a stored model key: a legacy `pro` resolves to the
       // model it named, and shipping it raw made the picker label a working model unavailable.
       return { ...book, chapterModel: book.chapterModel ? canonicalKey(book.chapterModel) : book.chapterModel, ocrModel: book.ocrModel ? canonicalKey(book.ocrModel) : book.ocrModel, status, chapters: chaptersWithStats, totalWords, totalDurationMs, files: filesWithAdvice, rawTextTotalWords, assembleQueued, folderPath };
@@ -953,6 +956,7 @@ export const booksRouter = router({
         })
         .where(eq(books.id, input.id));
 
+      await queueIndexBook(input.id);
       await appendLog(input.id, `Applied chapter boundaries: ${chapterOffset} chapters — chapters are suspended. Queue selected chapters when ready.`);
 
       return reloadBook(input.id);

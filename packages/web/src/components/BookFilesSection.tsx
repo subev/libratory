@@ -1,4 +1,7 @@
 import type { ExtractionSettings } from "../../../server/src/lib/extraction-presets.ts";
+import type { BookFile } from "../../../server/src/schema.ts";
+import type { ExtractionProgress } from "../../../server/src/lib/ocr-progress.ts";
+import { ExtractionRecoveryModal } from "./ExtractionRecoveryModal.tsx";
 import { useState, useRef } from "react";
 import { ExtractModal, type ExtractScope } from "./ExtractModal.tsx";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
@@ -10,7 +13,7 @@ export type BookFileRow = {
   id: string;
   index: number;
   filename: string;
-  status: string;
+  status: BookFile["status"];
   selected: boolean;
   skipSynthesis: boolean;
   rawWords?: number | null;
@@ -21,6 +24,7 @@ export type BookFileRow = {
   ocrLowConfidenceFraction?: number | null;
   ocrGarbled?: boolean;
   error: string | null;
+  extractionProgress?: ExtractionProgress | null;
 };
 
 const percent = (fraction: number | null | undefined) => `${Math.round((fraction ?? 0) * 100)}%`;
@@ -91,6 +95,10 @@ export function BookFilesSection({
   // stops an unhandled rejection now that the handlers return a promise.
   const detach = (result: void | Promise<unknown>) => void Promise.resolve(result).catch(() => {});
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const savedPages = files.reduce((sum, file) => sum + (file.extractionProgress?.saved ?? 0), 0);
+  const knownPages = files.reduce((sum, file) => sum + (file.extractionProgress?.total ?? 0), 0);
+  const unresolvedFiles = files.filter((file) => file.status === "failed" || file.status === "suspended").length;
 
   // Chapters belonging to the currently selected files — what a scoped re-extract would replace.
   const selectedFileIndexes = new Set(files.filter((f) => f.selected).map((f) => f.index));
@@ -165,6 +173,7 @@ export function BookFilesSection({
 
       <div className="flex items-center gap-2 mb-2 flex-wrap">
         <AddFilesButton bookId={bookId} onFilesAdded={onFilesAdded} />
+        {(ocrEngine === "llm" || knownPages > 0) && <Button size="sm" onClick={() => setRecoveryOpen(true)}>Saved pages and recovery</Button>}
         <Button
           size="sm"
           onClick={() => onExtractOpenChange(true)}
@@ -188,6 +197,11 @@ export function BookFilesSection({
 
       </div>
 
+      {knownPages > 0 && <p className="mb-3 text-sm text-(--text-secondary)" role="status">
+        {savedPages}/{knownPages} AI pages saved across {files.filter((file) => file.extractionProgress?.total != null).length} files.
+        {unresolvedFiles > 0 && ` ${unresolvedFiles} file(s) need attention; extraction is incomplete.`} Saved does not mean reviewed for narration.
+      </p>}
+      {recoveryOpen && <ExtractionRecoveryModal bookId={bookId} files={files} settings={extractionSettings} isProcessing={isProcessing} onClose={() => setRecoveryOpen(false)} />}
       <div className="overflow-x-auto rounded-lg border border-(--border)">
         <table className="w-full min-w-[48rem] divide-y divide-(--divide)">
           <thead className="bg-(--bg-subtle)">
@@ -262,6 +276,9 @@ export function BookFilesSection({
                       {file.error}
                     </span>
                   )}
+                  {file.extractionProgress && <span className="mt-1 block text-xs text-(--text-secondary)">
+                    {file.extractionProgress.problem ?? `${file.extractionProgress.saved}/${file.extractionProgress.total ?? "?"} AI pages saved; ${file.extractionProgress.reviewPages.length} await recovery`}
+                  </span>}
                   {file.ocrGarbled && (
                     <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-(--warning-text)" data-testid={`file-ocr-advisory-${file.id}`}>
                       <span className="wrap-break-word">

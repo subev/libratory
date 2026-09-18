@@ -20,12 +20,12 @@ const SCOPES: { id: ExtractScope; label: string; detail: string }[] = [
   {
     id: "selected",
     label: "Selected files",
-    detail: "Re-reads those files. Their chapters, edits and audio are replaced; other files keep theirs.",
+    detail: "Rebuilds those files, reusing saved AI pages. Their chapters, edits and audio are replaced; other files keep theirs.",
   },
   {
     id: "book",
     label: "Entire book",
-    detail: "Re-reads every file. All chapters, edits, audio and assemblies are replaced.",
+    detail: "Rebuilds every file, reusing saved AI pages. All chapters, edits, audio and assemblies are replaced.",
   },
   {
     id: "chapters",
@@ -154,8 +154,8 @@ export function ExtractModal({
             />
             <span>
               <span className="block text-(--text-secondary)">Ignore existing PDF text and run OCR again</span>
-              Use when a scanner’s text is incorrect, incomplete, or misplaced. Reads every page of the selected files
-              and replaces the text in a new PDF copy. The original is kept.
+              Use when a scanner’s text is incorrect, incomplete, or misplaced. Rebuilds the text in a new PDF copy.
+              The original and saved AI transcriptions are kept; AI reads only unresolved pages.
             </span>
           </label>
         )}
@@ -172,7 +172,7 @@ export function ExtractModal({
               pageCount={suggestion.data?.pageCount ?? null}
               tryHref={`/books/${bookId}/ocr?file=${tryFileIndex}`}
               status={replacingText
-                ? "Every selected page is read from its image with the engine below, even if the PDF already contains text. Choosing an AI model runs paid transcription again."
+                ? "Rebuilds the selected files with the engine below. Saved AI pages are reused; only unresolved pages need paid transcription."
                 : scan.read
                 ? scan.garbled
                   ? <><strong className="text-(--warning-text)">Tesseract struggled here.</strong> It read the pages in the background but doubted many of its words — the sign of photographed, curled or faded pages. That is what Surya and the AI model are for: pick one below, and the pages are read again.</>
