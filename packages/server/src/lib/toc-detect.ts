@@ -400,7 +400,7 @@ async function selectFromToc(
   const entries: ChapterEntry[] = chosen.map((c) => ({ index: c.i, titles: [printed(c.i).title, c.title], page: printed(c.i).page }));
   const { located, unresolved } = locateEntries(entries, catalog, pageMap);
   await log(
-    `[AI] Placed ${located.length} of ${chosen.length} chapter headings on their expected pages${where}` +
+    `[AI] Placed ${located.length} of ${chosen.length} chapter headings ${pageMap ? "on their expected pages" : "by title"}${where}` +
       (unresolved.length > 0 ? `, asking the model about ${unresolved.length}` : "")
   );
 

@@ -3,7 +3,7 @@ import { countWords } from "./pdf-raw-text.ts";
 
 export type TocEntry = { title: string; page: number | null; level: number | null };
 export type HeadingCatalogEntry = { id: string; blockIndex: number; page: number; level: number | null; text: string; words: number };
-export type PageAnchor = { printed: number; pdf: number };
+export type PageAnchor = { entry: number; printed: number; pdf: number };
 export type PageMap = { expected: (printed: number) => number; anchored: (printed: number) => boolean; anchors: PageAnchor[]; summary: string };
 export type ChapterEntry = { index: number; titles: string[]; page: number | null };
 export type Located = { entry: number; blockIndex: number };
@@ -14,6 +14,8 @@ const MIN_ANCHORS = 3;
 const ANCHOR_SIMILARITY = 0.75;
 const MATCH_SIMILARITY = 0.6;
 const MAX_CANDIDATES = 12;
+const MAX_ANCHORS_PER_ENTRY = 6;
+const MIN_COMPACT_LENGTH = 6;
 
 export function cumulativeWords(blocks: FlatBlock[]): { before: number[]; total: number } {
   const before: number[] = [];
@@ -25,6 +27,12 @@ export function cumulativeWords(blocks: FlatBlock[]): { before: number[]; total:
   return { before, total };
 }
 
+// "3. Ethics of Inarticulacy" and "3." in the notes carry the number; the body heading rarely does
+function stripNumbering(text: string): string {
+  const stripped = text.replace(/^\s*\p{N}+\s*[.)]?\s+(?=\S)/u, "");
+  return stripped.length > 0 ? stripped : text;
+}
+
 function titleTokens(text: string): string[] {
   return text
     .toLowerCase()
@@ -33,15 +41,26 @@ function titleTokens(text: string): string[] {
     .filter((t) => t.length >= 2 || /\p{N}/u.test(t));
 }
 
+function compact(text: string): string {
+  return text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
 // Recall over the printed title: OCR adds junk to a heading far more often than it drops words
 export function titleSimilarity(entryTitle: string, headingText: string): number {
-  const t = [...new Set(titleTokens(entryTitle))];
-  const h = new Set(titleTokens(headingText));
+  const title = stripNumbering(entryTitle);
+  const heading = stripNumbering(headingText);
+  const t = [...new Set(titleTokens(title))];
+  const h = new Set(titleTokens(heading));
   if (t.length === 0) return 0;
   const overlap = t.filter((w) => h.has(w)).length;
   if (t.length === 1) return overlap === 1 && h.size <= 3 ? 1 : 0;
   const sim = overlap / t.length;
-  return h.size > 2 * t.length + 3 ? sim * 0.6 : sim;
+  const tokenSim = h.size > 2 * t.length + 3 ? sim * 0.6 : sim;
+  // OCR splits words ("ETHI CS OF INARTICULACY"): the letters still read as the title once spacing is ignored
+  const ct = compact(title);
+  const ch = compact(heading);
+  if (ct.length >= MIN_COMPACT_LENGTH && ch.includes(ct) && ch.length <= ct.length * 1.5 + 3) return 1;
+  return tokenSim;
 }
 
 type Ranked = { heading: HeadingCatalogEntry; sim: number };
@@ -58,14 +77,18 @@ function unambiguous(best: Ranked, second: Ranked | undefined, margin: number) {
   return !second || second.sim <= best.sim - margin || second.heading.page === best.heading.page;
 }
 
+// Every strong title match is a candidate anchor: a chapter heading repeated in the notes or an
+// index matches just as well as the real one, and only the page-offset chain can tell them apart
 export function findAnchors(entries: TocEntry[], catalog: HeadingCatalogEntry[]): PageAnchor[] {
   const anchors: PageAnchor[] = [];
-  for (const entry of entries) {
-    if (entry.page === null || titleTokens(entry.title).length < 2) continue;
-    const [best, second] = ranked([entry.title], catalog);
-    if (!best || best.sim < ANCHOR_SIMILARITY || !unambiguous(best, second, 0.25)) continue;
-    anchors.push({ printed: entry.page, pdf: best.heading.page });
-  }
+  entries.forEach((entry, index) => {
+    if (entry.page === null || titleTokens(entry.title).length < 2) return;
+    const printed = entry.page;
+    ranked([entry.title], catalog)
+      .filter((c) => c.sim >= ANCHOR_SIMILARITY)
+      .slice(0, MAX_ANCHORS_PER_ENTRY)
+      .forEach((c) => anchors.push({ entry: index, printed, pdf: c.heading.page }));
+  });
   return anchors;
 }
 
@@ -77,7 +100,7 @@ export function buildPageMap(anchors: PageAnchor[]): PageMap | null {
   const prev = sorted.map(() => -1);
   sorted.forEach((b, j) => {
     sorted.slice(0, j).forEach((a, i) => {
-      if (b.pdf < a.pdf || Math.abs(b.pdf - b.printed - (a.pdf - a.printed)) > MAX_OFFSET_DRIFT) return;
+      if (a.entry === b.entry || b.pdf < a.pdf || Math.abs(b.pdf - b.printed - (a.pdf - a.printed)) > MAX_OFFSET_DRIFT) return;
       const score = (best[i] ?? 1) + 1;
       if (score > (best[j] ?? 1)) {
         best[j] = score;
@@ -139,15 +162,30 @@ function windowAround(catalog: HeadingCatalogEntry[], page: number, anchored: bo
   return close.length >= 2 ? close : nearPage(catalog, page, far);
 }
 
+// An entry without a printed page still starts before the next entry that has one
+function ceilings(entries: ChapterEntry[], pageMap: PageMap | null): (number | null)[] {
+  const out: (number | null)[] = entries.map(() => null);
+  if (!pageMap) return out;
+  let next: number | null = null;
+  for (let k = entries.length - 1; k >= 0; k--) {
+    out[k] = next;
+    const page = entries[k]?.page;
+    if (page !== null && page !== undefined) next = pageMap.expected(page);
+  }
+  return out;
+}
+
 export function locateEntries(entries: ChapterEntry[], catalog: HeadingCatalogEntry[], pageMap: PageMap | null): { located: Located[]; unresolved: Unresolved[] } {
   const located: Located[] = [];
   const unresolved: Unresolved[] = [];
+  const ceiling = ceilings(entries, pageMap);
   let lastBlock = -1;
 
-  for (const entry of entries) {
+  for (const [k, entry] of entries.entries()) {
     const printedPage = entry.page;
     const expected = printedPage !== null && pageMap ? { page: pageMap.expected(printedPage), anchored: pageMap.anchored(printedPage) } : null;
-    const pool = expected ? windowAround(catalog, expected.page, expected.anchored) : catalog;
+    const limit = ceiling[k] ?? null;
+    const pool = expected ? windowAround(catalog, expected.page, expected.anchored) : limit === null ? catalog : catalog.filter((h) => h.page <= limit);
     const open = pool.filter((h) => h.blockIndex > lastBlock);
     const scored = ranked(entry.titles, open);
     const [best, second] = scored;

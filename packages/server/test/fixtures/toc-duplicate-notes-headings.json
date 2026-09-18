@@ -1,0 +1,1657 @@
+{
+ "book": "Charles Taylor, Sources of the Self (1989), Marker output of a scanned PDF; chapter headings are repeated in the Notes section from PDF page 538",
+ "tocPages": [
+  8,
+  9
+ ],
+ "toc": [
+  {
+   "page": null,
+   "level": 0,
+   "title": "Preface"
+  },
+  {
+   "page": null,
+   "level": 0,
+   "title": "PART I"
+  },
+  {
+   "page": null,
+   "level": 1,
+   "title": "Identity and the Good"
+  },
+  {
+   "page": 3,
+   "level": 1,
+   "title": "1. Inescapable Frameworks"
+  },
+  {
+   "page": 25,
+   "level": 1,
+   "title": "2. The Self in Moral Space"
+  },
+  {
+   "page": 53,
+   "level": 1,
+   "title": "3. Ethics of Inarticulacy"
+  },
+  {
+   "page": 91,
+   "level": 1,
+   "title": "4. Moral Sources"
+  },
+  {
+   "page": null,
+   "level": 0,
+   "title": "PART II"
+  },
+  {
+   "page": null,
+   "level": 1,
+   "title": "Inwardness"
+  },
+  {
+   "page": 111,
+   "level": 1,
+   "title": "5. Moral Topography"
+  },
+  {
+   "page": 115,
+   "level": 1,
+   "title": "6. Plato's Self-Mastery"
+  },
+  {
+   "page": 127,
+   "level": 1,
+   "title": "7. \"In Interiore Homine\""
+  },
+  {
+   "page": 143,
+   "level": 1,
+   "title": "8. Descartes's Disengaged Reason"
+  },
+  {
+   "page": 159,
+   "level": 1,
+   "title": "9. Locke's Punctual Self"
+  },
+  {
+   "page": 177,
+   "level": 1,
+   "title": "10. Exploring \"l'Humaine Condition\""
+  },
+  {
+   "page": 185,
+   "level": 1,
+   "title": "11. Inner Nature"
+  },
+  {
+   "page": 199,
+   "level": 1,
+   "title": "12. A Digression on Historical Explanation"
+  },
+  {
+   "page": null,
+   "level": 0,
+   "title": "PART III"
+  },
+  {
+   "page": null,
+   "level": 1,
+   "title": "The Affirmation of Ordinary Life"
+  },
+  {
+   "page": 211,
+   "level": 1,
+   "title": "13. \"God Loveth Adverbs\""
+  },
+  {
+   "page": null,
+   "level": 1,
+   "title": "14. Rationalized Christianity"
+  },
+  {
+   "page": null,
+   "level": 1,
+   "title": "15. Moral Sentiments"
+  },
+  {
+   "page": null,
+   "level": 1,
+   "title": "16. The Providential Order"
+  },
+  {
+   "page": null,
+   "level": 1,
+   "title": "17. The Culture of Modernity"
+  },
+  {
+   "page": null,
+   "level": 0,
+   "title": "PART IV"
+  },
+  {
+   "page": null,
+   "level": 1,
+   "title": "The Voice of Nature"
+  },
+  {
+   "page": null,
+   "level": 1,
+   "title": "18. Fractured Horizons"
+  },
+  {
+   "page": null,
+   "level": 1,
+   "title": "19. Radical Enlightenment"
+  },
+  {
+   "page": null,
+   "level": 1,
+   "title": "20. Nature as Source"
+  },
+  {
+   "page": null,
+   "level": 1,
+   "title": "21. The Expressivist Turn"
+  },
+  {
+   "page": null,
+   "level": 0,
+   "title": "PART V"
+  },
+  {
+   "page": null,
+   "level": 1,
+   "title": "Subtler Languages"
+  },
+  {
+   "page": null,
+   "level": 1,
+   "title": "22. Our Victorian Contemporaries"
+  },
+  {
+   "page": null,
+   "level": 1,
+   "title": "23. Visions of the Post-Romantic Age"
+  },
+  {
+   "page": null,
+   "level": 1,
+   "title": "24. Epiphanies of Modernism"
+  },
+  {
+   "page": 495,
+   "level": 1,
+   "title": "25. Conclusion: The Conflicts of Modernity"
+  },
+  {
+   "page": null,
+   "level": 0,
+   "title": "Notes"
+  },
+  {
+   "page": null,
+   "level": 0,
+   "title": "Index"
+  }
+ ],
+ "catalog": [
+  {
+   "blockIndex": 0,
+   "page": 4,
+   "level": 1,
+   "text": "SOURCES OF THE SELF",
+   "words": 20
+  },
+  {
+   "blockIndex": 4,
+   "page": 5,
+   "level": 4,
+   "text": "Copyright C> 1989 by Charles Taylor All rights reserved Printed in the United States of America Tenth printing, 2001",
+   "words": 19
+  },
+  {
+   "blockIndex": 5,
+   "page": 5,
+   "level": 4,
+   "text": "Library of Congress Cataloging-in-Publication Data",
+   "words": 38
+  },
+  {
+   "blockIndex": 58,
+   "page": 10,
+   "level": 1,
+   "text": "PREFACE",
+   "words": 1617
+  },
+  {
+   "blockIndex": 76,
+   "page": 14,
+   "level": 1,
+   "text": "PART I",
+   "words": 6
+  },
+  {
+   "blockIndex": 78,
+   "page": 16,
+   "level": 1,
+   "text": "INESCAPABLE FRAMEWORKS",
+   "words": 382
+  },
+  {
+   "blockIndex": 83,
+   "page": 17,
+   "level": 1,
+   "text": "4 • IDENTI TY A ND THE GOOD",
+   "words": 2055
+  },
+  {
+   "blockIndex": 105,
+   "page": 21,
+   "level": 1,
+   "text": "8 . IDEN TITY AND THE GOO D",
+   "words": 2007
+  },
+  {
+   "blockIndex": 125,
+   "page": 25,
+   "level": 1,
+   "text": "u. IDENTITY A ND THE GOOD",
+   "words": 1012
+  },
+  {
+   "blockIndex": 136,
+   "page": 27,
+   "level": 1,
+   "text": "14• IDENTITY A ND THE GOOD",
+   "words": 145
+  },
+  {
+   "blockIndex": 139,
+   "page": 27,
+   "level": 1,
+   "text": "1 .4",
+   "words": 1904
+  },
+  {
+   "blockIndex": 156,
+   "page": 31,
+   "level": 4,
+   "text": "18• IDENTITY A ND THE GOO D",
+   "words": 3061
+  },
+  {
+   "blockIndex": 187,
+   "page": 37,
+   "level": 1,
+   "text": "Z4 • IDE NTITY AND THE GOOD",
+   "words": 159
+  },
+  {
+   "blockIndex": 189,
+   "page": 38,
+   "level": 1,
+   "text": "THE SELF IN MORAL SPACE",
+   "words": 3825
+  },
+  {
+   "blockIndex": 223,
+   "page": 45,
+   "level": 1,
+   "text": "2.2",
+   "words": 735
+  },
+  {
+   "blockIndex": 231,
+   "page": 47,
+   "level": 1,
+   "text": "34 • IDENTITY AND THE G O OD",
+   "words": 4143
+  },
+  {
+   "blockIndex": 273,
+   "page": 55,
+   "level": 1,
+   "text": "4� • IDENTITY A ND THE GOOD",
+   "words": 5450
+  },
+  {
+   "blockIndex": 320,
+   "page": 65,
+   "level": 1,
+   "text": "52. IDE N TITY A ND THE GOOD",
+   "words": 82
+  },
+  {
+   "blockIndex": 322,
+   "page": 66,
+   "level": 1,
+   "text": "ETHI CS OF INARTICULACY",
+   "words": 340
+  },
+  {
+   "blockIndex": 329,
+   "page": 67,
+   "level": 1,
+   "text": "54. IDEN TITY A ND THE GOOD",
+   "words": 4195
+  },
+  {
+   "blockIndex": 368,
+   "page": 75,
+   "level": 1,
+   "text": "62 • IDENTI TY AND THE G O OD",
+   "words": 169
+  },
+  {
+   "blockIndex": 371,
+   "page": 75,
+   "level": 1,
+   "text": "3.2",
+   "words": 12175
+  },
+  {
+   "blockIndex": 474,
+   "page": 99,
+   "level": 1,
+   "text": "86• IDE N TITY A ND THE GOOD",
+   "words": 2086
+  },
+  {
+   "blockIndex": 492,
+   "page": 103,
+   "level": 1,
+   "text": "90• IDENTITY AND THE GOOD",
+   "words": 95
+  },
+  {
+   "blockIndex": 496,
+   "page": 104,
+   "level": 1,
+   "text": "MORAL S OURCES",
+   "words": 7018
+  },
+  {
+   "blockIndex": 567,
+   "page": 118,
+   "level": 1,
+   "text": "4.4",
+   "words": 1224
+  },
+  {
+   "blockIndex": 580,
+   "page": 122,
+   "level": 1,
+   "text": "PART II",
+   "words": 2
+  },
+  {
+   "blockIndex": 581,
+   "page": 122,
+   "level": 1,
+   "text": "Inwardness",
+   "words": 1
+  },
+  {
+   "blockIndex": 582,
+   "page": 124,
+   "level": 1,
+   "text": "MORAL TOPOGRAPHY",
+   "words": 401
+  },
+  {
+   "blockIndex": 587,
+   "page": 125,
+   "level": 1,
+   "text": "II2 • INWA RDNESS",
+   "words": 1023
+  },
+  {
+   "blockIndex": 598,
+   "page": 127,
+   "level": 1,
+   "text": "II4 . INWA R D NESS",
+   "words": 84
+  },
+  {
+   "blockIndex": 601,
+   "page": 128,
+   "level": 1,
+   "text": "PLATO'S SELF-MASTERY",
+   "words": 4543
+  },
+  {
+   "blockIndex": 648,
+   "page": 137,
+   "level": 1,
+   "text": "U4 . INWA RDN ESS",
+   "words": 1486
+  },
+  {
+   "blockIndex": 665,
+   "page": 140,
+   "level": 1,
+   "text": "\"IN INTERIORE H OMINE\"",
+   "words": 7741
+  },
+  {
+   "blockIndex": 742,
+   "page": 155,
+   "level": 1,
+   "text": "I4:1 • INWA RDNESS",
+   "words": 73
+  },
+  {
+   "blockIndex": 745,
+   "page": 156,
+   "level": 1,
+   "text": "DESCARTES 'S D ISENGAGED REASON",
+   "words": 5475
+  },
+  {
+   "blockIndex": 801,
+   "page": 167,
+   "level": 1,
+   "text": "I54 . INWA RDNESS",
+   "words": 1963
+  },
+  {
+   "blockIndex": 825,
+   "page": 171,
+   "level": 1,
+   "text": "ISS ' INW A R DNESS",
+   "words": 86
+  },
+  {
+   "blockIndex": 827,
+   "page": 172,
+   "level": 1,
+   "text": "LOCKE'S PUNCTUAL SELF",
+   "words": 6492
+  },
+  {
+   "blockIndex": 899,
+   "page": 185,
+   "level": 1,
+   "text": "Or again:",
+   "words": 2031
+  },
+  {
+   "blockIndex": 921,
+   "page": 190,
+   "level": 1,
+   "text": "10",
+   "words": 1
+  },
+  {
+   "blockIndex": 922,
+   "page": 190,
+   "level": 1,
+   "text": "EXPLORING \" L' HUMAINE CONDITION\"",
+   "words": 3545
+  },
+  {
+   "blockIndex": 973,
+   "page": 198,
+   "level": 1,
+   "text": "11",
+   "words": 1
+  },
+  {
+   "blockIndex": 974,
+   "page": 198,
+   "level": 1,
+   "text": "INNER NATURE",
+   "words": 6264
+  },
+  {
+   "blockIndex": 1048,
+   "page": 211,
+   "level": 1,
+   "text": "I98 • INWARDNE SS",
+   "words": 233
+  },
+  {
+   "blockIndex": 1051,
+   "page": 212,
+   "level": 1,
+   "text": "12",
+   "words": 1
+  },
+  {
+   "blockIndex": 1052,
+   "page": 212,
+   "level": 1,
+   "text": "A D IG RESSION ON HISTORICAL EXPLANATION",
+   "words": 4284
+  },
+  {
+   "blockIndex": 1099,
+   "page": 222,
+   "level": 1,
+   "text": "PART III",
+   "words": 2
+  },
+  {
+   "blockIndex": 1100,
+   "page": 222,
+   "level": 1,
+   "text": "The Affirmation of Ordinary Life",
+   "words": 5
+  },
+  {
+   "blockIndex": 1101,
+   "page": 224,
+   "level": 1,
+   "text": "13",
+   "words": 1
+  },
+  {
+   "blockIndex": 1102,
+   "page": 224,
+   "level": 1,
+   "text": "\"GOD LOVETH ADVE RBS\"",
+   "words": 4
+  },
+  {
+   "blockIndex": 1103,
+   "page": 224,
+   "level": 4,
+   "text": "13.1",
+   "words": 1365
+  },
+  {
+   "blockIndex": 1120,
+   "page": 227,
+   "level": 1,
+   "text": "U4 ' THE A FFIR MATION OF ORDINA R Y L IFE",
+   "words": 2033
+  },
+  {
+   "blockIndex": 1141,
+   "page": 231,
+   "level": 4,
+   "text": "218 · THE A FFIR MA TION OF ORDINA R Y LIFE",
+   "words": 187
+  },
+  {
+   "blockIndex": 1144,
+   "page": 231,
+   "level": 1,
+   "text": "1 3.2",
+   "words": 1836
+  },
+  {
+   "blockIndex": 1164,
+   "page": 235,
+   "level": 1,
+   "text": "2.2.2. • THE A F Fl R MAT ION 0 F O R DIN A R Y L IF E",
+   "words": 1037
+  },
+  {
+   "blockIndex": 1176,
+   "page": 237,
+   "level": 1,
+   "text": "224 • THE A FFIR MA TION OF ORDINA R Y L IFE",
+   "words": 1576
+  },
+  {
+   "blockIndex": 1199,
+   "page": 240,
+   "level": 4,
+   "text": "13.3",
+   "words": 311
+  },
+  {
+   "blockIndex": 1205,
+   "page": 241,
+   "level": 1,
+   "text": "2.2.8 • THE A FFIRMA TI ON O F ORDINAR Y LIFE",
+   "words": 1142
+  },
+  {
+   "blockIndex": 1219,
+   "page": 243,
+   "level": 1,
+   "text": "13.4",
+   "words": 808
+  },
+  {
+   "blockIndex": 1226,
+   "page": 245,
+   "level": 1,
+   "text": "232 ' THE A FFIRMA TI ON QF ORDINA R Y L IFE",
+   "words": 827
+  },
+  {
+   "blockIndex": 1237,
+   "page": 247,
+   "level": 1,
+   "text": "14",
+   "words": 1
+  },
+  {
+   "blockIndex": 1238,
+   "page": 247,
+   "level": 1,
+   "text": "RATIONALIZED CHRI STIANITY",
+   "words": 3
+  },
+  {
+   "blockIndex": 1239,
+   "page": 247,
+   "level": 4,
+   "text": "14.1",
+   "words": 1592
+  },
+  {
+   "blockIndex": 1256,
+   "page": 250,
+   "level": 4,
+   "text": "14.2",
+   "words": 221
+  },
+  {
+   "blockIndex": 1260,
+   "page": 251,
+   "level": 1,
+   "text": "238 ' THE A FFIR MATION OF OR DINARY L IFE",
+   "words": 1061
+  },
+  {
+   "blockIndex": 1270,
+   "page": 253,
+   "level": 4,
+   "text": "240 • THE A FFIR MATION OF ORDINA R Y L I FE",
+   "words": 3846
+  },
+  {
+   "blockIndex": 1311,
+   "page": 261,
+   "level": 1,
+   "text": "M ORAL SENTIMENTS",
+   "words": 3
+  },
+  {
+   "blockIndex": 1312,
+   "page": 261,
+   "level": 4,
+   "text": "15.1",
+   "words": 835
+  },
+  {
+   "blockIndex": 1324,
+   "page": 263,
+   "level": 1,
+   "text": "2.50 ' THE A FFIR MA TION OF ORDINARY LIFE",
+   "words": 971
+  },
+  {
+   "blockIndex": 1339,
+   "page": 265,
+   "level": 1,
+   "text": "�5� • THE A FFIR MATION OF ORDINAR Y L IFE",
+   "words": 2065
+  },
+  {
+   "blockIndex": 1359,
+   "page": 269,
+   "level": 1,
+   "text": "2.56 ' THE A FFIRMA TION OF ORDINA RY LIFE",
+   "words": 1070
+  },
+  {
+   "blockIndex": 1372,
+   "page": 271,
+   "level": 1,
+   "text": "2.58 ' THE A FFIRMA TI ON OF ORDINA R Y L IFE",
+   "words": 643
+  },
+  {
+   "blockIndex": 1383,
+   "page": 272,
+   "level": 4,
+   "text": "15.2",
+   "words": 1258
+  },
+  {
+   "blockIndex": 1398,
+   "page": 275,
+   "level": 1,
+   "text": "262 · THE A FFIR M A TION OF O R D INARY L IFE",
+   "words": 1020
+  },
+  {
+   "blockIndex": 1412,
+   "page": 277,
+   "level": 1,
+   "text": "264 . THE AFFIRMATION OF O R DINAR Y L IFE",
+   "words": 772
+  },
+  {
+   "blockIndex": 1423,
+   "page": 279,
+   "level": 1,
+   "text": "THE PROVIDENTIAL O RDER",
+   "words": 4
+  },
+  {
+   "blockIndex": 1424,
+   "page": 279,
+   "level": 4,
+   "text": "16.1",
+   "words": 3886
+  },
+  {
+   "blockIndex": 1468,
+   "page": 287,
+   "level": 4,
+   "text": "2.74 ' THE A FFIR M A TION OF ORDINARY LIFE",
+   "words": 245
+  },
+  {
+   "blockIndex": 1472,
+   "page": 287,
+   "level": 1,
+   "text": "16.2",
+   "words": 95
+  },
+  {
+   "blockIndex": 1476,
+   "page": 287,
+   "level": 1,
+   "text": "Or again:",
+   "words": 511
+  },
+  {
+   "blockIndex": 1484,
+   "page": 289,
+   "level": 1,
+   "text": "2.76 • TH E A F FI R MAT ION 0 F O R DIN A R Y L 1 F E",
+   "words": 183
+  },
+  {
+   "blockIndex": 1488,
+   "page": 289,
+   "level": 1,
+   "text": "Further on, he praises God:",
+   "words": 1668
+  },
+  {
+   "blockIndex": 1509,
+   "page": 293,
+   "level": 1,
+   "text": "2.80 • THE A FFIRMATION OF -O R D INARY L IFE",
+   "words": 845
+  },
+  {
+   "blockIndex": 1523,
+   "page": 295,
+   "level": 1,
+   "text": "�8� • THE A FFIRMA TION OF O R DINAR Y LIFE",
+   "words": 991
+  },
+  {
+   "blockIndex": 1537,
+   "page": 297,
+   "level": 1,
+   "text": "�84 • THE A FFIR M A TI O N OF O R DINAR Y LIFE",
+   "words": 433
+  },
+  {
+   "blockIndex": 1541,
+   "page": 298,
+   "level": 1,
+   "text": "17",
+   "words": 1
+  },
+  {
+   "blockIndex": 1542,
+   "page": 298,
+   "level": 1,
+   "text": "THE CULTURE OF MODERNITY",
+   "words": 4
+  },
+  {
+   "blockIndex": 1543,
+   "page": 298,
+   "level": 1,
+   "text": "17.1",
+   "words": 340
+  },
+  {
+   "blockIndex": 1549,
+   "page": 299,
+   "level": 1,
+   "text": "�86 • THE A FFIRMA TION OF O R DINAR Y L IFE",
+   "words": 316
+  },
+  {
+   "blockIndex": 1553,
+   "page": 299,
+   "level": 1,
+   "text": "1 7.2",
+   "words": 647
+  },
+  {
+   "blockIndex": 1563,
+   "page": 301,
+   "level": 1,
+   "text": "2.88 · THE A FFIR M A TION OF ORD I NARY LIFE",
+   "words": 1700
+  },
+  {
+   "blockIndex": 1588,
+   "page": 304,
+   "level": 4,
+   "text": "17.4",
+   "words": 1394
+  },
+  {
+   "blockIndex": 1602,
+   "page": 307,
+   "level": 4,
+   "text": "17.5",
+   "words": 1110
+  },
+  {
+   "blockIndex": 1612,
+   "page": 309,
+   "level": 4,
+   "text": "17.6",
+   "words": 1561
+  },
+  {
+   "blockIndex": 1631,
+   "page": 313,
+   "level": 1,
+   "text": "3 00 • THE A FFIRMA TION OF O R D INA R Y L IFE",
+   "words": 1143
+  },
+  {
+   "blockIndex": 1650,
+   "page": 315,
+   "level": 4,
+   "text": "17.7",
+   "words": 258
+  },
+  {
+   "blockIndex": 1654,
+   "page": 316,
+   "level": 1,
+   "text": "PART IV",
+   "words": 2
+  },
+  {
+   "blockIndex": 1655,
+   "page": 316,
+   "level": 1,
+   "text": "The Voice of Nature",
+   "words": 4
+  },
+  {
+   "blockIndex": 1656,
+   "page": 318,
+   "level": 1,
+   "text": "18",
+   "words": 1
+  },
+  {
+   "blockIndex": 1657,
+   "page": 318,
+   "level": 1,
+   "text": "FRACTURED HORIZONS",
+   "words": 2
+  },
+  {
+   "blockIndex": 1658,
+   "page": 318,
+   "level": 4,
+   "text": "18.1",
+   "words": 4326
+  },
+  {
+   "blockIndex": 1704,
+   "page": 327,
+   "level": 1,
+   "text": "J I4 . THE VOICE OF N A TUR E",
+   "words": 142
+  },
+  {
+   "blockIndex": 1706,
+   "page": 327,
+   "level": 3,
+   "text": "18.2",
+   "words": 2790
+  },
+  {
+   "blockIndex": 1735,
+   "page": 333,
+   "level": 1,
+   "text": "320 • THE VOICE OF NA TUR E",
+   "words": 181
+  },
+  {
+   "blockIndex": 1738,
+   "page": 334,
+   "level": 1,
+   "text": "19",
+   "words": 1
+  },
+  {
+   "blockIndex": 1739,
+   "page": 334,
+   "level": 1,
+   "text": "RADICAL ENLIGHTENMENT",
+   "words": 2
+  },
+  {
+   "blockIndex": 1740,
+   "page": 334,
+   "level": 4,
+   "text": "19.1",
+   "words": 2276
+  },
+  {
+   "blockIndex": 1767,
+   "page": 339,
+   "level": 1,
+   "text": "32.6 • THE V O ICE OF NA TURE",
+   "words": 927
+  },
+  {
+   "blockIndex": 1779,
+   "page": 341,
+   "level": 1,
+   "text": "32.8 . THE VOICE OF NA TUR E",
+   "words": 2891
+  },
+  {
+   "blockIndex": 1809,
+   "page": 347,
+   "level": 1,
+   "text": "334 • TH E VOICE OF N A TURE",
+   "words": 909
+  },
+  {
+   "blockIndex": 1824,
+   "page": 349,
+   "level": 1,
+   "text": "336 ' THE V O I CE OF NA TURE",
+   "words": 4969
+  },
+  {
+   "blockIndex": 1878,
+   "page": 359,
+   "level": 1,
+   "text": "346 • THE VOICE OF NA TURE",
+   "words": 599
+  },
+  {
+   "blockIndex": 1888,
+   "page": 360,
+   "level": 1,
+   "text": "19.3",
+   "words": 272
+  },
+  {
+   "blockIndex": 1891,
+   "page": 361,
+   "level": 4,
+   "text": "348 • THE VOICE OF NA TURE",
+   "words": 924
+  },
+  {
+   "blockIndex": 1907,
+   "page": 363,
+   "level": 1,
+   "text": "350 • THE VOICE OF N A TURE",
+   "words": 1422
+  },
+  {
+   "blockIndex": 1930,
+   "page": 366,
+   "level": 4,
+   "text": "And from this he concludes:",
+   "words": 391
+  },
+  {
+   "blockIndex": 1936,
+   "page": 367,
+   "level": 1,
+   "text": "3 54 ' THE VOICE OF NA TURE",
+   "words": 383
+  },
+  {
+   "blockIndex": 1940,
+   "page": 368,
+   "level": 1,
+   "text": "20",
+   "words": 1
+  },
+  {
+   "blockIndex": 1941,
+   "page": 368,
+   "level": 1,
+   "text": "NATURE AS SOURCE",
+   "words": 3
+  },
+  {
+   "blockIndex": 1942,
+   "page": 368,
+   "level": 4,
+   "text": "20.1",
+   "words": 2266
+  },
+  {
+   "blockIndex": 1969,
+   "page": 373,
+   "level": 1,
+   "text": "3 60 • TH E VOICE OF N A TURE",
+   "words": 1556
+  },
+  {
+   "blockIndex": 1989,
+   "page": 376,
+   "level": 1,
+   "text": "20.2",
+   "words": 2119
+  },
+  {
+   "blockIndex": 2014,
+   "page": 381,
+   "level": 1,
+   "text": "THE EXPRESSIVIST TURN",
+   "words": 3
+  },
+  {
+   "blockIndex": 2015,
+   "page": 381,
+   "level": 4,
+   "text": "21.1",
+   "words": 3047
+  },
+  {
+   "blockIndex": 2044,
+   "page": 387,
+   "level": 1,
+   "text": "21.2",
+   "words": 1008
+  },
+  {
+   "blockIndex": 2054,
+   "page": 389,
+   "level": 1,
+   "text": "376 ' THE VOICE OF N A TUR E",
+   "words": 1020
+  },
+  {
+   "blockIndex": 2064,
+   "page": 391,
+   "level": 1,
+   "text": "3 78 ' THE VOICE OF NATURE",
+   "words": 5255
+  },
+  {
+   "blockIndex": 2127,
+   "page": 402,
+   "level": 4,
+   "text": "21.4",
+   "words": 917
+  },
+  {
+   "blockIndex": 2136,
+   "page": 404,
+   "level": 1,
+   "text": "PART V",
+   "words": 2
+  },
+  {
+   "blockIndex": 2137,
+   "page": 404,
+   "level": 1,
+   "text": "Subtler Languages",
+   "words": 2
+  },
+  {
+   "blockIndex": 2138,
+   "page": 406,
+   "level": 1,
+   "text": "22",
+   "words": 1
+  },
+  {
+   "blockIndex": 2139,
+   "page": 406,
+   "level": 1,
+   "text": "OUR VICTORIAN C ONTEMPORARIES",
+   "words": 4
+  },
+  {
+   "blockIndex": 2140,
+   "page": 406,
+   "level": 1,
+   "text": "22.1",
+   "words": 4091
+  },
+  {
+   "blockIndex": 2179,
+   "page": 414,
+   "level": 4,
+   "text": "22.2",
+   "words": 2084
+  },
+  {
+   "blockIndex": 2203,
+   "page": 419,
+   "level": 1,
+   "text": "406 • S U B T L E R LAN G U AGE S",
+   "words": 281
+  },
+  {
+   "blockIndex": 2209,
+   "page": 419,
+   "level": 1,
+   "text": "Or again,",
+   "words": 678
+  },
+  {
+   "blockIndex": 2220,
+   "page": 421,
+   "level": 1,
+   "text": "On a more personal level, he says in a letter:",
+   "words": 814
+  },
+  {
+   "blockIndex": 2231,
+   "page": 423,
+   "level": 4,
+   "text": "4IO ' S UB TLER LANG U A GES",
+   "words": 19
+  },
+  {
+   "blockIndex": 2233,
+   "page": 423,
+   "level": 1,
+   "text": "22.3",
+   "words": 1544
+  },
+  {
+   "blockIndex": 2249,
+   "page": 426,
+   "level": 4,
+   "text": "22.4",
+   "words": 2253
+  },
+  {
+   "blockIndex": 2273,
+   "page": 431,
+   "level": 1,
+   "text": "4I8 · SUBTLER LAN G U A GES",
+   "words": 113
+  },
+  {
+   "blockIndex": 2275,
+   "page": 432,
+   "level": 1,
+   "text": "23",
+   "words": 1
+  },
+  {
+   "blockIndex": 2276,
+   "page": 432,
+   "level": 1,
+   "text": "VISIONS OF THE POST-ROMANTIC AGE",
+   "words": 5
+  },
+  {
+   "blockIndex": 2277,
+   "page": 432,
+   "level": 4,
+   "text": "23.1",
+   "words": 3180
+  },
+  {
+   "blockIndex": 2311,
+   "page": 438,
+   "level": 1,
+   "text": "23.2",
+   "words": 2059
+  },
+  {
+   "blockIndex": 2332,
+   "page": 442,
+   "level": 4,
+   "text": "23.3",
+   "words": 2024
+  },
+  {
+   "blockIndex": 2355,
+   "page": 447,
+   "level": 4,
+   "text": "434 ' SUBTLER LAN G U A G ES",
+   "words": 132
+  },
+  {
+   "blockIndex": 2358,
+   "page": 447,
+   "level": 1,
+   "text": "23.4",
+   "words": 705
+  },
+  {
+   "blockIndex": 2370,
+   "page": 449,
+   "level": 1,
+   "text": "436 ' SUB TLER LANG U A GES",
+   "words": 882
+  },
+  {
+   "blockIndex": 2385,
+   "page": 451,
+   "level": 1,
+   "text": "438 ' SUBTLER LANG U A GES",
+   "words": 1623
+  },
+  {
+   "blockIndex": 2416,
+   "page": 454,
+   "level": 4,
+   "text": "23.5",
+   "words": 1023
+  },
+  {
+   "blockIndex": 2431,
+   "page": 457,
+   "level": 1,
+   "text": "444 ' S UB TLER LANG U A GES",
+   "words": 1632
+  },
+  {
+   "blockIndex": 2451,
+   "page": 460,
+   "level": 1,
+   "text": "23.6",
+   "words": 3488
+  },
+  {
+   "blockIndex": 2487,
+   "page": 467,
+   "level": 4,
+   "text": "454 . SUB T L E R LAN G U A G E S",
+   "words": 706
+  },
+  {
+   "blockIndex": 2495,
+   "page": 469,
+   "level": 1,
+   "text": "24",
+   "words": 1
+  },
+  {
+   "blockIndex": 2496,
+   "page": 469,
+   "level": 1,
+   "text": "EPIPHANIES OF MODERNISM",
+   "words": 3
+  },
+  {
+   "blockIndex": 2497,
+   "page": 469,
+   "level": 4,
+   "text": "24.1",
+   "words": 4729
+  },
+  {
+   "blockIndex": 2549,
+   "page": 479,
+   "level": 1,
+   "text": "466 • S UB T L E R LAN G U AGE S",
+   "words": 198
+  },
+  {
+   "blockIndex": 2555,
+   "page": 479,
+   "level": 1,
+   "text": "24.2",
+   "words": 2645
+  },
+  {
+   "blockIndex": 2588,
+   "page": 485,
+   "level": 1,
+   "text": "47� • S VB T L ER LANG V A G E S",
+   "words": 134
+  },
+  {
+   "blockIndex": 2590,
+   "page": 485,
+   "level": 1,
+   "text": "24.3",
+   "words": 800
+  },
+  {
+   "blockIndex": 2599,
+   "page": 487,
+   "level": 1,
+   "text": "474 ' S UB TLER LANG UA G ES",
+   "words": 28
+  },
+  {
+   "blockIndex": 2601,
+   "page": 487,
+   "level": 4,
+   "text": "IN A STATION OF THE METRO",
+   "words": 1783
+  },
+  {
+   "blockIndex": 2622,
+   "page": 490,
+   "level": 4,
+   "text": "24.4",
+   "words": 2112
+  },
+  {
+   "blockIndex": 2646,
+   "page": 495,
+   "level": 1,
+   "text": "482 ' SUBTLER LANG UA GES",
+   "words": 125
+  },
+  {
+   "blockIndex": 2649,
+   "page": 495,
+   "level": 3,
+   "text": "And these Things,",
+   "words": 110
+  },
+  {
+   "blockIndex": 2652,
+   "page": 495,
+   "level": 4,
+   "text": "24.5",
+   "words": 559
+  },
+  {
+   "blockIndex": 2660,
+   "page": 497,
+   "level": 1,
+   "text": "484 • S UB TL ER LANG UA GES",
+   "words": 720
+  },
+  {
+   "blockIndex": 2674,
+   "page": 499,
+   "level": 1,
+   "text": "486 • S UB T L E R LAN G U A G E S",
+   "words": 1801
+  },
+  {
+   "blockIndex": 2700,
+   "page": 503,
+   "level": 3,
+   "text": "24.6",
+   "words": 1531
+  },
+  {
+   "blockIndex": 2720,
+   "page": 508,
+   "level": 1,
+   "text": "CONCLUSION: THE CONFLICTS OF MODERNITY",
+   "words": 5
+  },
+  {
+   "blockIndex": 2721,
+   "page": 508,
+   "level": 4,
+   "text": "25.1",
+   "words": 2043
+  },
+  {
+   "blockIndex": 2742,
+   "page": 512,
+   "level": 1,
+   "text": "25.2",
+   "words": 1329
+  },
+  {
+   "blockIndex": 2763,
+   "page": 515,
+   "level": 4,
+   "text": "25.3",
+   "words": 5498
+  },
+  {
+   "blockIndex": 2816,
+   "page": 526,
+   "level": 4,
+   "text": "25.4",
+   "words": 2024
+  },
+  {
+   "blockIndex": 2842,
+   "page": 531,
+   "level": 1,
+   "text": "JIB ' CONCL USION",
+   "words": 171
+  },
+  {
+   "blockIndex": 2845,
+   "page": 531,
+   "level": 4,
+   "text": "25.5",
+   "words": 1384
+  },
+  {
+   "blockIndex": 2868,
+   "page": 536,
+   "level": 4,
+   "text": "In LIJ Io Z >< LIJ o Z -",
+   "words": 9
+  },
+  {
+   "blockIndex": 2869,
+   "page": 538,
+   "level": 1,
+   "text": "NOTES",
+   "words": 1
+  },
+  {
+   "blockIndex": 2870,
+   "page": 538,
+   "level": 4,
+   "text": "1. INESCAPABLE FRAMEWORKS",
+   "words": 299
+  },
+  {
+   "blockIndex": 2885,
+   "page": 539,
+   "level": 4,
+   "text": "2.. THE SELF IN MORAL SPACE",
+   "words": 2412
+  },
+  {
+   "blockIndex": 2929,
+   "page": 543,
+   "level": 4,
+   "text": "3. ETHICS OF INARTICULACY",
+   "words": 2401
+  },
+  {
+   "blockIndex": 3004,
+   "page": 548,
+   "level": 4,
+   "text": "4. MORAL SOURCES",
+   "words": 745
+  },
+  {
+   "blockIndex": 3030,
+   "page": 550,
+   "level": 4,
+   "text": "5. MORAL TOPOGRAPHY",
+   "words": 379
+  },
+  {
+   "blockIndex": 3041,
+   "page": 551,
+   "level": 4,
+   "text": "6. PLATO' S SELF-MASTERY",
+   "words": 481
+  },
+  {
+   "blockIndex": 3050,
+   "page": 552,
+   "level": 1,
+   "text": "7. \"IN INTERIORE HOMINE\"",
+   "words": 719
+  },
+  {
+   "blockIndex": 3080,
+   "page": 553,
+   "level": 4,
+   "text": "8. DESCARTES' S DISENGAGED REASON",
+   "words": 1804
+  },
+  {
+   "blockIndex": 3120,
+   "page": 557,
+   "level": 4,
+   "text": "9. LOCKE' S PUNCTUAL SELF",
+   "words": 970
+  },
+  {
+   "blockIndex": 3146,
+   "page": 559,
+   "level": 4,
+   "text": "10. EXPLORING \"L 'HUMAINE CONDITION\"",
+   "words": 469
+  },
+  {
+   "blockIndex": 3172,
+   "page": 560,
+   "level": 1,
+   "text": "I I. INNER NATURE",
+   "words": 602
+  },
+  {
+   "blockIndex": 3194,
+   "page": 561,
+   "level": 4,
+   "text": "1 2 . A DIG RESSION ON HISTORICAL EXPLANATION",
+   "words": 653
+  },
+  {
+   "blockIndex": 3211,
+   "page": 563,
+   "level": 1,
+   "text": "13. \"GOD LOVETH ADVERBS\"",
+   "words": 1323
+  },
+  {
+   "blockIndex": 3267,
+   "page": 566,
+   "level": 4,
+   "text": "14. RATIONALIZED CHRISTIANITY",
+   "words": 1161
+  },
+  {
+   "blockIndex": 3307,
+   "page": 568,
+   "level": 1,
+   "text": "I 5. MORAL SENTIMENTS",
+   "words": 2174
+  },
+  {
+   "blockIndex": 3390,
+   "page": 573,
+   "level": 4,
+   "text": "1 6. THE PROVIDENTIAL ORDER",
+   "words": 1142
+  },
+  {
+   "blockIndex": 3431,
+   "page": 575,
+   "level": 4,
+   "text": "1 7. THE CULTURE OF MODERNITY",
+   "words": 1135
+  },
+  {
+   "blockIndex": 3479,
+   "page": 578,
+   "level": 4,
+   "text": "1 8 . FRACTURED HORIZONS",
+   "words": 626
+  },
+  {
+   "blockIndex": 3492,
+   "page": 579,
+   "level": 4,
+   "text": "19. RADICAL ENLIGHTENMENT",
+   "words": 1934
+  },
+  {
+   "blockIndex": 3557,
+   "page": 583,
+   "level": 4,
+   "text": "2.0. NATURE AS SOURCE",
+   "words": 897
+  },
+  {
+   "blockIndex": 3593,
+   "page": 585,
+   "level": 1,
+   "text": "2. 1. THE EXPRESSIVIST TURN",
+   "words": 105
+  },
+  {
+   "blockIndex": 3597,
+   "page": 586,
+   "level": 1,
+   "text": "For I have learned To look on nature, not as in the hour Of thoughtless youth; but hearing oftentimes The still, sad music of humanity, Nor harsh nor grating, though of ample power To chasten and subdue. And I have felt ' A presence that disturbs me with the joy Of elevated thoughts; a sense sublime Of something deeply interfused, Whose dwelling is the light of setting suns, And the round ocean and the living air, And the blue sky, and in the mind of man; A motion and a spirit, that impels All thinking things, all objects of all thought, And rolls through all things.",
+   "words": 1413
+  },
+  {
+   "blockIndex": 3630,
+   "page": 589,
+   "level": 1,
+   "text": "would stand,",
+   "words": 354
+  },
+  {
+   "blockIndex": 3649,
+   "page": 590,
+   "level": 4,
+   "text": "2.2.. OUR VICTORIAN CONTEMPORARIES",
+   "words": 2238
+  },
+  {
+   "blockIndex": 3703,
+   "page": 594,
+   "level": 4,
+   "text": "2.3. VISIONS OF THE POST- ROMANTIC AGE",
+   "words": 2121
+  },
+  {
+   "blockIndex": 3788,
+   "page": 599,
+   "level": 4,
+   "text": "2. 4 . EPIPHANIES OF MODERNISM",
+   "words": 3409
+  },
+  {
+   "blockIndex": 3892,
+   "page": 606,
+   "level": 4,
+   "text": "2. 5. CONCLUSION: THE CONFLICTS OF MODERNITY",
+   "words": 979
+  },
+  {
+   "blockIndex": 3926,
+   "page": 610,
+   "level": 1,
+   "text": "INDEX",
+   "words": 3106
+  }
+ ]
+}
