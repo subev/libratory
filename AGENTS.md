@@ -953,11 +953,8 @@ Facts agents get wrong without reading the suite first:
 
 ## Pending Task Files
 
-See `tasks/` directory. Current tasks:
-
-- `tasks/chapter-merge-split.md` — Merge short chapters or split overly long ones
-- `tasks/column-filtering.md` — Filter multi-column PDFs by x-coordinate
-- `tasks/per-chapter-voice-speed.md` — Per-chapter voice and speed overrides
+The `tasks/` directory is the list — one file per idea, its first line the title. It is not repeated
+here: a hand-kept copy named three of nineteen files within a month.
 
 ### Bulgarian, and why `lang` is load-bearing
 
