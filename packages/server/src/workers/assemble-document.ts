@@ -10,6 +10,7 @@ import { chapterChunkPreviewDir } from "../lib/chunk-previews.ts";
 import { ensureSyncMap } from "../lib/sync-map.ts";
 import { buildReadaloudEpub, type ReadaloudChapter } from "../lib/readaloud-epub.ts";
 import { buildP2afLayer } from "../lib/p2af.ts";
+import { chapterLink } from "../lib/reader-doc.ts";
 import { deferUntilInputsSettle, documentJobKey } from "../lib/output-readiness.ts";
 import type { WorkerUtils } from "graphile-worker";
 import { mkdir, writeFile, rm } from "node:fs/promises";
@@ -177,7 +178,7 @@ async function assembleReadaloud(
   language: string | null,
   log: (msg: string) => Promise<void>,
 ) {
-  type Candidate = { id: string; index: number; title: string; audioPath: string | null; durationMs: number | null; chunkDir: string };
+  type Candidate = { id: string; index: number; title: string; audioPath: string | null; durationMs: number | null; chunkDir: string; link?: string };
 
   let candidates: Candidate[];
   if (language) {
@@ -190,6 +191,7 @@ async function assembleReadaloud(
         audioPath: chapterVariants.audioPath,
         durationMs: chapterVariants.audioDurationMs,
         audioStatus: chapterVariants.audioStatus,
+        source: chapters.source,
       })
       .from(chapterVariants)
       .innerJoin(chapters, eq(chapterVariants.chapterId, chapters.id))
@@ -208,6 +210,7 @@ async function assembleReadaloud(
         audioPath: r.audioPath,
         durationMs: r.durationMs,
         chunkDir: translationChunkPreviewDir(bookId, language, r.index),
+        link: chapterLink(r),
       }));
   } else {
     const rows = await db
@@ -222,6 +225,7 @@ async function assembleReadaloud(
       audioPath: ch.audioPath,
       durationMs: ch.durationMs,
       chunkDir: chapterChunkPreviewDir(bookId, ch.index),
+      link: chapterLink(ch),
     }));
   }
 
@@ -238,7 +242,7 @@ async function assembleReadaloud(
       skipped.push(ch.title);
       continue;
     }
-    readaloudChapters.push({ id: ch.id, index: ch.index, title: ch.title, audioPath: ch.audioPath, sync });
+    readaloudChapters.push({ id: ch.id, index: ch.index, title: ch.title, audioPath: ch.audioPath, sync, link: ch.link });
     includedIds.push(ch.id);
   }
 
@@ -275,7 +279,7 @@ async function assembleReadaloud(
         : async (exported, cover) => {
             const layer = await buildP2afLayer(book, exported, cover);
             await log(layer
-              ? `Read-along layer: ${layer.cues.length} chapter(s) on ${layer.manifest.pages.length} pages`
+              ? `Read-along layer: ${layer.cues.length} chapter(s) ${layer.manifest.pages.length > 0 ? `on ${layer.manifest.pages.length} pages` : "over their text, no pages"}`
               : "No read-along layer — this book has no page geometry");
             return layer;
           },

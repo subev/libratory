@@ -28,6 +28,7 @@ export type ReadaloudChapter = {
   title: string;
   audioPath: string;
   sync: SyncMap;
+  link?: string;
 };
 
 
@@ -68,9 +69,11 @@ function chapterBase(seq: number): string {
 
 // Layout mirrors the IDPF sample: XHTML and SMIL at the package root, audio in audio/ —
 // SMIL audio refs never contain "../", which trips some readers' native path handling.
-function chapterXhtml(base: string, title: string, sync: SyncMap, lang: string): string {
+// The source link sits outside the overlay: no <par> names it, so it is shown and never spoken
+function chapterXhtml(base: string, title: string, sync: SyncMap, lang: string, link?: string): string {
   const paragraphs = sync.chunks
     .map((c, i) => `    <p><span id="${base}-s${i}">${esc(c.text)}</span></p>`)
+    .concat(link ? [`    <p class="source"><a href="${esc(link).replace(/"/g, "&quot;")}">${esc(linkLabel(link))}</a></p>`] : [])
     .join("\n");
   return `<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
@@ -87,6 +90,14 @@ ${paragraphs}
 </body>
 </html>
 `;
+}
+
+function linkLabel(link: string): string {
+  try {
+    return new URL(link).hostname.replace(/^www\./, "");
+  } catch {
+    return link;
+  }
 }
 
 function chapterSmil(base: string, audioExt: string, sync: SyncMap): string {
@@ -147,6 +158,7 @@ ${items}
 const STYLE_CSS = `body { font-family: serif; line-height: 1.6; margin: 1em; }
 h1 { font-size: 1.4em; }
 p { margin: 0 0 0.9em 0; }
+.source { margin-top: 2em; font-size: 0.85em; }
 .-epub-media-overlay-active {
   background-color: #ffb;
 }
@@ -268,7 +280,7 @@ export async function buildReadaloudEpub(opts: {
   if (p2af) await writeP2afLayer(path.join(stagingDir, "OEBPS", P2AF_DIR), p2af);
 
   for (const ch of named) {
-    await writeFile(path.join(stagingDir, "OEBPS", `${ch.base}.xhtml`), chapterXhtml(ch.base, ch.title, ch.sync, lang));
+    await writeFile(path.join(stagingDir, "OEBPS", `${ch.base}.xhtml`), chapterXhtml(ch.base, ch.title, ch.sync, lang, ch.link));
     await writeFile(path.join(stagingDir, "OEBPS", `${ch.base}_overlay.smil`), chapterSmil(ch.base, ch.audioExt, ch.sync));
     await copyFile(ch.audioPath, path.join(stagingDir, "OEBPS", "audio", `${ch.base}${ch.audioExt}`));
   }
@@ -277,7 +289,7 @@ export async function buildReadaloudEpub(opts: {
   await rm(outputPath, { force: true });
   const zipOpts = { cwd: stagingDir, timeout: 600_000, maxBuffer: 16 * 1024 * 1024 };
   await execFileAsync("zip", ["-X", "-q", "-0", outputPath, "mimetype"], zipOpts);
-  const storedDirs = ["OEBPS/audio", ...(p2af ? [`OEBPS/${P2AF_DIR}/source`] : [])];
+  const storedDirs = ["OEBPS/audio", ...(p2af?.sources.length ? [`OEBPS/${P2AF_DIR}/source`] : [])];
   await execFileAsync(
     "zip",
     ["-X", "-q", "-9", "-r", outputPath, "META-INF", "OEBPS", ...storedDirs.flatMap((dir) => ["-x", `${dir}/*`])],
@@ -290,7 +302,7 @@ export async function buildReadaloudEpub(opts: {
 // compressed and are stored, so a reader can hand their bytes straight to a PDF renderer.
 async function writeP2afLayer(dir: string, layer: P2afLayer): Promise<void> {
   await mkdir(path.join(dir, "cues"), { recursive: true });
-  await mkdir(path.join(dir, "source"), { recursive: true });
+  if (layer.sources.length > 0) await mkdir(path.join(dir, "source"), { recursive: true });
   await writeFile(path.join(dir, "book.json"), JSON.stringify(layer.manifest));
   for (const cue of layer.cues) await writeFile(path.join(dir, cue.path), JSON.stringify(cue.doc));
   for (const source of layer.sources) await copyFile(source.pdfPath, path.join(dir, source.path));

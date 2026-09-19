@@ -517,7 +517,14 @@ export function BookDetail() {
     );
 
   const extractingFiles = book.files?.filter((f) => f.status === "extracting").length ?? 0;
-  const synthesizingCount = viewChapters.filter((c) => SYNTH_BUSY.includes(c.status)).length;
+  // "pending" is a chapter with a job in the queue and nothing speaking it yet; calling that
+  // synthesizing told a book stuck behind another one that all 57 of its chapters were under way
+  const queuedCount = viewChapters.filter((c) => c.status === "pending").length;
+  const synthesizingCount = viewChapters.filter((c) => SYNTH_BUSY.includes(c.status)).length - queuedCount;
+  const synthesisBadge = [
+    synthesizingCount > 0 ? `${synthesizingCount} synthesizing` : null,
+    queuedCount > 0 ? `${queuedCount} queued` : null,
+  ].filter(Boolean).join(" · ");
   const chaptersWithAudio = viewChapters.filter((c) => c.audioPath).length;
   const outputCount = bookAssemblies.filter((a) => (a.language ?? null) === activeVariant).length +
     bookDocuments.filter((d) => (d.language ?? null) === activeVariant).length;
@@ -551,7 +558,8 @@ export function BookDetail() {
   const structureConfirmed = Boolean(book.structureConfirmedAt);
   const audioReady = book.chapters.filter((c) => c.selected && c.audioPath).length;
   const selectedInFlightNow = book.chapters.some((c) => c.selected && (c.status === "pending" || c.status === "normalizing" || c.status === "synthesizing"));
-  const stage: "review" | "narrate" | "export" = !structureConfirmed ? "review" : audioReady > 0 && !selectedInFlightNow ? "export" : "narrate";
+  // A book with no PDF has no structure to review: its chapters arrived as they are
+  const stage: "review" | "narrate" | "export" = !structureConfirmed && !isSynthetic ? "review" : audioReady > 0 && !selectedInFlightNow ? "export" : "narrate";
   const trayActions: TrayAction[] = [
     ...(hasActiveChapters || translationAudioQueued
       ? [{
@@ -811,7 +819,7 @@ export function BookDetail() {
               count: stagesLocked ? "—" : book.chapters.length,
               locked: stagesLocked,
               title: stagesLocked ? "Locked — extract chapters from a source file first" : "Every chapter, its audio and its text",
-              badge: synthesizingCount > 0 ? { text: `${synthesizingCount} synthesizing`, tone: "synthesizing" as const } : null,
+              badge: synthesisBadge ? { text: synthesisBadge, tone: "synthesizing" as const } : null,
             },
             {
               id: "outputs",
@@ -1064,8 +1072,8 @@ export function BookDetail() {
             <>
               <div className="flex items-center gap-2 mb-3 flex-wrap shrink-0">
                 <Button
-                  variant={stage === "review" && book.kind === "pdf" ? "primary" : "secondary"}
-                  className={stage === "review" && book.kind === "pdf" ? "animate-pulse" : ""}
+                  variant={stage === "review" ? "primary" : "secondary"}
+                  className={stage === "review" ? "animate-pulse" : ""}
                   onClick={() => setShowStructure(true)}
                   disabled={book.kind !== "pdf"}
                   title={
@@ -1075,7 +1083,7 @@ export function BookDetail() {
                   }
                   data-testid="open-structure"
                 >
-                  <IconStructure className={`w-4 h-4 ${stage === "review" && book.kind === "pdf" ? "" : "text-(--accent-text)"}`} />
+                  <IconStructure className={`w-4 h-4 ${stage === "review" ? "" : "text-(--accent-text)"}`} />
                   Review chapters
                 </Button>
                 {book.chapterDetection && (

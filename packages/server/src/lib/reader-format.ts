@@ -32,6 +32,8 @@ export type ReaderChapter = {
   pageEnd: number | null;
   mode: "page" | "text";
   why?: ReaderUnmapped;
+  // Where a chapter written from something on the web came from. Absolute, unlike every other URL here
+  link?: { url: string };
 };
 
 export type ReaderManifest = {

@@ -38,6 +38,14 @@ export function chapterMode(chapter: Chapter): Pick<ReaderChapter, "mode" | "why
   return { mode: "page" };
 }
 
+// Only a chapter made from a page on the web has somewhere to send a reader; a digest's source
+// is another book here, and a note's is a note. The API takes any URL, and this one ends up as an
+// anchor in a file that travels, so nothing but the web leaves.
+export function chapterLink(chapter: Pick<Chapter, "source">): string | undefined {
+  if (chapter.source?.kind !== "url") return undefined;
+  return /^https?:\/\//i.test(chapter.source.url) ? chapter.source.url : undefined;
+}
+
 export async function buildManifest(book: Book): Promise<ReaderManifest> {
   const files = await db.select().from(bookFiles).where(eq(bookFiles.bookId, book.id)).orderBy(bookFileOrder, asc(bookFiles.index));
   const sources = await listMarkerSources(book);
@@ -92,6 +100,7 @@ export async function buildManifest(book: Book): Promise<ReaderManifest> {
     pages,
     chapters: rows.map((chapter) => {
       const offset = offsets.get(chapter.sourceFileIndex) ?? 0;
+      const link = chapterLink(chapter);
       return {
         i: chapter.index,
         id: chapter.id,
@@ -103,6 +112,7 @@ export async function buildManifest(book: Book): Promise<ReaderManifest> {
         pageStart: chapter.pageStart === null ? null : offset + chapter.pageStart - 1,
         pageEnd: chapter.pageEnd === null ? null : offset + chapter.pageEnd - 1,
         ...chapterMode(chapter),
+        ...(link ? { link: { url: link } } : {}),
       };
     }),
   };
@@ -201,7 +211,9 @@ export function buildText(chapter: Chapter): ReaderText | null {
   const text = chapterText(chapter).trim();
   if (!text) return null;
   const plain = { format: READER_FORMAT, text };
-  if (chapter.customText !== null || !Array.isArray(chapter.sourceBlocks)) return plain;
+  // Written text has no typed blocks for an edit to invalidate, only the paragraphs it was written in
+  if (!Array.isArray(chapter.sourceBlocks)) return { ...plain, blocks: paragraphBlocks(text) };
+  if (chapter.customText !== null) return plain;
   const blocks = chapter.sourceBlocks as SourceBlock[];
   const raw = joinTextBlocks(blocks);
   if (raw.text !== chapter.rawText || !blocks.some((block) => block.kind)) return plain;
@@ -242,6 +254,15 @@ export async function buildCues(chapter: Chapter): Promise<ReaderCues | null> {
       };
     }),
   };
+}
+
+function paragraphBlocks(text: string): NonNullable<ReaderText["blocks"]> {
+  const blocks: NonNullable<ReaderText["blocks"]> = [];
+  for (const match of text.matchAll(/\S(?:[^\n]|\n(?![ \t]*\n))*/g)) {
+    const body = match[0].trimEnd();
+    blocks.push({ start: match.index, end: match.index + body.length, kind: "prose" });
+  }
+  return blocks;
 }
 
 function wordTuple(word: SyncWord): [number, number, string] {

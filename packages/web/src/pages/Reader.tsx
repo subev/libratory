@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 
-import { IconArrowLeft, IconPause, IconPlay } from "../components/icons.tsx";
+import { IconArrowLeft, IconExternal, IconPause, IconPlay } from "../components/icons.tsx";
 import { Button } from "../components/Button.tsx";
 import { SegmentedControl } from "../components/SegmentedControl.tsx";
 import { CueTranscript, TextBody } from "../components/reader/CueTranscript.tsx";
@@ -294,6 +294,18 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
           />
 
           <div className="ml-auto flex items-center gap-3 text-xs text-(--text-muted)">
+            {chapter.link && (
+              <a
+                href={chapter.link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-(--accent-text) hover:text-(--accent-text-hover)"
+                title={chapter.link.url}
+                data-testid="reader-source-link"
+              >
+                source <IconExternal className="h-3 w-3" />
+              </a>
+            )}
             {grain && (
               <span
                 className="rounded bg-(--bg-subtle) px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide"
@@ -332,7 +344,8 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
         </p>
       )}
 
-      {chapter.mode === "text" && (
+      {/* A written chapter in a book with no pages lost nothing by reading as text */}
+      {chapter.mode === "text" && (hasPages || chapter.why !== "generated") && (
         <p
           className={hasPages ? NOTE_BANNER : WARN_BANNER}
           data-testid="reader-text-mode"

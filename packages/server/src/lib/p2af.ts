@@ -32,7 +32,9 @@ export async function buildP2afLayer(
   cover: string | null,
 ): Promise<P2afLayer | null> {
   const manifest = await buildManifest(book);
-  if (manifest.pages.length === 0) return null;
+  // A book with no PDF has no pages to lose, and its layer is cues over text. One that has a PDF
+  // and still no pages is geometry that failed to build, and that layer would promise print.
+  if (manifest.pages.length === 0 && manifest.sources.length > 0) return null;
   manifest.book.cover = cover;
 
   const sources = await listMarkerSources(book);

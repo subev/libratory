@@ -67,7 +67,7 @@ describe("buildReadaloudEpub", () => {
       language: "Bulgarian",
       chapters: [
         { id: "ch-0", index: 0, title: "Intro <1>", audioPath: mp3a, sync: sync(["Здравей & добре дошъл.", "Втора част."], 1500) },
-        { id: "ch-1", index: 1, title: "Chapter Two", audioPath: m4ab, sync: sync(["More text."], 2000) },
+        { id: "ch-1", index: 1, title: "Chapter Two", audioPath: m4ab, sync: sync(["More text."], 2000), link: "https://www.example.com/a?b=1&c=\"2\"" },
       ],
       stagingDir: path.join(baseDir, "staging"),
       outputPath,
@@ -98,6 +98,12 @@ describe("buildReadaloudEpub", () => {
     expect(xhtml).toContain("<h1>Intro &lt;1&gt;</h1>");
     expect(xhtml).toContain('<p><span id="ch000-s0">Здравей &amp; добре дошъл.</span></p>');
     expect(xhtml).toContain('xml:lang="bg"');
+
+    // A chapter written from the web names where it came from; the overlay never reads it aloud
+    expect(xhtml).not.toContain('class="source"');
+    const linked = await zipEntry(outputPath, "OEBPS/ch001.xhtml");
+    expect(linked).toContain('<p class="source"><a href="https://www.example.com/a?b=1&amp;c=&quot;2&quot;">example.com</a></p>');
+    expect(await zipEntry(outputPath, "OEBPS/ch001_overlay.smil")).not.toContain("source");
 
     // No "../" anywhere in SMIL refs — flat layout like the IDPF sample
     const smil = await zipEntry(outputPath, "OEBPS/ch000_overlay.smil");

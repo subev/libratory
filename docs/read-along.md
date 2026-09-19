@@ -54,6 +54,14 @@ anything it recognises, and say something useful about anything it does not.
   writes one). The last two are the same missing map for opposite reasons, and the document
   separates them so neither reader has to work it out from `audio`.
   Only a chapter with no pages at all falls back to the reflowed text.
+- **`link`** is optional: `{ "url": "https://…" }` on a chapter that was written from a page on
+  the web, which is where a reader who wants the original is sent. It is the one absolute URL in the
+  document — nothing here serves it and no container carries it — so a reader opens it outside
+  itself, and should open nothing that is not `http` or `https`.
+- **A book with no PDF has `sources: []` and `pages: []`.** A book made of written chapters — a
+  digest, a feed — is all `"generated"` text, and is read along with in the text view and nowhere
+  else. That is a whole book, not a broken one: a reader should say nothing about the print it
+  never had.
 
 ## `GET /read/chapter/:chapterId/cues.json`
 
@@ -161,6 +169,10 @@ A reader that shows the reflowed text draws `text.text` and marks each cue at it
 ignores both fields joins the cues' `s` as before and loses only the line breaks. An edited chapter,
 or one read before blocks were typed, carries neither.
 
+A written chapter — `"generated"`, no blocks ever typed — carries both all the same: one `prose`
+block per paragraph of its text, split at blank lines. Whoever wrote it left the paragraphs in, and
+an edit cannot outdate blocks that were never extracted, so it keeps them through one.
+
 ## Replacing incorrect imported OCR
 
 In **Source files → Extract → Selected files**, enable **Ignore existing PDF text and run OCR
@@ -246,6 +258,13 @@ slice of the file straight to a player or a PDF renderer without inflating anyth
 A chapter the export left out keeps its `pageStart`/`pageEnd` and loses its `audio` and `cues`,
 which is the same shape as a chapter nobody has narrated — so no reader needs a special case for
 a partial export.
+
+A book with no PDF still carries the layer — `book.json` and the cues, with no `source/` beside
+them — because the cues are what a reader follows the voice with, and the overlay's clips are a
+chunk long where the cues know every word. A book that *has* a PDF and no page geometry carries
+none: that layer would promise print it cannot place. Each chapter's XHTML ends with its `link`
+as an ordinary anchor outside the media overlay, so any EPUB reader shows it and none reads it
+aloud.
 
 `e2e/fixtures/tiny-book-readalong.epub` is one of these, built from `fixtures/tiny-book.pdf` by
 the pipeline itself: three pages, three narrated chapters, word granularity, 1.2 MB. It is checked

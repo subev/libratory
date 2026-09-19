@@ -25,7 +25,7 @@ Create a synthetic book (`kind: "api"`), optionally with chapters in the same ca
 ```
 
 - `client` — free-form identifier of the calling script; stored in `books.origin` and chapter sources.
-- `chapters[].url` — optional; when present the chapter gets a `{kind:"url"}` source and the UI renders a "source ↗" link. Without it the source is `{kind:"api"}`.
+- `chapters[].url` — optional; when present the chapter gets a `{kind:"url"}` source and the UI renders a "source ↗" link; the read-along reader and a synced EPUB export carry the same link (`link` in `docs/read-along.md`). Without it the source is `{kind:"api"}`.
 - `synthesize: false` (default) — chapters arrive **suspended** for review in the web UI, like digest chapters.
 - `synthesize: true` — chapters are queued straight to TTS with the book's voice (API text is normalized inline at insert — no worker roundtrip); poll `GET /api/books/:id` for audio readiness.
 

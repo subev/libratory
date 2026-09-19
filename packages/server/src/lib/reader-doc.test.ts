@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { chapterMode, printMarks } from "./reader-doc.ts";
+import { buildText, chapterLink, chapterMode, printMarks } from "./reader-doc.ts";
 import type { GeometryPage } from "./page-geometry.ts";
 import type { Chapter } from "../schema.ts";
 
@@ -93,4 +93,43 @@ it("carries semantic blocks and normalized offsets to the reader, but drops stal
   expect(document?.blocks?.map((b) => [b.kind, document.text.slice(b.start, b.end)])).toEqual([["verse", "Left verse"], ["verse", "Right verse"], ["footnote", "14 Note."]]);
   expect(buildText({ ...chapter, customText: "Edited." })?.blocks).toBeUndefined();
   expect(buildText({ ...chapter, cleanText: "Changed." })?.blocks).toBeUndefined();
+});
+
+describe("buildText", () => {
+  const written = "First paragraph,\nstill the first.\n\nSecond one.  \n \n\nThird.";
+
+  it("gives written text a prose block per paragraph, since nobody typed its blocks", () => {
+    const doc = buildText(extracted({ sourceBlocks: null, cleanText: written, rawText: written }));
+    expect(doc?.blocks?.map((block) => [block.kind, written.slice(block.start, block.end)])).toEqual([
+      ["prose", "First paragraph,\nstill the first."],
+      ["prose", "Second one."],
+      ["prose", "Third."],
+    ]);
+  });
+
+  it("keeps the paragraphs of written text through an edit, which has no typed blocks to outdate", () => {
+    const doc = buildText(extracted({ sourceBlocks: null, customText: "One.\n\nTwo." }));
+    expect(doc?.blocks).toEqual([
+      { start: 0, end: 4, kind: "prose" },
+      { start: 6, end: 10, kind: "prose" },
+    ]);
+  });
+});
+
+describe("chapterLink", () => {
+  it("links a chapter written from a page on the web", () => {
+    expect(chapterLink(extracted({ source: { kind: "url", url: "https://example.com/post", title: "Post" } })))
+      .toBe("https://example.com/post");
+  });
+
+  it("hands out nothing that is not the web", () => {
+    expect(chapterLink(extracted({ source: { kind: "url", url: "javascript:alert(1)" } }))).toBeUndefined();
+    expect(chapterLink(extracted({ source: { kind: "url", url: "file:///etc/passwd" } }))).toBeUndefined();
+  });
+
+  it("has nowhere to send a reader for a digest, a note or a bare API chapter", () => {
+    expect(chapterLink(extracted({ source: { kind: "book", bookId: "b", title: "A book" } }))).toBeUndefined();
+    expect(chapterLink(extracted({ source: { kind: "api" } }))).toBeUndefined();
+    expect(chapterLink(extracted({ source: null }))).toBeUndefined();
+  });
 });
