@@ -76,7 +76,7 @@ export function CuePages({
 
   return (
     <>
-      {spreads.map((spread) => (
+      {spreads.map((spread, at) => (
         <div key={spread.key} data-page-index={spread.page.i}>
           <PdfCanvas
             url={resolve(manifest.sources[spread.page.src]?.url ?? "") ?? ""}
@@ -103,7 +103,10 @@ export function CuePages({
               debug={debug}
             />
           </PdfCanvas>
-          <p className="mt-1 text-center text-[11px] text-(--text-faint)">{spread.page.i + 1}</p>
+          {/* A page can be many crops; its number goes under the last of them */}
+          {spreads[at + 1]?.page.i !== spread.page.i && (
+            <p className="mt-1 text-center text-[11px] text-(--text-faint)">{spread.page.i + 1}</p>
+          )}
         </div>
       ))}
     </>

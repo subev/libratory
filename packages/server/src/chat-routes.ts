@@ -12,7 +12,8 @@ import {
 import { profileIdFromHeader } from "./trpc.ts";
 import { contextExceeded, resolveLlm, modelKeySchema } from "./lib/llm.ts";
 import { describeError } from "./lib/errors.ts";
-import { buildChatTools, CitationCatalog, LIBRARY_CHAT_SYSTEM, type CitationSource } from "./lib/chat-tools.ts";
+import { buildChatTools, CitationCatalog, libraryChatSystem, scopeLanguages, type CitationSource } from "./lib/chat-tools.ts";
+import { withReaderTargets } from "./lib/citation-targets.ts";
 import { verifySources } from "./lib/citations.ts";
 import { buildAskContext, type AskScope } from "./lib/ask-ai.ts";
 import { estimateTokens } from "./lib/token-estimate.ts";
@@ -76,14 +77,16 @@ export function registerChatRoutes(fastify: FastifyInstance) {
 
     const catalog = new CitationCatalog();
     seedCatalogFromHistory(catalog, messages);
-    const tools = buildChatTools({ profileId, folderId: body.scope.folderId, bookId: body.scope.bookId, catalog });
+    const scope = { profileId, folderId: body.scope.folderId, bookId: body.scope.bookId };
+    const tools = buildChatTools({ ...scope, catalog });
+    const system = libraryChatSystem(await scopeLanguages(scope));
 
     const stream = createUIMessageStream({
       onError: (err) => (err instanceof Error ? err.message : "Chat failed"),
       execute: async ({ writer }) => {
         const result = streamText({
           model: llm.model,
-          system: LIBRARY_CHAT_SYSTEM,
+          system,
           messages: await convertToModelMessages(messages),
           tools,
           stopWhen: stepCountIs(MAX_STEPS),
@@ -95,7 +98,9 @@ export function registerChatRoutes(fastify: FastifyInstance) {
         });
         writer.merge(toUIMessageStream({ stream: result.stream, tools }));
         const text = await result.text;
-        writer.write({ type: "data-sources", data: verifySources(text, catalog) });
+        const sources = verifySources(text, catalog);
+        // The reader link is a convenience on top of the citation; failing to place one costs the link only
+        writer.write({ type: "data-sources", data: await withReaderTargets(sources).catch(() => sources) });
       },
     });
 

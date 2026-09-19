@@ -15,6 +15,9 @@ import { Button } from "../components/Button.tsx";
 
 type FolderOption = { id: string; name: string; depth: number };
 
+// How close to the bottom still counts as reading the newest line
+const FOLLOW_WITHIN_PX = 80;
+
 function flattenFolders(folders: { id: string; name: string; parentId: string | null }[]): FolderOption[] {
   const byParent = new Map<string | null, typeof folders>();
   for (const f of folders) {
@@ -59,8 +62,19 @@ export function Chat() {
   const { messages, sendMessage, setMessages, status, error, stop } = useChat({ transport });
   const busy = status === "submitted" || status === "streaming";
 
+  // The answer is followed only while the reader is at the bottom: scrolling up to read something
+  // else lets go, and coming back down takes hold again. It used to pull down on every token.
+  // Where the reader is gets judged here, against the height the page had before this update —
+  // a scroll listener hears about it a frame late, and a token landing in that frame pulled the
+  // page back down from under the scroll that was leaving.
+  const lastHeight = useRef(0);
+  const pinned = useRef(false);
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const atBottom = lastHeight.current - window.scrollY - window.innerHeight < FOLLOW_WITHIN_PX;
+    // Not smooth: an animation still on its way down reads as the reader having scrolled away
+    if (atBottom || pinned.current) bottomRef.current?.scrollIntoView({ behavior: "auto" });
+    pinned.current = false;
+    lastHeight.current = document.documentElement.scrollHeight;
   }, [messages]);
 
   const newChat = () => {
@@ -72,6 +86,8 @@ export function Chat() {
     const text = input.trim();
     if (!text || busy) return;
     setInput("");
+    // Asking is a request to see the answer, wherever the page was left
+    pinned.current = true;
     void sendMessage({ text }, { body: { scope: { folderId, bookId }, model } });
   };
 
@@ -155,7 +171,7 @@ export function Chat() {
           {messages.length === 0 && (
             <div className="text-sm text-(--text-muted) mt-12 text-center space-y-2">
               <p className="text-base">Ask anything about the books in your library.</p>
-              <p>The assistant searches across all book text — originals and translations, English or Bulgarian — and cites the passages it used. Click a source to open the book at that spot.</p>
+              <p>The assistant searches across all book text — originals and translations — and cites the passages it used. A source opens in the reader at the sentence where the chapter is narrated, and in the PDF at the page where it is not.</p>
             </div>
           )}
           {messages.map((message, i) => (

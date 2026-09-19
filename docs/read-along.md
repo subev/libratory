@@ -32,7 +32,11 @@ anything it recognises, and say something useful about anything it does not.
   inverse arithmetic is not needed either.
 - **`w`, `h`, `content` and `columns` are PDF points**, origin top-left, y downwards. `content`
   is the union of the page's text lines; `columns` are the column boxes in reading order, one
-  entry for a single-column page. Both are `[x, y, width, height]`.
+  entry for a single-column page. Both are `[x, y, width, height]`. They are crops to show one
+  after another, not always side-by-side strips of the whole page: a line that crosses the gutter —
+  a heading over both columns — ends the columns above it, takes an entry of its own as wide as a
+  column, and new columns start below it. A songbook page of three two-column songs is nine
+  entries, each song read left then right.
 - **`medianBodyPt`** is the median height of a text line, weighted by how much text the line
   holds — not the font size the PDF reports, which several real files give as 1pt or 53pt for
   ordinary 10pt text. It is what tells a reader, before the reader squints, whether this book

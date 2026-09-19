@@ -7,6 +7,7 @@ import { ExtractModal, type ExtractScope } from "./ExtractModal.tsx";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
 import { IconStop, IconRefresh, IconDelete, IconChevronUp, IconChevronDown } from "./icons.tsx";
 import { Button } from "./Button.tsx";
+import { rowClick } from "../lib/row-click.ts";
 import type { OcrEngine } from "../lib/ocr.ts";
 
 export type BookFileRow = {
@@ -225,7 +226,7 @@ export function BookFilesSection({
           </thead>
           <tbody className="bg-(--bg-card) divide-y divide-(--divide)">
             {files.map((file, i) => (
-              <tr key={file.id} className="hover:bg-(--bg-card-hover)">
+              <tr key={file.id} onClick={rowClick(() => setPreviewFileId(file.id))} className="cursor-pointer hover:bg-(--bg-card-hover)">
                 <td className="px-3 py-2">
                   <input
                     type="checkbox"

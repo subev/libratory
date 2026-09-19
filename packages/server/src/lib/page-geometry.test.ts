@@ -34,15 +34,28 @@ describe("pageLayout", () => {
     ]);
   });
 
-  it("keeps a heading that spans both columns from widening either one", () => {
+  it("gives a heading that spans both columns a crop of its own, above them", () => {
     const lines = [line(50, 250, 20, 14), ...rows.flatMap((top) => [line(50, 140, top), line(160, 250, top)])];
 
-    const { columns } = pageLayout(page(lines));
+    expect(pageLayout(page(lines)).columns).toEqual([
+      [50, 20, 200, 14],
+      [50, 40, 90, 145],
+      [160, 40, 90, 145],
+    ]);
+  });
 
-    // The heading lands in one column; clamping at the gutter stops it spilling over the other
-    expect(columns).toHaveLength(2);
-    expect((columns[0]?.[0] ?? 0) + (columns[0]?.[2] ?? 0)).toBe(140);
-    expect(columns[1]?.[0]).toBeGreaterThanOrEqual(140);
+  it("reads a page of two-column blocks under their own headings one block at a time", () => {
+    const block = (from: number) => [0, 15, 30, 45, 60].flatMap((dy) => [line(50, 140, from + dy), line(160, 250, from + dy)]);
+    // The second heading is a few centred words, narrower than a column
+    const lines = [...block(40), line(120, 180, 125), ...block(150)];
+
+    expect(pageLayout(page(lines)).columns).toEqual([
+      [50, 40, 90, 70],
+      [160, 40, 90, 70],
+      [105, 125, 90, 10],
+      [50, 150, 90, 70],
+      [160, 150, 90, 70],
+    ]);
   });
 
   it("treats a ragged single column as one column, not two", () => {

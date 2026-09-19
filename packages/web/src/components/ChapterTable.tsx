@@ -9,6 +9,7 @@ import { ChapterModal } from "./ChapterModal.tsx";
 import { chapterAudioDownload, chapterAudioUrl, SYNTH_BUSY, variantLabel } from "../lib/chapters.ts";
 import { ChapterAiModal } from "./ChapterAiModal.tsx";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
+import { rowClick } from "../lib/row-click.ts";
 import { SynthesizeModal, type SynthSettings } from "./SynthesizeModal.tsx";
 import {
   IconAi,
@@ -550,7 +551,8 @@ export function ChapterTable({
                     setDragOverChapterId(null);
                   }}
                   onDragEnd={() => { setDragChapterId(null); setDragOverChapterId(null); }}
-                  className={`group hover:bg-(--bg-card-hover) ${!chapter.selected ? "opacity-40" : ""} ${dragChapterId === chapter.id ? "opacity-30" : ""} ${dragOverChapterId === chapter.id && dragChapterId !== chapter.id ? "border-t-2 border-(--accent)" : ""}`}
+                  onClick={rowClick(() => openChapterModal(chapters.indexOf(chapter)))}
+                  className={`group cursor-pointer hover:bg-(--bg-card-hover) ${!chapter.selected ? "opacity-40" : ""} ${dragChapterId === chapter.id ? "opacity-30" : ""} ${dragOverChapterId === chapter.id && dragChapterId !== chapter.id ? "border-t-2 border-(--accent)" : ""}`}
                 >
                   {canDrag && (
                     <td className="px-2 py-3 cursor-grab text-(--text-faint)">

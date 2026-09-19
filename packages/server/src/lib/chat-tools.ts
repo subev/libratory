@@ -17,7 +17,22 @@ export type CitationSource = {
   chapterId: string | null;
   chapterTitle: string | null;
   language: string | null;
+  // Absent on sources a transcript kept from before these existed
+  chapterIndex?: number | null;
+  // How the passage starts, so six citations of one chapter can be told apart
+  snippet?: string;
+  // Where the narration speaks it, in ms — set only once the answer cites it (citation-targets.ts)
+  readAt?: number | null;
 };
+
+const SNIPPET_CHARS = 140;
+
+function snippetOf(text: string): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  if (flat.length <= SNIPPET_CHARS) return flat;
+  const cut = flat.slice(0, SNIPPET_CHARS);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), SNIPPET_CHARS / 2))}…`;
+}
 
 // Stable, verifiable citation ids for one request: tools register every passage
 // they return, the model may only cite registered ids (toc-detect discipline)
@@ -51,6 +66,8 @@ export class CitationCatalog {
       chapterId: hit.chapterId,
       chapterTitle: hit.chapterTitle,
       language: hit.language,
+      chapterIndex: hit.chapterIndex,
+      snippet: snippetOf(hit.text),
     };
     this.byId.set(id, source);
     this.byChunk.set(hit.chunkId, id);
@@ -76,14 +93,14 @@ export function buildChatTools(opts: { profileId: string; folderId?: string; boo
   return {
     search_library: tool({
       description:
-        "Search the user's book library. Hybrid keyword + semantic search across original book text and translations, in any language. Returns passages labeled with citation ids like [c_3]. Call this before answering; refine the query (or try another language) when results are weak.",
+        "Search the user's book library. Hybrid keyword + semantic search across original book text and translations, in any language. Returns passages labeled with citation ids like [c_3]. Call this before answering; refine the query when results are weak.",
       inputSchema: z.object({
         query: z.string().min(1).max(500).describe("The search query — keywords or a natural-language question"),
         limit: z.number().int().min(1).max(20).optional().describe("Max passages to return (default 8)"),
       }),
       execute: async ({ query, limit }) => {
         const result = await searchLibrary({ profileId, folderId, bookId, query, limit: limit ?? 8 });
-        if (result.hits.length === 0) return "No matching passages found. Try different keywords or another language.";
+        if (result.hits.length === 0) return "No matching passages found. Try different keywords.";
         const blocks = result.hits.map((hit) => describeHit(catalog.register(hit), hit));
         const note = result.mode === "keyword" ? "\n\n(Semantic search unavailable — keyword results only.)" : "";
         return blocks.join("\n\n---\n\n") + note;
@@ -139,11 +156,51 @@ export function buildChatTools(opts: { profileId: string; folderId?: string; boo
   };
 }
 
-export const LIBRARY_CHAT_SYSTEM = [
-  "You are the library assistant for a personal audiobook/reading app. You answer questions using ONLY passages retrieved from the user's own book library via your tools.",
-  "Always search before answering a content question. If the first search is weak, refine the query — try synonyms, different keywords, or the other language (the library mixes English and Bulgarian; you can search in either).",
-  "Cite every claim with the citation ids from tool results, inline, like [c_3]. Only use ids that appeared in tool output — never invent ids. If sources disagree, say so.",
-  "You have a budget of a few tool-calling rounds per answer. If 3–4 searches with varied queries come up empty, stop searching and say plainly that the library doesn't seem to cover it — do not answer from general knowledge without flagging it as such.",
-  "Answer in the language the user asked in. Quote short key phrases from sources where helpful; suggest which book/chapter to read for more detail.",
-  "Keep answers focused and concise. Use markdown.",
-].join("\n\n");
+// The languages of the books in scope, most books first. Null and unknown languages are left out.
+export async function scopeLanguages(opts: { profileId: string; folderId?: string; bookId?: string }): Promise<string[]> {
+  const filters: SQL[] = [eq(books.profileId, opts.profileId), sql`${books.language} IS NOT NULL`];
+  if (opts.bookId) filters.push(eq(books.id, opts.bookId));
+  else if (opts.folderId) filters.push(inArray(books.folderId, await folderSubtreeIds(opts.folderId)));
+  const rows = await db
+    .select({ language: books.language })
+    .from(books)
+    .where(and(...filters))
+    .groupBy(books.language)
+    .orderBy(sql`count(*) DESC`);
+  return [...new Set(rows.flatMap((row) => (row.language ? [languageName(row.language)] : [])))];
+}
+
+const languageNames = new Intl.DisplayNames(["en"], { type: "language" });
+
+// books.language is an ISO code; a model follows "Bulgarian" more reliably than "bg"
+function languageName(code: string): string {
+  try {
+    return languageNames.of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+// A query is matched against the book's own words, so it is written in the book's language —
+// whatever the question was asked in. The model used to be told the library "mixes English and
+// Bulgarian" and ran every search twice, once in a language the book does not contain.
+export function searchLanguageRule(languages: string[]): string {
+  const [only, ...others] = languages;
+  if (only === undefined) return "Write search queries in the language of the user's question.";
+  if (others.length === 0) {
+    return `Every book in scope is in ${only}. Write every search query in ${only}, whatever language the question is asked in — do not repeat a search in another language.`;
+  }
+  return `The books in scope are in: ${languages.join(", ")}. Write search queries in English by default. Search in one of the other languages only when the question is plainly about a book in that language, or when the English searches found nothing — never run the same search in two languages as a matter of course.`;
+}
+
+export function libraryChatSystem(languages: string[]): string {
+  return [
+    "You are the library assistant for a personal audiobook/reading app. You answer questions using ONLY passages retrieved from the user's own book library via your tools.",
+    "Always search before answering a content question. If the first search is weak, refine the query — try synonyms or different keywords.",
+    searchLanguageRule(languages),
+    "Cite every claim with the citation ids from tool results, inline, like [c_3]. Only use ids that appeared in tool output — never invent ids. If sources disagree, say so.",
+    "You have a budget of a few tool-calling rounds per answer. If 3–4 searches with varied queries come up empty, stop searching and say plainly that the library doesn't seem to cover it — do not answer from general knowledge without flagging it as such.",
+    "Answer in the language the user asked in. Quote short key phrases from sources where helpful; suggest which book/chapter to read for more detail.",
+    "Keep answers focused and concise. Use markdown.",
+  ].join("\n\n");
+}

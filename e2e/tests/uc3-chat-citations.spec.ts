@@ -16,9 +16,10 @@ test.describe("chat with citations", { tag: "@slow" }, () => {
     const answer = page.getByTestId("chat-assistant-message").last();
     await expect(answer).toContainText(FAKE_CITED_REPLY.split(" [")[0] ?? FAKE_CITED_REPLY, { timeout: 60_000 });
 
-    const chip = answer.getByTestId("chat-sources").getByRole("button").first();
-    await expect(chip).toContainText(/tiny.book/i);
-    await chip.click();
+    // The fixture book is not narrated, so its citation falls back to the PDF at the page
+    const sources = answer.getByTestId("chat-sources");
+    await expect(sources).toContainText(/tiny.book/i);
+    await sources.getByTestId("chat-source-pdf").first().click();
 
     const preview = page.getByTestId("pdf-preview-modal");
     await expect(preview).toBeVisible();

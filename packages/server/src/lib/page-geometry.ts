@@ -165,17 +165,43 @@ function splitColumns(boxes: GeometryLine["b"][], content: Rect, pageWidth: numb
   const gutter = depth >= MAX_SPLIT_DEPTH ? null : findGutter(boxes, content, pageWidth);
   if (gutter === null) return [content];
 
-  const left = boxes.filter((box) => midpoint(box) < gutter);
-  const right = boxes.filter((box) => midpoint(box) >= gutter);
-  if (left.length === 0 || right.length === 0) return [content];
+  // A line crossing the gutter ends the columns above it and starts new ones below: a songbook
+  // sets each song in two columns under its own heading, and reading the page's whole left side
+  // first walks through the first half of three songs. Each band reads left then right.
+  const bands: { spanning: boolean; boxes: GeometryLine["b"][] }[] = [];
+  for (const box of [...boxes].sort((a, b) => a[1] - b[1])) {
+    const spanning = box[0] < gutter && box[2] > gutter;
+    const band = bands.at(-1);
+    if (band?.spanning === spanning) band.boxes.push(box);
+    else bands.push({ spanning, boxes: [box] });
+  }
 
-  // Clamping at the gutter keeps a spanning heading from widening the column it fell into
-  const leftBox = clampRight(union(left), gutter);
-  const rightBox = clampLeft(union(right), gutter);
-  return [
-    ...splitColumns(left, leftBox, pageWidth, depth + 1),
-    ...splitColumns(right, rightBox, pageWidth, depth + 1),
-  ];
+  const crops = bands.map((band) => {
+    const left = band.boxes.filter((box) => midpoint(box) < gutter);
+    const right = band.boxes.filter((box) => midpoint(box) >= gutter);
+    if (band.spanning || left.length === 0 || right.length === 0) return { spanning: band.spanning, rects: [union(band.boxes)] };
+    // Clamping at the gutter keeps a line that overshoots it from widening the column it fell into
+    return {
+      spanning: false,
+      rects: [
+        ...splitColumns(left, clampRight(union(left), gutter), pageWidth, depth + 1),
+        ...splitColumns(right, clampLeft(union(right), gutter), pageWidth, depth + 1),
+      ],
+    };
+  });
+  if (!crops.some((crop) => crop.rects.length > 1)) return [content];
+
+  // A crop fills the reader's width, so a heading cropped to its own few words would be drawn
+  // several times the size of the verses under it; as wide as a column, it keeps their scale
+  const columnWidth = Math.max(...crops.filter((crop) => !crop.spanning).flatMap((crop) => crop.rects.map((rect) => rect[2])));
+  return crops.flatMap((crop) => (crop.spanning ? crop.rects.map((rect) => widen(rect, columnWidth, content)) : crop.rects));
+}
+
+function widen(rect: Rect, width: number, within: Rect): Rect {
+  if (rect[2] >= width) return rect;
+  const target = Math.min(width, within[2]);
+  const left = Math.min(Math.max(within[0], rect[0] - (target - rect[2]) / 2), within[0] + within[2] - target);
+  return [left, rect[1], target, rect[3]];
 }
 
 // The widest run of near-empty vertical space with text on both sides of it

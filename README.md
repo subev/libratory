@@ -67,7 +67,7 @@ Every book is a row you can open, and every chapter inside it is a row you can e
 <details>
 <summary><b>Library chat and search, in detail</b></summary>
 
-`/chat` is an agentic assistant that searches the *content* of every book — hybrid full-text + semantic search over local BGE-M3 embeddings. It is cross-language: ask in English and it finds the Bulgarian passage, and the other way round. Answers stream with verified citations; click a source chip to open the PDF at that page, the chapter, or the translation view. Any answer can be saved as a note. See [docs/library-search.md](docs/library-search.md).
+`/chat` is an agentic assistant that searches the *content* of every book — hybrid full-text + semantic search over local BGE-M3 embeddings. It is cross-language: ask in English and it searches a Bulgarian book in Bulgarian. Answers stream with verified citations; a source opens the reader at the sentence where the chapter is narrated, and otherwise the PDF at that page, the chapter, or the translation view. Any answer can be saved as a note. See [docs/library-search.md](docs/library-search.md).
 
 Library organization around it: nested folders with drag & drop, cross-folder search, and lightweight profiles (workspaces) so different people keep separate libraries.
 

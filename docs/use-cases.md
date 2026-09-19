@@ -39,11 +39,11 @@ context.
 ## UC3 — Chat with a book / citations (video 2)
 
 1. Open chat scoped to a book, ask a question → the model searches (not full-text-stuffing),
-   answers with `[c_N]` citations rendered as chips.
+   answers with `[c_N]` citations rendered as a source list.
 2. Click a citation → the PDF opens at that exact page.
 3. Works on originals and translations alike.
 
-Assert: an answer with ≥1 verified source chip; clicking the chip opens the PDF preview at the
+Assert: an answer with ≥1 verified source row; clicking it opens the PDF preview at the
 cited page.
 
 ## UC4 — Translate & transform variants (video 2)

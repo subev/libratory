@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { UIMessage } from "ai";
 import { trpc } from "../../trpc.ts";
 import { MarkdownBlock } from "../MarkdownBlock.tsx";
-import { SourceChips, type ChatSource } from "./SourceChips.tsx";
+import { SourceList, type ChatSource } from "./SourceList.tsx";
 import { IconSearch, IconCheck } from "../icons.tsx";
 
 function messageText(message: UIMessage): string {
@@ -81,7 +81,7 @@ export function ChatMessage({
       {text && (
         <div className="max-w-[90%] rounded-2xl rounded-bl-sm bg-(--bg-card) border border-(--border) px-4 py-3">
           <MarkdownBlock>{renderText(text, sources)}</MarkdownBlock>
-          <SourceChips sources={sources} onOpenPdf={onOpenPdf} />
+          <SourceList sources={sources} onOpenPdf={onOpenPdf} />
           <div className="flex items-center gap-2 mt-2">
             {savedNoteId ? (
               <span className="inline-flex items-center gap-1 text-xs text-(--success-text)">Saved to notes <IconCheck className="h-3 w-3" /></span>

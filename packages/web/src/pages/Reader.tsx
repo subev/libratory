@@ -6,7 +6,7 @@ import { Button } from "../components/Button.tsx";
 import { SegmentedControl } from "../components/SegmentedControl.tsx";
 import { CueTranscript, TextBody } from "../components/reader/CueTranscript.tsx";
 import { CuePages } from "../components/reader/CuePages.tsx";
-import { bodyFit, chapterPages, UNMAPPED, type ReaderCues, type ReaderManifest } from "../lib/reader-doc.ts";
+import { bodyFit, chapterPages, UNMAPPED, type ReaderCues, type ReaderManifest, type Rect } from "../lib/reader-doc.ts";
 import { httpSource, type DocumentSource } from "../lib/reader-source.ts";
 import { formatDuration } from "../lib/format.ts";
 import { useFollowCue, type FollowBand } from "../lib/cue-follow.ts";
@@ -130,7 +130,11 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
   const { data: cues, error: cueError } = useReaderDoc(cueUrl, source.cues);
 
   const [played, setPlayed] = useState<{ chapterId: string | null; ms: number }>({ chapterId: null, ms: 0 });
-  const ms = played.chapterId === chapterId ? played.ms : 0;
+  // ?t=<ms> opens the chapter at a moment of its narration — how a chat citation lands on its
+  // passage. It is where an unplayed chapter starts, so it stops mattering once the audio moves.
+  const startParam = Number(searchParams.get("t"));
+  const startAt = Number.isFinite(startParam) && startParam > 0 ? startParam : 0;
+  const ms = played.chapterId === chapterId ? played.ms : startAt;
   const setMs = useCallback((at: number) => setPlayed({ chapterId, ms: at }), [chapterId]);
 
   // A chapter nobody has narrated has no cues to reflow; its text is its own small document,
@@ -206,9 +210,11 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
   const measurePages = useElementWidth(setPagesWidth);
 
   const fit = useMemo(() => {
-    // What the reader is actually looking at: a column in column view, the whole page otherwise
+    // What the reader is actually looking at: a column in column view, the whole page otherwise.
+    // The tallest crop, because a page can open with a heading band, which is not where the reading is.
     const first = pages[0];
-    const cropWidth = (view === "column" ? first?.columns[0]?.[2] : first?.w) ?? 0;
+    const body = first?.columns.reduce<Rect | undefined>((tallest, crop) => (tallest && tallest[3] >= crop[3] ? tallest : crop), undefined);
+    const cropWidth = (view === "column" ? body?.[2] : first?.w) ?? 0;
     const rendered = width === "full" ? pagesWidth : WIDTHS.find((w) => w.id === width)!.px!;
     return bodyFit(manifest?.book.medianBodyPt ?? null, cropWidth, rendered);
   }, [pages, view, width, pagesWidth, manifest?.book.medianBodyPt]);
@@ -225,9 +231,14 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
   const grain: Grain | null = unmarkedPrint ? "paragraph" : (cues?.granularity ?? null);
 
   return (
-    <ReaderShell bookId={id} chapterId={chapter.id} title={manifest.book.title}>
+    <ReaderShell bookId={id} title={manifest.book.title} pinnedBack>
       <div className="sticky top-0 z-10 -mx-4 mb-4 border-b border-(--border) bg-(--bg-page)/95 px-4 py-2 backdrop-blur">
         <div className="flex flex-wrap items-center gap-3">
+          {/* In the pinned bar, not above it: a chapter is thousands of pixels of pages, and the way
+              out scrolled away with the first of them */}
+          <Button variant="icon" size="sm" to={backTo(id, chapter.id)} aria-label={id ? "Back to the book" : "Back to the library"} title={id ? "Back to the book" : "Back to the library"} data-testid="reader-back">
+            <IconArrowLeft className="h-4 w-4" />
+          </Button>
           <Button
             variant="icon"
             size="sm"
@@ -386,6 +397,7 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
           if (next) goToChapter(next.i, true);
         }}
         onLoadedMetadata={() => {
+          if (startAt > 0 && audioRef.current) audioRef.current.currentTime = startAt / 1000;
           if (!autoPlay.current) return;
           autoPlay.current = false;
           audioRef.current?.play().catch(() => {});
@@ -415,17 +427,23 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
   );
 }
 
-function ReaderShell({ bookId, chapterId, title, children }: { bookId?: string; chapterId?: string; title?: string; children: React.ReactNode }) {
-  // ?chapter=<id> is the book page's own deep link, so going back lands on the chapter you left
-  const back = bookId ? `/books/${bookId}${chapterId ? `?chapter=${chapterId}` : ""}` : "/";
+// ?chapter=<id> is the book page's own deep link, so going back lands on the chapter you left
+function backTo(bookId?: string, chapterId?: string): string {
+  return bookId ? `/books/${bookId}${chapterId ? `?chapter=${chapterId}` : ""}` : "/";
+}
+
+// `pinnedBack`: the toolbar below carries the way back, so the unpinned one here would be a second
+function ReaderShell({ bookId, title, pinnedBack = false, children }: { bookId?: string; title?: string; pinnedBack?: boolean; children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-(--bg-page) px-4 py-3">
       <div className="mx-auto max-w-5xl">
         <nav className="mb-2 flex items-center gap-2 text-sm text-(--text-muted)">
-          <Link to={back} className="flex items-center gap-1 text-(--accent-text) hover:text-(--accent-text-hover)" data-testid="reader-back">
-            <IconArrowLeft className="h-4 w-4" />
-            Back
-          </Link>
+          {!pinnedBack && (
+            <Link to={backTo(bookId)} className="flex items-center gap-1 text-(--accent-text) hover:text-(--accent-text-hover)" data-testid="reader-back">
+              <IconArrowLeft className="h-4 w-4" />
+              Back
+            </Link>
+          )}
           {title && <span className="truncate text-(--text-secondary)">{title}</span>}
         </nav>
         {children}
