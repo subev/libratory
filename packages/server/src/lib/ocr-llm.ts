@@ -714,7 +714,10 @@ export function makeLlmOcrRunner(deps: { transcribe: Transcriber; transcribePros
           if (diagnostic) {
             const filename = `ocr-failure-page-${pageNumber}-${Date.now()}.json`;
             try {
-              await writeFile(path.join(outDir, filename), JSON.stringify({ page: pageNumber, model, settingsKey: pageSettingsKey, ...diagnostic }, null, 2), { mode: 0o600 });
+              // Renamed into place: a resume parses every failure file, and a truncated one fails it for good.
+              const temp = path.join(outDir, `${filename}.part`);
+              await writeFile(temp, JSON.stringify({ page: pageNumber, model, settingsKey: pageSettingsKey, ...diagnostic }, null, 2), { mode: 0o600 });
+              await rename(temp, path.join(outDir, filename));
               await log(`Saved rejected AI response for page ${pageNumber}/${total}: ${filename}`);
             } catch (saveError) {
               await log(`Could not save rejected AI response: ${saveError instanceof Error ? saveError.message : String(saveError)}`).catch(() => {});

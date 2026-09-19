@@ -69,7 +69,7 @@ export function OcrEngineChoice({ value, onChange, model, onModelChange, pageCou
             <ModelPicker value={model ?? ""} onChange={onModelChange} requireVision testId="book-ocr-model" />
           </div>
           <span className="block">
-            {lineOrdering ? "Each page uses local Surya line detection and two AI calls: ordering and transcription. This costs more than Standard; provider pricing applies. Invalid order stops the run without automatic retries." : <>Every page image leaves this machine for the model's provider. {pageCount !== null ? `${pageCount} page${pageCount === 1 ? "" : "s"} cost ${formatLlmOcrCost(pageCount)} at DeepSeek Flash prices` : "Roughly a tenth of a cent a page at DeepSeek Flash prices"}; other providers charge their own rates. Each page is checked against a local Tesseract read, and pages that come back short are read a second time.</>}
+            {lineOrdering ? "Each page uses local Surya line detection and two AI calls: ordering and transcription. This costs more than Standard; provider pricing applies. A page whose order comes back invalid is flagged for review while the others continue; nothing is retried automatically." : <>Every page image leaves this machine for the model's provider. {pageCount !== null ? `${pageCount} page${pageCount === 1 ? "" : "s"} cost ${formatLlmOcrCost(pageCount)} at DeepSeek Flash prices` : "Roughly a tenth of a cent a page at DeepSeek Flash prices"}; other providers charge their own rates. Each page is checked against a local Tesseract read, and pages that come back short are read a second time.</>}
           </span>
         </div>
       )}
