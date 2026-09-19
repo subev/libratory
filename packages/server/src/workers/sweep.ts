@@ -3,6 +3,7 @@ import { quickAddJob } from "graphile-worker";
 import { db } from "../db.ts";
 import { appendLog } from "../lib/log.ts";
 import { env } from "../env.ts";
+import { synthesisJobSpec } from "../lib/synthesis-jobs.ts";
 
 const connectionString = env.DATABASE_URL;
 
@@ -127,7 +128,7 @@ export async function sweepStrandedWork() {
 
   for (const ch of strandedChapters) {
     if (ch.has_clean_text) {
-      await quickAddJob({ connectionString }, "synthesize", { chapterId: ch.id, bookId: ch.book_id, resume: true }, { maxAttempts: 1 });
+      await quickAddJob({ connectionString }, "synthesize", { chapterId: ch.id, bookId: ch.book_id, resume: true }, await synthesisJobSpec(ch.book_id));
     } else {
       await quickAddJob({ connectionString }, "normalize", { chapterId: ch.id, bookId: ch.book_id }, { maxAttempts: 1 });
     }
@@ -178,11 +179,11 @@ export async function sweepStrandedWork() {
         SELECT j.payload->>'translationId' FROM graphile_worker._private_jobs j
         JOIN graphile_worker._private_tasks t ON t.id = j.task_id
         WHERE t.identifier = 'synthesizeTranslation' AND j.payload->>'translationId' IS NOT NULL)
-    RETURNING ct.id, c.book_id
-  `)) as unknown as Array<{ id: string; book_id: string }>;
+    RETURNING ct.id, c.book_id, ct.language AS key
+  `)) as unknown as Array<{ id: string; book_id: string; key: string }>;
 
   for (const tr of strandedAudio) {
-    await quickAddJob({ connectionString }, "synthesizeTranslation", { translationId: tr.id, bookId: tr.book_id, resume: true }, { maxAttempts: 1 });
+    await quickAddJob({ connectionString }, "synthesizeTranslation", { translationId: tr.id, bookId: tr.book_id, resume: true }, await synthesisJobSpec(tr.book_id, tr.key));
     bump(tr.book_id);
   }
 

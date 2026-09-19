@@ -7,6 +7,7 @@ import type { SourceBlock } from "../lib/marker.ts";
 import { joinTextBlocks } from "../lib/extracted-text.ts";
 import { appendLog } from "../lib/log.ts";
 import { queueIndexBook } from "../lib/search-index.ts";
+import { synthesisJobSpec } from "../lib/synthesis-jobs.ts";
 
 export type NormalizePayload = {
   chapterId: string;
@@ -62,7 +63,7 @@ export async function normalize(payload: NormalizePayload, { addJob }: { addJob:
       .where(eq(chapters.id, chapterId));
 
     await queueIndexBook(bookId);
-    await addJob("synthesize", { chapterId, bookId }, { maxAttempts: 1 });
+    await addJob("synthesize", { chapterId, bookId }, await synthesisJobSpec(bookId));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await log(`Normalization failed for chapter ${chapterId}: ${message}`);

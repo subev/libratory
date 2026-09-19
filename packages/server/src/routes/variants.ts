@@ -16,6 +16,7 @@ import { dirSize } from "../lib/disk-usage.ts";
 import { assembleJobKey, inFlightInputs } from "../lib/output-readiness.ts";
 import { stat, unlink, rm } from "node:fs/promises";
 import type { SourceBlock } from "../lib/marker.ts";
+import { synthesisJobSpec } from "../lib/synthesis-jobs.ts";
 
 const connectionString = env.DATABASE_URL;
 
@@ -478,7 +479,7 @@ export const variantsRouter = router({
         { connectionString },
         "synthesizeTranslation",
         { translationId: row.id, bookId: chapter.bookId, resume: input.resume ?? false },
-        { maxAttempts: 1 },
+        await synthesisJobSpec(chapter.bookId, row.key),
       );
 
       const [updated] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, row.id));
@@ -521,12 +522,13 @@ export const variantsRouter = router({
         `Queued ${queueable.length} chapter${queueable.length === 1 ? "" : "s"} for ${input.key} synthesis` +
           (deferred > 0 ? ` (${deferred} will start when the text finishes)` : ""),
       );
+      const spec = await synthesisJobSpec(input.bookId, input.key);
       for (const r of ready) {
         await quickAddJob(
           { connectionString },
           "synthesizeTranslation",
           { translationId: r.id, bookId: input.bookId },
-          { maxAttempts: 1 },
+          spec,
         );
       }
       return { queued: queueable.length, deferred };

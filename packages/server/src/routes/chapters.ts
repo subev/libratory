@@ -13,6 +13,7 @@ import { stat } from "node:fs/promises";
 import type { SourceBlock } from "../lib/marker.ts";
 import { removeChapterArtifacts } from "../lib/chapter-artifacts.ts";
 import { queueIndexBook } from "../lib/search-index.ts";
+import { synthesisJobSpec } from "../lib/synthesis-jobs.ts";
 
 const connectionString = env.DATABASE_URL;
 
@@ -116,7 +117,7 @@ export const chaptersRouter = router({
           chapterId: input.id,
           bookId: chapter.bookId,
           resume: input.resume ?? false,
-        }, { maxAttempts: 1 });
+        }, await synthesisJobSpec(chapter.bookId));
       } else {
         await quickAddJob({ connectionString }, "normalize", {
           chapterId: input.id,

@@ -31,6 +31,7 @@ import path from "node:path";
 import { mkdir, unlink, rm } from "node:fs/promises";
 import { quickAddJob } from "graphile-worker";
 import { env } from "../env.ts";
+import { synthesisJobSpec } from "../lib/synthesis-jobs.ts";
 
 const connectionString = env.DATABASE_URL;
 
@@ -986,6 +987,7 @@ export const booksRouter = router({
 
       let queued = 0;
       let resynthesized = 0;
+      const synthesisSpec = await synthesisJobSpec(input.id);
       for (const ch of processable) {
         if (ch.status === "done") {
           resynthesized++;
@@ -996,7 +998,7 @@ export const booksRouter = router({
             .update(chapters)
             .set({ status: "pending", error: null, audioPath: null, durationMs: null, progress: null, synthesizedWith: null })
             .where(eq(chapters.id, ch.id));
-          await quickAddJob({ connectionString }, "synthesize", { chapterId: ch.id, bookId: input.id }, { maxAttempts: 1 });
+          await quickAddJob({ connectionString }, "synthesize", { chapterId: ch.id, bookId: input.id }, synthesisSpec);
           queued++;
         } else {
           await db
