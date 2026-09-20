@@ -108,17 +108,19 @@ describe("/mcp", () => {
       "assemble_book",
       "cancel_book",
       "cleanup_chapters",
+      "create_book",
       "export_book",
       "extract_book",
       "get_book",
-      "get_book_logs",
       "get_book_text",
       "get_capabilities",
       "get_chapter",
       "inspect_pdf",
       "list_books",
+      "list_notes",
       "list_voices",
       "redetect_chapters",
+      "save_note",
       "search_library",
       "set_book_settings",
       "start_download",
@@ -136,7 +138,7 @@ describe("/mcp", () => {
     const uploaded = parse(await client.callTool({ name: "upload_book", arguments: { paths: [file], language: "en" } }));
     expect(uploaded.title).toBe("My Book");
     expect(uploaded.status).toBe("pending");
-    expect(uploaded.files).toEqual([expect.objectContaining({ index: 0, filename: "My_Book.pdf", status: "pending" })]);
+    expect(uploaded.files).toEqual({ total: 1, withText: 0, withoutText: [{ index: 0, filename: "My_Book.pdf", status: "pending", error: null }] });
 
     const book = row(await getDb().select().from(books).where(eq(books.id, uploaded.id)));
     expect(book.language).toBe("en");
@@ -148,10 +150,11 @@ describe("/mcp", () => {
     expect(tasks).toEqual(["rawExtract", "extract"]);
 
     const listed = parse(await client.callTool({ name: "list_books", arguments: {} }));
-    expect(listed.map((b: { id: string }) => b.id)).toContain(uploaded.id);
+    expect(listed.books.map((b: { id: string }) => b.id)).toContain(uploaded.id);
 
     const fetched = parse(await client.callTool({ name: "get_book", arguments: { id: uploaded.id } }));
     expect(fetched.id).toBe(uploaded.id);
+    expect(fetched.files).toEqual([expect.objectContaining({ index: 0, filename: "My_Book.pdf", status: "pending" })]);
     expect(fetched.chapters).toEqual([]);
   });
 
@@ -165,9 +168,10 @@ describe("/mcp", () => {
     const uploaded = parse(await scoped.callTool({ name: "upload_book", arguments: { paths: [file] } }));
 
     const mine = parse(await scoped.callTool({ name: "list_books", arguments: {} }));
-    expect(mine.map((b: { id: string }) => b.id)).toEqual([uploaded.id]);
+    expect(mine.books.map((b: { id: string }) => b.id)).toEqual([uploaded.id]);
+    expect(mine.profiles.find((p: { current: boolean }) => p.current)).toMatchObject({ id: other, name: "Other" });
     const theirs = parse(await (await connect(url)).callTool({ name: "list_books", arguments: {} }));
-    expect(theirs).toEqual([]);
+    expect(theirs.books).toEqual([]);
   });
 
   it("reports bad paths as tool errors and leaves nothing behind", async () => {

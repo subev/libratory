@@ -17,6 +17,7 @@ Create a synthetic book (`kind: "api"`), optionally with chapters in the same ca
   "folderId": "<uuid, optional>",
   "voice": "<voice id, optional — validated, defaults like the web app>",
   "speed": 1.0,
+  "language": "<ISO code, optional — detected from the text when omitted>",
   "synthesize": false,
   "chapters": [
     { "title": "Story one", "text": "Chapter text…", "url": "https://example.com/article" }
@@ -26,6 +27,7 @@ Create a synthetic book (`kind: "api"`), optionally with chapters in the same ca
 
 - `client` — free-form identifier of the calling script; stored in `books.origin` and chapter sources.
 - `chapters[].url` — optional; when present the chapter gets a `{kind:"url"}` source and the UI renders a "source ↗" link; the read-along reader and a synced EPUB export carry the same link (`link` in `docs/read-along.md`). Without it the source is `{kind:"api"}`.
+- `language` — the language of the text (`en`, `bg`); left out, it is detected locally from the chapters sent with the book, and stays empty when there is too little text to tell. It is what the chat and the reading surfaces key off.
 - `synthesize: false` (default) — chapters arrive **suspended** for review in the web UI, like digest chapters.
 - `synthesize: true` — chapters are queued straight to TTS with the book's voice (API text is normalized inline at insert — no worker roundtrip); poll `GET /api/books/:id` for audio readiness.
 

@@ -4,8 +4,8 @@ import { z } from "zod";
 import { appRouter } from "../router.ts";
 import { computeBookStatus } from "../routes/books.ts";
 import { db } from "../db.ts";
-import { bookFiles, bookLogs, books, chapters, OCR_ENGINES, DEFAULT_OCR_ENGINE, type Chapter } from "../schema.ts";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { bookFiles, bookLogs, books, chapters, notes, OCR_ENGINES, DEFAULT_OCR_ENGINE, type Chapter } from "../schema.ts";
+import { and, desc, eq, ilike, inArray, isNull, sql } from "drizzle-orm";
 import { createPdfBook, ensurePdfDir, newPdfBookId, pdfFileName, MAX_LANGUAGE_CHARS } from "./pdf-books.ts";
 import { modelKeySchema } from "./llm.ts";
 import { listAllVoices } from "./voice-list.ts";
@@ -17,12 +17,18 @@ import { LLM_SECRETS, isConfigured, secretStatus } from "./secrets.ts";
 import { detectLanguage } from "./detect-language.ts";
 import { countWords, extractPdfAuthor, extractPdfRawText, pdfHasTextLayer } from "./pdf-raw-text.ts";
 import { pdfPageCount } from "./ocr-tesseract.ts";
+import { appendApiChapters, chapterInputSchema, createApiBook } from "./api-books.ts";
+import { listFolderPaths, listProfiles, resolveFolderId, resolveProfileId } from "./mcp-library.ts";
+import { saveNote } from "./notes.ts";
+import { parseTtsVoice } from "./tts.ts";
 import path from "node:path";
 import { copyFile, rm, stat } from "node:fs/promises";
 
 // The agent-facing surface: about twenty curated tools over the tRPC router, not the router
-// itself. Every long job returns at once with the book's state; wait_for_book is how a caller
+// itself. Every long job returns at once with a summary of the book; wait_for_book is how a caller
 // blocks on it. Each request gets its own server (the transport is stateless), so this must stay cheap.
+// Only get_book answers with every chapter: an agent pays for each token of a result and polls in
+// loops, and a 300-chapter book repeated on every call was most of a session's context.
 export function createMcpServer(profileId: string): McpServer {
   const caller = appRouter.createCaller({ profileId });
   const server = new McpServer({ name: "libratory", version: "1" });
@@ -33,6 +39,14 @@ export function createMcpServer(profileId: string): McpServer {
 
   const bookId = z.string().uuid().describe("Book id");
   const chapterId = z.string().uuid().describe("Chapter id");
+  const profileArg = z.string().trim().min(1).max(200).optional().describe("Profile name or id from list_books; the connection's profile when omitted");
+
+  // The x-profile-id header is fixed when the client is configured, so without a per-call
+  // override an agent could never reach a second profile.
+  const scoped = async (profile: string | undefined) => {
+    const id = profile === undefined ? profileId : await resolveProfileId(profile);
+    return { profileId: id, caller: id === profileId ? caller : appRouter.createCaller({ profileId: id }) };
+  };
 
   const getBook = async (id: string) => {
     const [book, assemblies, documents, [latestLog]] = await Promise.all([
@@ -48,6 +62,7 @@ export function createMcpServer(profileId: string): McpServer {
     ]);
     return compactBook(book, assemblies, documents, latestLog ?? null);
   };
+  const getSummary = async (id: string) => summarizeBook(await getBook(id));
 
   // The UI hides full extraction until the models are on disk; MCP has no such gate, and without
   // this the Python step fails offline with an error that names nothing the caller can do.
@@ -61,23 +76,50 @@ export function createMcpServer(profileId: string): McpServer {
   server.registerTool(
     "list_books",
     {
-      description: "List the books in the library, newest first, with their processing status and chapter counts.",
-      inputSchema: { folderId: z.string().uuid().nullable().optional().describe("Only books in this folder; omit for all") },
+      description:
+        "The library's layout and its books: the profiles (separate workspaces) with the current one marked, this profile's folders as paths with book counts, " +
+        "and the books newest first with processing status and chapter counts. Start here to find a book id, or a profile or folder to put a new book in. " +
+        "A large library is cut at `limit` — narrow it with `query` (words from the title) or `folder`.",
+      inputSchema: {
+        profile: profileArg,
+        folder: z.string().trim().min(1).optional().describe("Only books directly in this folder: a path such as Work/Contracts, or a folder id"),
+        query: z.string().trim().min(1).max(200).optional().describe("Only books whose title contains this"),
+        limit: z.number().int().min(1).max(500).default(100),
+      },
     },
-    async ({ folderId }) => {
-      const rows = await db
-        .select()
-        .from(books)
-        .where(folderId ? and(eq(books.profileId, profileId), eq(books.folderId, folderId)) : eq(books.profileId, profileId))
-        .orderBy(desc(books.createdAt));
-      const agg = (await db.execute(sql`
-        SELECT book_id, status, count(*)::int AS count, count(*) FILTER (WHERE audio_path IS NOT NULL)::int AS with_audio
-        FROM chapters GROUP BY book_id, status
-      `)) as unknown as Array<{ book_id: string; status: string; count: number; with_audio: number }>;
-      return json(
-        rows.map((book) => {
-          const mine = agg.filter((a) => a.book_id === book.id);
-          const statuses = mine.flatMap((a) => Array.from({ length: a.count }, () => a.status as Chapter["status"]));
+    async ({ profile, folder, query, limit }) => {
+      const scope = await scoped(profile);
+      const folderId = folder === undefined ? null : await resolveFolderId(scope.profileId, folder, { create: false });
+      const where = and(
+        eq(books.profileId, scope.profileId),
+        folderId ? eq(books.folderId, folderId) : undefined,
+        query ? ilike(books.title, `%${query.replace(/[\\%_]/g, "\\$&")}%`) : undefined,
+      );
+      const [[total], rows, profileList, folderList] = await Promise.all([
+        db.select({ count: sql<number>`count(*)::int` }).from(books).where(where),
+        db.select().from(books).where(where).orderBy(desc(books.createdAt)).limit(limit),
+        listProfiles(scope.profileId),
+        listFolderPaths(scope.profileId),
+      ]);
+      const ids = rows.map((r) => r.id);
+      const agg = ids.length === 0 ? [] : await db
+        .select({
+          bookId: chapters.bookId,
+          status: chapters.status,
+          count: sql<number>`count(*)::int`,
+          withAudio: sql<number>`(count(*) FILTER (WHERE ${chapters.audioPath} IS NOT NULL))::int`,
+        })
+        .from(chapters)
+        .where(inArray(chapters.bookId, ids))
+        .groupBy(chapters.bookId, chapters.status);
+      return json({
+        profiles: profileList,
+        folders: folderList.map((f) => ({ id: f.id, path: f.path, books: f.books })),
+        totalBooks: total?.count ?? rows.length,
+        truncated: (total?.count ?? rows.length) > rows.length,
+        books: rows.map((book) => {
+          const mine = agg.filter((a) => a.bookId === book.id);
+          const statuses = mine.flatMap((a) => Array.from({ length: a.count }, (): Chapter["status"] => a.status));
           return {
             id: book.id,
             title: book.title,
@@ -86,13 +128,13 @@ export function createMcpServer(profileId: string): McpServer {
             status: computeBookStatus(book, statuses),
             error: book.error,
             chapters: statuses.length,
-            chaptersWithAudio: mine.reduce((n, a) => n + a.with_audio, 0),
+            chaptersWithAudio: mine.reduce((n, a) => n + a.withAudio, 0),
             outputReady: book.outputPath !== null,
-            folderId: book.folderId,
+            folder: folderList.find((f) => f.id === book.folderId)?.path ?? null,
             createdAt: book.createdAt,
           };
         }),
-      );
+      });
     },
   );
 
@@ -136,14 +178,16 @@ export function createMcpServer(profileId: string): McpServer {
         "By default the whole pipeline runs unattended — text extraction, chapter detection, narration of every chapter, and assembly into one M4B — " +
         "so follow with wait_for_book until \"output\". Set fullExtract=false for an instant text-only book (readable and searchable in seconds, no chapters until extract_book), " +
         "or skipSynthesis=true to detect chapters but leave narration for synthesize_book. Scanned pages are read by OCR in the book's language, " +
-        "which needs that language's pack (see get_capabilities); pick voices with list_voices.",
+        "which needs that language's pack (see get_capabilities); pick voices with list_voices. Only PDFs — for text you already hold (a web page, markdown, a .docx you converted) use create_book. " +
+        "Returns a summary; get_book lists the files and chapters.",
       inputSchema: {
         paths: z.array(z.string().min(1)).min(1).max(50).describe("Absolute paths to PDF files, in reading order; several files make one book"),
         title: z.string().trim().min(1).max(500).optional().describe("Defaults to the first file's name"),
         voice: z.string().optional().describe("Narrator voice id from list_voices, e.g. kokoro:af_heart (default)"),
         speed: z.number().min(0.5).max(2).optional(),
         language: z.string().trim().max(MAX_LANGUAGE_CHARS).optional().describe("Language code of the text, e.g. en, bg; detected from the text when omitted"),
-        folderId: z.string().uuid().optional(),
+        profile: profileArg,
+        folder: z.string().trim().min(1).optional().describe("Where to file it: a path such as Work/Contracts (created when missing) or a folder id; the top level when omitted"),
         fullExtract: z.boolean().default(true),
         skipSynthesis: z.boolean().default(false),
         llmChapterDetection: z.boolean().default(false).describe("Let an AI model read the table of contents to place and title chapters"),
@@ -155,6 +199,10 @@ export function createMcpServer(profileId: string): McpServer {
     async (input) => {
       for (const p of input.paths) await requirePdfPath(p);
       if (input.fullExtract) await requireExtractionModels();
+      // Before the folder: a refused voice must not leave an empty folder behind.
+      if (input.voice !== undefined) parseTtsVoice(input.voice);
+      const scope = await scoped(input.profile);
+      const folderId = input.folder === undefined ? null : await resolveFolderId(scope.profileId, input.folder, { create: true });
       const { bookId: id, pdfDir } = newPdfBookId();
       await ensurePdfDir(pdfDir);
       try {
@@ -164,35 +212,88 @@ export function createMcpServer(profileId: string): McpServer {
           await copyFile(p, pdfPath);
           files.push({ index, filename: path.basename(p), pdfPath });
         }
-        await createPdfBook(id, { ...input, files }, profileId);
+        await createPdfBook(id, { ...input, folderId, files }, scope.profileId);
       } catch (err) {
         await db.delete(books).where(eq(books.id, id)).catch(() => {});
         await rm(pdfDir, { recursive: true, force: true }).catch(() => {});
         throw err;
       }
-      return json(await getBook(id));
+      return json(await getSummary(id));
+    },
+  );
+
+  server.registerTool(
+    "create_book",
+    {
+      description:
+        "Create a book from text you already hold — an article, a web page, notes, a report you wrote — one chapter per entry, with no PDF involved. " +
+        "The text is searchable at once (search_library) and can be narrated: synthesize=true starts narration now, otherwise the chapters wait for synthesize_book. " +
+        "Write plain prose as it should be read aloud; markdown syntax is stripped. Pass appendTo to add chapters to an existing book instead of creating one. " +
+        "A chapter's url is kept as its source link through to exports.",
+      inputSchema: {
+        title: z.string().trim().min(1).max(500).optional().describe("The new book's title; required unless appendTo is set"),
+        appendTo: bookId.optional().describe("Append the chapters to this book instead"),
+        chapters: z.array(chapterInputSchema).min(1).max(500),
+        profile: profileArg,
+        folder: z.string().trim().min(1).optional().describe("Where to file a new book: a path such as Work/Contracts (created when missing) or a folder id"),
+        voice: z.string().optional().describe("Narrator voice id from list_voices"),
+        speed: z.number().min(0.5).max(2).optional(),
+        language: z.string().trim().max(MAX_LANGUAGE_CHARS).optional().describe("Language code of the text, e.g. en, bg; detected from the text when omitted"),
+        synthesize: z.boolean().default(false),
+        client: z.string().trim().min(1).max(100).optional().describe("Who is writing this, e.g. the agent's or script's name; shown as the book's origin"),
+      },
+    },
+    async ({ title, appendTo, chapters: chapterInputs, profile, folder, voice, speed, language, synthesize, client }) => {
+      if (appendTo !== undefined) {
+        const appended = await appendApiChapters(appendTo, { chapters: chapterInputs, synthesize, client });
+        if (!appended) throw new Error("Book not found");
+        return json({ ...(await getSummary(appendTo)), added: appended.chapters });
+      }
+      if (title === undefined) throw new Error("A new book needs a title");
+      if (voice !== undefined) parseTtsVoice(voice);
+      const scope = await scoped(profile);
+      const folderId = folder === undefined ? undefined : await resolveFolderId(scope.profileId, folder, { create: true });
+      const created = await createApiBook({ title, folderId, client, voice, speed, language, chapters: chapterInputs, synthesize }, scope.profileId);
+      return json({ ...(await getSummary(created.book.id)), added: created.chapters });
     },
   );
 
   server.registerTool(
     "get_book",
     {
-      description: "A book's status, latest log line, files, chapters (without text, with narration progress), assembled audiobooks and exported documents.",
-      inputSchema: { id: bookId },
+      description:
+        "Everything about one book: status, latest log line, files, every chapter with its id and narration progress (no text), assembled audiobooks, exported documents and saved notes. " +
+        "This is the one call that lists chapters — the other tools answer with a summary. logs=true adds the processing log (OCR pages, narration chunks, failures; the newest 300 entries, logsOmitted counts the rest), logsAfter only the part of it after a timestamp.",
+      inputSchema: {
+        id: bookId,
+        logs: z.boolean().default(false),
+        logsAfter: z.string().datetime().optional().describe("Only log entries after this ISO timestamp; implies logs"),
+      },
     },
-    async ({ id }) => json(await getBook(id)),
+    async ({ id, logs, logsAfter }) => {
+      const book = await getBook(id);
+      const noteRows = await db
+        .select({ id: notes.id, title: notes.prompt, author: notes.model, chars: sql<number>`length(${notes.result})`, createdAt: notes.createdAt })
+        .from(notes)
+        .where(eq(notes.bookId, id))
+        .orderBy(desc(notes.createdAt));
+      if (!logs && logsAfter === undefined) return json({ ...book, notes: noteRows });
+      // A narrated book logs every chunk; the end of the log is where the answer is.
+      const entries = await caller.books.logs({ bookId: id, after: logsAfter });
+      return json({ ...book, notes: noteRows, logsOmitted: Math.max(0, entries.length - MAX_LOG_ENTRIES), logs: entries.slice(-MAX_LOG_ENTRIES) });
+    },
   );
 
   server.registerTool(
     "wait_for_book",
     {
       description:
-        "Block until a book reaches a stage, or the timeout passes, then return its state. Stages: \"text\" (raw text extracted), " +
-        "\"chapters\" (chapter detection finished), \"audio\" (no chapter still narrating), \"output\" (the M4B is assembled). " +
+        "Block until a book reaches a stage, or the timeout passes, then return a summary of it. Stages: \"text\" (every file has been read, OCR of scanned files included), " +
+        "\"searchable\" (that text is indexed, so search_library sees all of it), \"chapters\" (chapter detection finished), \"audio\" (no chapter still narrating), \"output\" (the M4B is assembled). " +
         "Returns early when the book fails. Call again if it times out — the work keeps running. The default timeout fits under the usual 60 s client limit; raise it only if the client allows longer calls.",
       inputSchema: {
         id: bookId,
-        until: z.enum(["text", "chapters", "audio", "output"]).default("output"),
+        until: z.enum(WAIT_STAGES).default("output"),
         timeoutSeconds: z.number().int().min(1).max(600).default(50),
       },
     },
@@ -202,11 +303,11 @@ export function createMcpServer(profileId: string): McpServer {
       const progressToken = progressTokenOf(extra);
       for (;;) {
         const book = await getBook(id);
-        const outcome = stageReached(book, until);
+        const outcome = stageReached(book, until, await queuedWork(id));
         const elapsedSeconds = Math.round((Date.now() - started) / 1000);
-        if (outcome) return json({ ...outcome, elapsedSeconds, book });
+        if (outcome) return json({ ...outcome, elapsedSeconds, book: summarizeBook(book) });
         const remaining = deadline - Date.now();
-        if (remaining <= 0 || extra.signal.aborted) return json({ satisfied: false, reason: "timeout", elapsedSeconds, book });
+        if (remaining <= 0 || extra.signal.aborted) return json({ satisfied: false, reason: "timeout", elapsedSeconds, book: summarizeBook(book) });
         // Clients that reset their timeout on progress can then wait the full timeoutSeconds.
         if (progressToken !== undefined) {
           await extra
@@ -216,15 +317,6 @@ export function createMcpServer(profileId: string): McpServer {
         await sleep(Math.min(POLL_MS, remaining), extra.signal);
       }
     },
-  );
-
-  server.registerTool(
-    "get_book_logs",
-    {
-      description: "The book's processing log, oldest first — what extraction, OCR, narration and assembly reported, including page and chunk progress.",
-      inputSchema: { id: bookId, after: z.string().datetime().optional().describe("Only entries after this ISO timestamp") },
-    },
-    async ({ id, after }) => json(await caller.books.logs({ bookId: id, after })),
   );
 
   server.registerTool(
@@ -321,7 +413,7 @@ export function createMcpServer(profileId: string): McpServer {
       const files = await db.select({ status: bookFiles.status }).from(bookFiles).where(eq(bookFiles.bookId, id));
       if (files.length > 0 && files.every((f) => f.status === "raw")) await caller.books.extractChapters({ id });
       else await caller.bookFiles.reExtractSelected({ bookId: id });
-      return json(await getBook(id));
+      return json(await getSummary(id));
     },
   );
 
@@ -339,7 +431,7 @@ export function createMcpServer(profileId: string): McpServer {
     },
     async (input) => {
       await caller.books.redetectChapters(input);
-      return json(await getBook(input.id));
+      return json(await getSummary(input.id));
     },
   );
 
@@ -367,7 +459,7 @@ export function createMcpServer(profileId: string): McpServer {
     async ({ id, chapterIds, resume }) => {
       if (chapterIds) for (const chapter of chapterIds) await caller.chapters.queue({ id: chapter, resume });
       else await caller.books.processSelected({ id });
-      return json(await getBook(id));
+      return json(await getSummary(id));
     },
   );
 
@@ -379,7 +471,7 @@ export function createMcpServer(profileId: string): McpServer {
     },
     async ({ id, waitForAll }) => {
       await caller.books.assemble({ id, waitForAll });
-      return json(await getBook(id));
+      return json(await getSummary(id));
     },
   );
 
@@ -396,7 +488,7 @@ export function createMcpServer(profileId: string): McpServer {
     },
     async (input) => {
       await caller.books.exportDocument(input);
-      return json(await getBook(input.id));
+      return json(await getSummary(input.id));
     },
   );
 
@@ -412,9 +504,11 @@ export function createMcpServer(profileId: string): McpServer {
   server.registerTool(
     "set_book_settings",
     {
-      description: "Change a book after upload: narrator voice (from list_voices), speed, the language of its text, author, OCR engine, or AI chapter detection. Audio already narrated keeps the old voice until synthesize_book runs again.",
+      description: "Change a book after upload: title, the folder it is filed in, narrator voice (from list_voices), speed, the language of its text, author, OCR engine, or AI chapter detection. Audio already narrated keeps the old voice until synthesize_book runs again.",
       inputSchema: {
         id: bookId,
+        title: z.string().trim().min(1).max(500).optional(),
+        folder: z.string().trim().min(1).nullable().optional().describe("Move the book: a path such as Work/Contracts (created when missing) or a folder id; null moves it to the top level"),
         voice: z.string().optional(),
         speed: z.number().min(0.5).max(2).optional(),
         language: z.string().max(MAX_LANGUAGE_CHARS).nullable().optional().describe("ISO code; null clears it"),
@@ -425,9 +519,17 @@ export function createMcpServer(profileId: string): McpServer {
         chapterModel: modelKeySchema.optional(),
       },
     },
-    async (input) => {
-      await caller.books.updateSettings(input);
-      return json(await getBook(input.id));
+    async ({ title, folder, ...settings }) => {
+      if (title !== undefined) await caller.books.rename({ id: settings.id, title });
+      if (folder !== undefined) {
+        // A folder belongs to a profile, so the move runs as the book's own profile, not the connection's.
+        const [owner] = await db.select({ profileId: books.profileId }).from(books).where(eq(books.id, settings.id));
+        if (!owner) throw new Error("Book not found");
+        const folderId = folder === null ? null : await resolveFolderId(owner.profileId, folder, { create: true });
+        await appRouter.createCaller({ profileId: owner.profileId }).books.moveToFolder({ ids: [settings.id], folderId });
+      }
+      if (Object.keys(settings).length > 1) await caller.books.updateSettings(settings);
+      return json(await getSummary(settings.id));
     },
   );
 
@@ -504,21 +606,86 @@ export function createMcpServer(profileId: string): McpServer {
   server.registerTool(
     "search_library",
     {
-      description: "Search the text of every book in the library. Results cite the book, chapter and page.",
+      description:
+        "Search the text of every book in the library — extracted PDFs, OCR'd scans, books made with create_book and finished translations. Results cite the book, chapter and page. " +
+        "Write the query in the language of the books. A book just uploaded is complete here once wait_for_book reaches \"searchable\". Keep an answer worth keeping with save_note.",
       inputSchema: {
         query: z.string().trim().min(1).max(500),
-        folderId: z.string().uuid().optional(),
+        profile: profileArg,
+        folder: z.string().trim().min(1).optional().describe("Only this folder and the folders inside it: a path such as Work/Contracts, or a folder id"),
         limit: z.number().int().min(1).max(30).optional(),
         mode: z.enum(["hybrid", "keyword"]).optional().describe("hybrid (default) adds semantic matches when the index is built"),
       },
     },
-    async (input) => json(await caller.search.library(input)),
+    async ({ profile, folder, ...input }) => {
+      const scope = await scoped(profile);
+      const folderId = folder === undefined ? undefined : await resolveFolderId(scope.profileId, folder, { create: false });
+      return json(await scope.caller.search.library({ ...input, folderId }));
+    },
+  );
+
+  server.registerTool(
+    "save_note",
+    {
+      description:
+        "Keep something you worked out — an answer with its citations, a summary, an analysis — as a note in the library, where the person sees it in the app and a later session finds it with list_notes. " +
+        "With bookId it lands on that book's Notes tab; without, it is a library note in the profile. Markdown.",
+      inputSchema: {
+        title: z.string().trim().min(1).max(4000).describe("The question answered, or a short title"),
+        markdown: z.string().min(1).max(1_000_000),
+        bookId: bookId.optional(),
+        profile: profileArg,
+        author: z.string().trim().min(1).max(64).default("agent").describe("Who wrote it, e.g. the agent's name; shown beside the note"),
+      },
+    },
+    async ({ title, markdown, bookId: id, profile, author }) => {
+      if (id !== undefined) {
+        const fileRows = await db.select({ id: bookFiles.id }).from(bookFiles).where(eq(bookFiles.bookId, id));
+        const [book] = await db.select({ id: books.id }).from(books).where(eq(books.id, id));
+        if (!book) throw new Error("Book not found");
+        return json({ noteId: await saveNote({ bookId: id, prompt: title, model: author, result: markdown, scope: { kind: "book-raw", files: fileRows.length } }) });
+      }
+      const scope = await scoped(profile);
+      return json({ noteId: await saveNote({ bookId: null, profileId: scope.profileId, prompt: title, model: author, result: markdown, scope: { kind: "library", question: title } }) });
+    },
+  );
+
+  server.registerTool(
+    "list_notes",
+    {
+      description:
+        "Notes saved in the library, newest first: AI answers people saved from the app and notes written with save_note. Check here before redoing an analysis. " +
+        "Without arguments it lists titles only; pass noteId to read one (long notes page through offset/maxChars), bookId for one book's notes, neither for the profile's library notes.",
+      inputSchema: {
+        noteId: z.string().uuid().optional(),
+        bookId: bookId.optional(),
+        profile: profileArg,
+        offset: z.number().int().min(0).default(0),
+        maxChars: z.number().int().min(1).max(200_000).default(20_000),
+      },
+    },
+    async ({ noteId, bookId: id, profile, offset, maxChars }) => {
+      if (noteId !== undefined) {
+        const [note] = await db.select().from(notes).where(eq(notes.id, noteId));
+        if (!note) throw new Error("Note not found");
+        return json({ id: note.id, bookId: note.bookId, title: note.prompt, author: note.model, createdAt: note.createdAt, ...page(note.result, offset, maxChars) });
+      }
+      const scope = await scoped(profile);
+      const rows = await db
+        .select({ id: notes.id, bookId: notes.bookId, title: notes.prompt, author: notes.model, chars: sql<number>`length(${notes.result})`, createdAt: notes.createdAt })
+        .from(notes)
+        .where(id !== undefined ? eq(notes.bookId, id) : and(isNull(notes.bookId), eq(notes.profileId, scope.profileId)))
+        .orderBy(desc(notes.createdAt))
+        .limit(200);
+      return json(rows);
+    },
   );
 
   return server;
 }
 
 const POLL_MS = 2000;
+const MAX_LOG_ENTRIES = 300;
 
 function page(text: string, offset: number, maxChars: number) {
   return { totalChars: text.length, offset, truncated: offset + maxChars < text.length, text: text.slice(offset, offset + maxChars) };
@@ -570,6 +737,7 @@ function compactBook(
     voice: book.voice,
     speed: book.speed,
     language: book.language,
+    searchIndex: book.searchIndex ? { status: book.searchIndex.status, progress: book.searchIndex.progress ?? null, error: book.searchIndex.error ?? null } : null,
     ocrEngine: book.ocrEngine,
     folderId: book.folderId,
     totalWords: book.totalWords,
@@ -608,6 +776,65 @@ function compactBook(
   };
 }
 
+// What wait_for_book and every action tool answer with: counts, and in detail only what went wrong.
+export function summarizeBook(book: CompactBook) {
+  const byStatus: Partial<Record<Chapter["status"], number>> = {};
+  for (const c of book.chapters) byStatus[c.status] = (byStatus[c.status] ?? 0) + 1;
+  return {
+    id: book.id,
+    title: book.title,
+    kind: book.kind,
+    status: book.status,
+    error: book.error,
+    latestLog: book.latestLog,
+    language: book.language,
+    voice: book.voice,
+    folderId: book.folderId,
+    totalWords: book.totalWords,
+    files: {
+      total: book.files.length,
+      withText: book.files.filter((f) => f.hasRawText).length,
+      withoutText: book.files.filter((f) => !f.hasRawText).map((f) => ({ index: f.index, filename: f.filename, status: f.status, error: f.error })),
+    },
+    chapters: {
+      total: book.chapters.length,
+      selected: book.chapters.filter((c) => c.selected).length,
+      withAudio: book.chapters.filter((c) => c.hasAudio).length,
+      byStatus,
+      failed: book.chapters.filter((c) => c.status === "failed").map((c) => ({ id: c.id, index: c.index, title: c.title, error: c.error })),
+    },
+    searchIndex: book.searchIndex,
+    outputPath: book.outputPath,
+    downloadUrl: book.downloadUrl,
+    assembleQueued: book.assembleQueued,
+    assemblies: book.assemblies.length,
+    documents: book.documents.map((d) => ({ id: d.id, format: d.format, language: d.language, downloadUrl: d.downloadUrl })),
+  };
+}
+
+// Jobs still owed to a book. A job that failed stays in the table with its attempts spent
+// (maxAttempts is 1 everywhere), so presence alone proves nothing; and a running one has spent
+// its attempt too, which is why the lock counts as well.
+export type QueuedWork = { text: boolean; index: boolean };
+
+const TEXT_TASKS = ["rawExtract", "ocrTextLayer"];
+const INDEX_TASKS = ["indexBook", "embedChunks"];
+
+async function queuedWork(bookId: string): Promise<QueuedWork> {
+  const [probe] = (await db.execute(
+    sql`SELECT to_regclass('graphile_worker._private_jobs') AS jobs_table`,
+  )) as unknown as Array<{ jobs_table: string | null }>;
+  if (!probe?.jobs_table) return { text: false, index: false };
+  const rows = (await db.execute(sql`
+    SELECT DISTINCT t.identifier
+    FROM graphile_worker._private_jobs j
+    JOIN graphile_worker._private_tasks t ON t.id = j.task_id
+    WHERE j.payload->>'bookId' = ${bookId} AND (j.locked_at IS NOT NULL OR j.attempts < j.max_attempts)
+  `)) as unknown as Array<{ identifier: string }>;
+  const owed = new Set(rows.map((r) => r.identifier));
+  return { text: TEXT_TASKS.some((t) => owed.has(t)), index: INDEX_TASKS.some((t) => owed.has(t)) };
+}
+
 const AUDIO_IN_FLIGHT = new Set(["pending", "normalizing", "synthesizing"]);
 const EXTRACTION_IN_FLIGHT = new Set(["pending", "extracting"]);
 
@@ -615,12 +842,46 @@ function audioSettled(book: CompactBook): boolean {
   return !book.chapters.some((c) => c.selected && AUDIO_IN_FLIGHT.has(c.status));
 }
 
-export function stageReached(book: CompactBook, until: "text" | "chapters" | "audio" | "output"): { satisfied: boolean; reason?: string } | null {
+export const WAIT_STAGES = ["text", "searchable", "chapters", "audio", "output"] as const;
+
+// One file with text used to satisfy "text" for the whole book, so a caller was told a
+// seventeen-file book was ready while OCR was on page 11 of its first scan, searched it, and
+// concluded the answer was not there.
+function textSettled(book: CompactBook, extracting: boolean, queued: QueuedWork): { satisfied: boolean; reason?: string } | null {
+  // A book written with create_book has no files; its chapters are its text.
+  if (book.files.length === 0) return book.chapters.length > 0 ? { satisfied: true } : null;
+  // Raw text lands in seconds and the thorough page read runs for half an hour after it, so
+  // "extracting" alone must not hold this back — only a file that still has nothing to show.
+  if (book.files.every((f) => f.hasRawText)) return { satisfied: true };
+  if (extracting || queued.text) return null;
+  // Nothing is left to run: the files without text were read and had none, and the summary names them.
+  if (book.files.some((f) => f.hasRawText)) return { satisfied: true };
+  return { satisfied: false, reason: "No file yielded any text — the PDFs may be encrypted or empty; get_book with logs=true says what each one reported" };
+}
+
+export function stageReached(book: CompactBook, until: (typeof WAIT_STAGES)[number], queued: QueuedWork): { satisfied: boolean; reason?: string } | null {
   if (book.status === "failed") return { satisfied: false, reason: book.error ?? "failed" };
   const extracting = book.status === "extracting" || book.files.some((f) => EXTRACTION_IN_FLIGHT.has(f.status));
   switch (until) {
     case "text":
-      return book.files.some((f) => f.hasRawText) ? { satisfied: true } : null;
+      return textSettled(book, extracting, queued);
+    case "searchable": {
+      // Whatever is still reading pages queues a reindex as its last act, and until then the
+      // index's "done" describes the text as it was before.
+      if (extracting || queued.text || queued.index) return null;
+      const text = textSettled(book, extracting, queued);
+      if (text?.satisfied !== true) return text;
+      switch (book.searchIndex?.status) {
+        case "done":
+          return { satisfied: true };
+        case "waiting":
+          return { satisfied: true, reason: "Indexed for keyword search only — semantic search needs the embeddings bundle (get_capabilities)" };
+        case "failed":
+          return { satisfied: false, reason: book.searchIndex.error ?? "Indexing failed" };
+        default:
+          return null;
+      }
+    }
     case "chapters":
       return book.chapters.length > 0 && !extracting ? { satisfied: true } : null;
     case "audio":

@@ -10,6 +10,8 @@ import { appendLog } from "./log.ts";
 import { parseTtsVoice } from "./tts.ts";
 import { env } from "../env.ts";
 import { synthesisJobSpec } from "./synthesis-jobs.ts";
+import { detectLanguage } from "./detect-language.ts";
+import { MAX_LANGUAGE_CHARS } from "./pdf-books.ts";
 
 const connectionString = env.DATABASE_URL;
 
@@ -25,6 +27,7 @@ export const createBookInputSchema = z.object({
   client: z.string().min(1).max(100).optional(),
   voice: z.string().optional(),
   speed: z.number().min(0.5).max(2).optional(),
+  language: z.string().trim().min(2).max(MAX_LANGUAGE_CHARS).optional(),
   chapters: z.array(chapterInputSchema).max(500).default([]),
   synthesize: z.boolean().default(false),
 });
@@ -100,6 +103,8 @@ export async function createApiBook(
       origin: { type: "api", ...(input.client ? { client: input.client } : {}) },
       ...(input.voice ? { voice: input.voice } : {}),
       ...(input.speed !== undefined ? { speed: input.speed } : {}),
+      // Set with the row, not after it: synthesize=true queues narration before this function returns.
+      language: input.language ?? detectLanguage(input.chapters.map((ch) => ch.text).join("\n").slice(0, 20_000)),
       folderId: input.folderId,
       profileId,
     })
