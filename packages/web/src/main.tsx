@@ -56,6 +56,7 @@ createRoot(document.getElementById("root")!).render(
                 <Route path="/books/:id/ocr" element={<Suspense fallback={null}><OcrTryPage /></Suspense>} />
                 <Route path="/open" element={<Suspense fallback={null}><ReaderOpen /></Suspense>} />
                 <Route path="/chat" element={<Chat />} />
+                <Route path="/chat/:conversationId" element={<Chat />} />
                 <Route path="/components" element={<Suspense fallback={null}><Components /></Suspense>} />
               </Routes>
             </IconDefaults>

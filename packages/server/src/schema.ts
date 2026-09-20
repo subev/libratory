@@ -65,6 +65,15 @@ export type NoteScope =
   | { kind: "book-raw"; files: number; digestBookId?: string }
   | { kind: "library"; folderId?: string; question: string };
 
+// Titles are snapshots: a conversation outlives the books and the folder it searched, and has to
+// go on naming them once they are gone.
+export type ChatBookRef = { id: string; title: string };
+
+export type ChatScope =
+  | { kind: "library" }
+  | { kind: "folder"; folderId: string; name: string }
+  | { kind: "books"; books: ChatBookRef[] };
+
 export type SearchIndexJob = {
   // "waiting" is not a failure: the BGE-M3 bundle is an optional 4.2 GB download, and a book that
   // arrives before it does is indexed for keyword search and queued for the rest.
@@ -306,6 +315,35 @@ export const notes = pgTable("notes", {
   scope: jsonb("scope").$type<NoteScope>().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const chatConversations = pgTable("chat_conversations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  profileId: uuid("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  // Empty until the first question names it
+  title: text("title").notNull().default(""),
+  // Fixed at creation: an answer must never appear to have searched a later selection
+  scope: jsonb("scope").$type<ChatScope>().notNull(),
+  // Books the answers actually quoted — what lets a whole-library chat be found by book
+  citedBooks: jsonb("cited_books").$type<ChatBookRef[]>().notNull().default([]),
+  model: text("model"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("chat_conversations_profile_updated_idx").on(t.profileId, t.updatedAt)]);
+
+export const chatMessages = pgTable("chat_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  conversationId: uuid("conversation_id").notNull().references(() => chatConversations.id, { onDelete: "cascade" }),
+  seq: integer("seq").notNull(),
+  role: text("role", { enum: ["user", "assistant"] }).notNull(),
+  // The UI message parts as streamed — text, tool calls with their results, data-sources
+  parts: jsonb("parts").$type<unknown[]>().notNull(),
+  // "stopped" and "failed" keep whatever text had arrived; neither is ever retried on its own
+  status: text("status", { enum: ["complete", "stopped", "failed"] }).notNull().default("complete"),
+  error: text("error"),
+  model: text("model"),
+  modelLabel: text("model_label"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique("chat_messages_conversation_seq").on(t.conversationId, t.seq)]);
 
 export const bookChunks = pgTable("book_chunks", {
   id: uuid("id").primaryKey().defaultRandom(),

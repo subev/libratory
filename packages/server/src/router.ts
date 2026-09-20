@@ -6,6 +6,7 @@ import { chaptersRouter } from "./routes/chapters.ts";
 import { bookFilesRouter } from "./routes/bookFiles.ts";
 import { variantsRouter } from "./routes/variants.ts";
 import { notesRouter } from "./routes/notes.ts";
+import { chatsRouter } from "./routes/chats.ts";
 import { foldersRouter } from "./routes/folders.ts";
 import { profilesRouter } from "./routes/profiles.ts";
 import { searchRouter } from "./routes/search.ts";
@@ -30,6 +31,7 @@ export const appRouter = router({
   bookFiles: bookFilesRouter,
   variants: variantsRouter,
   notes: notesRouter,
+  chats: chatsRouter,
   search: searchRouter,
   sayVoices: sayVoicesRouter,
   cartesiaVoices: cartesiaVoicesRouter,

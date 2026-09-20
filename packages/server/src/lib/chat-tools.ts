@@ -87,8 +87,21 @@ function describeHit(source: CitationSource, hit: SearchHit): string {
   return `[${source.id}] ${parts.join(", ")}:\n${hit.text}`;
 }
 
-export function buildChatTools(opts: { profileId: string; folderId?: string; bookId?: string; catalog: CitationCatalog }): ToolSet {
-  const { profileId, folderId, bookId, catalog } = opts;
+// What one chat may search. `bookIds` is the chosen set and is enforced by every tool — an empty
+// one matches nothing, it never widens to the library.
+export type ChatSearchScope = { profileId: string; folderId?: string; bookIds?: string[] };
+
+async function scopeBookFilters(scope: ChatSearchScope): Promise<SQL[]> {
+  const filters: SQL[] = [eq(books.profileId, scope.profileId)];
+  if (scope.bookIds) filters.push(scope.bookIds.length > 0 ? inArray(books.id, scope.bookIds) : sql`false`);
+  else if (scope.folderId) filters.push(inArray(books.folderId, await folderSubtreeIds(scope.folderId)));
+  return filters;
+}
+
+export function buildChatTools(opts: ChatSearchScope & { catalog: CitationCatalog }): ToolSet {
+  const { profileId, folderId, bookIds, catalog } = opts;
+  // One chosen book keeps the single-book ranking, which lifts the per-book cap on passages
+  const bookId = bookIds?.length === 1 ? bookIds[0] : undefined;
 
   return {
     search_library: tool({
@@ -99,7 +112,7 @@ export function buildChatTools(opts: { profileId: string; folderId?: string; boo
         limit: z.number().int().min(1).max(20).optional().describe("Max passages to return (default 8)"),
       }),
       execute: async ({ query, limit }) => {
-        const result = await searchLibrary({ profileId, folderId, bookId, query, limit: limit ?? 8 });
+        const result = await searchLibrary({ profileId, folderId, bookId, bookIds, query, limit: limit ?? 8 });
         if (result.hits.length === 0) return "No matching passages found. Try different keywords.";
         const blocks = result.hits.map((hit) => describeHit(catalog.register(hit), hit));
         const note = result.mode === "keyword" ? "\n\n(Semantic search unavailable — keyword results only.)" : "";
@@ -131,9 +144,7 @@ export function buildChatTools(opts: { profileId: string; folderId?: string; boo
         query: z.string().max(200).optional().describe("Optional title filter"),
       }),
       execute: async ({ query }) => {
-        const filters: SQL[] = [eq(books.profileId, profileId)];
-        if (bookId) filters.push(eq(books.id, bookId));
-        else if (folderId) filters.push(inArray(books.folderId, await folderSubtreeIds(folderId)));
+        const filters = await scopeBookFilters(opts);
         if (query?.trim()) {
           for (const word of query.trim().split(/\s+/).slice(0, 8)) {
             filters.push(ilike(books.title, `%${word.replace(/[\\%_]/g, "\\$&")}%`));
@@ -157,10 +168,8 @@ export function buildChatTools(opts: { profileId: string; folderId?: string; boo
 }
 
 // The languages of the books in scope, most books first. Null and unknown languages are left out.
-export async function scopeLanguages(opts: { profileId: string; folderId?: string; bookId?: string }): Promise<string[]> {
-  const filters: SQL[] = [eq(books.profileId, opts.profileId), sql`${books.language} IS NOT NULL`];
-  if (opts.bookId) filters.push(eq(books.id, opts.bookId));
-  else if (opts.folderId) filters.push(inArray(books.folderId, await folderSubtreeIds(opts.folderId)));
+export async function scopeLanguages(opts: ChatSearchScope): Promise<string[]> {
+  const filters = [...(await scopeBookFilters(opts)), sql`${books.language} IS NOT NULL`];
   const rows = await db
     .select({ language: books.language })
     .from(books)

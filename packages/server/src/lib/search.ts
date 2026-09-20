@@ -159,13 +159,15 @@ export async function searchLibrary(opts: {
   profileId: string;
   folderId?: string;
   bookId?: string;
+  // A chosen set of books; an empty one finds nothing rather than widening to the library
+  bookIds?: string[];
   query: string;
   limit?: number;
   mode?: "hybrid" | "keyword";
 }): Promise<SearchResult> {
   const { profileId, folderId, query } = opts;
   const limit = opts.limit ?? 12;
-  const bookIds = opts.bookId ? [opts.bookId] : await scopedBookIds(profileId, folderId);
+  const bookIds = opts.bookId ? [opts.bookId] : (opts.bookIds ?? await scopedBookIds(profileId, folderId));
   if (bookIds !== null && bookIds.length === 0) return { hits: [], mode: "keyword" };
 
   const vector = opts.mode === "keyword" ? null : await embedQuery(query);

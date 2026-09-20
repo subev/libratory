@@ -48,7 +48,7 @@ const targetClass = "ml-auto inline-flex shrink-0 items-center gap-1 self-center
 // Numbered like the [n] markers in the answer, grouped under the book so its title is said once,
 // and told apart by how each passage starts — a dozen citations of one chapter used to be a dozen
 // identical truncated pills.
-export function SourceList({ sources, onOpenPdf }: { sources: ChatSource[]; onOpenPdf: OpenPdf }) {
+export function SourceList({ sources, removedBookIds, onOpenPdf }: { sources: ChatSource[]; removedBookIds: ReadonlySet<string>; onOpenPdf: OpenPdf }) {
   if (sources.length === 0) return null;
 
   const numbered = sources.map((source, i) => ({ source, n: i + 1 }));
@@ -58,19 +58,40 @@ export function SourceList({ sources, onOpenPdf }: { sources: ChatSource[]; onOp
     <div className="mt-2 space-y-2" data-testid="chat-sources">
       {bookIds.map((bookId) => {
         const rows = numbered.filter((row) => row.source.bookId === bookId);
+        const removed = removedBookIds.has(bookId);
         return (
           <div key={bookId}>
-            <p className="px-2 text-xs font-medium text-(--text-secondary)">{rows[0]?.source.bookTitle}</p>
+            <p className="flex items-center gap-1.5 px-2 text-xs font-medium text-(--text-secondary)">
+              {rows[0]?.source.bookTitle}
+              {removed && <span className="rounded-full bg-(--warning-bg) px-1.5 text-[10px] font-semibold text-(--warning-text)">removed</span>}
+            </p>
             <ul>
               {rows.map(({ source, n }) => (
                 <li key={source.id} className="flex items-center gap-1">
-                  <SourceRow source={source} n={n} onOpenPdf={onOpenPdf} />
+                  {removed ? <RemovedRow source={source} n={n} /> : <SourceRow source={source} n={n} onOpenPdf={onOpenPdf} />}
                 </li>
               ))}
             </ul>
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// The passage is still named, so the answer stays checkable against memory; there is nothing to open
+function RemovedRow({ source, n }: { source: ChatSource; n: number }) {
+  return (
+    <div
+      title="This book is no longer in the library"
+      className="flex min-w-0 flex-1 cursor-not-allowed items-baseline gap-2 px-2 py-1 text-xs text-(--text-muted) opacity-60"
+      data-testid="chat-source-removed"
+    >
+      <span className="w-5 shrink-0 text-right font-medium tabular-nums">{n}.</span>
+      <span className="min-w-0">
+        <span className="block truncate text-(--text-secondary)">{where(source)}</span>
+        {source.snippet && <span className="block truncate text-(--text-faint)">{source.snippet}</span>}
+      </span>
     </div>
   );
 }

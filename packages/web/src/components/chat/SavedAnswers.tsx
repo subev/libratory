@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { trpc } from "../../trpc.ts";
 import { MarkdownBlock } from "../MarkdownBlock.tsx";
-import { IconChevronRight, IconClose } from "../icons.tsx";
+import { Modal, ModalHeader } from "../Modal.tsx";
+import { IconClose } from "../icons.tsx";
 
-export function SavedAnswers() {
-  const [open, setOpen] = useState(false);
+// Answers kept with Save as note. They are notes, not conversations: deleting a chat leaves them here.
+export function SavedAnswersModal({ onClose }: { onClose: () => void }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const utils = trpc.useUtils();
   const { data: notes = [] } = trpc.notes.listLibrary.useQuery();
@@ -12,19 +13,12 @@ export function SavedAnswers() {
     onSuccess: () => utils.notes.listLibrary.invalidate(),
   });
 
-  if (notes.length === 0) return null;
-
   return (
-    <div className="border-t border-(--border) pt-3 mt-2" data-testid="saved-answers">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 text-sm text-(--text-muted) hover:text-(--text-primary)"
-      >
-        <IconChevronRight className={`w-3 h-3 transition-transform ${open ? "rotate-90" : ""}`} />
-        Saved answers ({notes.length})
-      </button>
-      {open && (
-        <div className="divide-y divide-(--divide) mt-2">
+    <Modal size="md" onClose={onClose} testId="saved-answers">
+      <ModalHeader title="Saved answers" subtitle="Kept with Save as note — separate from the conversations they came from" onClose={onClose} />
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+        {notes.length === 0 && <p className="py-6 text-center text-sm text-(--text-muted)">Nothing saved yet.</p>}
+        <div className="divide-y divide-(--divide)">
           {notes.map((note) => {
             const expanded = expandedId === note.id;
             return (
@@ -56,7 +50,7 @@ export function SavedAnswers() {
             );
           })}
         </div>
-      )}
-    </div>
+      </div>
+    </Modal>
   );
 }

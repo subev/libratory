@@ -1,22 +1,14 @@
-import { useMemo, useRef, useState, useEffect } from "react";
-import { Link, useSearchParams } from "react-router";
-import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { useMemo, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { trpc } from "../trpc.ts";
-import { profileHeaders } from "../lib/profile.ts";
 import { ModelPicker } from "../components/ModelPicker.tsx";
-import { Dropdown } from "../components/Dropdown.tsx";
-import { ChatMessage } from "../components/chat/ChatMessage.tsx";
-import { SavedAnswers } from "../components/chat/SavedAnswers.tsx";
-import { PdfPreviewModal } from "../components/PdfPreviewModal.tsx";
-import { ModelBundleNotice } from "../components/ModelBundleNotice.tsx";
-import { IconArrowLeft, IconBook, IconClose } from "../components/icons.tsx";
 import { Button } from "../components/Button.tsx";
-
-type FolderOption = { id: string; name: string; depth: number };
-
-// How close to the bottom still counts as reading the newest line
-const FOLLOW_WITHIN_PX = 80;
+import { ChatSidebar } from "../components/chat/ChatSidebar.tsx";
+import { ConversationPane } from "../components/chat/ConversationPane.tsx";
+import { SavedAnswersModal } from "../components/chat/SavedAnswers.tsx";
+import { draftFromScope, type DraftScope, type FolderOption } from "../components/chat/SourcePicker.tsx";
+import { NO_FILTER, type ConversationScope, type HistoryFilter } from "../lib/chat-history.ts";
+import { IconArrowLeft, IconSidebar } from "../components/icons.tsx";
 
 function flattenFolders(folders: { id: string; name: string; parentId: string | null }[]): FolderOption[] {
   const byParent = new Map<string | null, typeof folders>();
@@ -41,197 +33,158 @@ for (const key of Object.keys(localStorage)) {
   if (key.startsWith("library-chat.messages.")) localStorage.removeItem(key);
 }
 
+// A viewport shell: the bar, the history and the composer are pinned, and the history and the
+// conversation each scroll on their own. Nothing here needs a scroll to the top to be reached.
 export function Chat() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const folderId = searchParams.get("folderId") ?? undefined;
+  const { conversationId } = useParams();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const bookId = searchParams.get("bookId") ?? undefined;
-  const { data: scopedBook } = trpc.books.get.useQuery({ id: bookId! }, { enabled: !!bookId });
-  const [model, setModel] = useState<string>("");
-  const [input, setInput] = useState("");
-  const [pdfPreview, setPdfPreview] = useState<{ fileId: string; page?: number; filename?: string } | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const folderId = searchParams.get("folderId") ?? undefined;
 
+  const { data: scopedBook } = trpc.books.get.useQuery({ id: bookId! }, { enabled: !!bookId });
   const { data: folders = [] } = trpc.folders.list.useQuery();
   const { data: indexStatus } = trpc.search.indexStatus.useQuery();
+  const { data: conversations = [] } = trpc.chats.list.useQuery();
+  const { data: savedAnswers = [] } = trpc.notes.listLibrary.useQuery();
   const folderOptions = useMemo(() => flattenFolders(folders), [folders]);
 
-  const transport = useMemo(
-    () => new DefaultChatTransport({ api: "/chat", headers: () => profileHeaders() }),
-    [],
+  // Arriving from a book shows that book's conversations; it is only where the filter starts
+  const [filter, setFilter] = useState<HistoryFilter>(() => (bookId ? { ...NO_FILTER, bookId } : NO_FILTER));
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [showSaved, setShowSaved] = useState(false);
+
+  // The pane is keyed so that opening another conversation starts it afresh. The one exception is
+  // a new chat's first question: it gains an id and a URL mid-answer, and remounting there would
+  // drop the stream — so a conversation born in this pane keeps the pane's key.
+  const [newChats, setNewChats] = useState(0);
+  const [born, setBorn] = useState<{ id: string; key: string } | null>(null);
+  // Only while that pane is still the one on screen: once another conversation has been opened the
+  // born one is a stored conversation like any other, and must be loaded like one
+  if (born && conversationId !== born.id && !(conversationId === undefined && `new-${newChats}` === born.key)) setBorn(null);
+  const bornHere = !!conversationId && born?.id === conversationId;
+  const paneKey = conversationId ? (bornHere ? born.key : conversationId) : `new-${newChats}`;
+
+  // Read once per opening, never from cache: the pane seeds its transcript from this and then owns it
+  const opened = trpc.chats.get.useQuery(
+    { id: conversationId! },
+    {
+      enabled: !!conversationId && !bornHere,
+      gcTime: 0,
+      staleTime: Infinity,
+      refetchOnWindowFocus: false,
+      // An answer being written by a run this window did not start — the tab that asked was
+      // closed, or it is open elsewhere. The server carries on regardless; this follows it.
+      refetchInterval: (query) => (query.state.data?.running ? 1000 : false),
+    },
   );
-  const { messages, sendMessage, setMessages, status, error, stop } = useChat({ transport });
-  const busy = status === "submitted" || status === "streaming";
+  const watching = !!opened.data?.running;
 
-  // The answer is followed only while the reader is at the bottom: scrolling up to read something
-  // else lets go, and coming back down takes hold again. It used to pull down on every token.
-  // Where the reader is gets judged here, against the height the page had before this update —
-  // a scroll listener hears about it a frame late, and a token landing in that frame pulled the
-  // page back down from under the scroll that was leaving.
-  const lastHeight = useRef(0);
-  const pinned = useRef(false);
-  useEffect(() => {
-    const atBottom = lastHeight.current - window.scrollY - window.innerHeight < FOLLOW_WITHIN_PX;
-    // Not smooth: an animation still on its way down reads as the reader having scrolled away
-    if (atBottom || pinned.current) bottomRef.current?.scrollIntoView({ behavior: "auto" });
-    pinned.current = false;
-    lastHeight.current = document.documentElement.scrollHeight;
-  }, [messages]);
+  const [modelByPane, setModelByPane] = useState<Record<string, string>>({});
+  const model = modelByPane[paneKey] ?? opened.data?.model ?? "";
 
-  const newChat = () => {
-    stop();
-    setMessages([]);
-  };
-
-  const send = () => {
-    const text = input.trim();
-    if (!text || busy) return;
-    setInput("");
-    // Asking is a request to see the answer, wherever the page was left
-    pinned.current = true;
-    void sendMessage({ text }, { body: { scope: { folderId, bookId }, model } });
-  };
-
-  const lastQuestionBefore = (index: number): string => {
-    for (let i = index - 1; i >= 0; i--) {
-      const m = messages[i];
-      if (m?.role === "user") {
-        return (m.parts ?? [])
-          .filter((p): p is { type: "text"; text: string } => p.type === "text")
-          .map((p) => p.text)
-          .join(" ");
-      }
-    }
-    return "";
+  // A new chat opened from a conversation starts on that conversation's sources
+  const [carried, setCarried] = useState<DraftScope | null>(null);
+  const newChat = (from?: ConversationScope) => {
+    const current = from ?? opened.data?.scope ?? conversations.find((c) => c.id === conversationId)?.scope;
+    setCarried(current ? draftFromScope(current) : null);
+    setDrawerOpen(false);
+    setNewChats((n) => n + 1);
+    void navigate(bookId ? `/chat?bookId=${bookId}` : "/chat");
   };
 
   const notIndexed = indexStatus ? indexStatus.total - indexStatus.done : 0;
+  const libraryNote = [
+    "Every book, originals and translations.",
+    notIndexed > 0 ? `${notIndexed} ${notIndexed === 1 ? "is" : "are"} not fully indexed yet — answers may miss ${notIndexed === 1 ? "it" : "them"}.` : "",
+    indexStatus && indexStatus.running > 0 ? `Indexing ${indexStatus.running} now…` : "",
+  ].filter(Boolean).join(" ");
+
+  const relatedCount = bookId
+    ? conversations.filter((c) => c.scope.kind === "books" && c.scope.books.some((book) => book.id === bookId)).length
+    : 0;
+  const activeTitle = conversations.find((c) => c.id === conversationId)?.title;
+  const loading = !!conversationId && !bornHere && opened.isPending;
+  const missing = !!conversationId && !bornHere && !opened.isPending && !opened.data;
 
   return (
-    <div className="min-h-screen bg-(--bg-page)">
-      <div className="max-w-3xl mx-auto px-6 py-6 flex flex-col min-h-screen">
-        <div className="flex items-center gap-3 mb-4">
-          <Link
-            to={bookId ? `/books/${bookId}` : "/"}
-            className="inline-flex items-center gap-1 max-w-64 text-(--text-faint) hover:text-(--text-secondary) text-sm"
-            title={bookId ? `Back to ${scopedBook?.title ?? "the book"}` : "Back to the library"}
-            data-testid="chat-back"
-          >
-            <IconArrowLeft className="h-4 w-4 shrink-0" />
-            <span className="truncate">{bookId ? (scopedBook?.title ?? "Back") : "Library"}</span>
-          </Link>
-          <h1 className="text-xl font-bold text-(--text-primary) shrink-0">Library chat</h1>
-          <div className="ml-auto flex items-center gap-2">
-            {messages.length > 0 && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={newChat}
-                data-testid="chat-new"
-              >
-                New chat
-              </Button>
-            )}
-            {bookId ? (
-              <span
-                className="inline-flex items-center gap-1.5 max-w-72 text-sm px-2.5 py-1.5 rounded-md border border-(--border) bg-(--bg-card) text-(--text-primary)"
-                data-testid="chat-book-scope"
-              >
-                <IconBook className="h-4 w-4 shrink-0" />
-                <span className="truncate" title={scopedBook?.title}>{scopedBook?.title ?? "…"}</span>
-                <button
-                  onClick={() => setSearchParams({})}
-                  className="text-(--text-faint) hover:text-(--text-secondary) shrink-0"
-                  title="Widen scope to the whole library"
-                >
-                  <IconClose className="h-4 w-4" />
-                </button>
-              </span>
-            ) : (
-            <Dropdown
-              value={folderId ?? ""}
-              onChange={(v) => setSearchParams(v ? { folderId: v } : {})}
-              testId="chat-scope"
-              options={[{ value: "", label: "Whole library" }, ...folderOptions.map((f) => ({ value: f.id, label: `${"\u00a0\u00a0".repeat(f.depth)}${f.name}` }))]}
-            />
-            )}
-            <ModelPicker value={model} onChange={setModel} requireTools testId="chat-model" />
-          </div>
-        </div>
-
-        <div className="mb-3"><ModelBundleNotice id="search" verb="Searching and asking across the library" /></div>
-
-        {notIndexed > 0 && (
-          <div className="text-xs text-(--text-muted) mb-3" data-testid="chat-index-hint">
-            {notIndexed} book{notIndexed === 1 ? " is" : "s are"} not fully indexed yet — answers may miss them.
-            {indexStatus!.running > 0 && ` Indexing ${indexStatus!.running} now…`}
-          </div>
-        )}
-
-        <div className="flex-1 flex flex-col gap-4 pb-6">
-          {messages.length === 0 && (
-            <div className="text-sm text-(--text-muted) mt-12 text-center space-y-2">
-              <p className="text-base">Ask anything about the books in your library.</p>
-              <p>The assistant searches across all book text — originals and translations — and cites the passages it used. A source opens in the reader at the sentence where the chapter is narrated, and in the PDF at the page where it is not.</p>
-            </div>
-          )}
-          {messages.map((message, i) => (
-            <ChatMessage
-              key={message.id}
-              message={message}
-              question={lastQuestionBefore(i)}
-              model={model}
-              folderId={folderId}
-              onOpenPdf={setPdfPreview}
-            />
-          ))}
-          {busy && (
-            <div className="flex items-center gap-2 text-sm text-(--text-muted)" data-testid="chat-busy">
-              <span className="w-2 h-2 rounded-full bg-(--accent) animate-pulse" />
-              {status === "submitted" ? "Searching the library…" : "Answering…"}
-              <button onClick={() => stop()} className="text-xs underline text-(--text-faint) hover:text-(--text-secondary)">Stop</button>
-            </div>
-          )}
-          {error && <div className="text-sm text-(--danger-text)">{error.message}</div>}
-          <div ref={bottomRef} />
-        </div>
-
-        <div className="sticky bottom-0 bg-(--bg-page) pb-6 pt-2">
-          <div className="flex gap-2">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  send();
-                }
-              }}
-              rows={2}
-              placeholder="Ask your library… (Enter to send, Shift+Enter for newline)"
-              className="flex-1 resize-none rounded-lg border border-(--border) bg-(--bg-card) text-(--text-primary) text-sm px-3 py-2 outline-none"
-              data-testid="chat-input"
-            />
-            <Button
-              variant="primary"
-              onClick={send}
-              disabled={busy || !input.trim()}
-              data-testid="chat-send"
-            >
-              Ask
-            </Button>
-          </div>
-          <SavedAnswers />
+    <div className="flex h-dvh flex-col overflow-hidden bg-(--bg-page) text-(--text-primary)">
+      <div className="flex h-12 flex-none items-center gap-2 border-b border-(--border) bg-(--bg-card) px-2 md:gap-3 md:px-4" data-testid="chat-toolbar">
+        {/* The labelled link below is hidden under md; a chat opened by its URL needs a way out that is not the browser's */}
+        <Button variant="icon" to={bookId ? `/books/${bookId}` : "/"} aria-label={bookId ? "Back to the book" : "Back to the library"} className="md:hidden" data-testid="chat-back-compact">
+          <IconArrowLeft className="h-5 w-5" />
+        </Button>
+        <Button variant="icon" onClick={() => setDrawerOpen(true)} aria-label="Conversations" className="md:hidden" data-testid="chat-history-open">
+          <IconSidebar className="h-5 w-5" />
+        </Button>
+        <Link
+          to={bookId ? `/books/${bookId}` : "/"}
+          className="hidden max-w-64 items-center gap-1 text-sm text-(--text-muted) hover:text-(--text-secondary) md:inline-flex"
+          title={bookId ? `Back to ${scopedBook?.title ?? "the book"}` : "Back to the library"}
+          data-testid="chat-back"
+        >
+          <IconArrowLeft className="h-4 w-4 shrink-0" />
+          <span className="truncate">{bookId ? (scopedBook?.title ?? "Back") : "Library"}</span>
+        </Link>
+        <div className="hidden h-5 w-px bg-(--border) md:block" />
+        <h1 className="min-w-0 flex-1 truncate text-base font-bold text-(--text-primary)">
+          <span className="md:hidden">{activeTitle ?? "Library chat"}</span>
+          <span className="hidden md:inline">Library chat</span>
+        </h1>
+        <div className="flex flex-none items-center gap-2">
+          <ModelPicker value={model} onChange={(key) => setModelByPane((prev) => ({ ...prev, [paneKey]: key }))} requireTools testId="chat-model" />
         </div>
       </div>
 
-      {pdfPreview && (
-        <PdfPreviewModal
-          fileId={pdfPreview.fileId}
-          page={pdfPreview.page}
-          filename={pdfPreview.filename}
-          onClose={() => setPdfPreview(null)}
-        />
-      )}
+      <div className="relative flex min-h-0 flex-1">
+        {drawerOpen && <div className="absolute inset-0 z-30 bg-(--scrim) md:hidden" onClick={() => setDrawerOpen(false)} />}
+        <aside
+          className={`${drawerOpen ? "flex" : "hidden"} absolute inset-y-0 left-0 z-40 w-80 max-w-[85vw] flex-col border-r border-(--border) bg-(--bg-card) shadow-xl md:static md:z-auto md:flex md:w-72 md:flex-none md:shadow-none`}
+          data-testid="chat-sidebar"
+        >
+          <ChatSidebar
+            conversations={conversations}
+            activeId={conversationId ?? null}
+            filter={filter}
+            onFilter={setFilter}
+            onNewChat={() => newChat()}
+            onNavigate={() => setDrawerOpen(false)}
+            onClose={() => setDrawerOpen(false)}
+            savedAnswers={savedAnswers.length}
+            onShowSaved={() => setShowSaved(true)}
+            onDeleted={(id) => {
+              if (id === conversationId) newChat();
+            }}
+          />
+        </aside>
+
+        {loading && <main className="flex-1" />}
+        {missing && (
+          <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center text-sm text-(--text-muted)" data-testid="chat-missing">
+            <p>This conversation is not here any more.</p>
+            <Button variant="primary" size="sm" onClick={() => newChat()}>New chat</Button>
+          </main>
+        )}
+        {!loading && !missing && (
+          <ConversationPane
+            // Remounted when a watched answer ends, so the pane is seeded again from what was kept
+            key={`${paneKey}:${watching ? "watching" : "own"}`}
+            open={opened.data ?? null}
+            preset={{ bookId, folderId, draft: carried ?? undefined }}
+            relatedCount={relatedCount}
+            model={model}
+            folders={folderOptions}
+            libraryNote={libraryNote}
+            onCreated={(id) => {
+              setBorn({ id, key: paneKey });
+              void navigate(`/chat/${id}`, { replace: true });
+            }}
+            onNewChat={newChat}
+          />
+        )}
+      </div>
+
+      {showSaved && <SavedAnswersModal onClose={() => setShowSaved(false)} />}
     </div>
   );
 }
