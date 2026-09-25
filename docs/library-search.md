@@ -17,7 +17,7 @@ The library holds ~527 books ≈ 217M characters ≈ 60–90M tokens of extracte
 | Scope | Whole profile, folder subtree, or one book | One book's raw text, or a chapter selection |
 | Notes | "Save as note" on demand (`notes.saveLibraryAnswer`, `bookId NULL`) | Every answer auto-saved as a note on the book, and drawn as one in the thread |
 
-Both stream over AI SDK UI-message streams from raw Fastify routes (`chat-routes.ts`, `assistant-routes.ts`) — tRPC can't stream, so these are the same carve-out as uploads/PDF serving. `POST /chat` was the library chat page's route until 2026-09-25, when that page became the assistant full width; the route and its tests stay as the search half's own harness, and the assistant reuses its tools (`buildChatTools`) and citation verification.
+Both stream over AI SDK UI-message streams from a raw Fastify route (`assistant-routes.ts`) — tRPC can't stream, so these are the same carve-out as uploads/PDF serving.
 
 ## The index: `book_chunks`
 
@@ -69,7 +69,7 @@ Then `groupHits()` tidies in JS — the same passage can legitimately exist 3+ t
 
 Exposed as tRPC `search.library` (for testing/UI) and consumed directly by the chat tools.
 
-## The agentic chat (`chat-routes.ts`, `lib/chat-tools.ts`, `lib/citations.ts`)
+## The agentic chat (`assistant-routes.ts`, `lib/chat-tools.ts`, `lib/citations.ts`)
 
 - **Loop**: AI SDK `streamText` with the OpenAI-compatible provider pointed at DeepSeek. Hard caps: `stopWhen: stepCountIs(8)` (it physically cannot search forever), 3-min abort signal, 4,096 max output tokens. `prepareStep` removes the tools on the last step (`activeTools: []`) and appends a user message saying the search rounds are spent, so the turn always ends with a text answer — without it a search-happy model burns all steps on tools and the stream closes silently with no answer. Declining the tools with `toolChoice: "none"` is not enough: DeepSeek V4 answers that by writing the calls it still wants as raw `<｜DSML｜…>` markup in the text.
 - **Tools** (zod schemas): `search_library` (hybrid search within the request's profile/folder/book scope), `read_passage` (context expansion by citation id), `list_books` (titles only, for meta questions).
@@ -136,7 +136,7 @@ Disk cost (at 527 books / 208K chunks): `book_chunks` data ~1.9GB, HNSW ~1.6GB (
 | Embeddings | `packages/server/src/lib/embeddings.ts`, `scripts/embed_bge_m3.py` |
 | Retrieval | `packages/server/src/lib/search.ts` (+ test), `routes/search.ts` |
 | Index jobs | `workers/index-book.ts`, `workers/embed-chunks.ts`, `lib/search-index.ts`, sweep additions in `workers/sweep.ts`, `src/scripts/backfill-search-index.ts` |
-| Chat backend | `packages/server/src/chat-routes.ts`, `lib/chat-tools.ts`, `lib/citations.ts` (+ test), `lib/ask-ai.ts` (+ test) |
+| Chat backend | `packages/server/src/assistant-routes.ts`, `lib/chat-run.ts`, `lib/chat-tools.ts`, `lib/citations.ts` (+ test), `lib/ask-ai.ts` (+ test) |
 | Chat frontend | `packages/web/src/components/assistant/{AssistantPanel,AssistantThread}.tsx`, `components/chat/{ChatSidebar,SourcePicker,SourceList,SavedAnswers}.tsx`, `lib/chat-message.ts` |
 | Ask AI frontend | the Ask AI buttons on the book page pin to `components/assistant/context.tsx`; the card and note are `components/assistant/ActionCard.tsx` |
 | Infra | `docker-compose.yml` (`pgvector/pgvector:pg17`), `scripts/setup.sh` (FlagEmbedding + BGE-M3 download) |

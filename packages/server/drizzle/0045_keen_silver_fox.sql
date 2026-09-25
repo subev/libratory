@@ -1,0 +1,1 @@
+ALTER TABLE "chat_conversations" DROP COLUMN "kind";

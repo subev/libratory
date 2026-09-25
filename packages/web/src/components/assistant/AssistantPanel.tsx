@@ -152,7 +152,7 @@ function SourcesModal({ value, onPick, onClose }: { value: SourcesChoice; onPick
 
 // The chat's history sidebar, in a dialog: search by question, filter by book, rename, delete
 function HistoryModal({ activeId, onOpen, onNew, onShowSaved, onClose }: { activeId: string | null; onOpen: (id: string) => void; onNew: () => void; onShowSaved: () => void; onClose: () => void }) {
-  const { data: conversations = [] } = trpc.chats.list.useQuery({ kind: "assistant" });
+  const { data: conversations = [] } = trpc.chats.list.useQuery();
   const { data: savedAnswers = [] } = trpc.notes.listLibrary.useQuery();
   const [filter, setFilter] = useState<HistoryFilter>(NO_FILTER);
   return (
@@ -233,8 +233,8 @@ function OpenPanel({ profileId, screen, onCollapse }: { profileId: string; scree
   const watching = !!opened?.running;
 
   const fetched = !!thread.id && !thread.born;
-  // A stored thread that is gone, or that belongs to the library chat, starts afresh
-  const stale = fetched && !isPending && (!opened || opened.kind !== "assistant");
+  // A stored thread that is gone starts afresh
+  const stale = fetched && !isPending && !opened;
   const loading = fetched && isPending;
   // Read, not continued, once everything it searched is gone; the next thread is never widened for it
   const closed = opened && !stale && !askable(opened.scope).canAsk

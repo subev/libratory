@@ -52,7 +52,7 @@ read, not continued. The library chat page was first made the assistant full wid
 panel is the one chat, the "Chat" links on the library and book headers are gone (the Assistant
 toggle beside them is the way in), past threads and saved answers sit behind the panel's History
 button, every conversation is `kind: "assistant"` (migrations 0043 and 0044), and `POST /chat`
-stays only as the search half's test harness. "Save as note" sits under every
+is gone, its run tests moved onto the assistant route. "Save as note" sits under every
 finished answer. The e2e chat specs were moved onto the new test ids, and the upload helper is
 scoped to the upload dialog because the panel beside the library carries a file input of its own.
 

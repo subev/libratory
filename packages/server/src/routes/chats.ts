@@ -2,7 +2,7 @@ import { z } from "zod";
 import { and, asc, eq } from "drizzle-orm";
 import { router, publicProcedure } from "../trpc.ts";
 import { db } from "../db.ts";
-import { books, chatConversations, CHAT_KINDS, DEFAULT_PROFILE_ID } from "../schema.ts";
+import { books, chatConversations, DEFAULT_PROFILE_ID } from "../schema.ts";
 import { modelKeySchema } from "../lib/llm.ts";
 import {
   createConversation,
@@ -27,9 +27,7 @@ const scopeInput = z.discriminatedUnion("kind", [
 ]);
 
 export const chatsRouter = router({
-  list: publicProcedure
-    .input(z.object({ kind: z.enum(CHAT_KINDS).default("library") }).default({ kind: "library" }))
-    .query(({ input, ctx }) => listConversations(ctx.profileId ?? DEFAULT_PROFILE_ID, input.kind)),
+  list: publicProcedure.query(({ ctx }) => listConversations(ctx.profileId ?? DEFAULT_PROFILE_ID)),
 
   get: publicProcedure
     .input(z.object({ id: z.string().uuid() }))
@@ -45,7 +43,6 @@ export const chatsRouter = router({
       return {
         id: conversation.id,
         title: conversation.title,
-        kind: conversation.kind,
         model: conversation.model,
         scope,
         removedBookIds: await removedBookIds(profileId, scope, stored),
@@ -66,11 +63,11 @@ export const chatsRouter = router({
   ),
 
   create: publicProcedure
-    .input(z.object({ scope: scopeInput, model: modelKeySchema.optional(), kind: z.enum(CHAT_KINDS).default("library") }))
+    .input(z.object({ scope: scopeInput, model: modelKeySchema.optional() }))
     .mutation(async ({ input, ctx }) => {
       const profileId = ctx.profileId ?? DEFAULT_PROFILE_ID;
       const scope = await scopeFromInput(profileId, input.scope);
-      const id = await createConversation(profileId, scope, input.model ?? null, input.kind);
+      const id = await createConversation(profileId, scope, input.model ?? null);
       return { id, scope: await resolveScope(profileId, scope) };
     }),
 

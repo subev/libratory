@@ -13,7 +13,6 @@ import { registerReaderRoutes } from "./lib/reader-routes.ts";
 import { registerUploadRoutes } from "./upload-routes.ts";
 import { registerStagedRoutes } from "./staged-routes.ts";
 import { sweepStaged } from "./lib/staged-files.ts";
-import { registerChatRoutes } from "./chat-routes.ts";
 import { registerAssistantRoutes } from "./assistant-routes.ts";
 import { registerTranslationStreamRoutes } from "./translation-stream-routes.ts";
 import { registerOcrTryRoutes } from "./lib/ocr-try-routes.ts";
@@ -95,7 +94,6 @@ async function main() {
   registerUploadRoutes(fastify);
   registerStagedRoutes(fastify);
   registerOcrTryRoutes(fastify);
-  registerChatRoutes(fastify);
   registerAssistantRoutes(fastify);
   registerTranslationStreamRoutes(fastify);
   registerApiRoutes(fastify);

@@ -24,6 +24,7 @@ import {
 import { deliverAnswer } from "./lib/chat-run.ts";
 import { assistantSystem, screenContext, screenSchema } from "./lib/assistant.ts";
 import { assistantTools, isAssistantTool, needsApproval } from "./lib/assistant-tools.ts";
+import { scopeLanguages, searchLanguageRule } from "./lib/chat-tools.ts";
 import { verifySources } from "./lib/citations.ts";
 import { withReaderTargets } from "./lib/citation-targets.ts";
 import { seedCatalog } from "./lib/chats.ts";
@@ -98,7 +99,7 @@ export function registerAssistantRoutes(fastify: FastifyInstance) {
     const body = bodySchema.parse(request.body);
     const profileId = profileIdFromHeader(request.headers["x-profile-id"]);
     const conversation = await getConversation(profileId, body.conversationId);
-    if (!conversation || conversation.kind !== "assistant") return reply.status(404).send({ error: "Conversation not found" });
+    if (!conversation) return reply.status(404).send({ error: "Conversation not found" });
     if (body.trigger === "submit" && !body.text) return reply.status(400).send({ error: "Empty question" });
     // Narrowed into locals: the schema cannot tie the two fields to the trigger
     const approvals = body.trigger !== "approval"
@@ -154,14 +155,15 @@ export function registerAssistantRoutes(fastify: FastifyInstance) {
       await touchStaged(conversation.id);
       const history = await loadMessages(conversation.id);
       const modelMessages = await convertToModelMessages(messagesForModel(history));
-      const context = { ...(await screenContext(profileId, body.screen)), stagedFiles: await listStaged(conversation.id) };
-      const system = assistantSystem(context);
-      const tokens = estimateTokens(system) + estimateTokens(JSON.stringify(modelMessages));
-      if (contextExceeded(llm.def, tokens)) throw refusal(`This conversation has outgrown ${llm.def.label} — start a new chat`);
-      const catalog = seedCatalog(history);
       // What the search may see: the page, when the thread follows it, else what the thread chose
       const scope = searchScopeOf(profileId, await resolveScope(profileId, conversation.scope), body.screen.bookId);
       if (!scope) throw refusal("Everything this conversation searched has been removed from the library — start a new chat");
+      const context = { ...(await screenContext(profileId, body.screen)), stagedFiles: await listStaged(conversation.id) };
+      // The chat's rule on which language to search in, from the books the scope holds
+      const system = `${assistantSystem(context)}\n\n${searchLanguageRule(await scopeLanguages(scope))}`;
+      const tokens = estimateTokens(system) + estimateTokens(JSON.stringify(modelMessages));
+      if (contextExceeded(llm.def, tokens)) throw refusal(`This conversation has outgrown ${llm.def.label} — start a new chat`);
+      const catalog = seedCatalog(history);
       toolSet = await assistantTools(profileId, { scope, catalog, llm });
       const { tools } = toolSet;
 
@@ -226,7 +228,7 @@ export function registerAssistantRoutes(fastify: FastifyInstance) {
     const body = undoSchema.parse(request.body);
     const profileId = profileIdFromHeader(request.headers["x-profile-id"]);
     const conversation = await getConversation(profileId, body.conversationId);
-    if (!conversation || conversation.kind !== "assistant") return reply.status(404).send({ error: "Conversation not found" });
+    if (!conversation) return reply.status(404).send({ error: "Conversation not found" });
     if (isChatRunning(conversation.id)) return reply.status(409).send({ error: "This conversation is answering — wait for it to finish" });
 
     const history = await loadMessages(conversation.id);

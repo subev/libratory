@@ -72,13 +72,13 @@ describe("staged files", () => {
 
   it("belongs to the thread that sends it, and goes when the thread does", async () => {
     const staged = await stage();
-    const conversationId = await createConversation(DEFAULT_PROFILE_ID, { kind: "library" }, null, "assistant");
+    const conversationId = await createConversation(DEFAULT_PROFILE_ID, { kind: "library" }, null);
     // In the order sent, whatever the database returns them in: the person may have arranged them
     const second = await stage("second.pdf");
     const claimed = await claimStaged([second.ref, staged.ref], conversationId, DEFAULT_PROFILE_ID);
     expect(claimed.map((c) => c.filename)).toEqual(["second.pdf", "dropped.pdf"]);
     // A second thread cannot take it
-    const other = await createConversation(DEFAULT_PROFILE_ID, { kind: "library" }, null, "assistant");
+    const other = await createConversation(DEFAULT_PROFILE_ID, { kind: "library" }, null);
     expect(await claimStaged([staged.ref], other, DEFAULT_PROFILE_ID)).toEqual([]);
     const { path: onDisk } = await resolveStaged(staged.ref, DEFAULT_PROFILE_ID);
     await deleteConversation(DEFAULT_PROFILE_ID, conversationId);
@@ -88,7 +88,7 @@ describe("staged files", () => {
 
   it("expires a day after its thread was last used, and clears what has no row", async () => {
     const staged = await stage();
-    const conversationId = await createConversation(DEFAULT_PROFILE_ID, { kind: "library" }, null, "assistant");
+    const conversationId = await createConversation(DEFAULT_PROFILE_ID, { kind: "library" }, null);
     await claimStaged([staged.ref], conversationId, DEFAULT_PROFILE_ID);
     const { path: onDisk } = await resolveStaged(staged.ref, DEFAULT_PROFILE_ID);
     const orphan = path.join(stagedDir(DEFAULT_PROFILE_ID), "orphan.pdf");

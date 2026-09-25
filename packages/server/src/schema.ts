@@ -69,8 +69,6 @@ export type NoteScope =
 // go on naming them once they are gone.
 export type ChatBookRef = { id: string; title: string };
 
-export const CHAT_KINDS = ["library", "assistant"] as const;
-export type ChatKind = (typeof CHAT_KINDS)[number];
 
 export type ChatScope =
   // The assistant panel's default: the book on screen when there is one, else the whole library
@@ -328,7 +326,6 @@ export const chatConversations = pgTable("chat_conversations", {
   title: text("title").notNull().default(""),
   // "assistant" threads belong to the panel beside the app and never show in the library chat's
   // history, nor the other way round; both keep their messages here
-  kind: text("kind", { enum: CHAT_KINDS }).notNull().default("assistant"),
   // Fixed at creation: an answer must never appear to have searched a later selection
   scope: jsonb("scope").$type<ChatScope>().notNull(),
   // Books the answers actually quoted — what lets a whole-library chat be found by book

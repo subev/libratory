@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gt, inArray, lt, max, ne, sql } from "drizzle-orm";
 import type { UIMessage } from "ai";
 import { db } from "../db.ts";
-import { books, chatConversations, chatMessages, folders, type ChatBookRef, type ChatKind, type ChatScope } from "../schema.ts";
+import { books, chatConversations, chatMessages, folders, type ChatBookRef, type ChatScope } from "../schema.ts";
 import { CitationCatalog, type ChatSearchScope, type CitationSource } from "./chat-tools.ts";
 import { removeStagedForConversation } from "./staged-files.ts";
 
@@ -188,19 +188,19 @@ export async function scopeFromInput(
   }
 }
 
-export async function createConversation(profileId: string, scope: ChatScope, model: string | null, kind: ChatKind = "library"): Promise<string> {
+export async function createConversation(profileId: string, scope: ChatScope, model: string | null): Promise<string> {
   // Conversations whose first question never landed are invisible; a day is long enough to be sure
   await db.delete(chatConversations).where(and(
     eq(chatConversations.profileId, profileId),
     eq(chatConversations.title, ""),
     lt(chatConversations.createdAt, new Date(Date.now() - 24 * 60 * 60 * 1000)),
   ));
-  const [row] = await db.insert(chatConversations).values({ profileId, scope, model, kind }).returning({ id: chatConversations.id });
+  const [row] = await db.insert(chatConversations).values({ profileId, scope, model }).returning({ id: chatConversations.id });
   if (!row) throw new Error("Could not start the conversation");
   return row.id;
 }
 
-export async function listConversations(profileId: string, kind: ChatKind = "library") {
+export async function listConversations(profileId: string) {
   const rows = await db
     .select({
       id: chatConversations.id,
@@ -213,7 +213,7 @@ export async function listConversations(profileId: string, kind: ChatKind = "lib
     })
     .from(chatConversations)
     // Untitled means never asked: a first question that was refused leaves one behind
-    .where(and(eq(chatConversations.profileId, profileId), eq(chatConversations.kind, kind), ne(chatConversations.title, "")))
+    .where(and(eq(chatConversations.profileId, profileId), ne(chatConversations.title, "")))
     .orderBy(desc(chatConversations.updatedAt));
 
   // Every question asked, so history can be searched by more than the first one

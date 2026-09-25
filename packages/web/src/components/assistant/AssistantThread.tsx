@@ -368,7 +368,7 @@ export function AssistantThread({ open, watching = false, profileId, scope, onCr
     // The page beside the panel shows what the answer did — a rename, a move, a new note or
     // folder — only if it reads again; the thread does not know which tool ran
     onFinish: () => {
-      void utils.chats.list.invalidate({ kind: "assistant" });
+      void utils.chats.list.invalidate();
       void pageChanged();
     },
   });
@@ -403,7 +403,7 @@ export function AssistantThread({ open, watching = false, profileId, scope, onCr
     let id = conversationId;
     if (!id) {
       try {
-        const created = await create.mutateAsync({ scope, kind: "assistant" });
+        const created = await create.mutateAsync({ scope });
         id = created.id;
         setConversationId(id);
         onCreated(id);
