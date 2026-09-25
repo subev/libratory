@@ -49,14 +49,15 @@ export function VariantMenu({
           aria-expanded={open}
           title="Switch which version of the book you are working on"
           data-testid="variant-menu-trigger"
-          className={`flex items-center gap-1.5 h-7 px-2.5 rounded-md border text-xs font-semibold ${
+          className={`flex shrink-0 items-center gap-1.5 h-7 px-2.5 rounded-md border text-xs font-semibold whitespace-nowrap ${
             active
               ? "bg-(--accent-subtle) border-(--accent) text-(--accent-text)"
               : "border-(--border-input) text-(--text-primary) hover:bg-(--bg-subtle)"
           }`}
         >
-          <IconTranslate className="h-3.5 w-3.5" />
-          {layout.showLabels ? currentName : shortName}
+          <IconTranslate className="h-3.5 w-3.5 shrink-0" />
+          {/* A squeezed header — the assistant panel open beside it — truncates the name; it never wraps to a second line */}
+          <span className="max-w-40 truncate">{layout.showLabels ? currentName : shortName}</span>
           {lanes.length > 0 && <span className="text-(--text-faint) font-normal tabular-nums">{lanes.length + 1}</span>}
           <IconChevronDown className="h-3 w-3 text-(--text-faint)" />
         </button>

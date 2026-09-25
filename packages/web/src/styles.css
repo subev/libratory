@@ -330,3 +330,19 @@ body {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(400%); }
 }
+
+/* The assistant's "Thinking…" line while the model reasons: a band of the primary text colour
+   sweeping over the faint one, the shape every reasoning model's own client uses, so it reads as
+   "working" without a spinner. Text-only: the gradient is clipped to the glyphs. */
+@keyframes thinking-sweep {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.thinking-sweep {
+  background: linear-gradient(90deg, var(--text-faint) 30%, var(--text-primary) 50%, var(--text-faint) 70%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: thinking-sweep 1.6s linear infinite;
+}

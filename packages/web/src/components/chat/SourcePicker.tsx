@@ -11,6 +11,22 @@ export type DraftScope =
   | { kind: "books"; bookIds: string[] };
 
 export type FolderOption = { id: string; name: string; depth: number };
+
+// The folder tree as the picker lists it: depth-first, with the depth for indentation
+export function flattenFolders(folders: { id: string; name: string; parentId: string | null }[]): FolderOption[] {
+  const byParent = new Map<string | null, typeof folders>();
+  for (const f of folders) byParent.set(f.parentId, [...(byParent.get(f.parentId) ?? []), f]);
+  const out: FolderOption[] = [];
+  const walk = (parentId: string | null, depth: number) => {
+    for (const f of byParent.get(parentId) ?? []) {
+      out.push({ id: f.id, name: f.name, depth });
+      walk(f.id, depth + 1);
+    }
+  };
+  walk(null, 0);
+  return out;
+}
+
 export type BookOption = { id: string; title: string; author: string | null };
 
 const KINDS = [
@@ -23,6 +39,8 @@ const KINDS = [
 // they still exist. Re-picking books for every chat is a chore; widening to the library is one click.
 export function draftFromScope(scope: ConversationScope | ConversationSummary["scope"]): DraftScope {
   switch (scope.kind) {
+    // A thread that followed the page has no sources to carry; the next starts wide
+    case "screen":
     case "library":
       return { kind: "library" };
     case "folder":

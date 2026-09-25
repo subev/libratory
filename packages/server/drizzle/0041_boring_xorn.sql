@@ -1,0 +1,1 @@
+ALTER TABLE "chat_conversations" ADD COLUMN "kind" text DEFAULT 'library' NOT NULL;

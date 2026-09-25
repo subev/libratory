@@ -44,7 +44,6 @@ export {
   Funnel as IconFilter,
   Books as IconBooks,
   BookBookmark as IconBookRemoved,
-  Prohibit as IconBlocked,
   PauseCircle as IconStopped,
   WarningCircle as IconFailed,
   ListBullets as IconStructure,
@@ -59,6 +58,11 @@ export {
   ArrowSquareOut as IconExternal,
   Sun as IconThemeLight,
   Moon as IconThemeDark,
+  ClockCounterClockwise as IconHistory,
+  NotePencil as IconNewChat,
+  PaperPlaneRight as IconSend,
+  Lightbulb as IconTip,
+  Paperclip as IconAttach,
 } from "@phosphor-icons/react";
 
 import type { ReactNode } from "react";

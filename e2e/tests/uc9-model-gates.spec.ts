@@ -30,7 +30,8 @@ test("UC9: full extraction is offered with its download, not silently broken", a
 });
 
 test("UC9: library chat says what it needs before it answers badly", async ({ page }) => {
-  await page.goto("/chat");
+  await page.goto("/");
+  await page.getByTestId("assistant-toggle").click();
 
   const notice = page.getByTestId("model-search-notice");
   await expect(notice).toBeVisible({ timeout: 20_000 });

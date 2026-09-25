@@ -15,7 +15,7 @@ vi.mock("./lib/llm.ts", async (original) => ({ ...(await original<typeof import(
 const searchLibrary = vi.fn();
 vi.mock("./lib/search.ts", async (original) => ({ ...(await original<typeof import("./lib/search.ts")>()), searchLibrary: (opts: unknown) => searchLibrary(opts) }));
 
-import { registerChatRoutes } from "./chat-routes.ts";
+import { FINAL_STEP_MESSAGE, registerChatRoutes } from "./chat-routes.ts";
 import { createConversation, isChatRunning, liveAnswer, loadMessages, sourcesOf, stopChatRun } from "./lib/chats.ts";
 
 const usage = { inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 1, text: 1, reasoning: 0 } };
@@ -86,6 +86,31 @@ describe("POST /chat", () => {
     const [, answer] = await loadMessages(id);
     expect(sourcesOf(answer!.parts).map((s) => s.id)).toEqual(["c_1"]);
     expect(isChatRunning(id)).toBe(false);
+  });
+
+  it("a model that searches on every step is handed no tools on the last one, and told to answer", async () => {
+    const { id, post } = await setup();
+    const calls: { tools: number; last: unknown }[] = [];
+    let step = 0;
+    const model = new MockLanguageModelV4({
+      doStream: async ({ tools, prompt }) => {
+        step += 1;
+        calls.push({ tools: tools?.length ?? 0, last: prompt.at(-1) });
+        // With tools on offer it searches; without them it answers
+        const parts = tools?.length
+          ? [{ type: "stream-start", warnings: [] }, { type: "tool-call", toolCallId: `t${step}`, toolName: "search_library", input: JSON.stringify({ query: `try ${step}` }) }, finish("tool-calls")]
+          : [{ type: "stream-start", warnings: [] }, { type: "text-start", id: "a" }, { type: "text-delta", id: "a", delta: "Not in the library [c_1]." }, { type: "text-end", id: "a" }, finish("stop")];
+        return { stream: streamOf(parts, null) } as never;
+      },
+    });
+    resolveLlm.mockResolvedValue({ model, def });
+
+    const response = await post({ text: "Is there a song about Nikola?" });
+    expect(response.statusCode).toBe(200);
+    expect(calls).toHaveLength(8);
+    expect(calls.slice(0, 7).every((c) => c.tools === 3)).toBe(true);
+    expect(calls[7]).toMatchObject({ tools: 0, last: { role: "user", content: [{ type: "text", text: FINAL_STEP_MESSAGE }] } });
+    expect(await transcript(id)).toEqual([["user", "complete", "Is there a song about Nikola?"], ["assistant", "complete", "Not in the library [c_1]."]]);
   });
 
   it("retrying a question that was refused answers that question, once, and leaves the earlier answer alone", async () => {

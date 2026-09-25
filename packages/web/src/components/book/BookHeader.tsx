@@ -1,49 +1,27 @@
 import { Breadcrumbs } from "../Breadcrumbs.tsx";
 import { Button } from "../Button.tsx";
+import { AssistantToggle } from "../assistant/AssistantPanel.tsx";
 import { EditableTitle } from "../EditableTitle.tsx";
 import { Menu, MenuDivider, MenuItem } from "../Menu.tsx";
 import { ThemeToggle } from "../ThemeToggle.tsx";
 import { VariantMenu, type VariantLane } from "./VariantMenu.tsx";
-import { PULSE } from "./StageTabs.tsx";
 import { useShellLayout } from "./BookShell.tsx";
 import {
-  IconAi,
   IconArrowLeft,
   IconArrowRight,
   IconBook,
-  IconChat,
   IconDisk,
   IconMore,
   IconRefresh,
   IconSettings,
 } from "../icons.tsx";
 
-type IndexState = { dot: string; hint: string; pulse: boolean };
-
-// Chat's dot is the only place the search index is visible on this page. The numbers the design puts
-// in its tooltip ("embedding 48 of 71") are not available: SearchIndexJob.progress is a prose string
-// written every fifth batch, so this says which of the three states it is in and stops there.
-function indexState(searchIndex: { status?: string } | null | undefined, hasChapters: boolean): IndexState {
-  const status = searchIndex?.status;
-  if (status === "done") return { dot: "bg-(--success-text)", hint: "Fully indexed — keyword and semantic search", pulse: false };
-  if (status === "queued" || status === "chunking" || status === "embedding") {
-    return { dot: "bg-(--badge-extracting-text)", hint: "Search indexing is running", pulse: true };
-  }
-  if (status === "failed") return { dot: "bg-(--danger-text)", hint: "Search indexing failed — this book is not searchable", pulse: false };
-  return {
-    dot: "bg-(--text-faint)",
-    hint: hasChapters ? "Not indexed yet" : "Not indexed yet — extract chapters first",
-    pulse: false,
-  };
-}
 
 export function BookHeader({
   bookId,
   title,
   headMeta,
   crumbs,
-  searchIndex,
-  hasChapters,
   onRename,
   prevBook,
   nextBook,
@@ -51,9 +29,6 @@ export function BookHeader({
   onNavigate,
   canRead,
   readTitle,
-  onAsk,
-  askDisabled,
-  askTitle,
   lanes,
   activeVariant,
   bookLanguage,
@@ -75,8 +50,6 @@ export function BookHeader({
   title: string;
   headMeta: string;
   crumbs: { to?: string; label: string }[];
-  searchIndex: { status?: string } | null | undefined;
-  hasChapters: boolean;
   onRename: (title: string) => void;
   prevBook: { id: string; title: string } | null;
   nextBook: { id: string; title: string } | null;
@@ -84,9 +57,6 @@ export function BookHeader({
   onNavigate: (id: string) => void;
   canRead: boolean;
   readTitle: string;
-  onAsk: () => void;
-  askDisabled: boolean;
-  askTitle: string;
   lanes: VariantLane[];
   activeVariant: string | null;
   bookLanguage: string | null;
@@ -152,12 +122,7 @@ export function BookHeader({
 
       <div className="flex-1" />
 
-      <ChatLink bookId={bookId} state={indexState(searchIndex, hasChapters)} showLabel={layout.showLabels} />
-
-      <Button variant="secondary" size="sm" onClick={onAsk} disabled={askDisabled} title={askTitle} data-testid="book-ask-ai">
-        <IconAi className="h-4 w-4" />
-        {layout.showLabels && "Ask AI"}
-      </Button>
+      <AssistantToggle />
 
       <Button variant="secondary" size="sm" to={`/books/${bookId}/read`} disabled={!canRead} title={readTitle} data-testid="book-read-link">
         <IconBook className="h-4 w-4" />
@@ -251,18 +216,3 @@ export function BookHeader({
   );
 }
 
-function ChatLink({ bookId, state, showLabel }: { bookId: string; state: IndexState; showLabel: boolean }) {
-  return (
-    <Button
-      variant="secondary"
-      size="sm"
-      to={`/chat?bookId=${bookId}`}
-      title={`Chat about this book — searches its text and translations, cites pages · ${state.hint}`}
-      data-testid="book-chat-link"
-    >
-      <IconChat className="h-4 w-4" />
-      {showLabel && "Chat"}
-      <span title={state.hint} className={`w-1.5 h-1.5 rounded-full ${state.dot} ${state.pulse ? PULSE : ""}`} />
-    </Button>
-  );
-}

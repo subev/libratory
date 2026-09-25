@@ -63,6 +63,7 @@ export default defineConfig(({ mode }) => {
           target: API,
           bypass: (req) => (req.method === "POST" ? undefined : "/index.html"),
         },
+        "/assistant": API,
         "/translations": API,
         "/scripts": API,
         "/pdf": API,

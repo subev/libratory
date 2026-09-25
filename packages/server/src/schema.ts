@@ -69,7 +69,12 @@ export type NoteScope =
 // go on naming them once they are gone.
 export type ChatBookRef = { id: string; title: string };
 
+export const CHAT_KINDS = ["library", "assistant"] as const;
+export type ChatKind = (typeof CHAT_KINDS)[number];
+
 export type ChatScope =
+  // The assistant panel's default: the book on screen when there is one, else the whole library
+  | { kind: "screen" }
   | { kind: "library" }
   | { kind: "folder"; folderId: string; name: string }
   | { kind: "books"; books: ChatBookRef[] };
@@ -321,6 +326,9 @@ export const chatConversations = pgTable("chat_conversations", {
   profileId: uuid("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   // Empty until the first question names it
   title: text("title").notNull().default(""),
+  // "assistant" threads belong to the panel beside the app and never show in the library chat's
+  // history, nor the other way round; both keep their messages here
+  kind: text("kind", { enum: CHAT_KINDS }).notNull().default("assistant"),
   // Fixed at creation: an answer must never appear to have searched a later selection
   scope: jsonb("scope").$type<ChatScope>().notNull(),
   // Books the answers actually quoted — what lets a whole-library chat be found by book
@@ -329,6 +337,26 @@ export const chatConversations = pgTable("chat_conversations", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("chat_conversations_profile_updated_idx").on(t.profileId, t.updatedAt)]);
+
+export const STAGED_STATUSES = ["uploading", "ready", "used", "removed", "expired"] as const;
+
+// A PDF dropped on the assistant panel, waiting under data/tmp/staged until a book is made from it
+// or it is forgotten. The model sees it as `staged:<id>`, never as a path. The row outlives the
+// file so a chip can say why it is gone; lib/staged-files.ts sweeps both.
+export const stagedFiles = pgTable("staged_files", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  profileId: uuid("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  // Claimed by the thread that first sends it; null while it is only a chip in the composer
+  conversationId: uuid("conversation_id").references(() => chatConversations.id, { onDelete: "cascade" }),
+  filename: text("filename").notNull(),
+  sizeBytes: integer("size_bytes").notNull().default(0),
+  sha256: text("sha256"),
+  path: dataPath("path").notNull(),
+  status: text("status", { enum: STAGED_STATUSES }).notNull().default("uploading"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // The expiry clock: restarted whenever the thread that holds the file is used again
+  lastActivityAt: timestamp("last_activity_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("staged_files_profile_status_idx").on(t.profileId, t.status)]);
 
 export const chatMessages = pgTable("chat_messages", {
   id: uuid("id").primaryKey().defaultRandom(),

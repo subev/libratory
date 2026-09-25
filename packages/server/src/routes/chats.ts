@@ -2,7 +2,7 @@ import { z } from "zod";
 import { and, asc, eq } from "drizzle-orm";
 import { router, publicProcedure } from "../trpc.ts";
 import { db } from "../db.ts";
-import { books, chatConversations, DEFAULT_PROFILE_ID } from "../schema.ts";
+import { books, chatConversations, CHAT_KINDS, DEFAULT_PROFILE_ID } from "../schema.ts";
 import { modelKeySchema } from "../lib/llm.ts";
 import {
   createConversation,
@@ -20,13 +20,16 @@ import {
 } from "../lib/chats.ts";
 
 const scopeInput = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("screen") }),
   z.object({ kind: z.literal("library") }),
   z.object({ kind: z.literal("folder"), folderId: z.string().uuid() }),
   z.object({ kind: z.literal("books"), bookIds: z.array(z.string().uuid()).min(1).max(200) }),
 ]);
 
 export const chatsRouter = router({
-  list: publicProcedure.query(({ ctx }) => listConversations(ctx.profileId ?? DEFAULT_PROFILE_ID)),
+  list: publicProcedure
+    .input(z.object({ kind: z.enum(CHAT_KINDS).default("library") }).default({ kind: "library" }))
+    .query(({ input, ctx }) => listConversations(ctx.profileId ?? DEFAULT_PROFILE_ID, input.kind)),
 
   get: publicProcedure
     .input(z.object({ id: z.string().uuid() }))
@@ -42,10 +45,12 @@ export const chatsRouter = router({
       return {
         id: conversation.id,
         title: conversation.title,
+        kind: conversation.kind,
         model: conversation.model,
         scope,
         removedBookIds: await removedBookIds(profileId, scope, stored),
-        messages: [...stored, ...(running && live ? [live] : [])].flatMap((message): WireChatMessage[] =>
+        // A continuation streams into a stored message: the live copy stands in for that row
+        messages: [...(running && live ? [...stored.filter((m) => m.id !== live.id), live] : stored)].flatMap((message): WireChatMessage[] =>
           message.role === "system" || !message.metadata ? [] : [{ id: message.id, role: message.role, parts: message.parts, metadata: message.metadata }]),
         running,
       };
@@ -61,11 +66,11 @@ export const chatsRouter = router({
   ),
 
   create: publicProcedure
-    .input(z.object({ scope: scopeInput, model: modelKeySchema.optional() }))
+    .input(z.object({ scope: scopeInput, model: modelKeySchema.optional(), kind: z.enum(CHAT_KINDS).default("library") }))
     .mutation(async ({ input, ctx }) => {
       const profileId = ctx.profileId ?? DEFAULT_PROFILE_ID;
       const scope = await scopeFromInput(profileId, input.scope);
-      const id = await createConversation(profileId, scope, input.model ?? null);
+      const id = await createConversation(profileId, scope, input.model ?? null, input.kind);
       return { id, scope: await resolveScope(profileId, scope) };
     }),
 

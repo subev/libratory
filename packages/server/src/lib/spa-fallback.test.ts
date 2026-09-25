@@ -34,7 +34,7 @@ async function createApp() {
 describe("registerSpaFallback", () => {
   it("serves the shell for the routes the client owns", async () => {
     const app = await createApp();
-    for (const url of ["/", "/open", "/chat", "/chat/c-1", "/folders/f-1", "/books/b-1", "/books/b-1/read"]) {
+    for (const url of ["/", "/open", "/folders/f-1", "/books/b-1", "/books/b-1/read"]) {
       const response = await app.inject({ method: "GET", url });
       expect(response.statusCode, url).toBe(200);
       expect(response.headers["content-type"], url).toContain("text/html");
@@ -63,7 +63,7 @@ describe("registerSpaFallback", () => {
 
   it("does not answer a non-GET with the shell", async () => {
     const app = await createApp();
-    const response = await app.inject({ method: "POST", url: "/chat" });
+    const response = await app.inject({ method: "POST", url: "/open" });
     expect(response.statusCode).toBe(404);
   });
 

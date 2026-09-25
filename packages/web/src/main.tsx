@@ -13,7 +13,8 @@ import { UpdateProgress } from "./components/UpdateProgress.tsx";
 import { IconDefaults } from "./components/icons.tsx";
 import { Home } from "./pages/Home.tsx";
 import { BookDetail } from "./pages/BookDetail.tsx";
-import { Chat } from "./pages/Chat.tsx";
+import { AssistantProvider } from "./components/assistant/context.tsx";
+import { AssistantPanel } from "./components/assistant/AssistantPanel.tsx";
 // Lazy so every other page stops paying for pdf.js
 const Reader = lazy(() => import("./pages/Reader.tsx").then((m) => ({ default: m.Reader })));
 const Components = lazy(() => import("./pages/Components.tsx").then((m) => ({ default: m.Components })));
@@ -48,6 +49,11 @@ createRoot(document.getElementById("root")!).render(
           <ErrorBoundary>
             <IconDefaults>
               <UpdateProgress />
+              {/* The assistant sits beside every page as a sibling, never inside one: each page
+                  measures its own width and steps its layout down when the panel opens */}
+              <AssistantProvider>
+                <div className="flex h-screen overflow-hidden">
+                  <div className="min-w-0 flex-1">
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/folders/:folderId" element={<Home />} />
@@ -55,10 +61,12 @@ createRoot(document.getElementById("root")!).render(
                 <Route path="/books/:id/read" element={<Suspense fallback={null}><Reader /></Suspense>} />
                 <Route path="/books/:id/ocr" element={<Suspense fallback={null}><OcrTryPage /></Suspense>} />
                 <Route path="/open" element={<Suspense fallback={null}><ReaderOpen /></Suspense>} />
-                <Route path="/chat" element={<Chat />} />
-                <Route path="/chat/:conversationId" element={<Chat />} />
                 <Route path="/components" element={<Suspense fallback={null}><Components /></Suspense>} />
               </Routes>
+                  </div>
+                  <AssistantPanel />
+                </div>
+              </AssistantProvider>
             </IconDefaults>
           </ErrorBoundary>
         </BrowserRouter>

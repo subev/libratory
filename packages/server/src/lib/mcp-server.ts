@@ -4,7 +4,7 @@ import { z } from "zod";
 import { appRouter } from "../router.ts";
 import { computeBookStatus } from "../routes/books.ts";
 import { db } from "../db.ts";
-import { bookFiles, bookLogs, books, chapters, notes, OCR_ENGINES, DEFAULT_OCR_ENGINE, type Chapter } from "../schema.ts";
+import { bookFiles, bookLogs, books, chapters, folders, notes, OCR_ENGINES, DEFAULT_OCR_ENGINE, type Chapter } from "../schema.ts";
 import { and, desc, eq, ilike, inArray, isNull, sql } from "drizzle-orm";
 import { createPdfBook, ensurePdfDir, newPdfBookId, pdfFileName, MAX_LANGUAGE_CHARS } from "./pdf-books.ts";
 import { modelKeySchema } from "./llm.ts";
@@ -21,6 +21,7 @@ import { appendApiChapters, chapterInputSchema, createApiBook } from "./api-book
 import { listFolderPaths, listProfiles, resolveFolderId, resolveProfileId } from "./mcp-library.ts";
 import { saveNote } from "./notes.ts";
 import { parseTtsVoice } from "./tts.ts";
+import { consumeStaged, isStagedRef, resolveStaged } from "./staged-files.ts";
 import path from "node:path";
 import { copyFile, rm, stat } from "node:fs/promises";
 
@@ -48,20 +49,7 @@ export function createMcpServer(profileId: string): McpServer {
     return { profileId: id, caller: id === profileId ? caller : appRouter.createCaller({ profileId: id }) };
   };
 
-  const getBook = async (id: string) => {
-    const [book, assemblies, documents, [latestLog]] = await Promise.all([
-      caller.books.get({ id }),
-      caller.books.assemblies({ bookId: id }),
-      caller.books.documents({ bookId: id }),
-      db
-        .select({ message: bookLogs.message, createdAt: bookLogs.createdAt })
-        .from(bookLogs)
-        .where(eq(bookLogs.bookId, id))
-        .orderBy(desc(bookLogs.createdAt))
-        .limit(1),
-    ]);
-    return compactBook(book, assemblies, documents, latestLog ?? null);
-  };
+  const getBook = (id: string) => loadBook(caller, id);
   const getSummary = async (id: string) => summarizeBook(await getBook(id));
 
   // The UI hides full extraction until the models are on disk; MCP has no such gate, and without
@@ -144,10 +132,10 @@ export function createMcpServer(profileId: string): McpServer {
       description:
         "Look at a PDF on the machine running Libratory before uploading it: page count, whether it has a text layer or is a scan needing OCR, " +
         "a language guess from the text, word count and author. Use it to choose language, voice and OCR engine up front.",
-      inputSchema: { path: z.string().min(1).describe("Absolute path to the PDF") },
+      inputSchema: { path: z.string().min(1).describe("Absolute path to the PDF, or a staged:<id> reference to a file dropped on the assistant panel") },
     },
-    async ({ path: pdfPath }) => {
-      await requirePdfPath(pdfPath);
+    async ({ path: source }) => {
+      const { path: pdfPath } = await resolvePdfSource(source, profileId);
       const [pages, hasTextLayer, text, author, info] = await Promise.all([
         pdfPageCount(pdfPath).catch(() => null),
         pdfHasTextLayer(pdfPath),
@@ -157,7 +145,7 @@ export function createMcpServer(profileId: string): McpServer {
       ]);
       const words = text ? countWords(text) : 0;
       return json({
-        path: pdfPath,
+        path: source,
         sizeBytes: info.size,
         pages,
         hasTextLayer,
@@ -175,13 +163,13 @@ export function createMcpServer(profileId: string): McpServer {
     {
       description:
         "Create a book from PDF files already on the machine running Libratory (absolute paths; the files are copied). " +
-        "By default the whole pipeline runs unattended — text extraction, chapter detection, narration of every chapter, and assembly into one M4B — " +
-        "so follow with wait_for_book until \"output\". Set fullExtract=false for an instant text-only book (readable and searchable in seconds, no chapters until extract_book), " +
-        "or skipSynthesis=true to detect chapters but leave narration for synthesize_book. Scanned pages are read by OCR in the book's language, " +
+        "By default the text is read and the chapters detected, and the chapters then wait for synthesize_book — narration is a decision taken after the chapters have been looked at, " +
+        "so follow with wait_for_book until \"chapters\". Set fullExtract=false for an instant text-only book (readable and searchable in seconds, no chapters until extract_book), " +
+        "or skipSynthesis=false to run the whole pipeline unattended — narration of every chapter and assembly into one M4B, wait_for_book until \"output\". Scanned pages are read by OCR in the book's language, " +
         "which needs that language's pack (see get_capabilities); pick voices with list_voices. Only PDFs — for text you already hold (a web page, markdown, a .docx you converted) use create_book. " +
         "Returns a summary; get_book lists the files and chapters.",
       inputSchema: {
-        paths: z.array(z.string().min(1)).min(1).max(50).describe("Absolute paths to PDF files, in reading order; several files make one book"),
+        paths: z.array(z.string().min(1)).min(1).max(50).describe("PDF files in reading order — absolute paths, or staged:<id> references to files dropped on the assistant panel; several files make one book"),
         title: z.string().trim().min(1).max(500).optional().describe("Defaults to the first file's name"),
         voice: z.string().optional().describe("Narrator voice id from list_voices, e.g. kokoro:af_heart (default)"),
         speed: z.number().min(0.5).max(2).optional(),
@@ -189,7 +177,7 @@ export function createMcpServer(profileId: string): McpServer {
         profile: profileArg,
         folder: z.string().trim().min(1).optional().describe("Where to file it: a path such as Work/Contracts (created when missing) or a folder id; the top level when omitted"),
         fullExtract: z.boolean().default(true),
-        skipSynthesis: z.boolean().default(false),
+        skipSynthesis: z.boolean().default(true).describe("false narrates every chapter as soon as it is detected and assembles the M4B, unattended"),
         llmChapterDetection: z.boolean().default(false).describe("Let an AI model read the table of contents to place and title chapters"),
         chapterModel: modelKeySchema.optional().describe("Model key for llmChapterDetection"),
         ocrEngine: z.enum(OCR_ENGINES).optional().describe(`OCR engine for scanned pages; ${DEFAULT_OCR_ENGINE} when omitted, surya reads photographed or faded pages better, llm sends page images to a cloud vision model (needs an AI provider key; see get_capabilities)`),
@@ -197,7 +185,7 @@ export function createMcpServer(profileId: string): McpServer {
       },
     },
     async (input) => {
-      for (const p of input.paths) await requirePdfPath(p);
+      const sources = await Promise.all(input.paths.map((p) => resolvePdfSource(p, profileId)));
       if (input.fullExtract) await requireExtractionModels();
       // Before the folder: a refused voice must not leave an empty folder behind.
       if (input.voice !== undefined) parseTtsVoice(input.voice);
@@ -206,13 +194,14 @@ export function createMcpServer(profileId: string): McpServer {
       const { bookId: id, pdfDir } = newPdfBookId();
       await ensurePdfDir(pdfDir);
       try {
-        const files = [];
-        for (const [index, p] of input.paths.entries()) {
+        const files = await Promise.all(sources.map(async (source, index) => {
           const pdfPath = path.join(pdfDir, pdfFileName(index));
-          await copyFile(p, pdfPath);
-          files.push({ index, filename: path.basename(p), pdfPath });
-        }
+          await copyFile(source.path, pdfPath);
+          return { index, filename: source.filename, pdfPath };
+        }));
         await createPdfBook(id, { ...input, folderId, files }, scope.profileId);
+        // The book has its own copy now; the staged ones are done with
+        await consumeStaged(input.paths);
       } catch (err) {
         await db.delete(books).where(eq(books.id, id)).catch(() => {});
         await rm(pdfDir, { recursive: true, force: true }).catch(() => {});
@@ -392,10 +381,15 @@ export function createMcpServer(profileId: string): McpServer {
     },
     async ({ id, title, text, selected }) => {
       if (title === undefined && text === undefined && selected === undefined) throw new Error("Nothing to change");
+      const [before] = await db.select({ title: chapters.title, selected: chapters.selected }).from(chapters).where(eq(chapters.id, id));
+      if (!before) throw new Error("Chapter not found");
       if (title !== undefined) await caller.chapters.rename({ id, title });
       if (text !== undefined) await caller.chapters.updateText({ id, customText: text });
       if (selected !== undefined) await caller.chapters.setSelected({ id, selected });
-      return json({ success: true });
+      const undo: Record<string, unknown> = { id };
+      if (title !== undefined) undo.title = before.title;
+      if (selected !== undefined) undo.selected = before.selected;
+      return json({ success: true, ...(text === undefined && Object.keys(undo).length > 1 ? { undo: { tool: "update_chapter", input: undo } } : {}) });
     },
   );
 
@@ -404,12 +398,15 @@ export function createMcpServer(profileId: string): McpServer {
     {
       description:
         "Run or redo the full extraction: OCR of scanned pages (in the book's language), a thorough page read and chapter detection. " +
-        "Pass ocrEngine to read the pages again with another engine (tesseract, surya, or llm for a cloud vision model). Existing chapters and audio are replaced, and after a redo the new chapters wait suspended for synthesize_book. Slow; then wait_for_book until \"chapters\".",
+        "Pass ocrEngine to read the pages again with another engine (tesseract, surya, or llm for a cloud vision model). Existing chapters and audio are replaced; the new chapters wait suspended for synthesize_book, never narrated on their own. Slow; then wait_for_book until \"chapters\".",
       inputSchema: { id: bookId, ocrEngine: z.enum(OCR_ENGINES).optional(), ocrModel: modelKeySchema.optional() },
     },
     async ({ id, ocrEngine, ocrModel }) => {
       await requireExtractionModels();
       if (ocrEngine !== undefined || ocrModel !== undefined) await caller.books.updateSettings({ id, ocrEngine, ocrModel });
+      // Extraction produces the structure; narration is decided afterwards, whatever the book was
+      // uploaded with — a book made with the unattended default used to narrate all its chapters here
+      await db.update(books).set({ skipSynthesis: true }).where(eq(books.id, id));
       const files = await db.select({ status: bookFiles.status }).from(bookFiles).where(eq(bookFiles.bookId, id));
       if (files.length > 0 && files.every((f) => f.status === "raw")) await caller.books.extractChapters({ id });
       else await caller.bookFiles.reExtractSelected({ bookId: id });
@@ -520,16 +517,67 @@ export function createMcpServer(profileId: string): McpServer {
       },
     },
     async ({ title, folder, ...settings }) => {
+      const [before] = await db.select({ profileId: books.profileId, title: books.title, folderId: books.folderId, author: books.author }).from(books).where(eq(books.id, settings.id));
+      if (!before) throw new Error("Book not found");
       if (title !== undefined) await caller.books.rename({ id: settings.id, title });
       if (folder !== undefined) {
         // A folder belongs to a profile, so the move runs as the book's own profile, not the connection's.
-        const [owner] = await db.select({ profileId: books.profileId }).from(books).where(eq(books.id, settings.id));
-        if (!owner) throw new Error("Book not found");
-        const folderId = folder === null ? null : await resolveFolderId(owner.profileId, folder, { create: true });
-        await appRouter.createCaller({ profileId: owner.profileId }).books.moveToFolder({ ids: [settings.id], folderId });
+        const folderId = folder === null ? null : await resolveFolderId(before.profileId, folder, { create: true });
+        await appRouter.createCaller({ profileId: before.profileId }).books.moveToFolder({ ids: [settings.id], folderId });
       }
       if (Object.keys(settings).length > 1) await caller.books.updateSettings(settings);
-      return json(await getSummary(settings.id));
+      // The call that puts a rename, a move or an author back, for the assistant panel's Undo.
+      // Only those: a voice or an OCR engine is chosen, not slipped, and is not undone with a click.
+      const undo: Record<string, unknown> = { id: settings.id };
+      if (title !== undefined) undo.title = before.title;
+      if (folder !== undefined) undo.folder = before.folderId;
+      if (settings.author !== undefined) undo.author = before.author;
+      return json({ ...(await getSummary(settings.id)), ...(Object.keys(undo).length > 1 ? { undo: { tool: "set_book_settings", input: undo } } : {}) });
+    },
+  );
+
+  server.registerTool(
+    "manage_folder",
+    {
+      description:
+        "Create, rename or move a folder in the library. Folders are named by path from the top level (Work/Contracts). " +
+        "create makes the path, parents included; rename gives one folder a new name; move puts it under another folder (or the top level with parent null). Nothing here deletes.",
+      inputSchema: {
+        action: z.enum(["create", "rename", "move"]),
+        folder: z.string().trim().min(1).max(500).describe("The folder: a path such as Work/Contracts, or an id from list_books"),
+        name: z.string().trim().min(1).max(200).optional().describe("rename: the new name"),
+        parent: z.string().trim().min(1).max(500).nullable().optional().describe("move: the new parent's path or id; null for the top level"),
+        profile: profileArg,
+      },
+    },
+    async ({ action, folder, name, parent, profile }) => {
+      const scope = await scoped(profile);
+      const paths = async () => listFolderPaths(scope.profileId);
+      switch (action) {
+        case "create": {
+          const id = await resolveFolderId(scope.profileId, folder, { create: true });
+          return json({ id, path: (await paths()).find((f) => f.id === id)?.path ?? folder });
+        }
+        case "rename": {
+          if (name === undefined) throw new Error("rename needs a name");
+          const id = await resolveFolderId(scope.profileId, folder, { create: false });
+          const before = (await paths()).find((f) => f.id === id);
+          await scope.caller.folders.rename({ id, name });
+          return json({ id, path: (await paths()).find((f) => f.id === id)?.path, undo: { tool: "manage_folder", input: { action: "rename", folder: id, name: before?.path.split("/").pop() ?? folder.split("/").pop() ?? folder } } });
+        }
+        case "move": {
+          if (parent === undefined) throw new Error("move needs a parent (null for the top level)");
+          const id = await resolveFolderId(scope.profileId, folder, { create: false });
+          const parentId = parent === null ? null : await resolveFolderId(scope.profileId, parent, { create: false });
+          const [before] = await db.select({ parentId: folders.parentId }).from(folders).where(eq(folders.id, id));
+          await scope.caller.folders.move({ id, parentId });
+          return json({ id, path: (await paths()).find((f) => f.id === id)?.path, undo: { tool: "manage_folder", input: { action: "move", folder: id, parent: before?.parentId ?? null } } });
+        }
+        default: {
+          const unhandled: never = action;
+          throw new Error(`unhandled action ${unhandled}`);
+        }
+      }
     },
   );
 
@@ -691,11 +739,18 @@ function page(text: string, offset: number, maxChars: number) {
   return { totalChars: text.length, offset, truncated: offset + maxChars < text.length, text: text.slice(offset, offset + maxChars) };
 }
 
-async function requirePdfPath(p: string): Promise<void> {
+// A PDF an agent names: a path on this machine, or a file the assistant panel staged for it. A
+// staged file keeps the name it was dropped with — on disk it is called by its id.
+async function resolvePdfSource(p: string, profileId: string): Promise<{ path: string; filename: string }> {
+  if (isStagedRef(p)) {
+    const staged = await resolveStaged(p, profileId);
+    return { path: staged.path, filename: staged.record.filename };
+  }
   if (!path.isAbsolute(p)) throw new Error(`Not an absolute path: ${p}`);
   if (!p.toLowerCase().endsWith(".pdf")) throw new Error(`Not a PDF: ${p}`);
   const info = await stat(p).catch(() => null);
   if (!info?.isFile()) throw new Error(`No such file: ${p}`);
+  return { path: p, filename: path.basename(p) };
 }
 
 // The SDK hands the client's progress token over as `_meta`, a name the lint rules reject inline.
@@ -718,7 +773,23 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 
 type Caller = ReturnType<typeof appRouter.createCaller>;
 type BookDetail = Awaited<ReturnType<Caller["books"]["get"]>>;
-type CompactBook = ReturnType<typeof compactBook>;
+export type CompactBook = ReturnType<typeof compactBook>;
+
+// One book as the tools see it: the router's view plus its outputs and the last log line
+export async function loadBook(caller: Caller, id: string): Promise<CompactBook> {
+  const [book, assemblies, documents, [latestLog]] = await Promise.all([
+    caller.books.get({ id }),
+    caller.books.assemblies({ bookId: id }),
+    caller.books.documents({ bookId: id }),
+    db
+      .select({ message: bookLogs.message, createdAt: bookLogs.createdAt })
+      .from(bookLogs)
+      .where(eq(bookLogs.bookId, id))
+      .orderBy(desc(bookLogs.createdAt))
+      .limit(1),
+  ]);
+  return compactBook(book, assemblies, documents, latestLog ?? null);
+}
 
 function compactBook(
   book: BookDetail,

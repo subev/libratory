@@ -1,13 +1,15 @@
 import { test, expect } from "@playwright/test";
 
 // Browser-only regression: all API calls are intercepted, so no library data or model is used.
-for (const width of [1280, 390]) {
-  test(`chat tables, pinned controls and history remain usable at ${width}px`, async ({ page }) => {
+// The assistant panel is the one chat, so this is where a long answer with tables has to fit.
+for (const width of [1280, 900]) {
+  test(`assistant tables, pinned composer and history remain usable at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 800 });
     await page.route("**/trpc/**", async (route) => {
       const data: Record<string, unknown> = {
+        "books.list": { folders: [], books: [], filterCounts: {} },
         "folders.list": [],
-        "search.indexStatus": { total: 0, done: 0, running: 0 },
+        "profiles.list": [{ id: "00000000-0000-4000-8000-000000000000", name: "Default", isDefault: true }],
         "llmModels.list": [{ key: "test", label: "Test model", hint: "", source: "Local", contextTokens: 8192, supportsTools: true }],
         "llmModels.getDefault": { resolved: "test" },
         "models.list": [],
@@ -24,7 +26,7 @@ for (const width of [1280, 390]) {
     const table = "| Група | Допустими отсъствия |\n| --- | --- |\n| **Ясла и I група** | **30 работни дни** |\n| II, III и IV група | 15 работни дни |";
     const wideTable = "| Identifier | Value |\n| --- | --- |\n| " + "long_identifier_".repeat(25) + " | 30 |";
     const answer = `${table}\n\n${"A paragraph in a long answer.\n\n".repeat(50)}${wideTable}`;
-    await page.route("**/chat", async (route) => {
+    await page.route("**/assistant", async (route) => {
       if (route.request().method() !== "POST") return route.continue();
       const chunks = [
         { type: "start", messageId: "answer" },
@@ -40,11 +42,13 @@ for (const width of [1280, 390]) {
       });
     });
 
-    await page.goto("/chat");
-    await expect(page.getByTestId("chat-model")).toContainText("Test model");
-    await page.getByTestId("chat-input").fill("Show the attendance limits.");
-    await page.getByTestId("chat-send").click();
-    const tables = page.getByTestId("chat-assistant-message").locator("table");
+    await page.goto("/");
+    const panel = page.getByTestId("assistant-panel");
+    await expect(panel).toBeVisible();
+    await expect(panel.getByTestId("assistant-model")).toContainText("Test model");
+    await panel.getByTestId("assistant-input").fill("Show the attendance limits.");
+    await panel.getByTestId("assistant-send").click();
+    const tables = panel.getByTestId("assistant-answer").locator("table");
     await expect(tables).toHaveCount(2);
     await expect(tables.first().getByRole("columnheader")).toHaveText(["Група", "Допустими отсъствия"]);
     await expect(tables.first().locator("tbody tr")).toHaveCount(2);
@@ -52,39 +56,33 @@ for (const width of [1280, 390]) {
     await expect(cell).toHaveCSS("border-top-width", "1px");
     await expect(cell).toHaveCSS("padding-left", "12px");
 
-    // The first question gives the chat its own address without dropping the answer it is streaming
-    await expect(page).toHaveURL(/\/chat\/11111111-1111-4111-8111-111111111111$/);
-
-    // The conversation scrolls inside the shell; the page itself never does
-    const scroller = page.getByTestId("chat-scroller");
+    // The transcript scrolls inside the panel; the page itself never does
+    const scroller = panel.getByTestId("assistant-transcript");
     await scroller.evaluate((element) => element.scrollTo(0, element.scrollHeight));
     await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(500);
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
-    await expect(page.getByTestId("chat-toolbar")).toBeInViewport({ ratio: 1 });
-    await expect(page.getByTestId("chat-sources-bar")).toBeInViewport({ ratio: 1 });
-    await expect(page.getByTestId("chat-input")).toBeInViewport({ ratio: 1 });
-    await expect(page.getByTestId("chat-model")).toBeInViewport({ ratio: 1 });
+    await expect(panel.getByTestId("assistant-input")).toBeInViewport({ ratio: 1 });
+    await expect(panel.getByTestId("assistant-model")).toBeInViewport({ ratio: 1 });
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    const overflow = page.getByRole("region", { name: "Table", exact: true }).last();
+    const overflow = panel.getByRole("region", { name: "Table", exact: true }).last();
     expect(await overflow.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
 
-    await page.getByTestId("chat-model").click();
-    await expect(page.getByTestId("chat-model-menu")).toBeVisible();
+    await panel.getByTestId("assistant-model").click();
+    await expect(page.getByTestId("assistant-model-menu")).toBeVisible();
     await page.keyboard.press("Escape");
 
-    // History is a sidebar on a wide screen and a drawer on a narrow one
-    if (width < 768) {
-      await expect(page.getByTestId("chat-sidebar")).toBeHidden();
-      await page.getByTestId("chat-history-open").click();
-    }
-    await expect(page.getByTestId("chat-sidebar")).toBeVisible();
-    await page.getByTestId("chat-new").click();
-    await expect(page.getByTestId("chat-assistant-message")).toHaveCount(0);
-    await expect(page.getByTestId("chat-source-picker")).toBeVisible();
-    if (width < 768) await expect(page.getByTestId("chat-sidebar")).toBeHidden();
+    // History is a dialog; New chat inside it starts an empty thread and closes it
+    await panel.getByTestId("chat-history-open").click();
+    const history = page.getByTestId("assistant-history-modal");
+    await expect(history).toBeVisible();
+    await history.getByTestId("chat-new").click();
+    await expect(history).toBeHidden();
+    await expect(panel.getByTestId("assistant-answer")).toHaveCount(0);
 
-    // A chat opened by its address still has a way back to the library at either width
-    await page.getByTestId(width < 768 ? "chat-back-compact" : "chat-back").click();
-    await expect(page).toHaveURL(/:\d+\/$/);
+    // Collapsed to the rail, and back
+    await panel.getByRole("button", { name: "Collapse the assistant" }).click();
+    await expect(page.getByTestId("assistant-rail")).toBeVisible();
+    await page.getByTestId("assistant-toggle").click();
+    await expect(page.getByTestId("assistant-panel")).toBeVisible();
   });
 }

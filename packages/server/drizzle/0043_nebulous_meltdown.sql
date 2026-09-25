@@ -1,0 +1,1 @@
+ALTER TABLE "chat_conversations" ALTER COLUMN "kind" SET DEFAULT 'assistant';

@@ -1,8 +1,9 @@
 import { and, asc, desc, eq, gt, inArray, lt, max, ne, sql } from "drizzle-orm";
 import type { UIMessage } from "ai";
 import { db } from "../db.ts";
-import { books, chatConversations, chatMessages, folders, type ChatBookRef, type ChatScope } from "../schema.ts";
-import type { ChatSearchScope, CitationSource } from "./chat-tools.ts";
+import { books, chatConversations, chatMessages, folders, type ChatBookRef, type ChatKind, type ChatScope } from "../schema.ts";
+import { CitationCatalog, type ChatSearchScope, type CitationSource } from "./chat-tools.ts";
+import { removeStagedForConversation } from "./staged-files.ts";
 
 export type ChatMessageStatus = (typeof chatMessages.$inferSelect)["status"];
 
@@ -22,6 +23,7 @@ export type StoredChatMessage = UIMessage<ChatMessageMetadata>;
 export type WireChatMessage = { id: string; role: "user" | "assistant"; parts: unknown[]; metadata: ChatMessageMetadata };
 
 export type ResolvedChatScope =
+  | { kind: "screen" }
   | { kind: "library" }
   | { kind: "folder"; folderId: string; name: string; available: boolean }
   | { kind: "books"; books: (ChatBookRef & { available: boolean })[] };
@@ -40,7 +42,7 @@ export function titleFromQuestion(question: string): string {
 // asked is closed, and ends only by finishing, by Stop, or by the conversation being deleted. In
 // memory like the extract registry — a restart ends the run with the process, and the question it
 // was answering is already saved.
-type ChatRun = {
+export type ChatRun = {
   controller: AbortController;
   // The answer as far as it has got, for a window that opens while it is being written
   latest: StoredChatMessage | null;
@@ -106,6 +108,7 @@ async function existingBooks(profileId: string, ids: string[]): Promise<Map<stri
 // it is not
 export async function resolveScope(profileId: string, scope: ChatScope): Promise<ResolvedChatScope> {
   switch (scope.kind) {
+    case "screen":
     case "library":
       return scope;
     case "folder": {
@@ -131,8 +134,11 @@ export async function resolveScope(profileId: string, scope: ChatScope): Promise
 
 // What the tools may search right now, or null when nothing the conversation chose is left.
 // A missing scope is never widened into a whole-library search.
-export function searchScopeOf(profileId: string, scope: ResolvedChatScope): ChatSearchScope | null {
+export function searchScopeOf(profileId: string, scope: ResolvedChatScope, screenBookId?: string): ChatSearchScope | null {
   switch (scope.kind) {
+    // The page decides: the book on screen, else everything
+    case "screen":
+      return screenBookId ? { profileId, bookIds: [screenBookId] } : { profileId };
     case "library":
       return { profileId };
     case "folder":
@@ -151,9 +157,11 @@ export function searchScopeOf(profileId: string, scope: ResolvedChatScope): Chat
 // Validates a requested scope against the profile and snapshots the names it will be shown by
 export async function scopeFromInput(
   profileId: string,
-  input: { kind: "library" } | { kind: "folder"; folderId: string } | { kind: "books"; bookIds: string[] },
+  input: { kind: "screen" } | { kind: "library" } | { kind: "folder"; folderId: string } | { kind: "books"; bookIds: string[] },
 ): Promise<ChatScope> {
   switch (input.kind) {
+    case "screen":
+      return { kind: "screen" };
     case "library":
       return { kind: "library" };
     case "folder": {
@@ -180,19 +188,19 @@ export async function scopeFromInput(
   }
 }
 
-export async function createConversation(profileId: string, scope: ChatScope, model: string | null): Promise<string> {
+export async function createConversation(profileId: string, scope: ChatScope, model: string | null, kind: ChatKind = "library"): Promise<string> {
   // Conversations whose first question never landed are invisible; a day is long enough to be sure
   await db.delete(chatConversations).where(and(
     eq(chatConversations.profileId, profileId),
     eq(chatConversations.title, ""),
     lt(chatConversations.createdAt, new Date(Date.now() - 24 * 60 * 60 * 1000)),
   ));
-  const [row] = await db.insert(chatConversations).values({ profileId, scope, model }).returning({ id: chatConversations.id });
+  const [row] = await db.insert(chatConversations).values({ profileId, scope, model, kind }).returning({ id: chatConversations.id });
   if (!row) throw new Error("Could not start the conversation");
   return row.id;
 }
 
-export async function listConversations(profileId: string) {
+export async function listConversations(profileId: string, kind: ChatKind = "library") {
   const rows = await db
     .select({
       id: chatConversations.id,
@@ -205,7 +213,7 @@ export async function listConversations(profileId: string) {
     })
     .from(chatConversations)
     // Untitled means never asked: a first question that was refused leaves one behind
-    .where(and(eq(chatConversations.profileId, profileId), ne(chatConversations.title, "")))
+    .where(and(eq(chatConversations.profileId, profileId), eq(chatConversations.kind, kind), ne(chatConversations.title, "")))
     .orderBy(desc(chatConversations.updatedAt));
 
   // Every question asked, so history can be searched by more than the first one
@@ -329,6 +337,14 @@ export async function retryQuestion(
   return "regenerated";
 }
 
+// The chat's citation discipline: passages the search returned are the only ids an answer may
+// cite, seeded from earlier answers so a follow-up can point back at them
+export function seedCatalog(history: { parts: unknown[] }[]): CitationCatalog {
+  const catalog = new CitationCatalog();
+  for (const message of history) catalog.seed(sourcesOf(message.parts));
+  return catalog;
+}
+
 export function sourcesOf(parts: unknown[]): CitationSource[] {
   return parts.flatMap((part) => {
     const candidate = part as { type?: unknown; data?: unknown };
@@ -347,7 +363,62 @@ export async function removedBookIds(profileId: string, scope: ResolvedChatScope
 
 // Writes the answer as it ended. The conversation is looked up first: one deleted mid-answer must
 // stay deleted, and its late answer has nowhere to go.
+// A tool part as the SDK stores it, read loosely: the parts are jsonb and only the fields the
+// approval flow touches are named here
+export type ToolPartLike = {
+  type: string;
+  toolCallId?: string;
+  toolName?: string;
+  state?: string;
+  input?: unknown;
+  output?: unknown;
+  approval?: { id: string; approved?: boolean; reason?: string };
+};
+
+const isToolPartLike = (part: unknown): part is ToolPartLike =>
+  !!part && typeof part === "object" && typeof (part as { type?: unknown }).type === "string" && (part as ToolPartLike).type.startsWith("tool-") || (part as ToolPartLike)?.type === "dynamic-tool";
+
+// The panel's Run or Cancel, written into the stored message: the call's state goes from
+// approval-requested to approval-responded, and the next generation executes or denies it.
+// Null when no such request is waiting — a stale card, or one already answered.
+export function respondToApproval(history: StoredChatMessage[], approvalId: string, approved: boolean, reason?: string): StoredChatMessage | null {
+  const message = history.at(-1);
+  if (!message || message.role !== "assistant") return null;
+  let found = false;
+  const parts = message.parts.map((part) => {
+    if (!isToolPartLike(part) || part.state !== "approval-requested" || part.approval?.id !== approvalId) return part;
+    found = true;
+    return { ...part, state: "approval-responded", approval: { ...part.approval, approved, ...(reason ? { reason } : {}) } };
+  });
+  return found ? { ...message, parts: parts as StoredChatMessage["parts"] } : null;
+}
+
+// A card the person walked past — asked something else instead of Run or Cancel — is answered
+// no on their behalf, so the call is never left dangling in front of the model
+export function denyPendingApprovals(message: StoredChatMessage, reason: string): StoredChatMessage | null {
+  let changed = false;
+  const parts = message.parts.map((part) => {
+    if (!isToolPartLike(part) || part.state !== "approval-requested" || !part.approval) return part;
+    changed = true;
+    return { ...part, state: "approval-responded", approval: { ...part.approval, approved: false, reason } };
+  });
+  return changed ? { ...message, parts: parts as StoredChatMessage["parts"] } : null;
+}
+
+export async function updateMessageParts(messageId: string, parts: unknown[]): Promise<void> {
+  await db.update(chatMessages).set({ parts }).where(eq(chatMessages.id, messageId));
+}
+
+// An answer continued in place — after an approved call ran — replaces its own row
+export async function replaceAnswer(opts: { messageId: string; parts: unknown[]; status: ChatMessageStatus; error: string | null }): Promise<void> {
+  await db.update(chatMessages).set({ parts: opts.parts, status: opts.status, error: opts.error }).where(eq(chatMessages.id, opts.messageId));
+  const [row] = await db.select({ conversationId: chatMessages.conversationId }).from(chatMessages).where(eq(chatMessages.id, opts.messageId));
+  if (row) await db.update(chatConversations).set({ updatedAt: new Date() }).where(eq(chatConversations.id, row.conversationId));
+}
+
 export async function saveAnswer(opts: {
+  // The id the stream carried, so the row and the message the browser holds are one
+  id?: string;
   conversationId: string;
   parts: unknown[];
   status: ChatMessageStatus;
@@ -362,6 +433,7 @@ export async function saveAnswer(opts: {
   if (!conversation) return;
 
   await db.insert(chatMessages).values({
+    ...(opts.id ? { id: opts.id } : {}),
     conversationId: opts.conversationId,
     seq: await nextSeq(opts.conversationId),
     role: "assistant",
@@ -387,6 +459,7 @@ export async function deleteConversation(profileId: string, id: string): Promise
   // Aborted, not awaited: saveAnswer looks the conversation up first, so an answer that ends after
   // the row has gone has nowhere to land
   running.get(id)?.controller.abort(STOPPED_BY_DELETE);
+  await removeStagedForConversation(id);
   const deleted = await db
     .delete(chatConversations)
     .where(and(eq(chatConversations.id, id), eq(chatConversations.profileId, profileId)))

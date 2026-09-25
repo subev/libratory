@@ -288,6 +288,34 @@
       "when": 1789902565865,
       "tag": "0040_deep_firestar",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1790336133079,
+      "tag": "0041_boring_xorn",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1790350662610,
+      "tag": "0042_little_slyde",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1790363767202,
+      "tag": "0043_nebulous_meltdown",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1790363767773,
+      "tag": "0044_chat_kind_assistant",
+      "breakpoints": true
     }
   ]
 }

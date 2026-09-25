@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, type DragEvent } from "react";
 import { useNavigate } from "react-router";
-import { captureDrop, type DroppedItems } from "../lib/dnd.ts";
+import { captureDrop, type DroppedItems , readEntryFiles } from "../lib/dnd.ts";
 import { profileHeaders } from "../lib/profile.ts";
 import { IconDragHandle, IconClose, IconAdd } from "./icons.tsx";
 import { Button } from "./Button.tsx";
@@ -124,26 +124,6 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
     } finally {
       setIsUploading(false);
     }
-  }
-
-  async function readEntryFiles(entry: FileSystemEntry): Promise<File[]> {
-    if (entry.isFile) {
-      const file = await new Promise<File>((resolve, reject) => (entry as FileSystemFileEntry).file(resolve, reject));
-      return file.name.toLowerCase().endsWith(".pdf") ? [file] : [];
-    }
-    if (entry.isDirectory) {
-      const reader = (entry as FileSystemDirectoryEntry).createReader();
-      const entries: FileSystemEntry[] = [];
-      // readEntries returns batches of ≤100; keep reading until an empty batch
-      for (;;) {
-        const batch = await new Promise<FileSystemEntry[]>((resolve, reject) => reader.readEntries(resolve, reject));
-        if (batch.length === 0) break;
-        entries.push(...batch);
-      }
-      const nested = await Promise.all(entries.map(readEntryFiles));
-      return nested.flat();
-    }
-    return [];
   }
 
   async function ingest({ entries, files }: DroppedItems) {

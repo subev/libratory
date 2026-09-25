@@ -8,16 +8,16 @@ The library holds ~527 books ≈ 217M characters ≈ 60–90M tokens of extracte
 
 ## The two AI surfaces (don't confuse them)
 
-| | **Library chat** (`/chat`, `POST /chat`) | **Ask AI** (modal, `POST /chat/ask`) |
+| | **Assistant search** (the docked panel, `POST /assistant`) | **Ask AI** (the assistant's `analyze_text` tool, behind a card) |
 |---|---|---|
 | How it reads | Agentic retrieval: the model iteratively calls search tools over the index | The *entire* scope text (book raw text or selected chapters) is stuffed into context |
 | Best at | Pointed questions, "where does it say…", cross-book questions, follow-ups | Whole-book analysis: summaries, themes, characters — anything needing every word |
 | Citations | Yes — verified, click-through to PDF page / chapter / translation | No (there are no chunk ids in stuffed mode) |
-| Turns | Multi-turn conversation | One shot per Ask |
+| Turns | Multi-turn conversation | The pinned text stays under the composer; every follow-up reads it again |
 | Scope | Whole profile, folder subtree, or one book | One book's raw text, or a chapter selection |
-| Notes | "Save as note" on demand (`notes.saveLibraryAnswer`, `bookId NULL`) | Every answer auto-saved as a note (unchanged legacy behavior) |
+| Notes | "Save as note" on demand (`notes.saveLibraryAnswer`, `bookId NULL`) | Every answer auto-saved as a note on the book, and drawn as one in the thread |
 
-Both stream over AI SDK UI-message streams from raw Fastify routes (`chat-routes.ts`) — tRPC can't stream, so these are the same carve-out as uploads/PDF serving.
+Both stream over AI SDK UI-message streams from raw Fastify routes (`chat-routes.ts`, `assistant-routes.ts`) — tRPC can't stream, so these are the same carve-out as uploads/PDF serving. `POST /chat` was the library chat page's route until 2026-09-25, when that page became the assistant full width; the route and its tests stay as the search half's own harness, and the assistant reuses its tools (`buildChatTools`) and citation verification.
 
 ## The index: `book_chunks`
 
@@ -71,10 +71,10 @@ Exposed as tRPC `search.library` (for testing/UI) and consumed directly by the c
 
 ## The agentic chat (`chat-routes.ts`, `lib/chat-tools.ts`, `lib/citations.ts`)
 
-- **Loop**: AI SDK `streamText` with the OpenAI-compatible provider pointed at DeepSeek. Hard caps: `stopWhen: stepCountIs(8)` (it physically cannot search forever), 3-min abort signal, 4,096 max output tokens. `prepareStep` forces `toolChoice: "none"` on the last step so the turn always ends with a text answer — without it a search-happy model burns all steps on tools and the stream closes silently with no answer.
+- **Loop**: AI SDK `streamText` with the OpenAI-compatible provider pointed at DeepSeek. Hard caps: `stopWhen: stepCountIs(8)` (it physically cannot search forever), 3-min abort signal, 4,096 max output tokens. `prepareStep` removes the tools on the last step (`activeTools: []`) and appends a user message saying the search rounds are spent, so the turn always ends with a text answer — without it a search-happy model burns all steps on tools and the stream closes silently with no answer. Declining the tools with `toolChoice: "none"` is not enough: DeepSeek V4 answers that by writing the calls it still wants as raw `<｜DSML｜…>` markup in the text.
 - **Tools** (zod schemas): `search_library` (hybrid search within the request's profile/folder/book scope), `read_passage` (context expansion by citation id), `list_books` (titles only, for meta questions).
 - **Citations — the id-catalog discipline** (borrowed from `toc-detect.ts`): every passage a tool returns is registered in a per-request `CitationCatalog` as `c_1, c_2…`. The system prompt requires inline `[c_N]` markers using only ids from tool output. After streaming, `verifySources()` parses the final text and keeps only catalog-known ids — **a hallucinated citation cannot render**. Verified sources ship as one `data-sources` part; the UI rewrites `[c_N]` → `[n]` and renders a source list (grouped by book; chapter, page and the passage's opening words per row): a cited passage of a narrated chapter → the reader at the moment it is spoken (`/books/:id/read?chapter=<index>&t=<ms>`, placed by `lib/citation-targets.ts` from the chunk's `charStart` and the chapter's sync map), with the PDF as a second button; otherwise raw → `PdfPreviewModal` (`/pdf/:fileId#page=N` — pages from the chunk), chapter → PDF page when resolvable via `sourceFileIndex`, else the book page; translation/variant → `/books/:bookId?variant=<key>`. The catalog is re-seeded from prior messages' `data-sources` parts so follow-up turns can cite earlier passages.
-- **Persistence**: conversations are kept in Postgres (`chat_conversations` / `chat_messages`), listed in a history sidebar and reopened at `/chat/:conversationId` with their messages, citations, sources and model. The server owns the transcript and the run: a request brings one question, the answer goes on when the tab is closed, and only Stop, deleting the conversation or the timeout ends it early. What a conversation searches is fixed at its first question. `AGENTS.md` ("Conversations") has the full contract. "Save as note" is still a separate, deliberate act → a `notes` row with `bookId NULL`, listed behind the sidebar's "Saved answers" (`notes.listLibrary`), untouched when a conversation is deleted.
+- **Persistence**: conversations are kept in Postgres (`chat_conversations` / `chat_messages`), listed behind the assistant panel's History button and reopened there with their messages, citations, sources and model. The server owns the transcript and the run: a request brings one question, the answer goes on when the tab is closed, and only Stop, deleting the conversation or the timeout ends it early. What a conversation searches is fixed at its first question. `AGENTS.md` ("Conversations") has the full contract. "Save as note" is still a separate, deliberate act → a `notes` row with `bookId NULL`, listed behind the sidebar's "Saved answers" (`notes.listLibrary`), untouched when a conversation is deleted.
 
 ## When indexing happens (the lifecycle)
 
@@ -137,6 +137,6 @@ Disk cost (at 527 books / 208K chunks): `book_chunks` data ~1.9GB, HNSW ~1.6GB (
 | Retrieval | `packages/server/src/lib/search.ts` (+ test), `routes/search.ts` |
 | Index jobs | `workers/index-book.ts`, `workers/embed-chunks.ts`, `lib/search-index.ts`, sweep additions in `workers/sweep.ts`, `src/scripts/backfill-search-index.ts` |
 | Chat backend | `packages/server/src/chat-routes.ts`, `lib/chat-tools.ts`, `lib/citations.ts` (+ test), `lib/ask-ai.ts` (+ test) |
-| Chat frontend | `packages/web/src/pages/Chat.tsx`, `components/chat/{ChatMessage,SourceList,SavedAnswers}.tsx` |
-| Ask AI frontend | `packages/web/src/components/ChapterAiModal.tsx` |
+| Chat frontend | `packages/web/src/components/assistant/{AssistantPanel,AssistantThread}.tsx`, `components/chat/{ChatSidebar,SourcePicker,SourceList,SavedAnswers}.tsx`, `lib/chat-message.ts` |
+| Ask AI frontend | the Ask AI buttons on the book page pin to `components/assistant/context.tsx`; the card and note are `components/assistant/ActionCard.tsx` |
 | Infra | `docker-compose.yml` (`pgvector/pgvector:pg17`), `scripts/setup.sh` (FlagEmbedding + BGE-M3 download) |

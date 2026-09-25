@@ -119,6 +119,7 @@ describe("/mcp", () => {
       "list_books",
       "list_notes",
       "list_voices",
+      "manage_folder",
       "redetect_chapters",
       "save_note",
       "search_library",

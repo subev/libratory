@@ -34,3 +34,32 @@ export function captureDrop(e: React.DragEvent): DroppedItems {
 export function hasFiles(e: React.DragEvent): boolean {
   return e.dataTransfer.types.includes("Files");
 }
+
+// Every PDF under a dropped entry, folders walked. readEntries answers in batches of at most 100,
+// so a directory is read until an empty batch. Shared by the upload zone and the assistant panel.
+export async function readEntryFiles(entry: FileSystemEntry): Promise<File[]> {
+  if (entry.isFile) {
+    const file = await new Promise<File>((resolve, reject) => (entry as FileSystemFileEntry).file(resolve, reject));
+    return file.name.toLowerCase().endsWith(".pdf") ? [file] : [];
+  }
+  if (entry.isDirectory) {
+    const reader = (entry as FileSystemDirectoryEntry).createReader();
+    const entries: FileSystemEntry[] = [];
+    for (;;) {
+      const batch = await new Promise<FileSystemEntry[]>((resolve, reject) => reader.readEntries(resolve, reject));
+      if (batch.length === 0) break;
+      entries.push(...batch);
+    }
+    const nested = await Promise.all(entries.map(readEntryFiles));
+    return nested.flat();
+  }
+  return [];
+}
+
+// The files of a drop: the plain files when nothing dropped was a folder, else every PDF found
+// under the entries, in name order
+export async function droppedPdfs({ entries, files }: DroppedItems): Promise<File[]> {
+  if (!entries.some((entry) => entry.isDirectory)) return files;
+  const collected = (await Promise.all(entries.map(readEntryFiles))).flat();
+  return collected.sort((a, b) => a.name.localeCompare(b.name));
+}

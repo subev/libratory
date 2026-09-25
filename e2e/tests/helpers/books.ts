@@ -24,7 +24,8 @@ export async function uploadFixtureBook(page: Page, { waitForIndex = false } = {
   await page.goto("/");
   // Upload lives in a modal now: the library's first screen is the library, not a drop zone
   await page.getByTestId("open-upload").click();
-  await page.locator('input[type="file"]').setInputFiles(FIXTURE_PDF);
+  // Scoped to the dialog: the assistant panel beside the library carries a file input of its own
+  await page.getByTestId("upload-modal").locator('input[type="file"]').setInputFiles(FIXTURE_PDF);
   await page.getByRole("button", { name: /^Upload and create/ }).click();
   // The dialog hands over to the book page with the Extract modal open; these flows want the page itself
   await expect(page).toHaveURL(/\/books\/[0-9a-f-]+/);

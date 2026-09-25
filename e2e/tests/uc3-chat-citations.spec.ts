@@ -7,13 +7,14 @@ test.describe("chat with citations", { tag: "@slow" }, () => {
     test.setTimeout(5 * 60_000);
 
     await uploadFixtureBook(page, { waitForIndex: true });
-    await page.getByRole("link", { name: /Chat/ }).click();
+    // The assistant beside the book page searches that book
+    await page.getByTestId("assistant-toggle").click();
 
-    await pickOption(page, "chat-model", FAKE_MODEL_KEY);
-    await page.getByTestId("chat-input").fill("How does the voyage begin?");
-    await page.getByTestId("chat-send").click();
+    await pickOption(page, "assistant-model", FAKE_MODEL_KEY);
+    await page.getByTestId("assistant-input").fill("Where does the voyage begin? Quote the page.");
+    await page.getByTestId("assistant-send").click();
 
-    const answer = page.getByTestId("chat-assistant-message").last();
+    const answer = page.getByTestId("assistant-answer").last();
     await expect(answer).toContainText(FAKE_CITED_REPLY.split(" [")[0] ?? FAKE_CITED_REPLY, { timeout: 60_000 });
 
     // The fixture book is not narrated, so its citation falls back to the PDF at the page

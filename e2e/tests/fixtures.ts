@@ -21,7 +21,13 @@ export const test = base.extend<{ profileId: string }, { fakeLlm: void }>({
     });
   },
   page: async ({ page, profileId }, use) => {
-    await page.addInitScript((id: string) => localStorage.setItem("profile.id", id), profileId);
+    // The assistant panel starts open for a newcomer and takes 392px of the viewport, which
+    // drops the library into its compact layout; the suite asserts the full-width one, so the
+    // panel starts collapsed here and its own specs open it
+    await page.addInitScript((id: string) => {
+      localStorage.setItem("profile.id", id);
+      localStorage.setItem("assistant.open", "0");
+    }, profileId);
     await use(page);
   },
   // Worker-scoped and requested by name only: tests that need the stub destructure it as

@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { Link } from "react-router";
 import { trpc } from "../../trpc.ts";
 import { Button } from "../Button.tsx";
 import { Dropdown } from "../Dropdown.tsx";
 import { Menu, MenuDivider, MenuItem } from "../Menu.tsx";
 import { Modal, ModalHeader } from "../Modal.tsx";
 import { SegmentedControl } from "../SegmentedControl.tsx";
-import {
+import { IconAi,
   IconAdd,
   IconBook,
   IconBookRemoved,
@@ -36,6 +35,7 @@ import {
 } from "../../lib/chat-history.ts";
 
 const SCOPE_ICONS: Record<ScopeSummary["kind"], typeof IconBook> = {
+  screen: IconAi,
   library: IconBooks,
   folder: IconFolder,
   book: IconBook,
@@ -62,6 +62,7 @@ export function ChatSidebar({
   onFilter,
   onNewChat,
   onNavigate,
+  onOpen,
   onDeleted,
   onClose,
   savedAnswers,
@@ -74,6 +75,9 @@ export function ChatSidebar({
   onNewChat: () => void;
   // A row was opened — the narrow-screen drawer closes on it
   onNavigate: () => void;
+  // Given, a row opens the conversation here instead of navigating to the chat page: the
+  // assistant panel shows its own history and keeps the page beside it
+  onOpen: (id: string) => void;
   onDeleted: (id: string) => void;
   onClose: () => void;
   savedAnswers: number;
@@ -183,6 +187,7 @@ export function ChatSidebar({
                 renaming={conversation.id === renamingId}
                 now={now}
                 onNavigate={onNavigate}
+                onOpen={onOpen}
                 onRename={() => setRenamingId(conversation.id)}
                 onRenameDone={() => setRenamingId(null)}
                 onDelete={() => setDeleting(conversation)}
@@ -221,6 +226,7 @@ function HistoryRow({
   renaming,
   now,
   onNavigate,
+  onOpen,
   onRename,
   onRenameDone,
   onDelete,
@@ -230,6 +236,7 @@ function HistoryRow({
   renaming: boolean;
   now: Date;
   onNavigate: () => void;
+  onOpen: (id: string) => void;
   onRename: () => void;
   onRenameDone: () => void;
   onDelete: () => void;
@@ -266,11 +273,14 @@ function HistoryRow({
         </div>
       ) : (
         // button-ok: a history row — one entry selected out of a list, not an action
-        <Link
-          to={`/chat/${conversation.id}`}
-          onClick={onNavigate}
-          aria-current={active ? "page" : undefined}
-          className={`flex flex-col gap-0.5 rounded-md py-1.5 pr-8 pl-2 hover:bg-(--bg-card-hover) ${active ? "bg-(--bg-selected)" : ""}`}
+        <button
+          type="button"
+          onClick={() => {
+            onOpen(conversation.id);
+            onNavigate();
+          }}
+          aria-current={active ? "true" : undefined}
+          className={`flex w-full flex-col gap-0.5 rounded-md py-1.5 pr-8 pl-2 text-left hover:bg-(--bg-card-hover) ${active ? "bg-(--bg-selected)" : ""}`}
         >
           <span className="line-clamp-2 text-xs leading-snug text-(--text-primary)">{conversation.title}</span>
           <span className={`flex min-w-0 items-center gap-1 text-xs ${tone}`}>
@@ -278,7 +288,7 @@ function HistoryRow({
             <span className="min-w-0 flex-1 truncate">{summary.label}</span>
             <span className="shrink-0 tabular-nums text-(--text-faint)">{formatWhen(conversation.updatedAt, now)}</span>
           </span>
-        </Link>
+        </button>
       )}
       <div className={`absolute top-1 right-1 ${active ? "" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"}`}>
         <Menu
@@ -313,6 +323,8 @@ function HistoryRow({
 
 function searchedPhrase(conversation: ConversationSummary): string {
   switch (conversation.scope.kind) {
+    case "screen":
+      return "The pages it followed";
     case "library":
       return "The library it searched";
     case "folder":

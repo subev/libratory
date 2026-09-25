@@ -48,7 +48,9 @@ const targetClass = "ml-auto inline-flex shrink-0 items-center gap-1 self-center
 // Numbered like the [n] markers in the answer, grouped under the book so its title is said once,
 // and told apart by how each passage starts — a dozen citations of one chapter used to be a dozen
 // identical truncated pills.
-export function SourceList({ sources, removedBookIds, onOpenPdf }: { sources: ChatSource[]; removedBookIds: ReadonlySet<string>; onOpenPdf: OpenPdf }) {
+// `inPlace` navigates this window instead of opening a tab: right for the assistant panel, which
+// stays beside whatever page opens, wrong for the chat page, which the navigation would replace
+export function SourceList({ sources, removedBookIds, onOpenPdf, inPlace = false }: { sources: ChatSource[]; removedBookIds: ReadonlySet<string>; onOpenPdf: OpenPdf; inPlace?: boolean }) {
   if (sources.length === 0) return null;
 
   const numbered = sources.map((source, i) => ({ source, n: i + 1 }));
@@ -68,7 +70,7 @@ export function SourceList({ sources, removedBookIds, onOpenPdf }: { sources: Ch
             <ul>
               {rows.map(({ source, n }) => (
                 <li key={source.id} className="flex items-center gap-1">
-                  {removed ? <RemovedRow source={source} n={n} /> : <SourceRow source={source} n={n} onOpenPdf={onOpenPdf} />}
+                  {removed ? <RemovedRow source={source} n={n} /> : <SourceRow source={source} n={n} onOpenPdf={onOpenPdf} inPlace={inPlace} />}
                 </li>
               ))}
             </ul>
@@ -96,8 +98,9 @@ function RemovedRow({ source, n }: { source: ChatSource; n: number }) {
   );
 }
 
-function SourceRow({ source, n, onOpenPdf }: { source: ChatSource; n: number; onOpenPdf: OpenPdf }) {
+function SourceRow({ source, n, onOpenPdf, inPlace }: { source: ChatSource; n: number; onOpenPdf: OpenPdf; inPlace: boolean }) {
   const reader = readerLink(source);
+  const tab = inPlace ? {} : { target: "_blank", rel: "noopener noreferrer" };
   const fileId = source.fileId;
   const openPdf = fileId
     ? () => onOpenPdf({
@@ -126,7 +129,7 @@ function SourceRow({ source, n, onOpenPdf }: { source: ChatSource; n: number; on
     return (
       <>
         {/* button-ok: a citation row — a numbered two-line list entry, not an action button */}
-        <Link to={reader} target="_blank" rel="noopener noreferrer" className={rowClass} data-testid="chat-source-read">
+        <Link to={reader} {...tab} className={rowClass} data-testid="chat-source-read">
           {body}
           <span className={targetClass}><IconBook className="h-3 w-3" /> Read</span>
         </Link>
@@ -155,7 +158,7 @@ function SourceRow({ source, n, onOpenPdf }: { source: ChatSource; n: number; on
 
   return (
     // button-ok: a citation row — a numbered two-line list entry, not an action button
-    <Link to={bookLink(source)} target="_blank" rel="noopener noreferrer" className={rowClass}>
+    <Link to={bookLink(source)} {...tab} className={rowClass}>
       {body}
       <span className={targetClass}><IconExternal className="h-3 w-3" /> Book</span>
     </Link>

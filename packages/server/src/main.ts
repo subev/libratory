@@ -11,7 +11,10 @@ import { createContext } from "./trpc.ts";
 import { startWorker, stopWorker } from "./workers/setup.ts";
 import { registerReaderRoutes } from "./lib/reader-routes.ts";
 import { registerUploadRoutes } from "./upload-routes.ts";
+import { registerStagedRoutes } from "./staged-routes.ts";
+import { sweepStaged } from "./lib/staged-files.ts";
 import { registerChatRoutes } from "./chat-routes.ts";
+import { registerAssistantRoutes } from "./assistant-routes.ts";
 import { registerTranslationStreamRoutes } from "./translation-stream-routes.ts";
 import { registerOcrTryRoutes } from "./lib/ocr-try-routes.ts";
 import { registerApiRoutes } from "./api-routes.ts";
@@ -51,6 +54,9 @@ async function sweepStalePreviews() {
 async function main() {
   await ensureDataDirs();
   await sweepStalePreviews();
+  // Files dropped on the assistant panel and never made into a book: a day, then gone
+  await sweepStaged().catch((err: unknown) => console.error("[staged] sweep failed:", err));
+  setInterval(() => sweepStaged().catch((err: unknown) => console.error("[staged] sweep failed:", err)), 60 * 60 * 1000).unref();
 
   const fastify = Fastify(createFastifyOptions());
   // Before any register: a child scope inherits the handler its parent had when the scope was made.
@@ -87,8 +93,10 @@ async function main() {
   fastify.get("/health", async () => ({ ok: true, instance: env.LIBRATORY_INSTANCE ?? null }));
 
   registerUploadRoutes(fastify);
+  registerStagedRoutes(fastify);
   registerOcrTryRoutes(fastify);
   registerChatRoutes(fastify);
+  registerAssistantRoutes(fastify);
   registerTranslationStreamRoutes(fastify);
   registerApiRoutes(fastify);
   registerMcpRoutes(fastify, trustedHosts);

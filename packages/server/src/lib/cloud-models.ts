@@ -239,6 +239,23 @@ function googleChatIds(body: unknown): Set<string> | null {
   );
 }
 
+// Whether a key the person has just pasted opens the provider's door, asked before it is saved:
+// a rejected key is told apart from a provider that cannot be reached, because the two call for
+// different next steps. The listing is the cheapest request every provider has.
+export async function verifyKey(provider: LlmSecretProvider, apiKey: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const listing = LISTINGS[provider];
+  const label = LLM_SECRETS.find((s) => s.provider === provider)?.label ?? provider;
+  let res: Response;
+  try {
+    res = await fetch(listing.url, { headers: listing.headers(apiKey), signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
+  } catch {
+    return { ok: false, reason: `${label} could not be reached — check the connection and try again` };
+  }
+  if (res.status === 401 || res.status === 403) return { ok: false, reason: `${label} rejected this key` };
+  if (!res.ok) return { ok: false, reason: `${label} answered ${res.status} — try again in a moment` };
+  return { ok: true };
+}
+
 async function probe(provider: LlmSecretProvider): Promise<Listed[]> {
   const apiKey = env[keyVar(provider) as keyof typeof env] as string | undefined;
   if (!apiKey) return [];

@@ -74,11 +74,13 @@ export function formatWhen(date: string | Date, now: Date): string {
   return at.toLocaleDateString(undefined, { day: "numeric", month: "short", ...(at.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }) });
 }
 
-export type ScopeSummary = { kind: "library" | "folder" | "book" | "books" | "removed"; label: string };
+export type ScopeSummary = { kind: "screen" | "library" | "folder" | "book" | "books" | "removed"; label: string };
 
 // One line under a conversation's title: what it searched
 export function scopeSummary(scope: ConversationSummary["scope"] | ConversationScope): ScopeSummary {
   switch (scope.kind) {
+    case "screen":
+      return { kind: "screen", label: "Follows the page" };
     case "library":
       return { kind: "library", label: "Whole library" };
     case "folder":
@@ -103,6 +105,7 @@ export function scopeSummary(scope: ConversationSummary["scope"] | ConversationS
 // it is never widened to the whole library.
 export function askable(scope: ConversationScope): { canAsk: boolean; remaining: number; removed: BookRef[] } {
   switch (scope.kind) {
+    case "screen":
     case "library":
       return { canAsk: true, remaining: 0, removed: [] };
     case "folder":

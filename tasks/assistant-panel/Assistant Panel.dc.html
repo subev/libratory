@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><meta name="design_doc_mode" content="canvas"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet"><link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css"><link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css"><style>
+:root{
+--stack-sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+--stack-display:"Fraunces","Iowan Old Style",Georgia,serif;
+--bg-page:light-dark(oklch(.9686 .0091 78.28),#16140f);
+--bg-card:light-dark(oklch(.9885 .0057 84.57),#1e1b14);
+--bg-card-hover:light-dark(oklch(.955 .012 80),rgb(253 241 228/6%));
+--bg-subtle:light-dark(oklch(.9363 .0218 83.26),rgb(253 241 228/4%));
+--bg-selected:light-dark(rgb(226 96 31/10%),rgb(239 119 52/14%));
+--border:light-dark(oklch(.8866 .0404 89.7),rgb(253 241 228/12%));
+--border-input:light-dark(oklch(.82 .042 85),rgb(253 241 228/26%));
+--text-primary:light-dark(oklch(.366 .0251 49.61),#fdf1e4);
+--text-secondary:light-dark(oklch(.4444 .0096 73.64),rgb(253 241 228/82%));
+--text-muted:light-dark(oklch(.5534 .0116 58.07),rgb(253 241 228/62%));
+--text-faint:light-dark(oklch(.64 .01 58),rgb(253 241 228/42%));
+--accent:light-dark(#e2601f,#ef7734);
+--accent-hover:light-dark(oklch(.7 .17 45),oklch(.76 .16 50));
+--accent-text:light-dark(oklch(.52 .155 45),#ef7734);
+--accent-subtle:light-dark(rgb(226 96 31/12%),rgb(239 119 52/16%));
+--on-accent:#2a1408;
+--danger-bg:light-dark(oklch(.4437 .1613 26.9/.10),oklch(.5771 .2152 27.3/.20));
+--danger-text:light-dark(oklch(.4437 .1613 26.9),oklch(.74 .15 27));
+--success-text:light-dark(oklch(.43 .105 150),oklch(.8 .13 150));
+--success-bg:light-dark(oklch(.52 .115 150/12%),oklch(.72 .14 150/18%));
+--warning-text:light-dark(oklch(.48 .09 70),oklch(.82 .11 78));
+--warning-bg:rgb(224 145 61/15%);
+}
+body{margin:0;background:#ece7dd;color:#1a1a1a;font-family:var(--stack-sans);-webkit-font-smoothing:antialiased}
+a{color:var(--accent-text);text-decoration:none}a:hover{color:var(--accent-hover)}
+textarea,input,select,button{font-family:inherit}
+@keyframes spin{to{transform:rotate(360deg)}}
+.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08)}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 13px/1.2 system-ui,sans-serif;color:#1a1a1a}.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 system-ui,sans-serif;color:rgba(0,0,0,.55)}
+</style></helmet>
+
+<section class="dv-turn" id="t2">
+<div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">What the assistant can do: MCP tools as cards</span></div>
+<div style="max-width:84ch;margin:-8px 0 22px;font:13px/1.55 system-ui,sans-serif;color:rgba(0,0,0,.62)">
+<p style="margin:0 0 6px"><b>One tool set.</b> The assistant calls the same tools as <code>mcp-server.ts</code>, with nothing built just for the panel. The rule is set per tool:</p>
+<ul style="margin:0 0 6px;padding-left:18px">
+<li><b>Read-only</b> (list_books, get_book, inspect_pdf, search_library…) runs without asking and shows as a one-line trace.</li>
+<li><b>Small, easy to reverse</b> (rename, move to a folder, save a note) runs straight away and shows <i>Undo</i>.</li>
+<li><b>Changes something</b> shows a card and waits for <i>Run</i>.</li>
+<li><b>Spends credit or downloads</b> shows the same card with a cost line.</li>
+</ul>
+<p style="margin:0"><b>Staged files.</b> A dropped PDF is uploaded to <code>data/tmp</code> and gets an ID like <code>staged:ab12</code>. <code>inspect_pdf</code> and <code>upload_book</code> accept these IDs alongside paths, so the model never sees the file system. From the panel, <code>upload_book</code> runs with <code>fullExtract=false</code>: a text-only book in seconds, and the assistant suggests the next step.</p>
+</div>
+
+<div id="2a" style="display:flex;flex-direction:column;gap:9px;margin-bottom:36px">
+<div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>Staged files: the chips attached to a message, in every state</div>
+<div style="display:flex;gap:28px;flex-wrap:wrap;padding:20px;background:oklch(.9885 .0057 84.57);border:1px solid rgba(0,0,0,.08);border-radius:8px;font-family:var(--stack-sans);color:var(--text-primary);letter-spacing:-.01em;max-width:1440px">
+  <div style="width:230px;display:flex;flex-direction:column;gap:8px">
+    <span title="brothers-karamazov-garnett.pdf" style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 4px 0 10px;border:1px solid var(--border);border-radius:7px;background:var(--bg-page);font-size:12.5px"><span style="width:12px;height:12px;flex:none;border-radius:99px;background:conic-gradient(var(--accent) 0 62%,var(--bg-subtle) 0)"></span><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">brothers-karamazov-garnett.pdf</span><span style="flex:none;color:var(--text-faint);font-size:11.5px;font-variant-numeric:tabular-nums">62%</span><button aria-label="Remove" title="Remove" style="white-space:nowrap;flex:none;width:20px;height:20px;display:grid;place-items:center;border:0;border-radius:5px;background:transparent;color:var(--text-faint);cursor:pointer"><i class="ph ph-x" style="font-size:11px" aria-hidden="true"></i></button></span>
+    <div style="font:11.5px/1.45 system-ui,sans-serif;color:rgba(0,0,0,.55)"><b>Uploading.</b> The send button waits until every chip has finished uploading.</div>
+  </div>
+  <div style="width:230px;display:flex;flex-direction:column;gap:8px">
+    <span title="master-and-margarita.pdf" style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 4px 0 10px;border:1px solid var(--border);border-radius:7px;background:var(--bg-page);font-size:12.5px"><i class="ph ph-circle-notch" style="font-size:13px;color:var(--text-muted);flex:none" aria-hidden="true"></i><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">master-and-margarita.pdf</span><span style="flex:none;color:var(--text-faint);font-size:11.5px">Reading…</span><button aria-label="Remove" title="Remove" style="white-space:nowrap;flex:none;width:20px;height:20px;display:grid;place-items:center;border:0;border-radius:5px;background:transparent;color:var(--text-faint);cursor:pointer"><i class="ph ph-x" style="font-size:11px" aria-hidden="true"></i></button></span>
+    <div style="font:11.5px/1.45 system-ui,sans-serif;color:rgba(0,0,0,.55)"><b>Inspecting.</b> <code>inspect_pdf</code> runs by itself as soon as the upload finishes.</div>
+  </div>
+  <div style="width:230px;display:flex;flex-direction:column;gap:8px">
+    <span title="brothers-karamazov-garnett.pdf · 824 pages · English · has text" style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 4px 0 10px;border:1px solid var(--border);border-radius:7px;background:var(--bg-page);font-size:12.5px"><i class="ph ph-file-pdf" style="font-size:14px;color:var(--text-muted);flex:none" aria-hidden="true"></i><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">brothers-karamazov-garnett.pdf</span><span style="flex:none;color:var(--text-faint);font-size:11.5px">824 p</span><button aria-label="Remove" title="Remove" style="white-space:nowrap;flex:none;width:20px;height:20px;display:grid;place-items:center;border:0;border-radius:5px;background:transparent;color:var(--text-faint);cursor:pointer"><i class="ph ph-x" style="font-size:11px" aria-hidden="true"></i></button></span>
+    <div style="font:11.5px/1.45 system-ui,sans-serif;color:rgba(0,0,0,.55)"><b>Ready.</b> Hover for the details <code>inspect_pdf</code> found. × deletes the staged file.</div>
+  </div>
+  <div style="width:230px;display:flex;flex-direction:column;gap:8px">
+    <span title="parvoto-stapalo-scan.pdf · 188 pages · scan, needs OCR" style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 4px 0 10px;border:1px solid var(--border);border-radius:7px;background:var(--bg-page);font-size:12.5px"><i class="ph ph-file-pdf" style="font-size:14px;color:var(--text-muted);flex:none" aria-hidden="true"></i><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">parvoto-stapalo-scan.pdf</span><span style="flex:none;white-space:nowrap;font-size:10.5px;font-weight:600;padding:1px 6px;border-radius:99px;background:var(--warning-bg);color:var(--warning-text)">Scan</span><button aria-label="Remove" title="Remove" style="white-space:nowrap;flex:none;width:20px;height:20px;display:grid;place-items:center;border:0;border-radius:5px;background:transparent;color:var(--text-faint);cursor:pointer"><i class="ph ph-x" style="font-size:11px" aria-hidden="true"></i></button></span>
+    <div style="font:11.5px/1.45 system-ui,sans-serif;color:rgba(0,0,0,.55)"><b>Ready, but a scan.</b> The assistant asks about the OCR engine before adding it.</div>
+  </div>
+  <div style="width:230px;display:flex;flex-direction:column;gap:8px">
+    <span title="cover.jpg is not a PDF" style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 4px 0 10px;border:1px solid var(--danger-text);border-radius:7px;background:var(--danger-bg);color:var(--danger-text);font-size:12.5px"><i class="ph ph-warning-circle" style="font-size:14px;flex:none" aria-hidden="true"></i><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">cover.jpg</span><span style="flex:none;font-size:11.5px">Not a PDF</span><button aria-label="Remove" title="Remove" style="white-space:nowrap;flex:none;width:20px;height:20px;display:grid;place-items:center;border:0;border-radius:5px;background:transparent;color:var(--danger-text);cursor:pointer"><i class="ph ph-x" style="font-size:11px" aria-hidden="true"></i></button></span>
+    <div style="font:11.5px/1.45 system-ui,sans-serif;color:rgba(0,0,0,.55)"><b>Refused.</b> Nothing is uploaded, and the other chips still send.</div>
+  </div>
+  <div style="width:230px;display:flex;flex-direction:column;gap:8px">
+    <span title="Staged files are kept for 24 hours" style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px dashed var(--border-input);border-radius:7px;background:transparent;color:var(--text-faint);font-size:12.5px"><i class="ph ph-clock-counter-clockwise" style="font-size:14px;flex:none" aria-hidden="true"></i><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">old-notes.pdf</span><span style="flex:none;font-size:11.5px">Expired</span></span>
+    <div style="font:11.5px/1.45 system-ui,sans-serif;color:rgba(0,0,0,.55)"><b>Expired.</b> When you reopen an old chat, unused files show as expired and need dropping again.</div>
+  </div>
+</div>
+</div>
+
+<div id="2b" style="display:flex;flex-direction:column;gap:9px;margin-bottom:36px">
+<div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a>Read-only tools: a one-line trace that opens to show the calls. There's no card and no confirm</div>
+<div style="display:flex;gap:28px;flex-wrap:wrap;padding:20px;background:oklch(.9885 .0057 84.57);border:1px solid rgba(0,0,0,.08);border-radius:8px;font-family:var(--stack-sans);color:var(--text-primary);letter-spacing:-.01em;max-width:1440px">
+  <div style="width:360px;display:flex;flex-direction:column;gap:10px;font-size:14px;line-height:1.55">
+    <button style="white-space:nowrap;flex:none;align-self:flex-start;display:flex;align-items:center;gap:6px;height:24px;padding:0 6px;margin-left:-6px;border:0;border-radius:5px;background:transparent;color:var(--text-muted);font-size:12px;cursor:pointer"><i class="ph ph-magnifying-glass" style="font-size:13px" aria-hidden="true"></i>Checked 3 PDFs<i class="ph ph-caret-right" style="font-size:10px" aria-hidden="true"></i></button>
+    <p style="margin:0">These look like three different books. The third is a scan…</p>
+  </div>
+  <div style="width:360px;display:flex;flex-direction:column;gap:10px;font-size:14px;line-height:1.55">
+    <button style="white-space:nowrap;flex:none;align-self:flex-start;display:flex;align-items:center;gap:6px;height:24px;padding:0 6px;margin-left:-6px;border:0;border-radius:5px;background:var(--bg-subtle);color:var(--text-primary);font-size:12px;cursor:pointer"><i class="ph ph-magnifying-glass" style="font-size:13px" aria-hidden="true"></i>Checked 3 PDFs<i class="ph ph-caret-down" style="font-size:10px" aria-hidden="true"></i></button>
+    <div style="display:flex;flex-direction:column;gap:3px;padding:8px 10px;border-left:2px solid var(--border);font:12px/1.5 ui-monospace,Menlo,monospace;color:var(--text-muted)">
+      <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="inspect_pdf · brothers-karamazov-garnett.pdf → 824 pages, text, en">inspect_pdf · brothers-karamazov… → 824 p, text, en</div>
+      <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="inspect_pdf · master-and-margarita.pdf → 412 pages, text, en">inspect_pdf · master-and-marga… → 412 p, text, en</div>
+      <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="inspect_pdf · parvoto-stapalo-scan.pdf → 188 pages, scan, bg">inspect_pdf · parvoto-stapalo… → 188 p, scan, bg</div>
+    </div>
+    <p style="margin:0">These look like three different books. The third is a scan…</p>
+  </div>
+  <div style="width:360px;display:flex;flex-direction:column;gap:10px;font-size:14px;line-height:1.55">
+    <div style="align-self:flex-end;max-width:85%;padding:9px 12px;border-radius:12px 12px 4px 12px;background:var(--bg-selected)">Where does Ivan talk about the Grand Inquisitor?</div>
+    <button style="white-space:nowrap;flex:none;align-self:flex-start;display:flex;align-items:center;gap:6px;height:24px;padding:0 6px;margin-left:-6px;border:0;border-radius:5px;background:transparent;color:var(--text-muted);font-size:12px;cursor:pointer"><i class="ph ph-magnifying-glass" style="font-size:13px" aria-hidden="true"></i>Searched your library<i class="ph ph-caret-right" style="font-size:10px" aria-hidden="true"></i></button>
+    <p style="margin:0">Book V, chapter 5, “The Grand Inquisitor”, about 40 minutes of audio. <a href="#2b">Open at that chapter</a></p>
+  </div>
+</div>
+</div>
+
+<div id="2c" style="display:flex;flex-direction:column;gap:9px;margin-bottom:36px">
+<div class="dv-olabel"><a class="dv-oid" href="#2c">2c</a>One action from start to finish: synthesize_book with a cloud voice, from confirm through running and done to failed</div>
+<div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;padding:20px;background:oklch(.9885 .0057 84.57);border:1px solid rgba(0,0,0,.08);border-radius:8px;font-family:var(--stack-sans);color:var(--text-primary);letter-spacing:-.01em;max-width:1600px">
+  <div style="width:340px;border:1px solid var(--accent);border-radius:10px;background:var(--bg-card);overflow:hidden">
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border)"><i class="ph ph-waveform" style="font-size:16px;color:var(--text-secondary);flex:none" aria-hidden="true"></i><span style="flex:1;min-width:0;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Narrate 12 chapters</span><span style="flex:none;white-space:nowrap;font-size:11px;font-weight:600;padding:2px 7px;border-radius:99px;background:var(--warning-bg);color:var(--warning-text)">Uses credit</span></div>
+    <div style="padding:12px;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.5">
+      <div style="display:grid;grid-template-columns:64px 1fr;gap:4px 12px;font-size:12.5px"><span style="color:var(--text-muted)">Book</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">The Brothers Karamazov</span><span style="color:var(--text-muted)">Voice</span><span>ElevenLabs · Charlotte</span><span style="color:var(--text-muted)">Chapters</span><span>12 selected · 364,153 words</span></div>
+      <div style="display:flex;gap:8px;padding:8px 10px;border-radius:7px;background:var(--warning-bg);color:var(--warning-text);font-size:12.5px;line-height:1.45"><i class="ph ph-coins" style="font-size:14px;flex:none;margin-top:1px" aria-hidden="true"></i><span>About 2.1 million characters of ElevenLabs credit. A free voice on this Mac costs nothing.</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button style="white-space:nowrap;flex:none;height:30px;padding:0 14px;border:0;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:12.5px;font-weight:600;cursor:pointer">Run</button><button style="white-space:nowrap;flex:none;height:30px;padding:0 12px;border:1px solid var(--border-input);border-radius:7px;background:var(--bg-card);color:var(--text-primary);font-size:12.5px;font-weight:500;cursor:pointer">Try one chapter</button><button style="white-space:nowrap;flex:none;height:30px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:var(--text-muted);font-size:12.5px;cursor:pointer">Cancel</button></div>
+    </div>
+  </div>
+  <div style="width:340px;border:1px solid var(--border);border-radius:10px;background:var(--bg-card);overflow:hidden">
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border)"><i class="ph ph-waveform" style="font-size:16px;color:var(--text-secondary);flex:none" aria-hidden="true"></i><span style="flex:1;min-width:0;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Narrate 12 chapters</span><span style="flex:none;white-space:nowrap;font-size:11px;font-weight:600;padding:2px 7px;border-radius:99px;background:var(--warning-bg);color:var(--warning-text)">Running</span></div>
+    <div style="padding:12px;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.5">
+      <div style="display:flex;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--text-muted)"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Chapter 4 of 12 · Book IV · Strains</span><span style="flex:none;font-variant-numeric:tabular-nums">31%</span></div>
+      <div style="height:5px;border-radius:99px;background:var(--bg-subtle);overflow:hidden"><div style="height:100%;width:31%;background:var(--accent);border-radius:99px"></div></div>
+      <div style="display:flex;gap:8px;align-items:center"><button style="white-space:nowrap;flex:none;height:28px;padding:0 12px;border:1px solid var(--border-input);border-radius:7px;background:var(--bg-card);color:var(--text-primary);font-size:12.5px;font-weight:500;cursor:pointer">Stop</button><span style="font-size:12px;color:var(--text-faint);min-width:0">You can close the panel; it keeps going.</span></div>
+    </div>
+  </div>
+  <div style="width:340px;border:1px solid var(--border);border-radius:10px;background:var(--bg-card);overflow:hidden">
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border)"><i class="ph ph-waveform" style="font-size:16px;color:var(--text-secondary);flex:none" aria-hidden="true"></i><span style="flex:1;min-width:0;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Narrate 12 chapters</span><span style="flex:none;white-space:nowrap;font-size:11px;font-weight:600;padding:2px 7px;border-radius:99px;background:var(--success-bg);color:var(--success-text)">Done</span></div>
+    <div style="padding:12px;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.5">
+      <p style="margin:0">All 12 chapters narrated, <b>31 h 40 min</b> in total.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button style="white-space:nowrap;flex:none;height:28px;padding:0 12px;border:1px solid var(--border-input);border-radius:7px;background:var(--bg-card);color:var(--text-primary);font-size:12.5px;font-weight:500;cursor:pointer">Listen to chapter 1</button></div>
+    </div>
+  </div>
+  <div style="width:340px;border:1px solid var(--danger-text);border-radius:10px;background:var(--bg-card);overflow:hidden">
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border)"><i class="ph ph-waveform" style="font-size:16px;color:var(--text-secondary);flex:none" aria-hidden="true"></i><span style="flex:1;min-width:0;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Narrate 12 chapters</span><span style="flex:none;white-space:nowrap;font-size:11px;font-weight:600;padding:2px 7px;border-radius:99px;background:var(--danger-bg);color:var(--danger-text)">Stopped</span></div>
+    <div style="padding:12px;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.5">
+      <p style="margin:0">Stopped at chapter 5: <b>ElevenLabs says the account is out of credit.</b> Chapters 1–4 keep their audio.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button style="white-space:nowrap;flex:none;height:28px;padding:0 12px;border:0;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:12.5px;font-weight:600;cursor:pointer">Resume</button><button style="white-space:nowrap;flex:none;height:28px;padding:0 12px;border:1px solid var(--border-input);border-radius:7px;background:var(--bg-card);color:var(--text-primary);font-size:12.5px;font-weight:500;cursor:pointer">Finish with a free voice</button></div>
+    </div>
+  </div>
+  <div style="width:340px;display:flex;flex-direction:column;gap:10px;font-size:14px;line-height:1.55">
+    <div style="font:600 11px system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:rgba(0,0,0,.45)">After “Done”, the assistant says</div>
+    <p style="margin:0">Last step: <b>Make the audiobook</b> joins them into one M4B with chapter markers, for any audiobook player.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button style="white-space:nowrap;flex:none;display:flex;align-items:center;gap:6px;height:30px;padding:0 12px;border:0;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:12.5px;font-weight:600;cursor:pointer"><i class="ph ph-package" style="font-size:14px" aria-hidden="true"></i>Make the audiobook</button></div>
+  </div>
+</div>
+</div>
+
+<div id="2d" style="display:flex;flex-direction:column;gap:9px">
+<div class="dv-olabel"><a class="dv-oid" href="#2d">2d</a>Every tool that changes something, shown at its confirm step. The grey line under each card says what running and done look like</div>
+<div style="display:flex;flex-direction:column;gap:28px;padding:20px;background:oklch(.9885 .0057 84.57);border:1px solid rgba(0,0,0,.08);border-radius:8px;font-family:var(--stack-sans);color:var(--text-primary);letter-spacing:-.01em;max-width:1600px">
+  <sc-for list="{{ catalog }}" as="g" hint-placeholder-count="5">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="font:600 11px system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:rgba(0,0,0,.45)">{{ g.name }}</div>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start">
+        <sc-for list="{{ g.cards }}" as="c" hint-placeholder-count="3">
+          <div style="width:340px;display:flex;flex-direction:column;gap:6px">
+            <code style="font:600 11px ui-monospace,Menlo,monospace;color:rgba(0,0,0,.5)">{{ c.tool }}</code>
+            <div style="border:1px solid {{ c.border }};border-radius:10px;background:var(--bg-card);overflow:hidden">
+              <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border)"><i class="ph {{ c.icon }}" style="font-size:16px;color:var(--text-secondary);flex:none" aria-hidden="true"></i><span title="{{ c.title }}" style="flex:1;min-width:0;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.title }}</span><span style="flex:none;white-space:nowrap;font-size:11px;font-weight:600;padding:2px 7px;border-radius:99px;background:{{ c.badgeBg }};color:{{ c.badgeFg }}">{{ c.badge }}</span></div>
+              <div style="padding:12px;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.5">
+                <div style="display:grid;grid-template-columns:64px 1fr;gap:4px 12px;font-size:12.5px">
+                  <sc-for list="{{ c.fields }}" as="f" hint-placeholder-count="2">
+                    <span style="color:var(--text-muted)">{{ f.k }}</span><span title="{{ f.v }}" style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.v }}</span>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ c.cost }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;gap:8px;padding:8px 10px;border-radius:7px;background:var(--warning-bg);color:var(--warning-text);font-size:12.5px;line-height:1.45"><i class="ph {{ c.costIcon }}" style="font-size:14px;flex:none;margin-top:1px" aria-hidden="true"></i><span>{{ c.cost }}</span></div>
+                </sc-if>
+                <p style="margin:0;color:var(--text-muted);font-size:12.5px">{{ c.note }}</p>
+                <sc-if value="{{ c.confirm }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:8px"><button style="white-space:nowrap;flex:none;height:30px;padding:0 14px;border:0;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:12.5px;font-weight:600;cursor:pointer">{{ c.primary }}</button><button style="white-space:nowrap;flex:none;height:30px;padding:0 12px;border:1px solid var(--border-input);border-radius:7px;background:var(--bg-card);color:var(--text-primary);font-size:12.5px;font-weight:500;cursor:pointer">Cancel</button></div></sc-if>
+                <sc-if value="{{ c.undo }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:8px"><button style="white-space:nowrap;flex:none;display:flex;align-items:center;gap:6px;height:28px;padding:0 12px;border:1px solid var(--border-input);border-radius:7px;background:var(--bg-card);color:var(--text-primary);font-size:12.5px;font-weight:500;cursor:pointer"><i class="ph ph-arrow-counter-clockwise" style="font-size:13px" aria-hidden="true"></i>Undo</button></div></sc-if>
+              </div>
+            </div>
+            <div style="font:11.5px/1.45 system-ui,sans-serif;color:rgba(0,0,0,.55)">{{ c.after }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-for>
+</div>
+</div>
+</section>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Assistant panel — first pass</span></div>
+<div style="max-width:80ch;margin:-8px 0 22px;font:13px/1.55 system-ui,sans-serif;color:rgba(0,0,0,.62)">
+<p style="margin:0 0 6px"><b>Idea.</b> The assistant is docked on the right and open on first launch. Until a model is connected, the panel has one job: pick a provider, follow three steps, paste the key. Once connected, it explains the extract → synthesize → output loop, knows the current page and book, suggests the next step and runs it after you confirm.</p>
+<p style="margin:0 0 6px"><b>Also a drop zone.</b> Once a model is connected, drop PDFs on the panel or use the paperclip. The assistant reads them and suggests how to add them: one book each, combined into one, or edit titles first. You don't have to go to the Library page.</p>
+<p style="margin:0"><b>Free path.</b> “On this Mac” is one of the provider tiles, so someone with no cloud account can unlock the assistant with Ollama or LM Studio.</p>
+</div>
+
+<div id="1a" style="display:flex;flex-direction:column;gap:9px;width:1440px">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Desktop prototype. Step through the moments with the Demo menu (top right), or click through them</div>
+<div style="width:1440px;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden">
+<div style="color-scheme:{{ scheme }}">
+<div data-screen-label="Assistant · desktop" style="width:1440px;height:860px;display:flex;flex-direction:column;overflow:hidden;background:var(--bg-page);color:var(--text-primary);font-family:var(--stack-sans);font-size:14px;letter-spacing:-.01em">
+
+  <div style="display:flex;align-items:center;gap:12px;height:48px;padding:0 16px;flex:none;border-bottom:1px solid var(--border);background:var(--bg-card)">
+    <span style="font-family:var(--stack-display);font-weight:600;font-size:18px;letter-spacing:-.02em;flex:none">Libratory</span>
+    <sc-if value="{{ onBook }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);min-width:0"><i class="ph ph-caret-right" style="font-size:12px" aria-hidden="true"></i><span style="flex:none">Library</span><i class="ph ph-caret-right" style="font-size:12px" aria-hidden="true"></i><span style="color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">The Brothers Karamazov</span></div>
+    </sc-if>
+    <div style="flex:1"></div>
+    <label style="display:flex;align-items:center;gap:6px;color:var(--text-faint);font-size:11px;flex:none">Demo
+      <select ref="{{ selRef }}" value="{{ demo }}" onChange="{{ onDemo }}" style="height:26px;padding:0 5px;border:1px solid var(--border-input);border-radius:6px;background:var(--bg-card);color:var(--text-muted);font-size:11.5px">
+        <option value="nokey">1 · Empty library, no key</option>
+        <option value="paste">2 · Key pasted</option>
+        <option value="checking">2 · Checking the key</option>
+        <option value="failed">3 · Key failed</option>
+        <option value="local">3 · Model on this Mac instead</option>
+        <option value="chat">4 · First unlocked conversation</option>
+        <option value="drop">4 · Dragging PDFs onto the panel</option>
+        <option value="uploaded">4 · PDFs dropped: how to add them?</option>
+        <option value="created">4 · Books created from the panel</option>
+        <option value="combine">4 · Combine into one book</option>
+        <option value="combined">4 · Combined book created</option>
+        <option value="bookfirst">5 · On a book page, first look</option>
+        <option value="book">5 · Asked how to make an audiobook</option>
+        <option value="confirm">6 · Confirm an action</option>
+        <option value="running">6 · Action running</option>
+        <option value="done">6 · Action finished</option>
+        <option value="collapsed">7 · Collapsed</option>
+        <option value="restored">8 · After a page reload</option>
+      </select>
+    </label>
+    <div style="width:1px;height:20px;background:var(--border)"></div>
+    <button aria-label="Settings" title="Settings" style="white-space:nowrap;flex:none;width:28px;height:28px;display:grid;place-items:center;border:1px solid var(--border-input);border-radius:6px;background:transparent;color:var(--text-muted);cursor:pointer" style-hover="background:var(--bg-subtle);color:var(--text-primary)"><i class="ph ph-gear-six" style="font-size:15px" aria-hidden="true"></i></button>
+    <button onClick="{{ toggleTheme }}" aria-label="Toggle appearance" title="Toggle appearance" style="white-space:nowrap;flex:none;width:28px;height:28px;display:grid;place-items:center;border:1px solid var(--border-input);border-radius:6px;background:transparent;color:var(--text-muted);cursor:pointer" style-hover="background:var(--bg-subtle);color:var(--text-primary)"><i class="ph {{ themeIcon }}" style="font-size:15px" aria-hidden="true"></i></button>
+    <button onClick="{{ togglePanel }}" aria-pressed="{{ panelOpen }}" title="Show or hide the assistant" style="white-space:nowrap;flex:none;display:flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid {{ asstBtnBorder }};border-radius:6px;background:{{ asstBtnBg }};color:{{ asstBtnFg }};font-size:12.5px;font-weight:600;cursor:pointer"><i class="ph ph-chat-circle-text" style="font-size:15px" aria-hidden="true"></i>Assistant</button>
+  </div>
+
+  <div style="flex:1;display:flex;min-height:0">
+
+    <main style="flex:1;min-width:0;overflow-y:auto">
+      <sc-if value="{{ onLibrary }}" hint-placeholder-val="{{ true }}">
+        <div style="max-width:780px;margin:0 auto;padding:40px 32px">
+          <h1 style="margin:0 0 4px;font-family:var(--stack-display);font-weight:600;font-size:28px;letter-spacing:-.02em">Library</h1>
+          <p style="margin:0 0 24px;color:var(--text-muted);font-size:14px">{{ libSubtitle }}</p>
+          <sc-if value="{{ libEmpty }}" hint-placeholder-val="{{ true }}">
+            <div style="border:1.5px dashed var(--border-input);border-radius:12px;background:var(--bg-card);padding:64px 24px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+              <i class="ph ph-file-arrow-down" style="font-size:32px;color:var(--text-faint)" aria-hidden="true"></i>
+              <div style="font-size:15px;font-weight:600">Drop a PDF, an EPUB or a whole folder</div>
+              <div style="font-size:13px;color:var(--text-muted)">Its text is extracted right away, so the book is readable within seconds.</div>
+              <button style="white-space:nowrap;flex:none;margin-top:6px;height:32px;padding:0 14px;border:1px solid var(--border-input);border-radius:7px;background:var(--bg-card);color:var(--text-primary);font-size:13px;font-weight:500;cursor:pointer" style-hover="background:var(--bg-card-hover)">Choose files…</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{ libHasBooks }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid var(--border);border-radius:10px;background:var(--bg-card);overflow:hidden">
+              <sc-for list="{{ libBooks }}" as="b" hint-placeholder-count="3">
+                <div onClick="{{ openBook }}" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer" style-hover="background:var(--bg-card-hover)">
+                  <div style="width:26px;height:39px;flex:none;border-radius:2px;background:{{ b.cover }}"></div>
+                  <div style="flex:1;min-width:0">
+                    <div title="{{ b.title }}" style="font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ b.title }}</div>
+                    <div style="font-size:12px;color:var(--text-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ b.meta }}</div>
+                  </div>
+                  <span style="flex:none;white-space:nowrap;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:99px;background:{{ b.badgeBg }};color:{{ b.badgeFg }}">{{ b.badge }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ onBook }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:900px;margin:0 auto;padding:32px">
+          <div style="display:flex;gap:22px;align-items:flex-start">
+            <div style="width:96px;height:144px;flex:none;border-radius:4px;background:linear-gradient(160deg,oklch(.42 .07 35),oklch(.3 .05 30));box-shadow:0 1px 3px rgb(42 20 8/20%)"></div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+              <h1 style="margin:0;font-family:var(--stack-display);font-weight:600;font-size:28px;letter-spacing:-.02em">The Brothers Karamazov</h1>
+              <div style="font-size:14px;color:var(--text-muted)">Fyodor Dostoevsky · 364,153 words · 824 pages</div>
+              <div style="display:flex;gap:6px;margin-top:4px">
+                <span style="white-space:nowrap;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--success-bg);color:var(--success-text)">Text extracted</span>
+                <span style="white-space:nowrap;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:99px;background:{{ chBadgeBg }};color:{{ chBadgeFg }}">{{ chBadge }}</span>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+                <button style="white-space:nowrap;flex:none;display:flex;align-items:center;gap:6px;height:32px;padding:0 13px;border:{{ exBorder }};border-radius:7px;background:{{ exBg }};color:{{ exFg }};font-size:13px;font-weight:600;cursor:pointer"><i class="ph ph-list-numbers" style="font-size:15px" aria-hidden="true"></i>Extract chapters</button>
+                <button style="white-space:nowrap;flex:none;display:flex;align-items:center;gap:6px;height:32px;padding:0 13px;border:1px solid var(--border-input);border-radius:7px;background:var(--bg-card);color:var(--text-primary);font-size:13px;font-weight:500;cursor:pointer" style-hover="background:var(--bg-card-hover)"><i class="ph ph-chat-text" style="font-size:15px" aria-hidden="true"></i>Ask AI</button>
+                <button title="{{ synthTitle }}" style="white-space:nowrap;flex:none;display:flex;align-items:center;gap:6px;height:32px;padding:0 13px;border:{{ syBorder }};border-radius:7px;background:{{ syBg }};color:{{ syFg }};font-size:13px;font-weight:600;cursor:pointer;opacity:{{ synthOpacity }}"><i class="ph ph-waveform" style="font-size:15px" aria-hidden="true"></i>Synthesize</button>
+                <button title="{{ synthTitle }}" style="white-space:nowrap;flex:none;display:flex;align-items:center;gap:6px;height:32px;padding:0 13px;border:1px solid var(--border-input);border-radius:7px;background:var(--bg-card);color:var(--text-primary);font-size:13px;font-weight:500;cursor:pointer;opacity:{{ synthOpacity }}"><i class="ph ph-export" style="font-size:15px" aria-hidden="true"></i>Export</button>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:32px;border:1px solid var(--border);border-radius:10px;background:var(--bg-card);overflow:hidden">
+            <div style="display:flex;align-items:center;gap:8px;height:40px;padding:0 14px;border-bottom:1px solid var(--border)">
+              <span style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted);flex:1">Chapters</span>
+              <sc-if value="{{ isRunning }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap">Finding headings · {{ progress }}%</span></sc-if>
+            </div>
+            <sc-if value="{{ noChapters }}" hint-placeholder-val="{{ true }}">
+              <div style="padding:40px 16px;text-align:center;color:var(--text-muted);font-size:13px">No chapters yet. The book is one long text until it’s split.</div>
+            </sc-if>
+            <sc-for list="{{ chapterRows }}" as="c" hint-placeholder-count="0">
+              <div style="display:flex;align-items:center;gap:12px;height:38px;padding:0 14px;border-bottom:1px solid var(--border);font-size:13.5px">
+                <span style="width:22px;flex:none;color:var(--text-faint);font-variant-numeric:tabular-nums">{{ c.n }}</span>
+                <span title="{{ c.title }}" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.title }}</span>
+                <span style="flex:none;color:var(--text-faint);font-size:12px;font-variant-numeric:tabular-nums">{{ c.words }}</span>
+                <span style="flex:none;white-space:nowrap;font-size:11px;font-weight:600;padding:1px 7px;border-radius:99px;background:var(--bg-subtle);color:var(--text-muted)">No audio</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+    </main>
+
+    <sc-if value="{{ panelCollapsed }}" hint-placeholder-val="{{ false }}">
+      <aside style="width:48px;flex:none;border-left:1px solid var(--border);background:var(--bg-card);display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:10px">
+        <button onClick="{{ togglePanel }}" aria-label="Open assistant" title="Open assistant" style="white-space:nowrap;flex:none;width:36px;height:36px;display:grid;place-items:center;border:0;border-radius:8px;background:transparent;color:var(--text-secondary);cursor:pointer" style-hover="background:var(--bg-subtle);color:var(--text-primary)"><i class="ph ph-chat-circle-text" style="font-size:19px" aria-hidden="true"></i></button>
+        <sc-if value="{{ hasTip }}" hint-placeholder-val="{{ false }}"><button onClick="{{ togglePanel }}" title="Next step for this book: extract chapters" style="white-space:nowrap;flex:none;font-size:10.5px;font-weight:700;padding:2px 6px;border:0;border-radius:99px;background:var(--accent-subtle);color:var(--accent-text);cursor:pointer">1 tip</button></sc-if>
+        <span style="writing-mode:vertical-rl;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);margin-top:4px">Assistant</span>
+      </aside>
+    </sc-if>
+
+    <sc-if value="{{ panelOpen }}" hint-placeholder-val="{{ true }}">
+      <aside style="width:{{ panelWidth }}px;flex:none;display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--border);background:var(--bg-card);position:relative">
+
+        <div style="display:flex;align-items:center;gap:8px;height:46px;padding:0 10px 0 16px;flex:none;border-bottom:1px solid var(--border)">
+          <span style="font-family:var(--stack-display);font-weight:600;font-size:15px;letter-spacing:-.02em;flex:none">Assistant</span>
+          <span title="{{ contextTitle }}" style="display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:99px;background:var(--bg-subtle);color:var(--text-muted);font-size:11.5px;min-width:0;max-width:160px"><i class="ph {{ contextIcon }}" style="font-size:12px;flex:none" aria-hidden="true"></i><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ contextLabel }}</span></span>
+          <div style="flex:1"></div>
+          <sc-if value="{{ unlocked }}" hint-placeholder-val="{{ false }}">
+            <button aria-label="Past assistant chats" title="Past assistant chats" style="white-space:nowrap;flex:none;width:28px;height:28px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:var(--text-muted);cursor:pointer" style-hover="background:var(--bg-subtle);color:var(--text-primary)"><i class="ph ph-clock-counter-clockwise" style="font-size:16px" aria-hidden="true"></i></button>
+            <button aria-label="New chat" title="New chat" style="white-space:nowrap;flex:none;width:28px;height:28px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:var(--text-muted);cursor:pointer" style-hover="background:var(--bg-subtle);color:var(--text-primary)"><i class="ph ph-note-pencil" style="font-size:16px" aria-hidden="true"></i></button>
+          </sc-if>
+          <button onClick="{{ collapse }}" aria-label="Collapse assistant" title="Collapse" style="white-space:nowrap;flex:none;width:28px;height:28px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:var(--text-muted);cursor:pointer" style-hover="background:var(--bg-subtle);color:var(--text-primary)"><i class="ph ph-sidebar-simple" style="font-size:16px;transform:scaleX(-1)" aria-hidden="true"></i></button>
+        </div>
+
+        <div style="flex:1;min-height:0;overflow-y:auto;padding:20px 16px">
+
+          <sc-if value="{{ setup }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <div>
+                <h2 style="margin:0 0 6px;font-family:var(--stack-display);font-weight:600;font-size:20px;line-height:1.25;letter-spacing:-.02em;text-wrap:pretty">Connect a model to turn on the assistant</h2>
+                <p style="margin:0;font-size:13px;line-height:1.5;color:var(--text-secondary);text-wrap:pretty">It explains how Libratory turns a PDF into an audiobook, tells you what to do next and does it for you. It needs an AI model: a cloud key, or a model running on this Mac.</p>
+              </div>
+
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <sc-for list="{{ providers }}" as="p" hint-placeholder-count="5">
+                  <button onClick="{{ p.pick }}" aria-pressed="{{ p.sel }}" title="{{ p.name }} · {{ p.note }}" style="white-space:nowrap;flex:none;grid-column:{{ p.span }};display:flex;align-items:center;gap:9px;min-width:0;height:48px;padding:0 10px;border:1px solid {{ p.border }};border-radius:9px;background:{{ p.bg }};color:var(--text-primary);text-align:left;cursor:pointer;box-shadow:{{ p.ring }}" style-hover="border-color:var(--accent)">
+                    <span style="width:26px;height:26px;flex:none;display:grid;place-items:center;border-radius:6px;background:var(--bg-subtle);color:var(--text-secondary);font-size:11px;font-weight:700"><i class="ph {{ p.icon }}" style="font-size:15px" aria-hidden="true"></i></span>
+                    <span style="display:flex;flex-direction:column;min-width:0;flex:1">
+                      <span style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</span>
+                      <span style="font-size:11px;color:{{ p.noteColor }};overflow:hidden;text-overflow:ellipsis">{{ p.note }}</span>
+                    </span>
+                  </button>
+                </sc-for>
+              </div>
+
+              <sc-if value="{{ showKeyForm }}" hint-placeholder-val="{{ true }}">
+                <div style="border:1px solid var(--border);border-radius:10px;background:var(--bg-page);padding:14px;display:flex;flex-direction:column;gap:12px">
+                  <ol style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px;flex:none">
+                    <li style="display:flex;gap:10px;font-size:13px;line-height:1.45;flex:none"><span style="width:20px;height:20px;flex:none;display:grid;place-items:center;border-radius:99px;background:var(--bg-subtle);font-size:11px;font-weight:700;color:var(--text-secondary)">1</span><span style="flex:1;min-width:0">Open <a href="#1a" title="{{ sel.url }}" style="font-weight:600;white-space:nowrap">{{ sel.urlLabel }} <i class="ph ph-arrow-up-right" style="font-size:11px" aria-hidden="true"></i></a> and sign in.</span></li>
+                    <li style="display:flex;gap:10px;font-size:13px;line-height:1.45;flex:none"><span style="width:20px;height:20px;flex:none;display:grid;place-items:center;border-radius:99px;background:var(--bg-subtle);font-size:11px;font-weight:700;color:var(--text-secondary)">2</span><span style="flex:1;min-width:0">{{ sel.step2 }} It starts with <code style="font:12px ui-monospace,Menlo,monospace;padding:1px 4px;border-radius:4px;background:var(--bg-subtle)">{{ sel.prefix }}</code>.</span></li>
+                    <li style="display:flex;gap:10px;font-size:13px;line-height:1.45;flex:none"><span style="width:20px;height:20px;flex:none;display:grid;place-items:center;border-radius:99px;background:var(--accent-subtle);font-size:11px;font-weight:700;color:var(--accent-text)">3</span><span>Paste it here.</span></li>
+                  </ol>
+                  <div style="display:flex;gap:8px">
+                    <input type="password" value="{{ keyValue }}" onChange="{{ onKey }}" aria-label="{{ sel.name }} API key" placeholder="Paste your {{ sel.name }} key" style="flex:1;min-width:0;height:34px;padding:0 10px;border:1px solid {{ keyBorder }};border-radius:7px;background:var(--bg-card);color:var(--text-primary);font:13px ui-monospace,Menlo,monospace;outline:none">
+                    <button onClick="{{ connect }}" disabled="{{ connectDisabled }}" style="white-space:nowrap;flex:none;display:flex;align-items:center;gap:6px;height:34px;padding:0 14px;border:0;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:13px;font-weight:600;cursor:pointer;opacity:{{ connectOpacity }}" style-hover="background:var(--accent-hover)">{{ spinner }}{{ connectLabel }}</button>
+                  </div>
+                  <sc-if value="{{ isFailed }}" hint-placeholder-val="{{ false }}">
+                    <div role="alert" style="display:flex;gap:8px;padding:9px 10px;border-radius:7px;background:var(--danger-bg);color:var(--danger-text);font-size:12.5px;line-height:1.45">
+                      <i class="ph ph-warning-circle" style="font-size:15px;flex:none;margin-top:1px" aria-hidden="true"></i>
+                      <span><b>{{ sel.name }} rejected this key.</b> Check it was copied whole, with no spaces, and that the account has credit. Nothing was saved.</span>
+                    </div>
+                  </sc-if>
+                  <div style="display:flex;gap:8px;font-size:12px;line-height:1.45;color:var(--text-muted)"><i class="ph ph-coins" style="font-size:14px;flex:none;margin-top:1px" aria-hidden="true"></i><span>{{ sel.cost }}</span></div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ showLocal }}" hint-placeholder-val="{{ false }}">
+                <div style="border:1px solid var(--border);border-radius:10px;background:var(--bg-page);padding:14px;display:flex;flex-direction:column;gap:10px">
+                  <div style="display:flex;align-items:center;gap:8px;font-size:13px"><span style="width:8px;height:8px;border-radius:99px;background:var(--success-text);flex:none"></span><span style="flex:1">Found Ollama with 2 models</span><button style="white-space:nowrap;flex:none;height:24px;padding:0 8px;border:0;border-radius:5px;background:transparent;color:var(--accent-text);font-size:12px;font-weight:600;cursor:pointer" style-hover="background:var(--bg-subtle)">Look again</button></div>
+                  <sc-for list="{{ localModels }}" as="m" hint-placeholder-count="2">
+                    <label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid {{ m.border }};border-radius:8px;background:var(--bg-card);cursor:pointer">
+                      <input type="radio" name="localm" checked="{{ m.sel }}" onChange="{{ m.pick }}" style="accent-color:var(--accent);margin:0">
+                      <span style="flex:1;min-width:0;font:13px ui-monospace,Menlo,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.name }}</span>
+                      <span style="flex:none;font-size:11.5px;color:var(--text-faint);white-space:nowrap">{{ m.meta }}</span>
+                    </label>
+                  </sc-for>
+                  <button onClick="{{ connect }}" style="white-space:nowrap;flex:none;align-self:flex-start;height:32px;padding:0 14px;border:0;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:13px;font-weight:600;cursor:pointer" style-hover="background:var(--accent-hover)">Use {{ localSel }}</button>
+                  <p style="margin:0;font-size:12px;line-height:1.45;color:var(--text-muted)">Free and private: nothing leaves this Mac. Answers are slower than a cloud model. No Ollama? Install it or LM Studio, download a model, and Libratory finds it.</p>
+                </div>
+              </sc-if>
+
+              <p style="margin:0;display:flex;gap:6px;font-size:11.5px;line-height:1.45;color:var(--text-faint)"><i class="ph ph-lock-simple" style="font-size:13px;flex:none;margin-top:1px" aria-hidden="true"></i><span>Keys stay on this Mac, in the same place as Settings, and every AI feature in the app can use them.</span></p>
+
+
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ libThread }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--success-text)"><i class="ph ph-check-circle" style="font-size:15px" aria-hidden="true"></i>Connected to DeepSeek V4 Flash</div>
+              <div style="font-size:14px;line-height:1.55;display:flex;flex-direction:column;gap:10px">
+                <p style="margin:0">You're set. Libratory works in three steps:</p>
+                <div style="display:flex;flex-direction:column;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+                  <sc-for list="{{ loop }}" as="s" hint-placeholder-count="3">
+                    <div style="display:flex;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--bg-page)">
+                      <i class="ph {{ s.icon }}" style="font-size:17px;color:var(--accent-text);flex:none;margin-top:1px" aria-hidden="true"></i>
+                      <div style="min-width:0"><div style="font-size:13.5px;font-weight:600">{{ s.name }}</div><div style="font-size:12.5px;line-height:1.45;color:var(--text-secondary)">{{ s.desc }}</div></div>
+                    </div>
+                  </sc-for>
+                </div>
+                <p style="margin:0">Your library is empty, so start by dropping a PDF here.</p>
+              </div>
+
+              <sc-if value="{{ isUploaded }}" hint-placeholder-val="{{ false }}">
+                <div style="align-self:flex-end;max-width:88%;display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+                  <sc-for list="{{ droppedFiles }}" as="f" hint-placeholder-count="3">
+                    <span title="{{ f.tip }}" style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;max-width:100%;border:1px solid var(--border);border-radius:7px;background:var(--bg-page);font-size:12.5px"><i class="ph ph-file-pdf" style="font-size:14px;color:var(--text-muted);flex:none" aria-hidden="true"></i><span style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.name }}</span><sc-if value="{{ f.scan }}" hint-placeholder-val="{{ false }}"><span style="flex:none;white-space:nowrap;font-size:10.5px;font-weight:600;padding:1px 6px;border-radius:99px;background:var(--warning-bg);color:var(--warning-text)">Scan</span></sc-if><span style="flex:none;color:var(--text-faint);font-size:11.5px">{{ f.pages }}</span></span>
+                  </sc-for>
+                </div>
+                <div style="font-size:14px;line-height:1.55;display:flex;flex-direction:column;gap:10px">
+                  <button style="white-space:nowrap;flex:none;align-self:flex-start;display:flex;align-items:center;gap:6px;height:24px;padding:0 6px;margin-left:-6px;border:0;border-radius:5px;background:transparent;color:var(--text-muted);font-size:12px;cursor:pointer" style-hover="background:var(--bg-subtle);color:var(--text-primary)"><i class="ph ph-magnifying-glass" style="font-size:13px" aria-hidden="true"></i>Checked 3 PDFs<i class="ph ph-caret-right" style="font-size:10px" aria-hidden="true"></i></button>
+                  <p style="margin:0">These look like three different books. The third is a scan, so it’ll need OCR to read the text.</p>
+                  <div style="display:flex;flex-direction:column;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--bg-page)">
+                    <sc-for list="{{ droppedFiles }}" as="f" hint-placeholder-count="3">
+                      <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border)">
+                        <div style="width:20px;height:30px;flex:none;border-radius:2px;background:{{ f.cover }}"></div>
+                        <div style="flex:1;min-width:0"><div title="{{ f.title }}" style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.title }}</div><div style="font-size:11.5px;color:var(--text-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.guess }}</div></div>
+                        <span style="flex:none;white-space:nowrap;font-size:11px;font-weight:600;padding:1px 7px;border-radius:99px;background:{{ f.badgeBg }};color:{{ f.badgeFg }}">{{ f.badge }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <sc-if value="{{ askHow }}" hint-placeholder-val="{{ true }}">
+                    <p style="margin:0">How should they go in?</p>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                      <button onClick="{{ createBooks }}" style="white-space:nowrap;flex:none;display:flex;align-items:center;gap:6px;height:30px;padding:0 12px;border:0;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:12.5px;font-weight:600;cursor:pointer" style-hover="background:var(--accent-hover)"><i class="ph ph-books" style="font-size:14px" aria-hidden="true"></i>Create 3 books</button>
+                      <button onClick="{{ combineAsk }}" title="Treat the PDFs as parts or volumes of one book" style="white-space:nowrap;flex:none;height:30px;padding:0 12px;border:1px solid var(--border-input);border-radius:7px;background:var(--bg-card);color:var(--text-primary);font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:var(--bg-card-hover)">Combine into one</button>
+                      <button style="white-space:nowrap;flex:none;height:30px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:var(--text-muted);font-size:12.5px;cursor:pointer" style-hover="background:var(--bg-subtle);color:var(--text-primary)">Edit titles first</button>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ isCombine }}" hint-placeholder-val="{{ false }}">
+                    <div style="align-self:flex-end;max-width:85%;padding:9px 12px;border-radius:12px 12px 4px 12px;background:var(--bg-selected)">Combine into one</div>
+                    <p style="margin:0">They look like different works, so combining gives one book with one chapter list. Set the order and a title:</p>
+                    <div style="border:1px solid var(--accent);border-radius:10px;background:var(--bg-card);overflow:hidden">
+                      <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border)"><i class="ph ph-book" style="font-size:16px;color:var(--text-secondary);flex:none" aria-hidden="true"></i><span style="flex:1;min-width:0;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Make one book from 3 PDFs</span><span style="flex:none;white-space:nowrap;font-size:11px;font-weight:600;padding:2px 7px;border-radius:99px;background:var(--accent-subtle);color:var(--accent-text)">Needs your OK</span></div>
+                      <div style="padding:12px;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.5">
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-muted)">Title<input value="{{ combineTitle }}" onChange="{{ onCombineTitle }}" style="height:32px;padding:0 10px;border:1px solid var(--border-input);border-radius:7px;background:var(--bg-page);color:var(--text-primary);font-size:13.5px;outline:none"></label>
+                        <div style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-muted)">Order
+                          <div style="display:flex;flex-direction:column;border:1px solid var(--border);border-radius:8px;overflow:hidden">
+                            <sc-for list="{{ combineFiles }}" as="c" hint-placeholder-count="3">
+                              <div style="display:flex;align-items:center;gap:8px;height:36px;padding:0 4px 0 10px;border-bottom:1px solid var(--border);background:var(--bg-page)">
+                                <span style="width:14px;flex:none;color:var(--text-faint);font-size:12px;font-variant-numeric:tabular-nums">{{ c.n }}</span>
+                                <span title="{{ c.name }}" style="flex:1;min-width:0;font-size:12.5px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span>
+                                <span style="flex:none;font-size:11.5px;color:var(--text-faint)">{{ c.pages }}</span>
+                                <button onClick="{{ c.up }}" disabled="{{ c.first }}" aria-label="Move up" title="Move up" style="white-space:nowrap;flex:none;width:26px;height:26px;display:grid;place-items:center;border:0;border-radius:5px;background:transparent;color:var(--text-muted);cursor:pointer;opacity:{{ c.upOp }}" style-hover="background:var(--bg-subtle)"><i class="ph ph-arrow-up" style="font-size:13px" aria-hidden="true"></i></button>
+                                <button onClick="{{ c.down }}" disabled="{{ c.last }}" aria-label="Move down" title="Move down" style="white-space:nowrap;flex:none;width:26px;height:26px;display:grid;place-items:center;border:0;border-radius:5px;background:transparent;color:var(--text-muted);cursor:pointer;opacity:{{ c.downOp }}" style-hover="background:var(--bg-subtle)"><i class="ph ph-arrow-down" style="font-size:13px" aria-hidden="true"></i></button>
+                              </div>
+                            </sc-for>
+                          </div>
+                        </div>
+                        <p style="margin:0;color:var(--text-muted);font-size:12.5px">Page numbers continue from file to file. The scanned part waits for OCR.</p>
+                        <div style="display:flex;gap:8px"><button onClick="{{ combineRun }}" style="white-space:nowrap;flex:none;height:30px;padding:0 14px;border:0;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:12.5px;font-weight:600;cursor:pointer" style-hover="background:var(--accent-hover)">Create book</button><button onClick="{{ combineCancel }}" style="white-space:nowrap;flex:none;height:30px;padding:0 12px;border:1px solid var(--border-input);border-radius:7px;background:var(--bg-card);color:var(--text-primary);font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:var(--bg-card-hover)">Cancel</button></div>
+                      </div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ isCombined }}" hint-placeholder-val="{{ false }}">
+                    <div style="align-self:flex-end;max-width:85%;padding:9px 12px;border-radius:12px 12px 4px 12px;background:var(--bg-selected)">Combine into one</div>
+                    <p style="margin:0">Done: <b>{{ combineTitle }}</b> is in your library, made from 3 PDFs. The text of the first two parts is being extracted; the scanned part waits for OCR.</p>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap"><button onClick="{{ openBook }}" style="white-space:nowrap;flex:none;height:30px;padding:0 12px;border:1px solid var(--border-input);border-radius:7px;background:var(--bg-card);color:var(--text-primary);font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:var(--bg-card-hover)">Open the book</button></div>
+                  </sc-if>
+                  <sc-if value="{{ isCreated }}" hint-placeholder-val="{{ false }}">
+                    <div style="align-self:flex-end;max-width:85%;padding:9px 12px;border-radius:12px 12px 4px 12px;background:var(--bg-selected)">Create 3 books</div>
+                    <p style="margin:0">Done: 3 books are in your library. The text of the first two is being extracted now, which takes a few seconds each. The scan waits until you choose how to OCR it.</p>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                      <button onClick="{{ openBook }}" title="Open The Brothers Karamazov" style="white-space:nowrap;flex:none;height:30px;padding:0 12px;border:1px solid var(--border-input);border-radius:7px;background:var(--bg-card);color:var(--text-primary);font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:var(--bg-card-hover)">Open The Brothers Karamazov</button>
+                      <button style="white-space:nowrap;flex:none;height:30px;padding:0 12px;border:1px solid var(--border-input);border-radius:7px;background:var(--bg-card);color:var(--text-primary);font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:var(--bg-card-hover)">Set up OCR for the scan</button>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ showSuggestions }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
+                  <sc-for list="{{ suggestions }}" as="q" hint-placeholder-count="3">
+                    <button title="{{ q }}" style="white-space:nowrap;flex:none;max-width:100%;overflow:hidden;text-overflow:ellipsis;height:30px;padding:0 11px;border:1px solid var(--border-input);border-radius:99px;background:var(--bg-card);color:var(--text-secondary);font-size:12.5px;cursor:pointer" style-hover="background:var(--bg-card-hover);color:var(--text-primary)">{{ q }}</button>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ bookThread }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <sc-if value="{{ isBookFirst }}" hint-placeholder-val="{{ false }}">
+              <div style="border:1px solid var(--border);border-radius:10px;background:var(--bg-page);padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+                <div style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)">Next step for this book</div>
+                <p style="margin:0;font-size:13.5px;line-height:1.5">{{ nextA }}<b>{{ nextB }}</b>{{ nextC }}</p>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <button onClick="{{ askRun }}" style="white-space:nowrap;flex:none;display:flex;align-items:center;gap:6px;height:30px;padding:0 12px;border:0;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:12.5px;font-weight:600;cursor:pointer" style-hover="background:var(--accent-hover)"><i class="ph ph-list-numbers" style="font-size:14px" aria-hidden="true"></i>Extract chapters</button>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
+                <button onClick="{{ askHow2 }}" title="How do I turn this into an audiobook?" style="white-space:nowrap;flex:none;max-width:100%;overflow:hidden;text-overflow:ellipsis;height:30px;padding:0 11px;border:1px solid var(--border-input);border-radius:99px;background:var(--bg-card);color:var(--text-secondary);font-size:12.5px;cursor:pointer" style-hover="background:var(--bg-card-hover);color:var(--text-primary)">How do I turn this into an audiobook?</button>
+                <button title="What does Extract actually do?" style="white-space:nowrap;flex:none;max-width:100%;overflow:hidden;text-overflow:ellipsis;height:30px;padding:0 11px;border:1px solid var(--border-input);border-radius:99px;background:var(--bg-card);color:var(--text-secondary);font-size:12.5px;cursor:pointer" style-hover="background:var(--bg-card-hover);color:var(--text-primary)">What does Extract actually do?</button>
+              </div>
+              </sc-if>
+              <sc-if value="{{ asked }}" hint-placeholder-val="{{ false }}">
+
+              <div style="align-self:flex-end;max-width:85%;padding:9px 12px;border-radius:12px 12px 4px 12px;background:var(--bg-selected);font-size:14px;line-height:1.5">How do I turn this into an audiobook?</div>
+
+              <div style="font-size:14px;line-height:1.55;display:flex;flex-direction:column;gap:10px">
+                <p style="margin:0">{{ stepsIntro }}</p>
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <sc-for list="{{ bookSteps }}" as="s" hint-placeholder-count="3">
+                    <div style="display:flex;gap:10px;padding:8px 10px;border-radius:8px;background:{{ s.bg }}">
+                      <span style="width:20px;height:20px;flex:none;display:grid;place-items:center;border-radius:99px;background:{{ s.dotBg }};color:{{ s.dotFg }};font-size:11px;font-weight:700"><i class="ph {{ s.dotIcon }}" style="font-size:12px" aria-hidden="true"></i></span>
+                      <div style="min-width:0"><div style="font-size:13.5px;font-weight:600;color:{{ s.fg }}">{{ s.name }}</div><div style="font-size:12.5px;line-height:1.45;color:var(--text-muted)">{{ s.desc }}</div></div>
+                    </div>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ isBook }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button onClick="{{ askRun }}" style="white-space:nowrap;flex:none;display:flex;align-items:center;gap:6px;height:30px;padding:0 12px;border:0;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:12.5px;font-weight:600;cursor:pointer" style-hover="background:var(--accent-hover)"><i class="ph ph-list-numbers" style="font-size:14px" aria-hidden="true"></i>Extract chapters</button>
+                    <button style="white-space:nowrap;flex:none;height:30px;padding:0 12px;border:1px solid var(--border-input);border-radius:7px;background:var(--bg-card);color:var(--text-primary);font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:var(--bg-card-hover)">What if it splits wrong?</button>
+                  </div>
+                </sc-if>
+              </div>
+
+              <sc-if value="{{ showActionCard }}" hint-placeholder-val="{{ false }}">
+                <div style="border:1px solid {{ cardBorder }};border-radius:10px;background:var(--bg-card);overflow:hidden">
+                  <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border)">
+                    <i class="ph ph-list-numbers" style="font-size:16px;color:var(--text-secondary);flex:none" aria-hidden="true"></i>
+                    <span style="flex:1;min-width:0;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Extract chapters</span>
+                    <span style="flex:none;white-space:nowrap;font-size:11px;font-weight:600;padding:2px 7px;border-radius:99px;background:{{ cardBadgeBg }};color:{{ cardBadgeFg }}">{{ cardBadge }}</span>
+                  </div>
+                  <div style="padding:12px;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.5">
+                    <sc-if value="{{ isConfirm }}" hint-placeholder-val="{{ false }}">
+                      <dl style="margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12.5px">
+                        <dt style="color:var(--text-muted)">Book</dt><dd title="The Brothers Karamazov" style="margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">The Brothers Karamazov</dd>
+                        <dt style="color:var(--text-muted)">Method</dt><dd style="margin:0">Headings in the PDF, on this Mac</dd>
+                        <dt style="color:var(--text-muted)">Takes</dt><dd style="margin:0">About a minute</dd>
+                      </dl>
+                      <p style="margin:0;color:var(--text-muted);font-size:12.5px">Nothing is deleted. If it guesses wrong, you can re-cut in Structure.</p>
+                      <div style="display:flex;gap:8px">
+                        <button onClick="{{ run }}" style="white-space:nowrap;flex:none;height:30px;padding:0 14px;border:0;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:12.5px;font-weight:600;cursor:pointer" style-hover="background:var(--accent-hover)">Run</button>
+                        <button onClick="{{ cancelRun }}" style="white-space:nowrap;flex:none;height:30px;padding:0 12px;border:1px solid var(--border-input);border-radius:7px;background:var(--bg-card);color:var(--text-primary);font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:var(--bg-card-hover)">Cancel</button>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ isRunning }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--text-muted)"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Reading headings, page {{ page }} of 824</span><span style="flex:none;font-variant-numeric:tabular-nums">{{ progress }}%</span></div>
+                      <div style="height:5px;border-radius:99px;background:var(--bg-subtle);overflow:hidden"><div style="height:100%;width:{{ progress }}%;background:var(--accent);border-radius:99px;transition:width .3s"></div></div>
+                      <div style="display:flex;gap:8px;align-items:center">
+                        <button onClick="{{ cancelRun }}" style="white-space:nowrap;flex:none;height:28px;padding:0 12px;border:1px solid var(--border-input);border-radius:7px;background:var(--bg-card);color:var(--text-primary);font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:var(--bg-card-hover)">Stop</button>
+                        <span style="font-size:12px;color:var(--text-faint);min-width:0">You can keep working; it runs in the background.</span>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+                      <p style="margin:0">Found <b>12 chapters</b>, from “Book I: A Nice Little Family” to the Epilogue. They’re in the table now.</p>
+                      <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <button style="white-space:nowrap;flex:none;height:28px;padding:0 12px;border:1px solid var(--border-input);border-radius:7px;background:var(--bg-card);color:var(--text-primary);font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:var(--bg-card-hover)">Review in Structure</button>
+                        <button style="white-space:nowrap;flex:none;height:28px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:var(--text-muted);font-size:12.5px;cursor:pointer" style-hover="background:var(--bg-subtle);color:var(--text-primary)">Undo</button>
+                      </div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size:14px;line-height:1.55;display:flex;flex-direction:column;gap:10px">
+                  <p style="margin:0">Next is <b>Synthesize</b>: pick a voice and turn the chapters into audio. The free voices run on this Mac; cloud voices sound more natural but need their own key.</p>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button style="white-space:nowrap;flex:none;display:flex;align-items:center;gap:6px;height:30px;padding:0 12px;border:0;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:12.5px;font-weight:600;cursor:pointer" style-hover="background:var(--accent-hover)"><i class="ph ph-waveform" style="font-size:14px" aria-hidden="true"></i>Choose a voice</button>
+                    <button style="white-space:nowrap;flex:none;height:30px;padding:0 12px;border:1px solid var(--border-input);border-radius:7px;background:var(--bg-card);color:var(--text-primary);font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:var(--bg-card-hover)">Try one chapter first</button>
+                  </div>
+                </div>
+              </sc-if>
+              <sc-if value="{{ isRestored }}" hint-placeholder-val="{{ false }}">
+                <div style="border:1px solid var(--border);border-radius:10px;background:var(--bg-card);overflow:hidden">
+                  <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border)"><i class="ph ph-list-numbers" style="font-size:16px;color:var(--text-faint);flex:none" aria-hidden="true"></i><span style="flex:1;min-width:0;font-size:13.5px;font-weight:600;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Extract chapters</span><span style="flex:none;white-space:nowrap;font-size:11px;font-weight:600;padding:2px 7px;border-radius:99px;background:var(--bg-subtle);color:var(--text-muted)">Out of date</span></div>
+                  <div style="padding:12px;font-size:13px;line-height:1.5;color:var(--text-secondary)">Chapters were extracted outside this chat after this was suggested, so it won’t run.</div>
+                </div>
+                <p style="margin:0;font-size:14px;line-height:1.55">Chapters are in now: 12 of them. Next is <b>Synthesize</b>, which gives each chapter a voice.</p>
+                <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-muted)"><i class="ph ph-warning" style="font-size:14px;flex:none" aria-hidden="true"></i><span style="flex:1;min-width:0">Answer interrupted by a page reload.</span><button style="white-space:nowrap;flex:none;height:26px;padding:0 10px;border:1px solid var(--border-input);border-radius:6px;background:var(--bg-card);color:var(--text-primary);font-size:12px;font-weight:500;cursor:pointer" style-hover="background:var(--bg-card-hover)">Retry</button></div>
+              </sc-if>
+              </sc-if>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="flex:none;padding:10px 12px 12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px">
+          <sc-if value="{{ isRestored }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <span title="The page reloaded before this file finished uploading" style="display:inline-flex;align-items:center;gap:6px;height:28px;max-width:100%;padding:0 4px 0 10px;border:1px dashed var(--border-input);border-radius:7px;color:var(--text-muted);font-size:12.5px"><i class="ph ph-arrow-counter-clockwise" style="font-size:14px;flex:none" aria-hidden="true"></i><span style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">idiot-pevear.pdf</span><span style="flex:none;font-size:11.5px;color:var(--text-faint)">Upload interrupted · drop again</span><button aria-label="Dismiss" title="Dismiss" style="white-space:nowrap;flex:none;width:20px;height:20px;display:grid;place-items:center;border:0;border-radius:5px;background:transparent;color:var(--text-faint);cursor:pointer"><i class="ph ph-x" style="font-size:11px" aria-hidden="true"></i></button></span>
+            </div>
+          </sc-if>
+          <div style="display:flex;align-items:flex-end;gap:6px;padding:6px;border:1px solid var(--border-input);border-radius:10px;background:var(--bg-page)">
+            <button onClick="{{ attach }}" disabled="{{ composerLocked }}" aria-label="Attach PDFs" title="{{ attachTitle }}" style="white-space:nowrap;flex:none;width:30px;height:30px;display:grid;place-items:center;border:0;border-radius:7px;background:transparent;color:var(--text-secondary);cursor:pointer;opacity:{{ attachOpacity }}" style-hover="background:var(--bg-subtle);color:var(--text-primary)"><i class="ph ph-paperclip" style="font-size:17px" aria-hidden="true"></i></button>
+            <textarea rows="1" disabled="{{ composerLocked }}" placeholder="{{ composerPlaceholder }}" style="flex:1;min-width:0;resize:none;border:0;background:transparent;color:var(--text-primary);font-size:14px;line-height:20px;padding:5px 2px;outline:none"></textarea>
+            <sc-if value="{{ unlocked }}" hint-placeholder-val="{{ false }}"><button title="DeepSeek V4 Flash · change model" style="white-space:nowrap;flex:none;display:flex;align-items:center;gap:4px;height:30px;padding:0 7px;border:0;border-radius:6px;background:transparent;color:var(--text-muted);font-size:12px;cursor:pointer" style-hover="background:var(--bg-subtle);color:var(--text-primary)">V4 Flash<i class="ph ph-caret-down" style="font-size:10px" aria-hidden="true"></i></button></sc-if>
+            <button aria-label="Send" title="Send" disabled="{{ composerLocked }}" style="white-space:nowrap;flex:none;width:30px;height:30px;display:grid;place-items:center;border:0;border-radius:7px;background:{{ sendBg }};color:{{ sendFg }};cursor:pointer"><i class="ph ph-arrow-up" style="font-size:16px" aria-hidden="true"></i></button>
+          </div>
+        </div>
+
+        <sc-if value="{{ isDrop }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ attach }}" style="position:absolute;inset:8px;z-index:20;border:2px dashed var(--accent);border-radius:12px;background:light-dark(rgb(251 246 238/94%),rgb(30 27 20/94%));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:24px;cursor:copy">
+            <i class="ph ph-file-arrow-down" style="font-size:36px;color:var(--accent-text)" aria-hidden="true"></i>
+            <div style="font-family:var(--stack-display);font-weight:600;font-size:19px;letter-spacing:-.02em">Drop to add 3 PDFs</div>
+            <div style="font-size:13px;color:var(--text-secondary);max-width:260px;line-height:1.5">I’ll look at them and suggest how to add them to your library.</div>
+          </div>
+        </sc-if>
+      </aside>
+    </sc-if>
+
+  </div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;panelWidth&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:480,&quot;min&quot;:340,&quot;max&quot;:480,&quot;step&quot;:4,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;},&quot;recommended&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;DeepSeek&quot;,&quot;Google Gemini&quot;,&quot;On this Mac&quot;],&quot;default&quot;:&quot;DeepSeek&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = { order: [0, 1, 2], combineTitle: 'Untitled collection', demo: 'nokey', dark: false, provider: null, key: '', progress: 46, localSel: 'qwen3:14b', collapsed: false };
+  timers = [];
+  selRef = React.createRef();
+  componentDidUpdate() { const s = this.selRef.current; if (s && s.value !== this.state.demo) s.value = this.state.demo; }
+  componentWillUnmount() { this.clear(); }
+  clear() { this.timers.forEach(t => clearTimeout(t)); this.timers = []; }
+  go(demo, extra = {}) {
+    this.clear();
+    const base = { demo, collapsed: demo === 'collapsed', ...extra };
+    if (['paste', 'checking', 'failed'].includes(demo) && !this.state.key) base.key = 'sk-4b1e9f0c2a7d44e1b8c09a';
+    if (demo === 'nokey') base.key = '';
+    if (demo === 'local') base.provider = 'local';
+    if (['nokey', 'paste', 'checking', 'failed'].includes(demo) && this.state.provider === 'local') base.provider = null;
+    if (demo === 'running' && extra.progress == null) base.progress = 46;
+    this.setState(base);
+  }
+  animateRun() {
+    this.go('running', { progress: 4 });
+    const tick = () => {
+      const p = this.state.progress + 8;
+      if (p >= 100) { this.go('done'); return; }
+      this.setState({ progress: p });
+      this.timers.push(setTimeout(tick, 260));
+    };
+    this.timers.push(setTimeout(tick, 260));
+  }
+  catalog() {
+    const undo = { badge: 'Done', badgeBg: 'var(--success-bg)', badgeFg: 'var(--success-text)', confirm: false, undo: true, border: 'var(--border)' };
+    const ok = { confirm: true, border: 'var(--accent)', badge: 'Needs your OK', badgeBg: 'var(--accent-subtle)', badgeFg: 'var(--accent-text)' };
+    const credit = { confirm: true, border: 'var(--accent)', badge: 'Uses credit', badgeBg: 'var(--warning-bg)', badgeFg: 'var(--warning-text)', costIcon: 'ph-coins' };
+    const dl = { confirm: true, border: 'var(--accent)', badge: 'Download', badgeBg: 'var(--warning-bg)', badgeFg: 'var(--warning-text)', costIcon: 'ph-download-simple' };
+    const F = o => Object.entries(o).map(([k, v]) => ({ k, v }));
+    const B = 'The Brothers Karamazov';
+    return [
+      { name: 'New books', cards: [
+        { ...ok, tool: 'upload_book · staged', icon: 'ph-books', title: 'Add 3 books', fields: F({ Files: '3 PDFs dropped in this chat', As: '3 separate books', Language: 'Detected: en, en, bg', Text: 'Extracted now, on this Mac' }), note: 'Chapters and audio wait until you ask. The scan waits for its OCR engine.', primary: 'Add books', after: 'Running shows one row per book with its extraction status. Done links to each book, and the staged files are removed.' },
+        { ...ok, tool: 'upload_book · staged, combined', icon: 'ph-book', title: 'Make one book from 2 PDFs', fields: F({ Files: 'vol-1.pdf, vol-2.pdf, in this order', Title: 'War and Peace', Text: 'Extracted now, on this Mac' }), note: 'The order can be changed before running. Page numbers continue from file to file.', primary: 'Create book', after: 'Offered when the files look like volumes of one work (same author, numbered names).' },
+        { ...ok, tool: 'create_book', icon: 'ph-note-pencil', title: 'Make a book from this text', fields: F({ Title: 'Notes on Book V', Chapters: '4, from this conversation', Narrate: 'Not yet' }), note: 'For text the assistant already has: a summary, a pasted web page. No PDF needed.', primary: 'Create book', after: 'Done: link to the book. With appendTo it reads “Add 4 chapters to …” instead.' }
+      ]},
+      { name: 'Structure', cards: [
+        { ...ok, tool: 'extract_book', icon: 'ph-list-numbers', title: 'Extract chapters', fields: F({ Book: B, Method: 'Headings in the PDF', Takes: 'About a minute' }), note: 'Nothing is deleted. If it guesses wrong, you can re-cut in Structure.', primary: 'Run', after: 'Running shows the page counter and a progress bar. Done shows the chapter count and offers Review in Structure or Undo.' },
+        { ...credit, tool: 'redetect_chapters', icon: 'ph-arrows-split', title: 'Re-cut chapters', fields: F({ Book: B, Method: 'AI reads the table of contents', Model: 'DeepSeek V4 Flash' }), cost: 'One request, well under a cent.', note: 'Replaces the current 12 chapters. Text you edited is kept.', primary: 'Run', after: 'Done shows old count → new count, and offers Undo.' },
+        { ...undo, tool: 'update_chapter · title', icon: 'ph-pencil-simple', title: 'Renamed chapter 7', fields: F({ From: 'Book VII · Alyosha', To: 'Book VII: Alyosha' }), note: 'Ran straight away. A change to the chapter text asks first, since it needs narrating again.', after: 'Undo stays until the next message. Several renames group into one card with a list.' },
+        { ...credit, tool: 'cleanup_chapters', icon: 'ph-broom', title: 'Clean up the OCR text', fields: F({ Book: 'Първото стъпало', Chapters: 'All 9', Model: 'DeepSeek V4 Flash' }), cost: 'About 48,000 words, a few cents on DeepSeek.', note: 'Writes an edited copy for the narrator. The OCR text is kept.', primary: 'Run', after: 'Running shows one tick per chapter. Done offers Compare a chapter.' }
+      ]},
+      { name: 'Audio', cards: [
+        { ...ok, tool: 'synthesize_book · free voice', icon: 'ph-waveform', title: 'Narrate 12 chapters', fields: F({ Book: B, Voice: 'Kokoro · Heart, on this Mac', Takes: 'Several hours, in the background' }), note: 'Free. You can keep using the app while it runs.', primary: 'Run', after: 'See 2c for the full sequence. A cloud voice adds the cost line.' },
+        { ...ok, tool: 'assemble_book', icon: 'ph-package', title: 'Make the audiobook', fields: F({ Chapters: '12 narrated', Output: 'One M4B with chapter markers' }), note: 'If some chapters are still narrating, it waits for them.', primary: 'Assemble', after: 'Done offers Show in Finder and Play.' },
+        { ...ok, tool: 'cancel_book', icon: 'ph-stop-circle', title: 'Stop narration', fields: F({ Book: B, Progress: '7 of 12 chapters narrated' }), note: 'The 7 finished chapters keep their audio; the queue is cleared.', primary: 'Stop', after: 'Shown only when something is running for that book.' }
+      ]},
+      { name: 'Output', cards: [
+        { ...ok, tool: 'export_book', icon: 'ph-export', title: 'Export as EPUB', fields: F({ Format: 'EPUB with read-along', Chapters: '12 selected' }), note: 'Read-along needs the chapters narrated first; the card says if some aren’t.', primary: 'Export', after: 'Done offers Show in Finder. The file also appears under Documents on the book.' }
+      ]},
+      { name: 'Settings & more', cards: [
+        { ...ok, tool: 'set_book_settings', icon: 'ph-sliders-horizontal', title: 'Change the voice', fields: F({ Book: B, From: 'Kokoro · Heart', To: 'Kokoro · Michael' }), note: 'Chapters already narrated keep the old voice until you narrate again.', primary: 'Change', after: 'If there’s narrated audio, Done suggests narrating again.' },
+        { ...dl, tool: 'start_download', icon: 'ph-translate', title: 'Download Bulgarian OCR', fields: F({ Pack: 'Tesseract · bul', For: 'Първото стъпало' }), cost: 'A 14 MB download, once.', note: 'Needed to read Bulgarian scans on this Mac.', primary: 'Download', after: 'Running shows MB downloaded. Done continues the task it was needed for.' },
+        { ...undo, tool: 'set_book_settings · folder', icon: 'ph-folder-simple', title: 'Moved to Russian novels', fields: F({ Book: B, Folder: 'Russian novels (new)' }), note: 'Ran straight away. A new folder is removed again on Undo.', after: 'Title and folder changes run like this; voice, language and OCR engine ask first.' },
+        { ...undo, tool: 'save_note', icon: 'ph-bookmark-simple', title: 'Saved a note', fields: F({ Book: B, Note: '“Ivan’s chapters read best at 0.9×”' }), note: 'Notes appear on the book and in search.', after: 'No follow-up from the assistant.' }
+      ]}
+    ];
+  }
+  renderVals() {
+    const s = this.state, d = s.demo;
+    const rec = this.props.recommended ?? 'DeepSeek';
+    const recId = { DeepSeek: 'deepseek', 'Google Gemini': 'gemini', 'On this Mac': 'local' }[rec] || 'deepseek';
+    const provId = s.provider || recId;
+    const P = {
+      deepseek: { name: 'DeepSeek', icon: 'ph-lightning', url: 'https://platform.deepseek.com/api_keys', urlLabel: 'platform.deepseek.com', step2: 'Choose “Create new API key” and copy it.', prefix: 'sk-', cost: 'Prepaid credit, pay as you go. A question to the assistant costs a small fraction of a cent.', note: 'Cheapest' },
+      openai: { name: 'OpenAI', icon: 'ph-sparkle', url: 'https://platform.openai.com/api-keys', urlLabel: 'platform.openai.com', step2: 'Choose “Create new secret key” and copy it.', prefix: 'sk-proj-', cost: 'Pay as you go, separate from a ChatGPT subscription.', note: 'Pay as you go' },
+      anthropic: { name: 'Anthropic', icon: 'ph-asterisk', url: 'https://console.anthropic.com/settings/keys', urlLabel: 'console.anthropic.com', step2: 'Choose “Create key” and copy it.', prefix: 'sk-ant-', cost: 'Pay as you go, separate from a Claude subscription.', note: 'Pay as you go' },
+      gemini: { name: 'Google Gemini', icon: 'ph-diamond', url: 'https://aistudio.google.com/apikey', urlLabel: 'aistudio.google.com', step2: 'Choose “Create API key” and copy it.', prefix: 'AIza', cost: 'Has a free tier with daily limits; paid use is billed to your Google Cloud account.', note: 'Free tier' },
+      local: { name: 'On this Mac', icon: 'ph-desktop', note: 'Free · Ollama or LM Studio' }
+    };
+    const order = ['deepseek', 'openai', 'anthropic', 'gemini', 'local'];
+    const providers = order.map(id => {
+      const p = P[id], sel = id === provId, isRec = id === recId;
+      return {
+        name: p.name, icon: p.icon, sel,
+        note: isRec ? (id === 'local' ? p.note : `Recommended · ${p.note}`) : p.note,
+        noteColor: isRec ? 'var(--accent-text)' : 'var(--text-faint)',
+        span: id === 'local' ? '1 / -1' : 'auto',
+        border: sel ? 'var(--accent)' : 'var(--border)',
+        bg: sel ? 'var(--bg-selected)' : 'var(--bg-card)',
+        ring: sel ? '0 0 0 1px var(--accent)' : 'none',
+        pick: () => { this.clear(); this.setState({ provider: id, demo: id === 'local' ? 'local' : (s.key ? 'paste' : 'nokey') }); }
+      };
+    });
+    const setup = ['nokey', 'paste', 'checking', 'failed', 'local'].includes(d);
+    const onBook = ['bookfirst', 'book', 'confirm', 'running', 'done', 'collapsed', 'restored'].includes(d);
+    const panelOpen = !s.collapsed;
+    const isChecking = d === 'checking', isFailed = d === 'failed';
+    const spinner = isChecking ? React.createElement('i', { className: 'ph ph-circle-notch', 'aria-hidden': true, style: { fontSize: 14, animation: 'spin .8s linear infinite', display: 'inline-block' } }) : null;
+    const uploaded = ['uploaded', 'created', 'combine', 'combined'].includes(d), created = d === 'created', combined = d === 'combined';
+    const cover = h => `linear-gradient(160deg,oklch(.5 .07 ${h}),oklch(.34 .05 ${h}))`;
+    const libBooks = combined ? [{ title: s.combineTitle, meta: '3 PDFs · 1,424 pages', cover: cover(35), badge: 'Extracting text…', badgeBg: 'var(--warning-bg)', badgeFg: 'var(--warning-text)' }] : created ? [
+      { title: 'The Brothers Karamazov', meta: 'Fyodor Dostoevsky · 824 pages', cover: cover(35), badge: 'Text extracted', badgeBg: 'var(--success-bg)', badgeFg: 'var(--success-text)' },
+      { title: 'The Master and Margarita', meta: 'Mikhail Bulgakov · 412 pages', cover: cover(250), badge: 'Extracting text…', badgeBg: 'var(--warning-bg)', badgeFg: 'var(--warning-text)' },
+      { title: 'Първото стъпало', meta: 'Scanned · 188 pages', cover: cover(140), badge: 'Needs OCR', badgeBg: 'var(--bg-subtle)', badgeFg: 'var(--text-muted)' }
+    ] : [];
+    const isRunning = d === 'running', isDone = d === 'done', isConfirm = d === 'confirm', isRestored = d === 'restored', chDone = isDone || isRestored;
+    const chTitles = ['Book I · A Nice Little Family', 'Book II · An Unfortunate Gathering', 'Book III · The Sensualists', 'Book IV · Strains', 'Book V · Pro and Contra', 'Book VI · The Russian Monk', 'Book VII · Alyosha', 'Book VIII · Mitya', 'Book IX · The Preliminary Investigation', 'Book X · Boys', 'Book XI · Brother Ivan Fyodorovich', 'Book XII · A Judicial Error'];
+    const chWords = [21840, 30112, 34905, 26431, 38770, 24018, 19362, 41203, 28650, 22190, 40115, 36557];
+    const stepState = isDone ? 1 : 0;
+    const bookSteps = [
+      { name: 'Extract', desc: 'Split the text into chapters. The text itself is already in.' },
+      { name: 'Synthesize', desc: 'Give each chapter a voice and make its audio.' },
+      { name: 'Output', desc: 'Join the chapters into one audiobook, or export an EPUB or PDF.' }
+    ].map((st, i) => {
+      const done = i < stepState, cur = i === stepState;
+      return { ...st, bg: cur ? 'var(--bg-selected)' : 'transparent', fg: cur ? 'var(--text-primary)' : 'var(--text-secondary)', dotBg: done ? 'var(--success-bg)' : cur ? 'var(--accent)' : 'var(--bg-subtle)', dotFg: done ? 'var(--success-text)' : cur ? 'var(--on-accent)' : 'var(--text-muted)', dotIcon: done ? 'ph-check' : cur ? 'ph-arrow-right' : 'ph-circle' };
+    });
+    const locked = setup;
+    return {
+      demo: d, scheme: s.dark ? 'dark' : 'light', themeIcon: s.dark ? 'ph-sun' : 'ph-moon',
+      onDemo: e => this.go(e.target.value),
+      toggleTheme: () => this.setState({ dark: !s.dark }),
+      togglePanel: () => this.setState({ collapsed: !s.collapsed, demo: s.demo === 'collapsed' ? 'bookfirst' : s.demo }),
+      collapse: () => this.setState({ collapsed: true }),
+      panelOpen, panelCollapsed: !panelOpen,
+      panelWidth: this.props.panelWidth ?? 392,
+      asstBtnBorder: panelOpen ? 'var(--accent)' : 'var(--border-input)',
+      asstBtnBg: panelOpen ? 'var(--accent-subtle)' : 'transparent',
+      asstBtnFg: panelOpen ? 'var(--accent-text)' : 'var(--text-muted)',
+      onLibrary: !onBook, onBook,
+      libEmpty: !(created || combined), libHasBooks: created || combined, libBooks,
+      libSubtitle: combined ? '1 book' : created ? '3 books' : 'No books yet.',
+      openBook: () => this.go('book'),
+      contextIcon: onBook ? 'ph-book-open' : 'ph-books',
+      contextLabel: onBook ? 'The Brothers Karamazov' : 'Library',
+      contextTitle: onBook ? 'Knows this page: The Brothers Karamazov' : 'Knows this page: Library',
+      setup, unlocked: !setup, providers,
+      sel: P[provId], showKeyForm: provId !== 'local', showLocal: provId === 'local',
+      keyValue: s.key, onKey: e => this.setState({ key: e.target.value, demo: e.target.value ? 'paste' : 'nokey' }),
+      keyBorder: isFailed ? 'var(--danger-text)' : 'var(--border-input)',
+      connectDisabled: !s.key || isChecking, connectOpacity: (!s.key && provId !== 'local') ? .45 : 1,
+      connectLabel: isChecking ? 'Checking' : isFailed ? 'Try again' : 'Connect', spinner, isFailed,
+      connect: () => {
+        if (provId === 'local') { this.go('chat'); return; }
+        this.go('checking');
+        this.timers.push(setTimeout(() => this.go(s.key.trim().length < 12 ? 'failed' : 'chat'), 1400));
+      },
+      localModels: [{ name: 'qwen3:14b', meta: '9.3 GB · 40K context' }, { name: 'gemma3:12b', meta: '8.1 GB · 128K context' }].map(m => ({ ...m, sel: m.name === s.localSel, border: m.name === s.localSel ? 'var(--accent)' : 'var(--border)', pick: () => this.setState({ localSel: m.name }) })),
+      localSel: s.localSel,
+      libThread: ['chat', 'drop', 'uploaded', 'created', 'combine', 'combined'].includes(d),
+      askHow: d === 'uploaded', isCreated: created,
+      createBooks: () => this.go('created'),
+      attachTitle: locked ? 'Connect a model first' : 'Attach PDFs',
+      attachOpacity: locked ? .4 : 1,
+      loop: [
+        { icon: 'ph-file-text', name: 'Extract', desc: 'Pull the text out of a PDF and split it into chapters.' },
+        { icon: 'ph-waveform', name: 'Synthesize', desc: 'Give chapters a voice. Optionally translate, summarize or simplify them first.' },
+        { icon: 'ph-export', name: 'Output', desc: 'Get an audiobook with chapter markers, or an EPUB or PDF.' }
+      ],
+      isUploaded: uploaded, showSuggestions: !uploaded,
+      droppedFiles: [
+        { name: 'brothers-karamazov-garnett.pdf', size: '6.2 MB', pages: '824 p', tip: 'brothers-karamazov-garnett.pdf · 6.2 MB · 824 pages · English · has text', title: 'The Brothers Karamazov', guess: 'Fyodor Dostoevsky · 824 pages', cover: cover(35), badge: 'Has text', badgeBg: 'var(--success-bg)', badgeFg: 'var(--success-text)' },
+        { name: 'master-and-margarita.pdf', size: '3.1 MB', pages: '412 p', tip: 'master-and-margarita.pdf · 3.1 MB · 412 pages · English · has text', title: 'The Master and Margarita', guess: 'Mikhail Bulgakov · 412 pages', cover: cover(250), badge: 'Has text', badgeBg: 'var(--success-bg)', badgeFg: 'var(--success-text)' },
+        { name: 'parvoto-stapalo-scan.pdf', size: '48 MB', scan: true, pages: '188 p', tip: 'parvoto-stapalo-scan.pdf · 48 MB · 188 pages · Bulgarian · scan, needs OCR', title: 'Първото стъпало', guess: 'Title from the cover · 188 pages', cover: cover(140), badge: 'Scan', badgeBg: 'var(--warning-bg)', badgeFg: 'var(--warning-text)' }
+      ],
+      suggestions: ['What’s the difference between extract and synthesize?', 'Which voices are free?', 'Can it read scanned books?'],
+      isDrop: d === 'drop',
+      attach: () => this.go('uploaded'),
+      bookThread: onBook, isBook: d === 'book', isBookFirst: d === 'bookfirst', asked: onBook && d !== 'bookfirst', isRestored,
+      hasTip: onBook && !chDone && !isRunning, askHow2: () => this.go('book'),
+      isCombine: d === 'combine', isCombined: combined, combineTitle: s.combineTitle,
+      onCombineTitle: e => this.setState({ combineTitle: e.target.value }),
+      combineAsk: () => this.go('combine'), combineRun: () => this.go('combined'), combineCancel: () => this.go('uploaded'),
+      combineFiles: s.order.map((k, i, a) => {
+        const base = [['brothers-karamazov-garnett.pdf', '824 p'], ['master-and-margarita.pdf', '412 p'], ['parvoto-stapalo-scan.pdf', '188 p']][k];
+        const mv = dir => () => { const o = [...a]; [o[i], o[i + dir]] = [o[i + dir], o[i]]; this.setState({ order: o }); };
+        return { n: i + 1, name: base[0], pages: base[1], first: i === 0, last: i === a.length - 1, upOp: i === 0 ? .3 : 1, downOp: i === a.length - 1 ? .3 : 1, up: mv(-1), down: mv(1) };
+      }), bookSteps,
+      askRun: () => this.go('confirm'),
+      run: () => this.animateRun(),
+      cancelRun: () => this.go('book'),
+      showActionCard: isConfirm || isRunning || isDone,
+      isConfirm, isRunning, isDone,
+      cardBorder: isConfirm ? 'var(--accent)' : 'var(--border)',
+      cardBadge: isConfirm ? 'Needs your OK' : isRunning ? 'Running' : 'Done',
+      cardBadgeBg: isConfirm ? 'var(--accent-subtle)' : isRunning ? 'var(--warning-bg)' : 'var(--success-bg)',
+      cardBadgeFg: isConfirm ? 'var(--accent-text)' : isRunning ? 'var(--warning-text)' : 'var(--success-text)',
+      progress: s.progress, page: Math.round(824 * s.progress / 100),
+      chBadge: chDone ? '12 chapters' : isRunning ? 'Finding chapters…' : 'No chapters',
+      chBadgeBg: chDone ? 'var(--success-bg)' : isRunning ? 'var(--warning-bg)' : 'var(--bg-subtle)',
+      chBadgeFg: chDone ? 'var(--success-text)' : isRunning ? 'var(--warning-text)' : 'var(--text-muted)',
+      noChapters: !chDone,
+      chapterRows: chDone ? chTitles.map((t, i) => ({ n: i + 1, title: t, words: chWords[i].toLocaleString('en-US') })) : [],
+      synthOpacity: chDone ? 1 : .45,
+      synthTitle: chDone ? '' : 'Extract chapters first',
+      catalog: this.catalog(), selRef: this.selRef,
+      nextA: isDone ? '12 chapters, no audio yet. ' : isRunning ? 'Finding chapters now. ' : 'The text is in, but it’s one long block. ',
+      nextB: isDone ? 'Synthesize' : isRunning ? 'Next: Synthesize' : 'Extract chapters',
+      nextC: isDone ? ' gives each one a voice.' : isRunning ? ', once it’s done.' : ' splits it so each chapter can get its own audio.',
+      stepsIntro: isDone ? 'Extract is done. You’re on the second of three steps:' : 'Three steps from here. You’re on the first:',
+      exBorder: chDone ? '1px solid var(--border-input)' : '0', exBg: chDone ? 'var(--bg-card)' : 'var(--accent)', exFg: chDone ? 'var(--text-primary)' : 'var(--on-accent)',
+      syBorder: chDone ? '0' : '1px solid var(--border-input)', syBg: chDone ? 'var(--accent)' : 'var(--bg-card)', syFg: chDone ? 'var(--on-accent)' : 'var(--text-primary)',
+      composerLocked: locked,
+      composerPlaceholder: locked ? 'Connect a model to ask questions' : onBook ? 'Ask about this book or what to do next' : 'Ask how to do something, or drop PDFs',
+      sendBg: locked ? 'var(--bg-subtle)' : 'var(--accent)',
+      sendFg: locked ? 'var(--text-faint)' : 'var(--on-accent)'
+    };
+  }
+}
+</script>
+</body>
+</html>

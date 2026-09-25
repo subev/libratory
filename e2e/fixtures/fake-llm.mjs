@@ -35,6 +35,21 @@ function sseChunk(id, delta, finish = null) {
   return `data: ${JSON.stringify(payload)}\n\n`;
 }
 
+function messageText(message) {
+  const content = message?.content;
+  if (typeof content === "string") return content;
+  return Array.isArray(content) ? content.map((part) => (typeof part?.text === "string" ? part.text : "")).join("") : "";
+}
+
+function pinnedRead(messages) {
+  const last = [...(messages ?? [])].reverse().find((m) => m.role === "user");
+  const text = messageText(last);
+  const book = /\(bookId ([0-9a-f-]{36})\)/.exec(text);
+  if (!book) return null;
+  const prompt = text.split("\n\nRead the whole text")[0]?.trim() || "Summarize";
+  return { prompt, bookId: book[1] };
+}
+
 export function startFakeLlm(port = 3111) {
   let calls = 0;
 
@@ -76,6 +91,19 @@ export function startFakeLlm(port = 3111) {
 
       const hasTools = Array.isArray(body.tools) && body.tools.length > 0;
       const hasToolResults = (body.messages ?? []).some((m) => m.role === "tool");
+      // The assistant's Ask AI hand-off: a question ending "Read the whole text of … (bookId …)."
+      // is answered by reading it whole, with the words before that line as the prompt
+      const pinned = hasTools && !hasToolResults && body.tools.some((t) => t.function?.name === "analyze_text") ? pinnedRead(body.messages) : null;
+      if (body.stream && pinned) {
+        res.writeHead(200, SSE_HEADERS);
+        res.write(sseChunk(id, { role: "assistant" }));
+        res.write(sseChunk(id, {
+          tool_calls: [{ index: 0, id: "call_fake_read", type: "function", function: { name: "analyze_text", arguments: JSON.stringify(pinned) } }],
+        }));
+        res.write(sseChunk(id, {}, "tool_calls"));
+        res.write("data: [DONE]\n\n");
+        return res.end();
+      }
       if (body.stream && hasTools && !hasToolResults) {
         res.writeHead(200, SSE_HEADERS);
         res.write(sseChunk(id, { role: "assistant" }));

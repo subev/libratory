@@ -7,12 +7,13 @@ import { Breadcrumbs } from "../components/Breadcrumbs.tsx";
 import { Button } from "../components/Button.tsx";
 import { ProfileSwitcher } from "../components/ProfileSwitcher.tsx";
 import { SettingsModal } from "../components/SettingsModal.tsx";
+import { AssistantToggle } from "../components/assistant/AssistantPanel.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
 import { LibraryShell } from "../components/library/LibraryShell.tsx";
 import { LibraryFilters } from "../components/library/LibraryFilters.tsx";
 import { filterCounts, type LibraryFilter } from "../lib/library-filter.ts";
 import { UploadModal } from "../components/library/UploadModal.tsx";
-import { IconAdd, IconChat, IconBook, IconSettings, IconUpload } from "../components/icons.tsx";
+import { IconAdd, IconBook, IconSettings, IconUpload } from "../components/icons.tsx";
 import type { DragItems, DroppedItems } from "../lib/dnd.ts";
 
 export function Home() {
@@ -68,16 +69,6 @@ export function Home() {
           <Button
             variant="secondary"
             size="sm"
-            to={folderId ? `/chat?folderId=${folderId}` : "/chat"}
-            title="Chat with the whole library — searches every indexed book and cites pages"
-            data-testid="library-chat-link"
-          >
-            <IconChat className="h-4 w-4" />
-            Chat with library
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
             to="/open"
             title="Open a synced EPUB and read along on its own pages — nothing is uploaded"
             data-testid="open-container-link"
@@ -85,6 +76,7 @@ export function Home() {
             <IconBook className="h-4 w-4" />
             Open a read-along EPUB
           </Button>
+          <AssistantToggle />
           <ThemeToggle />
           <Button
             variant="icon"

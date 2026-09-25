@@ -7,7 +7,7 @@ import type { BookLayout } from "../lib/book-layout.ts";
 import { StatusBadge } from "./StatusBadge.tsx";
 import { ChapterModal } from "./ChapterModal.tsx";
 import { chapterAudioDownload, chapterAudioUrl, SYNTH_BUSY, variantLabel } from "../lib/chapters.ts";
-import { ChapterAiModal } from "./ChapterAiModal.tsx";
+import { useAssistant } from "./assistant/context.tsx";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
 import { rowClick } from "../lib/row-click.ts";
 import { SynthesizeModal, type SynthSettings } from "./SynthesizeModal.tsx";
@@ -139,7 +139,7 @@ export function ChapterTable({
     );
   };
 
-  const [aiChapter, setAiChapter] = useState<{ id: string; title: string } | null>(null);
+  const { pin } = useAssistant();
   const [pdfPreview, setPdfPreview] = useState<{ fileId: string; page: number; filename?: string } | null>(null);
   const [synthesizeChapterId, setSynthesizeChapterId] = useState<string | null>(null);
   const toggleAllRef = useRef<HTMLInputElement>(null);
@@ -707,7 +707,7 @@ export function ChapterTable({
                       <Button
                         variant="icon"
                         size="sm"
-                        onClick={() => setAiChapter({ id: chapter.id, title: chapter.title })}
+                        onClick={() => pin({ bookId, bookTitle: null, chapters: [{ id: chapter.id, title: chapter.title }] })}
                         title="Summarize, question, or run any prompt against this chapter's text"
                         aria-label="Ask AI about this chapter"
                         data-testid="row-ask-ai"
@@ -840,13 +840,6 @@ export function ChapterTable({
           onSetSelected={onSetSelected}
           onPickVoice={setSynthesizeChapterId}
           voicePickerOpen={synthesizeChapterId !== null}
-        />
-      ) : null}
-
-      {aiChapter ? (
-        <ChapterAiModal
-          scope={{ kind: "chapters", bookId, chapters: [aiChapter] }}
-          onClose={() => setAiChapter(null)}
         />
       ) : null}
 

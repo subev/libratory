@@ -37,9 +37,10 @@ test("settings: a saved cloud key lands in .env and the pickers, and removal res
     expect(await fs.readFile(ENV_PATH, "utf8")).toContain(`${target.envVar}=${DUMMY_KEY}`);
 
     // The provider's models appear in pickers without a server restart
-    await page.goto("/chat");
-    await page.getByTestId("chat-model").click();
-    await expect(page.getByTestId("chat-model-menu").getByText(target.label, { exact: true })).toHaveCount(1);
+    await page.goto("/");
+    await page.getByTestId("assistant-toggle").click();
+    await page.getByTestId("assistant-model").click();
+    await expect(page.getByTestId("assistant-model-menu").getByText(target.label, { exact: true })).toHaveCount(1);
 
     await page.goto("/");
     await page.getByTestId("settings-gear").click();
@@ -48,10 +49,11 @@ test("settings: a saved cloud key lands in .env and the pickers, and removal res
 
     expect(await fs.readFile(ENV_PATH, "utf8")).toBe(snapshot);
 
-    await page.goto("/chat");
-    await page.getByTestId("chat-model").click();
-    await expect(page.getByTestId("chat-model-menu")).toBeVisible();
-    await expect(page.getByTestId("chat-model-menu").getByText(target.label, { exact: true })).toHaveCount(0);
+    await page.goto("/");
+    await page.getByTestId("assistant-toggle").click();
+    await page.getByTestId("assistant-model").click();
+    await expect(page.getByTestId("assistant-model-menu")).toBeVisible();
+    await expect(page.getByTestId("assistant-model-menu").getByText(target.label, { exact: true })).toHaveCount(0);
   } finally {
     // Failure-path safety net: clear the key from the server's memory and restore the file
     await trpcMutation(request, "secrets.set", { envVar: target.envVar, value: null }).catch(() => {});

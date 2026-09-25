@@ -6,6 +6,7 @@ import { ModelBundleNotice, useModelBundle } from "../components/ModelBundleNoti
 import { ChapterTable } from "../components/ChapterTable.tsx";
 import { SYNTH_BUSY, TEXT_BUSY, variantLabel } from "../lib/chapters.ts";
 import { SynthesizeModal, type SynthSettings } from "../components/SynthesizeModal.tsx";
+import { BOOK_DIALOGS } from "../../../server/src/lib/assistant-targets.ts";
 import { StructureModal } from "../components/StructureModal.tsx";
 import { VariantModal } from "../components/VariantModal.tsx";
 import { BookFilesSection } from "../components/BookFilesSection.tsx";
@@ -13,7 +14,7 @@ import { AudioOutputsSection } from "../components/AudioOutputsSection.tsx";
 import { DocumentOutputsSection } from "../components/DocumentOutputsSection.tsx";
 import { LogDock } from "../components/LogDock.tsx";
 import { DiskUsageModal, useDiskUsageTotal } from "../components/DiskUsage.tsx";
-import { ChapterAiModal, type AiScope } from "../components/ChapterAiModal.tsx";
+import { useAssistant } from "../components/assistant/context.tsx";
 import { NotesSection } from "../components/NotesSection.tsx";
 import { Button } from "../components/Button.tsx";
 import { BookShell, TabPanel, WithShellLayout } from "../components/book/BookShell.tsx";
@@ -175,23 +176,55 @@ export function BookDetail() {
   const cancelFileMutation = trpc.bookFiles.cancel.useMutation({ onSuccess: invalidate });
 
   // Opened from the toolbar and from the raw-text block, so it cannot live in either of them.
-  // Try one page hands back here with ?extract=1 so the modal reopens where the user left it; the
-  // flag is consumed on arrival so a refresh does not open it again
-  const [extractOpen, setExtractOpen] = useState(() => searchParams.get("extract") === "1");
-  useEffect(() => {
-    if (!searchParams.has("extract")) return;
-    const next = new URLSearchParams(searchParams);
-    next.delete("extract");
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
+  // Try one page hands back here with ?extract=1 so the modal reopens where the user left it, and
+  // the assistant panel opens any of the four dialogs with ?dialog=<name>. The flag is consumed
+  // on arrival so a refresh does not open it again.
+  const [extractOpen, setExtractOpen] = useState(false);
   const [showStructure, setShowStructure] = useState(false);
   const [showTranslation, setShowTranslation] = useState(false);
   const [showSynthesize, setShowSynthesize] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const requestedDialog = searchParams.get("dialog") ?? (searchParams.get("extract") === "1" ? "extract" : null);
+  /* eslint-disable react/set-state-in-effect -- the URL is the external system here: the assistant
+     panel changes it under a page that is already mounted, so the dialog cannot be initialised from
+     it once and the flag is consumed right after */
+  useEffect(() => {
+    if (requestedDialog === null) return;
+    const dialog = BOOK_DIALOGS.find((d) => d === requestedDialog);
+    switch (dialog) {
+      case "extract":
+        setExtractOpen(true);
+        break;
+      case "structure":
+        setShowStructure(true);
+        break;
+      case "synthesize":
+        setShowSynthesize(true);
+        break;
+      case "export":
+        setExportOpen(true);
+        break;
+      case undefined:
+        break;
+      default: {
+        const unhandled: never = dialog;
+        throw new Error(`unhandled dialog ${unhandled}`);
+      }
+    }
+    // Functional, so the effect depends on the request alone and not on every render's params object
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("dialog");
+      next.delete("extract");
+      return next;
+    }, { replace: true });
+  }, [requestedDialog, setSearchParams]);
+  /* eslint-enable react/set-state-in-effect */
   const [exportFormat, setExportFormat] = useState<ExportFormatId>("epub-sync");
   const [showDetails, setShowDetails] = useState(false);
   const [showDiskUsage, setShowDiskUsage] = useState(false);
-  const [askScope, setAskScope] = useState<AiScope | null>(null);
+  // Ask AI pins the text to the assistant, which reads it whole through analyze_text
+  const { pin } = useAssistant();
   const setActiveVariant = (key: string | null) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -234,7 +267,7 @@ export function BookDetail() {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
-      if (askScope || showStructure || showTranslation || showSynthesize) return;
+      if (showStructure || showTranslation || showSynthesize) return;
       // A modal on top means the keys belong to it, not to the shelf underneath
       if (document.querySelector('[role="dialog"]')) return;
       const target = e.key === "[" ? prevBookId : nextBookId;
@@ -242,7 +275,7 @@ export function BookDetail() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [prevBookId, nextBookId, navigate, askScope, showStructure, showTranslation, showSynthesize]);
+  }, [prevBookId, nextBookId, navigate, showStructure, showTranslation, showSynthesize]);
 
   const { data: translationRows = [] } = trpc.variants.listForBook.useQuery(
     { bookId: id!, key: activeVariant! },
@@ -615,17 +648,13 @@ export function BookDetail() {
       label: "Ask AI",
       onClick: () => {
         const selected = book.chapters.filter((c) => c.selected).map((c) => ({ id: c.id, title: c.title }));
-        setAskScope(
-          selected.length > 0 && !activeVariant
-            ? { kind: "chapters", bookId: book.id, chapters: selected }
-            : { kind: "book-raw", bookId: book.id, bookTitle: book.title, chapters: selected },
-        );
+        pin({ bookId: book.id, bookTitle: book.title, chapters: selected.length > 0 && !activeVariant ? selected : null });
       },
       disabled: book.rawTextTotalWords === 0 && (selectedCount === 0 || !!activeVariant),
       title:
         book.rawTextTotalWords === 0 && selectedCount === 0
           ? "No raw text or chapters to ask about"
-          : "Summarize, question, or run any prompt — switch between selected chapters and the whole book inside",
+          : "Pin the selected chapters, or the whole book, to the assistant and ask anything over all of the text",
     },
     {
       id: "delete",
@@ -748,8 +777,6 @@ export function BookDetail() {
             { to: "/", label: "Home" },
             ...(book.folderPath ?? []).map((f) => ({ to: `/folders/${f.id}`, label: f.name })),
           ]}
-          searchIndex={orderedBooks.find((b) => b.id === book.id)?.searchIndex}
-          hasChapters={book.chapters.length > 0}
           onRename={(title) => renameMutation.mutate({ id: book.id, title })}
           prevBook={prevBook ?? null}
           nextBook={nextBook ?? null}
@@ -757,13 +784,6 @@ export function BookDetail() {
           onNavigate={(target) => navigate(`/books/${target}`)}
           canRead={canRead}
           readTitle={readTitle}
-          onAsk={() => setAskScope({ kind: "book-raw", bookId: book.id, bookTitle: book.title })}
-          askDisabled={!hasRawText}
-          askTitle={
-            hasRawText
-              ? "Ask AI about this book — one call, the whole text goes to the model"
-              : NO_RAW_TEXT
-          }
           lanes={variantLanes}
           activeVariant={activeVariant}
           bookLanguage={book.language ?? null}
@@ -1044,7 +1064,7 @@ export function BookDetail() {
                     </Button>
                     <Button
                       variant="secondary"
-                      onClick={() => setAskScope({ kind: "book-raw", bookId: book.id, bookTitle: book.title })}
+                      onClick={() => pin({ bookId: book.id, bookTitle: book.title, chapters: null })}
                       disabled={!hasRawText}
                       title={
                         hasRawText
@@ -1259,7 +1279,6 @@ export function BookDetail() {
         />
       )}
 
-      {askScope && <ChapterAiModal scope={askScope} onClose={() => setAskScope(null)} />}
 
       {showSynthesize && (
         <SynthesizeModal

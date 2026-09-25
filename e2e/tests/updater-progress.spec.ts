@@ -45,6 +45,6 @@ test("the bar survives navigation, because a download outlives the page it start
   await emit(page, { percent: 20, transferred: 38e6, total: 190e6 });
   await expect(page.getByTestId("update-progress")).toBeVisible();
 
-  await page.getByTestId("library-chat-link").click();
+  await page.getByTestId("open-container-link").click();
   await expect(page.getByTestId("update-progress")).toContainText("20% — 38 MB of 190 MB");
 });

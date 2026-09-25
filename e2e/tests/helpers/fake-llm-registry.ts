@@ -14,7 +14,8 @@ export async function registerFakeLlm(url: string): Promise<() => Promise<void>>
   const entries = [
     { ...base, key: FAKE_MODEL_KEY, label: "E2E Fake", supportsTools: true },
     { ...base, key: FAKE_NOTOOLS_KEY, label: "E2E Fake NoTools" },
-    { ...base, key: FAKE_TINY_KEY, label: "E2E Fake Tiny", contextTokens: 100 },
+    // Tools on, so the assistant can be pointed at it and refuse it by name for its context
+    { ...base, key: FAKE_TINY_KEY, label: "E2E Fake Tiny", contextTokens: 100, supportsTools: true },
   ];
   await fs.writeFile(LLM_MODELS_PATH, JSON.stringify(entries, null, 2));
   return async () => {

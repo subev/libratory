@@ -5,7 +5,7 @@ import { Link } from "react-router";
 import { trpc } from "../trpc.ts";
 import { StatusBadge } from "./StatusBadge.tsx";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
-import { ChapterAiModal } from "./ChapterAiModal.tsx";
+import { useAssistant } from "./assistant/context.tsx";
 import { VariantModal } from "./VariantModal.tsx";
 import { PillToggle } from "./PillToggle.tsx";
 import { Button } from "./Button.tsx";
@@ -142,7 +142,7 @@ function ChapterModalBody({
   const [hoveredChunkUrl, setHoveredChunkUrl] = useState<string | null>(null);
 
   const [showCompare, setShowCompare] = useState(false);
-  const [showAi, setShowAi] = useState(false);
+  const { pin } = useAssistant();
 
   const isVariant = !!variant;
 
@@ -583,7 +583,10 @@ function ChapterModalBody({
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => setShowAi(true)}
+            onClick={() => {
+              pin({ bookId, bookTitle: null, chapters: [{ id: chapter.id, title: chapter.title }] });
+              onClose();
+            }}
             title="Summarize, question, or run any prompt against this chapter's text"
             data-testid="chapter-ask-ai"
           >
@@ -858,12 +861,6 @@ function ChapterModalBody({
           page={pdfPage}
           filename={sourceFile.filename}
           onClose={() => setPdfPage(null)}
-        />
-      ) : null}
-      {showAi ? (
-        <ChapterAiModal
-          scope={{ kind: "chapters", bookId, chapters: [{ id: chapter.id, title: chapter.title }] }}
-          onClose={() => setShowAi(false)}
         />
       ) : null}
       {showCompare && variant ? (
