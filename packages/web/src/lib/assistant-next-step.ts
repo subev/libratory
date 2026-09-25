@@ -52,7 +52,7 @@ export function nextStep(book: NextStepBook): NextStep {
       step: "review",
       title: "Review the chapters",
       body: "The chapters were found automatically. Look them over, fix a boundary if one is wrong, then confirm them.",
-      action: { label: "Open the chapters", to: `${page}?tab=chapters` },
+      action: { label: "Review chapters", to: `${page}?tab=chapters&dialog=structure` },
       questions: ["What if a chapter boundary is wrong?", "Can the AI propose the chapters?"],
     };
   }
@@ -73,7 +73,7 @@ export function nextStep(book: NextStepBook): NextStep {
       step: "narrate",
       title: "Give the chapters a voice",
       body: "Pick a voice and speed in the Synthesize dialog under the chapter table. A local voice is free; cloud voices are metered.",
-      action: { label: "Open the chapters", to: `${page}?tab=chapters` },
+      action: { label: "Pick a voice", to: `${page}?tab=chapters&dialog=synthesize` },
       questions: ["Which voice should I use?", "How much would a cloud voice cost?"],
     };
   }
@@ -82,7 +82,7 @@ export function nextStep(book: NextStepBook): NextStep {
       step: "output",
       title: "Make the audiobook",
       body: `${withAudio} chapter${withAudio === 1 ? " has" : "s have"} audio. Export… under the chapter table assembles one M4B with chapter markers, or a read-along EPUB.`,
-      action: { label: "Open the chapters", to: `${page}?tab=chapters` },
+      action: { label: "Export…", to: `${page}?tab=chapters&dialog=export` },
       questions: ["What is a read-along EPUB?", "Where do I listen to it?"],
     };
   }
