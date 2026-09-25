@@ -4,7 +4,7 @@ import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../env.ts";
 import { rectsForRange } from "./cue-rects.ts";
@@ -13,7 +13,7 @@ import { normalizeBlocks } from "./normalizer.ts";
 import { makeLlmOcrRunner, type RawLlmPage, type Reference } from "./ocr-llm.ts";
 import { parseTsv } from "./ocr-tesseract.ts";
 import { ensureSourceGeometry } from "./page-geometry.ts";
-import { tesseractEnv } from "./tessdata.ts";
+import { ensureTessdata, tesseractEnv } from "./tessdata.ts";
 
 // The findings of the first AI-read book, kept as one path from placed words to the rects the
 // reader draws, so a different placement can be judged on the same two questions: do the boxes
@@ -31,6 +31,11 @@ afterAll(async () => {
 });
 
 describe("placement, copy, geometry and rects", () => {
+  // Tesseract is run here directly, so the language packs are staged here too: on a fresh
+  // checkout the directory exists only once something has asked for it, and whichever test file
+  // ran first used to be that something
+  beforeAll(() => ensureTessdata());
+
   it.skipIf(!existsSync(python))("keeps every box on the page and lands a cue on its lines, even where the local reader skipped words", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "placement-"));
     dirs.push(dir);
