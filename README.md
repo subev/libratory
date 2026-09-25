@@ -114,8 +114,10 @@ If you want "this EPUB in a cloned voice", use Ebook2Audiobook. If you want to c
 
 ```bash
 git clone https://github.com/subev/libratory.git && cd libratory
-docker compose --profile app up -d --build   # Postgres + the app on one port
+docker compose --profile app pull && docker compose --profile app up -d   # Postgres + the prebuilt app on one port
 ```
+
+The image is published to `ghcr.io/subev/libratory` for amd64 and arm64 on every release. To build it from the checkout instead — after a local change, or to run something unreleased — use `docker compose --profile app up -d --build`.
 
 Web UI and API share http://localhost:3034. One container holds the server, the built web UI and both Python environments (CPU-only torch, so no multi-gigabyte nvidia downloads).
 
