@@ -53,7 +53,9 @@ createRoot(document.getElementById("root")!).render(
                   measures its own width and steps its layout down when the panel opens */}
               <AssistantProvider>
                 <div className="flex h-screen overflow-hidden">
-                  <div className="min-w-0 flex-1">
+                  {/* Pages that own no scroll pane (the reader, Try one page, the gallery) scroll here:
+                      the window cannot grow inside an overflow-hidden shell */}
+                  <div className="min-w-0 flex-1 overflow-y-auto">
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/folders/:folderId" element={<Home />} />

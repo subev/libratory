@@ -2,8 +2,8 @@ import { useEffect, useRef } from "react";
 
 import { cueIndexAt, wordIndexAt, type ReaderCues } from "./reader-doc.ts";
 
-// Keeping the spoken cue in view, in whatever is scrolling — the reader scrolls the window,
-// the chapter modal scrolls its own panel.
+// Keeping the spoken cue in view, in whatever is scrolling — the reader scrolls the page slot
+// beside the assistant, the chapter modal scrolls its own panel, and a bare window is the fallback.
 export type FollowBand = { top: number; bottom: number; landing: number };
 
 // Auto-scroll steps back this long after the reader touches the page themselves
