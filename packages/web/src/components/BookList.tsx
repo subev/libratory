@@ -7,6 +7,7 @@ import { DigestModal } from "./DigestModal.tsx";
 import { HnDigestModal } from "./HnDigestModal.tsx";
 import { FolderPickerModal } from "./FolderPickerModal.tsx";
 import { setDragItems, getDragItems, hasDragItems, type DragItems } from "../lib/dnd.ts";
+import { rowClick } from "../lib/row-click.ts";
 import { statusStyles } from "./StatusBadge.tsx";
 import { IconBook, IconCheck, IconChevronDown, IconChevronUp, IconDelete, IconFolder, IconMore, IconRename, IconUpload } from "./icons.tsx";
 import { Button } from "./Button.tsx";
@@ -43,6 +44,7 @@ function FolderTableRow({
   onDropItems: (items: DragItems) => void;
 }) {
   const utils = trpc.useUtils();
+  const navigate = useNavigate();
   const layout = useLibraryLayout();
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(folder.name);
@@ -74,9 +76,10 @@ function FolderTableRow({
 
   return (
     <tr
-      className={`hover:bg-(--bg-card-hover) ${selected ? "bg-(--bg-selected)" : ""} ${dragOver ? "outline outline-2 -outline-offset-2 outline-(--accent)" : ""}`}
+      className={`cursor-pointer hover:bg-(--bg-card-hover) ${selected ? "bg-(--bg-selected)" : ""} ${dragOver ? "outline outline-2 -outline-offset-2 outline-(--accent)" : ""}`}
       data-testid="folder-row"
       draggable
+      onClick={rowClick(() => navigate(`/folders/${folder.id}`))}
       onDragStart={onDragStartRow}
       onDragOver={(e) => {
         if (!hasDragItems(e)) return;
@@ -513,10 +516,7 @@ export function BookList({
                 className={`cursor-pointer hover:bg-(--bg-card-hover) ${selectedIds.has(book.id) ? "bg-(--bg-selected)" : ""}`}
                 draggable
                 onDragStart={(e) => setDragItems(e, dragItemsFor("book", book.id))}
-                onClick={(e) => {
-                  if ((e.target as HTMLElement).closest("a, button, input, label, select")) return;
-                  navigate(`/books/${book.id}`);
-                }}
+                onClick={rowClick(() => navigate(`/books/${book.id}`))}
               >
                 <td className="px-3 py-3">
                   <input
