@@ -25,6 +25,8 @@ export type ShowInApp = {
   chapterId?: string;
   chapterIndex?: number;
   atMs?: number;
+  // A book page target only: the version to show — a language such as "German", or a rewrite's key
+  variant?: string;
 };
 
 // The dialogs the book page opens from its URL, consumed on arrival
@@ -37,6 +39,13 @@ export function appUrlFor(show: ShowInApp): string {
     if (!book) throw new Error(`${show.target} needs a bookId`);
     return book;
   };
+  // The book page, on the version asked for; the page reads ?variant= and falls back to the original
+  const bookPage = (query: Record<string, string>): string => {
+    const params = new URLSearchParams(query);
+    if (show.variant) params.set("variant", show.variant);
+    const q = params.toString();
+    return `${needBook()}${q ? `?${q}` : ""}`;
+  };
   switch (show.target) {
     case "library":
       return "/";
@@ -44,26 +53,26 @@ export function appUrlFor(show: ShowInApp): string {
       if (!show.folderId) throw new Error("folder needs a folderId");
       return `/folders/${show.folderId}`;
     case "book":
-      return needBook();
+      return bookPage({});
     case "source-files":
-      return `${needBook()}?tab=files`;
+      return bookPage({ tab: "files" });
     case "chapters":
-      return `${needBook()}?tab=chapters`;
+      return bookPage({ tab: "chapters" });
     case "outputs":
-      return `${needBook()}?tab=outputs`;
+      return bookPage({ tab: "outputs" });
     case "notes":
-      return `${needBook()}?tab=notes`;
+      return bookPage({ tab: "notes" });
     case "extract":
-      return `${needBook()}?dialog=extract`;
+      return bookPage({ dialog: "extract" });
     case "review-chapters":
-      return `${needBook()}?tab=chapters&dialog=structure`;
+      return bookPage({ tab: "chapters", dialog: "structure" });
     case "synthesize":
-      return `${needBook()}?tab=chapters&dialog=synthesize`;
+      return bookPage({ tab: "chapters", dialog: "synthesize" });
     case "export":
-      return `${needBook()}?tab=chapters&dialog=export`;
+      return bookPage({ tab: "chapters", dialog: "export" });
     case "chapter":
       if (!show.chapterId) throw new Error("chapter needs a chapterId");
-      return `${needBook()}?tab=chapters&chapter=${show.chapterId}`;
+      return bookPage({ tab: "chapters", chapter: show.chapterId });
     case "reader": {
       const params = new URLSearchParams();
       if (show.chapterIndex !== undefined) params.set("chapter", String(show.chapterIndex));
@@ -80,7 +89,14 @@ export function appUrlFor(show: ShowInApp): string {
 
 // What the trace says once the person has been taken there
 export function describeTarget(show: ShowInApp): string {
-  switch (show.target) {
+  const where = describePlace(show.target);
+  return show.variant && show.target !== "library" && show.target !== "folder" && show.target !== "reader"
+    ? `${where}, ${show.variant} version`
+    : where;
+}
+
+function describePlace(target: AppTarget): string {
+  switch (target) {
     case "library":
       return "Opened the library";
     case "folder":
@@ -108,7 +124,7 @@ export function describeTarget(show: ShowInApp): string {
     case "reader":
       return "Opened the reader";
     default: {
-      const unhandled: never = show.target;
+      const unhandled: never = target;
       throw new Error(`unhandled target ${unhandled}`);
     }
   }

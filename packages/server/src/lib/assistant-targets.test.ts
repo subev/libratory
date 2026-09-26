@@ -11,6 +11,10 @@ describe("assistant targets", () => {
     expect(appUrlFor({ target: "chapter", bookId: "b", chapterId: "c" })).toBe("/books/b?tab=chapters&chapter=c");
     expect(appUrlFor({ target: "reader", bookId: "b", chapterIndex: 2, atMs: 1500.4 })).toBe("/books/b/read?chapter=2&t=1500");
     expect(appUrlFor({ target: "reader", bookId: "b" })).toBe("/books/b/read");
+    expect(appUrlFor({ target: "book", bookId: "b", variant: "German" })).toBe("/books/b?variant=German");
+    expect(appUrlFor({ target: "chapters", bookId: "b", variant: "Chinese (Simplified)" })).toBe("/books/b?tab=chapters&variant=Chinese+%28Simplified%29");
+    expect(appUrlFor({ target: "reader", bookId: "b", variant: "German" })).toBe("/books/b/read");
+    expect(describeTarget({ target: "chapters", bookId: "b", variant: "German" })).toBe("Opened the chapters, German version");
   });
 
   it("refuses a target without what it needs", () => {

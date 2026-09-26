@@ -52,7 +52,7 @@ function unwrap(result: unknown): unknown {
 const showInApp = tool({
   description:
     "Take the person to a place in the app, in the window the panel is open in: the library, a folder, a book (or one of its tabs — source files, chapters, outputs, notes), " +
-    "one of the book's dialogs (extract, review-chapters, synthesize, export), one chapter's own view, or the reader at a chapter and a moment of its narration. " +
+    "one of the book's dialogs (extract, review-chapters, synthesize, export), one chapter's own view, or the reader at a chapter and a moment of its narration; with variant, the book page shows that translation or rewrite instead of the original. " +
     "Use it right after you did or found the thing worth looking at — the book just made, the chapter in question, the dialog for the step you recommend — once per answer, and say where you took them. Never as a substitute for an answer.",
   inputSchema: z.object({
     target: z.enum(APP_TARGETS),
@@ -61,6 +61,7 @@ const showInApp = tool({
     chapterId: z.string().uuid().optional().describe("For chapter"),
     chapterIndex: z.number().int().min(0).optional().describe("For reader: which chapter, 0-based"),
     atMs: z.number().min(0).optional().describe("For reader: the moment of the narration to start at"),
+    variant: z.string().trim().min(1).max(60).optional().describe("For a book page target: the version to show — a language such as German, or a rewrite's key from get_book's variants; omit for the original"),
   }),
   execute: async (input) => ({ shown: input, url: appUrlFor(input) }),
 });
