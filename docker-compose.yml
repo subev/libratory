@@ -24,6 +24,10 @@ services:
     # Behind a profile so `pnpm db:up` keeps meaning "Postgres and nothing else" on a Mac.
     # The headless path opts in:  docker compose --profile app up -d --build
     profiles: ["app"]
+    # Published by .github/workflows/docker.yml on every release, for amd64 and arm64. With both
+    # `image` and `build` here, `up -d --build` still builds from this checkout, and
+    # `pull` followed by `up -d` runs the prebuilt one — the README shows both.
+    image: ghcr.io/subev/libratory:latest
     build: .
     ports:
       # Published on localhost for the same reason HOST defaults to 127.0.0.1 — there is no login.
