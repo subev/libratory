@@ -605,7 +605,7 @@ export function AssistantThread({ open, watching = false, profileId, scope, onCr
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void ask(input); } }}
-            placeholder={closed ?? (attachments.chips.length > 0 ? "Say what to do with them, or just send…" : screen.bookId ? "Ask about this book…" : "Ask how it works, or drop a PDF…")}
+            placeholder={closed ?? (attachments.chips.length > 0 ? "Say what to do with them, or just send…" : pinned ? `Or write your own prompt over ${pinned.chapters ? (pinned.chapters.length === 1 ? "the chapter" : "these chapters") : "the whole text"}…` : screen.bookId ? "Ask about this book…" : "Ask how it works, or drop a PDF…")}
             disabled={!!closed}
             title={closed ?? undefined}
             rows={1}
