@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 
-import { getDb, resetDb, row } from "../../test/setup.ts";
-import { books, chapters, folders, notes, profiles, DEFAULT_PROFILE_ID } from "../schema.ts";
+import { ensureGraphileTables, getDb, resetDb, row } from "../../test/setup.ts";
+import { books, chapters, chapterVariants, folders, notes, profiles, DEFAULT_PROFILE_ID } from "../schema.ts";
 
 vi.mock("../db.ts", async () => {
   const { getDb } = await import("../../test/setup.ts");
@@ -35,6 +35,8 @@ const chapter = (title: string) => ({
 
 beforeEach(async () => {
   await resetDb(getDb());
+  // The variant routes clear a lane's queued jobs before requeueing, which reads the worker's tables
+  await ensureGraphileTables(getDb());
 });
 
 describe("placing a book", () => {
@@ -124,5 +126,62 @@ describe("get_book", () => {
     expect(full.chapters.map((c: { id: string }) => c.id).sort()).toEqual(rows.map((r) => r.id).sort());
     expect(full.logs.length).toBeGreaterThan(0);
     expect(await call("get_book", { id: created.id })).not.toHaveProperty("logs");
+  });
+});
+
+describe("translate_book", () => {
+  it("queues a translation of the selected chapters and lists it under the book's variants", async () => {
+    const call = await connect();
+    const created = await call("create_book", { title: "Rules", chapters: [chapter("One"), chapter("Two")] });
+
+    const queued = await call("translate_book", { id: created.id, language: "german" });
+    expect(queued.key).toBe("German");
+    expect(queued.queued).toBe(2);
+    expect(queued.variants).toEqual([
+      { key: "German", kind: "translation", label: null, chapters: { total: 2, done: 0, running: 2, failed: 0 }, withAudio: 0 },
+    ]);
+    expect((await call("get_book", { id: created.id })).variants).toHaveLength(1);
+
+    // Another spelling joins the version that exists rather than opening a second one
+    await getDb().update(chapterVariants).set({ status: "done" }).where(eq(chapterVariants.key, "German"));
+    await expect(call("translate_book", { id: created.id, language: "GERMAN" })).rejects.toThrow(/No selected chapters need "German"/);
+    expect((await call("translate_book", { id: created.id, language: "chinese (simplified)" })).key).toBe("Chinese (Simplified)");
+  });
+
+  it("refuses a language code, and anything but one target", async () => {
+    const call = await connect();
+    const created = await call("create_book", { title: "Rules", chapters: [chapter("One")] });
+    await expect(call("translate_book", { id: created.id, language: "de" })).rejects.toThrow(/English name/);
+    await expect(call("translate_book", { id: created.id })).rejects.toThrow(/exactly one/);
+    await expect(call("translate_book", { id: created.id, language: "German", preset: "summary" })).rejects.toThrow(/exactly one/);
+  });
+
+  it("rewrites only the named chapters, with a preset or a prompt", async () => {
+    const call = await connect();
+    const created = await call("create_book", { title: "Rules", chapters: [chapter("One"), chapter("Two")] });
+    const [first] = (await call("get_book", { id: created.id })).chapters as { id: string }[];
+
+    const summary = await call("translate_book", { id: created.id, preset: "summary", chapterIds: [first!.id] });
+    expect(summary.key).toBe("summary");
+    expect(summary.queued).toBe(1);
+
+    const rhymed = await call("translate_book", { id: created.id, prompt: "Rewrite it in rhyming couplets.", label: "Rhymed" });
+    expect(rhymed.key).toBe("custom-rhymed");
+    expect(rhymed.queued).toBe(2);
+    const lanes = rhymed.variants as { key: string; kind: string; label: string | null; chapters: { total: number } }[];
+    expect(lanes.map((l) => [l.key, l.kind, l.label, l.chapters.total])).toEqual([
+      ["summary", "transform", "Summary", 1],
+      ["custom-rhymed", "transform", "Rhymed", 2],
+    ]);
+
+    // A finished or queued chapter is not rewritten again unless it is named; a failed one is
+    await getDb().update(chapterVariants).set({ status: "done" }).where(eq(chapterVariants.chapterId, first!.id));
+    await expect(call("translate_book", { id: created.id, prompt: "Rewrite it in rhyming couplets.", label: "rhymed" })).rejects.toThrow(/already has "rhymed"/);
+    await getDb().update(chapterVariants).set({ status: "failed" }).where(and(eq(chapterVariants.key, "custom-rhymed"), ne(chapterVariants.chapterId, first!.id)));
+    expect((await call("translate_book", { id: created.id, prompt: "Rewrite it in rhyming couplets.", label: "rhymed" })).queued).toBe(1);
+    // The preset path is the router's: the chapter without a summary gets one, then nothing is left to queue
+    expect((await call("translate_book", { id: created.id, preset: "summary" })).queued).toBe(1);
+    await expect(call("translate_book", { id: created.id, preset: "summary" })).rejects.toThrow(/No selected chapters need/);
+    expect((await call("translate_book", { id: created.id, preset: "summary", chapterIds: [first!.id] })).queued).toBe(1);
   });
 });

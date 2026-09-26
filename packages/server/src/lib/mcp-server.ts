@@ -4,8 +4,10 @@ import { z } from "zod";
 import { appRouter } from "../router.ts";
 import { computeBookStatus } from "../routes/books.ts";
 import { db } from "../db.ts";
-import { bookFiles, bookLogs, books, chapters, folders, notes, OCR_ENGINES, DEFAULT_OCR_ENGINE, type Chapter } from "../schema.ts";
-import { and, desc, eq, ilike, inArray, isNull, sql } from "drizzle-orm";
+import { bookFiles, bookLogs, books, chapters, chapterVariants, folders, notes, OCR_ENGINES, DEFAULT_OCR_ENGINE, type Chapter, type ChapterVariant } from "../schema.ts";
+import { TRANSFORM_PRESETS } from "./transform-presets.ts";
+import { variantKeySlug } from "./transform.ts";
+import { and, asc, desc, eq, ilike, inArray, isNull, sql } from "drizzle-orm";
 import { createPdfBook, ensurePdfDir, newPdfBookId, pdfFileName, MAX_LANGUAGE_CHARS } from "./pdf-books.ts";
 import { modelKeySchema } from "./llm.ts";
 import { listAllVoices } from "./voice-list.ts";
@@ -30,6 +32,9 @@ import { copyFile, rm, stat } from "node:fs/promises";
 // blocks on it. Each request gets its own server (the transport is stateless), so this must stay cheap.
 // Only get_book answers with every chapter: an agent pays for each token of a result and polls in
 // loops, and a 300-chapter book repeated on every call was most of a session's context.
+const PRESET_IDS = TRANSFORM_PRESETS.map((p) => p.id) as [string, ...string[]];
+const PRESET_HELP = `Rewrite with a preset: ${TRANSFORM_PRESETS.map((p) => `${p.id} (${p.label})`).join(", ")}`;
+
 export function createMcpServer(profileId: string): McpServer {
   const caller = appRouter.createCaller({ profileId });
   const server = new McpServer({ name: "libratory", version: "1" });
@@ -461,6 +466,79 @@ export function createMcpServer(profileId: string): McpServer {
   );
 
   server.registerTool(
+    "translate_book",
+    {
+      description:
+        "Make a second version of the chapters beside the original: a translation into a language, or an AI rewrite (a preset, or your own instruction). Each chapter's text goes through the AI model, so it costs tokens and minutes per chapter. " +
+        "Every selected chapter, or only chapterIds (which redoes them even when finished); selected chapters that already have this version finished are skipped. " +
+        "The version is listed under variants in get_book, has its own lane in the book page's language menu, and once done can be narrated and exported (export_book with language). This is how a book is translated — export_book only writes out a version that exists.",
+      inputSchema: {
+        id: bookId,
+        language: z.string().trim().min(1).max(40).optional().describe("Translate into this language, by its English name as the app lists it: German, Bulgarian, Spanish — never a code"),
+        preset: z.enum(PRESET_IDS).optional().describe(PRESET_HELP),
+        prompt: z.string().trim().min(1).max(2000).optional().describe("Rewrite with your own instruction instead of a preset"),
+        label: z.string().trim().min(1).max(40).optional().describe("Name for a prompt rewrite, shown in the app; inferred from the prompt when omitted"),
+        chapterIds: z.array(chapterId).min(1).optional().describe("Only these chapters; omit for every selected chapter"),
+      },
+    },
+    async ({ id, language, preset, prompt, label, chapterIds }) => {
+      if ([language, preset, prompt].filter((v) => v !== undefined).length !== 1) throw new Error("Pass exactly one of language, preset or prompt");
+      if (language && /^[a-z]{2}([-_][a-z]{2,4})?$/i.test(language)) {
+        throw new Error(`Pass the language's English name, e.g. German — "${language}" is a code and would become a version of its own`);
+      }
+      const targets = chapterIds
+        ? await db.select({ id: chapters.id }).from(chapters).where(and(eq(chapters.bookId, id), inArray(chapters.id, chapterIds)))
+        : null;
+      if (targets && targets.length !== chapterIds?.length) throw new Error("A chapter is not in this book");
+
+      // Selected chapters that already have the version, or are getting it, are left alone; named ones are redone
+      const doneFor = async (key: string): Promise<Set<string>> => {
+        if (targets) return new Set();
+        const rows = await db
+          .select({ chapterId: chapterVariants.chapterId })
+          .from(chapterVariants)
+          .innerJoin(chapters, eq(chapterVariants.chapterId, chapters.id))
+          .where(and(eq(chapters.bookId, id), eq(chapterVariants.key, key), inArray(chapterVariants.status, ["done", "pending", "translating"])));
+        return new Set(rows.map((r) => r.chapterId));
+      };
+
+      if (prompt !== undefined) {
+        const rows = targets ?? await db.select({ id: chapters.id }).from(chapters).where(and(eq(chapters.bookId, id), eq(chapters.selected, true))).orderBy(asc(chapters.index));
+        if (rows.length === 0) throw new Error("No chapters are selected");
+        // The version is named by the label, else by the first call from the prompt; the rest join it by that name
+        let name = label;
+        let key = name ? await laneKey(id, `custom-${variantKeySlug(name)}`) : null;
+        let skip = key ? await doneFor(key) : new Set<string>();
+        let queued = 0;
+        for (const row of rows) {
+          if (skip.has(row.id)) continue;
+          const variant = await caller.variants.createTransform({ chapterId: row.id, prompt, ...(name ? { label: name } : {}) });
+          if (!variant) throw new Error("Failed to create the variant");
+          queued += 1;
+          if (!key) {
+            key = variant.key;
+            name = variant.label ?? undefined;
+            skip = await doneFor(key);
+          }
+        }
+        if (queued === 0) throw new Error(`Every selected chapter already has "${name}" or is getting it`);
+        return json({ key, queued, ...(await getSummary(id)) });
+      }
+
+      const key = await laneKey(id, language !== undefined ? titleCase(language) : preset ?? "");
+      if (!key) throw new Error("Pass exactly one of language, preset or prompt");
+      let queued: number;
+      if (targets) {
+        for (const row of targets) await caller.variants.start({ chapterId: row.id, key });
+        queued = targets.length;
+      } else {
+        ({ queued } = await caller.variants.processSelected({ bookId: id, key }));
+      }
+      return json({ key, queued, ...(await getSummary(id)) });
+    },
+  );
+
+  server.registerTool(
     "assemble_book",
     {
       description: "Assemble the narrated chapters into one M4B with chapter markers. With waitForAll (default) it waits for chapters still narrating. Then wait_for_book until \"output\".",
@@ -479,12 +557,13 @@ export function createMcpServer(profileId: string): McpServer {
       inputSchema: {
         id: bookId,
         format: z.enum(["pdf", "epub", "epub-sync"]),
-        language: z.string().min(1).optional().describe("Export a translation instead of the original"),
+        language: z.string().min(1).optional().describe("Export a finished version instead of the original: its key as get_book lists it under variants — a language name such as German, or a rewrite's key. translate_book makes one"),
         waitForAll: z.boolean().default(true),
       },
     },
     async (input) => {
-      await caller.books.exportDocument(input);
+      const language = input.language === undefined ? undefined : await laneKey(input.id, input.language);
+      await caller.books.exportDocument({ ...input, language });
       return json(await getSummary(input.id));
     },
   );
@@ -777,7 +856,7 @@ export type CompactBook = ReturnType<typeof compactBook>;
 
 // One book as the tools see it: the router's view plus its outputs and the last log line
 export async function loadBook(caller: Caller, id: string): Promise<CompactBook> {
-  const [book, assemblies, documents, [latestLog]] = await Promise.all([
+  const [book, assemblies, documents, [latestLog], variantRows] = await Promise.all([
     caller.books.get({ id }),
     caller.books.assemblies({ bookId: id }),
     caller.books.documents({ bookId: id }),
@@ -787,8 +866,51 @@ export async function loadBook(caller: Caller, id: string): Promise<CompactBook>
       .where(eq(bookLogs.bookId, id))
       .orderBy(desc(bookLogs.createdAt))
       .limit(1),
+    db
+      .select({ key: chapterVariants.key, kind: chapterVariants.kind, label: chapterVariants.label, status: chapterVariants.status, audioStatus: chapterVariants.audioStatus })
+      .from(chapterVariants)
+      .innerJoin(chapters, eq(chapterVariants.chapterId, chapters.id))
+      .where(eq(chapters.bookId, id))
+      .orderBy(asc(chapterVariants.createdAt)),
   ]);
-  return compactBook(book, assemblies, documents, latestLog ?? null);
+  return compactBook(book, assemblies, documents, latestLog ?? null, summarizeVariants(variantRows));
+}
+
+// "german" and "German" are one version, not two: a key the book already has wins over its spelling
+async function laneKey(bookId: string, key: string): Promise<string> {
+  const rows = await db
+    .selectDistinct({ key: chapterVariants.key })
+    .from(chapterVariants)
+    .innerJoin(chapters, eq(chapterVariants.chapterId, chapters.id))
+    .where(and(eq(chapters.bookId, bookId), sql`lower(${chapterVariants.key}) = lower(${key})`));
+  return rows[0]?.key ?? key;
+}
+
+// "chinese (simplified)" → "Chinese (Simplified)", the spelling the app's language list uses
+function titleCase(name: string): string {
+  return name.replace(/(^|[\s(])([a-zà-ÿ])/g, (_, before: string, letter: string) => before + letter.toUpperCase());
+}
+
+// The translations and rewrites a book has, one line per version: the model has to see that
+// "German" exists before it can export it, and that it does not before it offers to
+type VariantRow = Pick<ChapterVariant, "key" | "kind" | "label" | "status" | "audioStatus">;
+export type VariantSummary = { key: string; kind: VariantRow["kind"]; label: string | null; chapters: { total: number; done: number; running: number; failed: number }; withAudio: number };
+
+export function summarizeVariants(rows: VariantRow[]): VariantSummary[] {
+  const byKey = new Map<string, VariantSummary>();
+  for (const r of rows) {
+    let lane = byKey.get(r.key);
+    if (!lane) {
+      lane = { key: r.key, kind: r.kind, label: r.label, chapters: { total: 0, done: 0, running: 0, failed: 0 }, withAudio: 0 };
+      byKey.set(r.key, lane);
+    }
+    lane.chapters.total += 1;
+    if (r.status === "done") lane.chapters.done += 1;
+    else if (r.status === "failed") lane.chapters.failed += 1;
+    else if (r.status === "pending" || r.status === "translating") lane.chapters.running += 1;
+    if (r.audioStatus === "done") lane.withAudio += 1;
+  }
+  return [...byKey.values()];
 }
 
 function compactBook(
@@ -796,6 +918,7 @@ function compactBook(
   assemblies: Awaited<ReturnType<Caller["books"]["assemblies"]>>,
   documents: Awaited<ReturnType<Caller["books"]["documents"]>>,
   latestLog: { message: string; createdAt: Date } | null,
+  variants: VariantSummary[],
 ) {
   return {
     id: book.id,
@@ -842,6 +965,7 @@ function compactBook(
     })),
     assemblies: assemblies.map((a) => ({ id: a.id, outputPath: a.outputPath, sizeBytes: a.sizeBytes, createdAt: a.createdAt, downloadUrl: `/download/assembly/${a.id}` })),
     documents: documents.map((d) => ({ id: d.id, format: d.format, language: d.language, outputPath: d.outputPath, sizeBytes: d.sizeBytes, createdAt: d.createdAt, downloadUrl: `/download/document/${d.id}` })),
+    variants,
     createdAt: book.createdAt,
     updatedAt: book.updatedAt,
   };
@@ -880,6 +1004,7 @@ export function summarizeBook(book: CompactBook) {
     assembleQueued: book.assembleQueued,
     assemblies: book.assemblies.length,
     documents: book.documents.map((d) => ({ id: d.id, format: d.format, language: d.language, downloadUrl: d.downloadUrl })),
+    variants: book.variants,
   };
 }
 

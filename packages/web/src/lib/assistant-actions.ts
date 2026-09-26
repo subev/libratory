@@ -14,6 +14,7 @@ const ACTIONS: Record<CardTool, Action> = {
   extract_book: { label: "Extract the chapters", note: "Reads the pages thoroughly and splits them into chapters. Existing chapters and their audio are replaced." },
   redetect_chapters: { label: "Find the chapters again", note: "Uses the pages already read. The current chapters and their audio are replaced." },
   cleanup_chapters: { label: "Clean up the text", note: "Sends each chapter's text to the AI model, which repairs OCR artifacts into a copy the narrator reads." },
+  translate_book: { label: "Translate or rewrite the chapters", note: "Each chapter's text goes to the AI model. The new version sits beside the original in the book's language menu, ready to narrate or export." },
   synthesize_book: { label: "Narrate the chapters", note: "Runs in the background; the panel can be closed. A cloud voice is metered." },
   assemble_book: { label: "Make the audiobook", note: "Joins the narrated chapters into one M4B with chapter markers." },
   export_book: { label: "Export a document", note: "Appears under Outputs when it is done." },
@@ -76,6 +77,8 @@ const FIELD_LABELS: Record<string, string> = {
   selected: "Selected",
   markdown: "Note",
   prompt: "Prompt",
+  preset: "Rewrite",
+  label: "Name",
 };
 
 // Hidden from the card: ids the person cannot read, and a profile the panel already fixes

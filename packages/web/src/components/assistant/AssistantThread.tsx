@@ -359,7 +359,7 @@ export function AssistantThread({ open, watching = false, profileId, scope, onCr
     [],
   );
   const { pinned, unpin } = useAssistant();
-  const pageChanged = () => Promise.all([utils.books.invalidate(), utils.chapters.invalidate(), utils.notes.invalidate(), utils.folders.invalidate()]);
+  const pageChanged = () => Promise.all([utils.books.invalidate(), utils.chapters.invalidate(), utils.variants.invalidate(), utils.notes.invalidate(), utils.folders.invalidate()]);
   const { messages, sendMessage, regenerate, status, error, stop, addToolApprovalResponse, setMessages } = useChat<StoredChatMessage>({
     transport,
     messages: open?.messages,

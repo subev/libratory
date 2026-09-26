@@ -42,6 +42,8 @@ export const TOOL_TIERS = {
   cancel_book: "confirm",
   synthesize_book: "confirm",
   cleanup_chapters: "spend",
+  // Every chapter's text through the AI model, a translation or a rewrite
+  translate_book: "spend",
   // The panel's own: Ask AI as a tool — the whole text goes to the model, so it costs
   analyze_text: "spend",
   start_download: "spend",

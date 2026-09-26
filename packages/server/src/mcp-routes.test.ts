@@ -126,6 +126,7 @@ describe("/mcp", () => {
       "set_book_settings",
       "start_download",
       "synthesize_book",
+      "translate_book",
       "update_chapter",
       "upload_book",
       "wait_for_book",

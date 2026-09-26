@@ -66,7 +66,8 @@ save_note     { bookId, title: "When may a sick child return?", markdown: "… (
 | `cleanup_chapters` | AI repair of OCR artifacts (split words, stray hyphens, page furniture) into the narrated copy, for all selected chapters or `chapterIds`. |
 | `synthesize_book` | Narrate every selected chapter, or `chapterIds`; `resume` continues an interrupted chapter from its finished chunks. |
 | `assemble_book` | Build the M4B from narrated chapters; `waitForAll` (default true) waits for chapters still narrating. |
-| `export_book` | `pdf`, `epub` or `epub-sync` document of the selected chapters, optionally of a translation. |
+| `translate_book` | A second version of the selected chapters (or `chapterIds`) beside the original: `language` by its English name (`German`), a rewrite `preset` (`eli5`, `shorten`, `summary`, `enrich`), or a `prompt` with an optional `label`. Each chapter goes through the AI model; `get_book` lists the versions under `variants`. |
+| `export_book` | `pdf`, `epub` or `epub-sync` document of the selected chapters; `language` names a finished version from `variants` instead of the original. |
 | `cancel_book` | Stop extraction and narration and clear queued jobs. |
 | `search_library` | Search the text of every book; hits cite book, chapter and page. `profile`, `folder` (that folder and everything inside it), `limit`, `mode`. |
 | `save_note` | Keep an answer or analysis as a note (markdown): on a book's Notes tab with `bookId`, otherwise a library note in the profile. `author` names the writer. |
