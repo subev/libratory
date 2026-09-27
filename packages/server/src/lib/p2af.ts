@@ -88,7 +88,8 @@ export async function buildVariantP2afLayer(
     .where(and(eq(chapters.bookId, book.id), eq(chapterVariants.key, key)))
     .orderBy(asc(chapters.index));
 
-  const translation = rows.find((row) => row.variant.kind === "translation");
+  // One key is one lane, so every row shares its kind
+  const translation = rows[0]?.variant.kind === "translation";
   const manifest: ReaderManifest = {
     format: READER_FORMAT,
     book: {
