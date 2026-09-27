@@ -110,3 +110,34 @@ jobs:
             $(printf "$IMAGE@sha256:%s " *)
 
       - run: docker buildx imagetools inspect "$IMAGE:${{ steps.meta.outputs.version }}"
+
+  # The install file, published beside the image so installing and updating are one command with
+  # nothing cloned: docker compose -f oci://ghcr.io/subev/libratory-compose up -d --pull always.
+  # Image references are pinned to digests, so a versioned artifact always runs the image it
+  # shipped with; `latest` moves with the image.
+  compose:
+    needs: manifest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE }}-compose
+          tags: |
+            type=semver,pattern={{version}}
+            type=ref,event=branch
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Publish deploy/compose.yaml under the tags
+        run: |
+          docker compose version
+          for tag in $(jq -r '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON"); do
+            docker compose -f deploy/compose.yaml publish --resolve-image-digests -y "$tag"
+          done

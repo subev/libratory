@@ -1,0 +1,45 @@
+# The install file: published to ghcr.io/subev/libratory-compose on every release, so the whole
+# install (and every update) is one command in any shell, with nothing cloned or downloaded:
+#
+#   docker compose -f oci://ghcr.io/subev/libratory-compose up -d --pull always
+#
+# The root docker-compose.yml is the development file (Postgres for `pnpm db:up`, the app built
+# from the checkout). The project name and volume names match it, so an install that began from a
+# clone keeps its library when it switches to this.
+name: libratory
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: libratory
+      POSTGRES_PASSWORD: libratory
+      POSTGRES_DB: libratory
+    volumes:
+      - pgdata17:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U libratory"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  app:
+    image: ghcr.io/subev/libratory:latest
+    ports:
+      # Loopback only: there is no login. README "Docker: volumes, ports…" covers serving a LAN.
+      - "127.0.0.1:3034:3034"
+    environment:
+      DATABASE_URL: postgres://libratory:libratory@postgres:5432/libratory
+    volumes:
+      - data:/data
+      - models:/models
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata17:
+  data:
+  models:
