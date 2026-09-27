@@ -113,11 +113,10 @@ If you want "this EPUB in a cloned voice", use Ebook2Audiobook. If you want to c
 ### Docker — Linux, Windows, or a headless server
 
 ```bash
-git clone https://github.com/subev/libratory.git && cd libratory
-docker compose --profile app pull && docker compose --profile app up -d   # Postgres + the prebuilt app on one port
+docker compose -f oci://ghcr.io/subev/libratory-compose up -d --pull always
 ```
 
-The image is published to `ghcr.io/subev/libratory` for amd64 and arm64 on every release. To build it from the checkout instead — after a local change, or to run something unreleased — use `docker compose --profile app up -d --build`.
+That is the whole install, in any shell — nothing to clone or download first — and running it again is the update. It fetches the install file (`deploy/compose.yaml`) published beside the image, then Postgres and the prebuilt app, for amd64 and arm64. To build from a checkout instead — after a local change, or to run something unreleased — clone the repo and use `docker compose --profile app up -d --build`.
 
 Web UI and API share http://localhost:3034. One container holds the server, the built web UI and both Python environments (CPU-only torch, so no multi-gigabyte nvidia downloads).
 
@@ -174,9 +173,9 @@ The ⚙️ button on the home page opens Settings: it shows which local servers 
 <details>
 <summary><b>Docker: volumes, ports, and exposing it beyond localhost</b></summary>
 
-Nothing in the image is Linux-specific, so the same two commands are also the Windows route, through Docker Desktop with the WSL2 backend — that path is new, so [open an issue](https://github.com/subev/libratory/issues/new) if it does not work. Migrations apply at boot, and the first boot caches the essential Kokoro voice (~350 MB) before the server starts. The library lives in the `data` volume, every lazily-downloaded model in the `models` volume — backing those two up is the whole story. API keys set in ⚙️ Settings persist in `/data/.env`.
+Nothing in the image is Linux-specific, so the same command is also the Windows route, through Docker Desktop with the WSL2 backend — that path is new, so [open an issue](https://github.com/subev/libratory/issues/new) if it does not work. Migrations apply at boot, and the first boot caches the essential Kokoro voice (~350 MB) before the server starts. The database lives in the `pgdata17` volume, the library's files in `data`, every lazily-downloaded model in `models` — backing up those three is the whole story (the models can be downloaded again, the other two cannot). API keys set in ⚙️ Settings persist in `/data/.env`.
 
-The port is published on **127.0.0.1 deliberately**: there is no login, so anyone who can reach it can read and delete everything. Postgres is bound the same way, and for the same reason — its password is the default `libratory`. To serve your LAN, replace the mapping in a `docker-compose.override.yml` (`ports: !override ["3034:3034"]` — Compose *appends* a plain `ports` entry, and the second binding then fails on the port the first already holds) — and know who is on that network — or front it with a reverse proxy or Tailscale.
+The port is published on **127.0.0.1 deliberately**: there is no login, so anyone who can reach it can read and delete everything. Postgres is not published at all by the install file (the checkout's development file binds it to 127.0.0.1:5433) — its password is the default `libratory`. To serve your LAN, replace the mapping in an override file passed after the first, `-f oci://ghcr.io/subev/libratory-compose -f override.yaml` (`services: app: ports: !override ["3034:3034"]` — Compose *appends* a plain `ports` entry, and the second binding then fails on the port the first already holds) — and know who is on that network — or front it with a reverse proxy or Tailscale.
 
 The server tells browsers apart from strangers by matching their `Origin` against the Host they asked for. Reaching it by address — `http://192.168.1.50:3034`, `http://100.x.y.z:3034` — needs no configuration. Reaching it by *name* does: set `TRUSTED_HOSTS=library.example.com` (comma-separated, `host:port` when it is not the default port), because a name that vouches for itself is exactly what a DNS-rebinding page sends. A reverse proxy must also forward the original `Host` header (nginx: `proxy_set_header Host $host;` — Caddy already does), or every browser POST looks foreign and gets rejected.
 
