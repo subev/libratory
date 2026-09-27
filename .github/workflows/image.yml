@@ -1,0 +1,76 @@
+# Builds the headless image and boots it the way a user would, whenever a file that shapes the image
+# changes. Test runs from source and never builds it, so the image used to break silently: a pnpm
+# patch added on 9 September made every image build fail until the 27th, and nobody knew until a
+# release tried to publish one. Application code is left to Test — it changes every day, the build
+# takes about twenty minutes, and what breaks the image is how it is assembled, not what it runs.
+name: Image
+
+on:
+  push:
+    branches: [main]
+    paths: &image-inputs
+      - Dockerfile
+      - .dockerignore
+      - deploy/**
+      - scripts/docker-entrypoint.sh
+      - scripts/pins.json
+      - scripts/requirements-pocket.txt
+      - pyproject.toml
+      - uv.lock
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - patches/**
+      - "**/package.json"
+      - tsconfig.base.json
+      - .github/workflows/image.yml
+  pull_request:
+    paths: *image-inputs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-boot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Same reason as docker.yml: two torch environments and chromium outgrow a hosted runner's disk.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune -af >/dev/null
+          df -h / | tail -1
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # Tagged as the name deploy/compose.yaml references, so the boot below runs this build and
+      # never pulls the published one.
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          load: true
+          tags: ghcr.io/subev/libratory:latest
+
+      - name: Boot it with the install file
+        run: |
+          docker compose -f deploy/compose.yaml up -d --pull never --wait --wait-timeout 600
+          curl -sf http://127.0.0.1:3034/health
+          curl -sf 'http://127.0.0.1:3034/trpc/folders.list?input=%7B%7D'
+          curl -sf -o /dev/null http://127.0.0.1:3034/
+
+      # A boot that answers can still have logged a failure on the way up; the staged-files sweep
+      # running before migrations did exactly that.
+      - name: No errors while booting
+        run: |
+          docker compose -f deploy/compose.yaml logs app > boot.log 2>&1
+          if grep -E 'Error|failed' boot.log; then exit 1; fi
+
+      - if: failure()
+        run: docker compose -f deploy/compose.yaml logs
