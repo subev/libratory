@@ -60,6 +60,7 @@ jobs:
 
       - name: Boot it with the install file
         run: |
+          docker compose -f deploy/compose.yaml pull postgres
           docker compose -f deploy/compose.yaml up -d --pull never --wait --wait-timeout 600
           curl -sf http://127.0.0.1:3034/health
           curl -sf 'http://127.0.0.1:3034/trpc/folders.list?input=%7B%7D'
