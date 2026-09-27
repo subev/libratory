@@ -53,9 +53,6 @@ async function sweepStalePreviews() {
 async function main() {
   await ensureDataDirs();
   await sweepStalePreviews();
-  // Files dropped on the assistant panel and never made into a book: a day, then gone
-  await sweepStaged().catch((err: unknown) => console.error("[staged] sweep failed:", err));
-  setInterval(() => sweepStaged().catch((err: unknown) => console.error("[staged] sweep failed:", err)), 60 * 60 * 1000).unref();
 
   const fastify = Fastify(createFastifyOptions());
   // Before any register: a child scope inherits the handler its parent had when the scope was made.
@@ -282,6 +279,11 @@ async function main() {
   // machine that has never seen this project comes up against an empty database. Applying here is
   // idempotent — drizzle skips anything already recorded in __drizzle_migrations.
   await migrate(db, { migrationsFolder: env.MIGRATIONS_DIR });
+
+  // Files dropped on the assistant panel and never made into a book: a day, then gone.
+  // After migrate: on a fresh install the table does not exist until then.
+  await sweepStaged().catch((err: unknown) => console.error("[staged] sweep failed:", err));
+  setInterval(() => sweepStaged().catch((err: unknown) => console.error("[staged] sweep failed:", err)), 60 * 60 * 1000).unref();
 
   await startWorker();
 
