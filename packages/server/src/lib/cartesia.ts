@@ -8,7 +8,7 @@ import { pcm16WavHeader, readWavPcm } from "./wav.ts";
 
 const CARTESIA_URL = "https://api.cartesia.ai";
 const CARTESIA_VERSION = "2026-08-14";
-const MODEL_ID = "sonic-3.5";
+const MODEL_ID = "sonic-3.6";
 const SAMPLE_RATE = 44100;
 const PAUSE_MS = 250;
 const REQUEST_TIMEOUT_MS = 120_000;
