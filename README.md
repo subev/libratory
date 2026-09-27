@@ -146,7 +146,7 @@ An Apple Silicon Mac, or a Linux machine (x86_64 or arm64, CPU is enough), or Wi
 
 - **Mac**: [Homebrew](https://brew.sh), then: `brew install ffmpeg poppler tesseract espeak-ng python@3.12 node pnpm` — for running from source, which spawns `ffmpeg`, `pdftotext` and `tesseract` off your `PATH`. The packaged app carries its own copies and needs none of this.
 - **Linux (from source)**: `ffmpeg espeak-ng poppler-utils tesseract-ocr tesseract-ocr-eng tesseract-ocr-osd zip unzip python3.12 node pnpm` from your package manager — `pnpm run setup` names whatever is missing. Or skip all of it and run the Docker image.
-- Docker — [OrbStack](https://orbstack.dev/) or Docker Desktop on a Mac, Docker Engine on Linux (Postgres). The desktop app will require it too.
+- Docker — [OrbStack](https://orbstack.dev/) or Docker Desktop on a Mac, Docker Engine on Linux (Postgres). The desktop app requires it too.
 - Optional: an AI model for translation, rewrites, cleanup, digests, Ask AI, chat, and LLM chapter detection — [Ollama](https://ollama.com) or LM Studio running locally (auto-discovered, fully offline), or a [DeepSeek](https://platform.deepseek.com/) / OpenAI / Anthropic / Gemini API key.
 - Optional: a [Cartesia](https://cartesia.ai) or [ElevenLabs](https://elevenlabs.io) API key for their cloud voices.
 - Optional: a [HuggingFace](https://huggingface.co) account for Pocket TTS **voice cloning** — accept the terms at [kyutai/pocket-tts](https://huggingface.co/kyutai/pocket-tts) and put a read token in `HF_TOKEN`. The 26 built-in Pocket TTS voices need no account and no token.
