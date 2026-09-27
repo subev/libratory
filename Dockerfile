@@ -8,6 +8,8 @@ FROM node:22-bookworm AS web-build
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# patchedDependencies in package.json: pnpm hashes these before it installs anything.
+COPY patches patches/
 COPY packages/server/package.json packages/server/
 COPY packages/web/package.json packages/web/
 COPY packages/desktop/package.json packages/desktop/
@@ -65,6 +67,7 @@ RUN --mount=type=cache,target=/root/.cache/uv uv venv --python 3.12 /opt/venv-po
 
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches patches/
 COPY packages/server/package.json packages/server/
 COPY packages/web/package.json packages/web/
 COPY packages/desktop/package.json packages/desktop/
