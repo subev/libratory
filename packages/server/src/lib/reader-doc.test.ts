@@ -1,6 +1,10 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { buildText, chapterLink, chapterMode, printMarks } from "./reader-doc.ts";
+import { buildText, buildVariantCues, chapterLink, chapterMode, printMarks } from "./reader-doc.ts";
+import { writeSyncMap } from "./sync-map.ts";
 import type { GeometryPage } from "./page-geometry.ts";
 import type { Chapter } from "../schema.ts";
 
@@ -131,5 +135,39 @@ describe("chapterLink", () => {
     expect(chapterLink(extracted({ source: { kind: "book", bookId: "b", title: "A book" } }))).toBeUndefined();
     expect(chapterLink(extracted({ source: { kind: "api" } }))).toBeUndefined();
     expect(chapterLink(extracted({ source: null }))).toBeUndefined();
+  });
+});
+
+describe("buildVariantCues", () => {
+  it("times a translation's narration over its own paragraphs, with nothing placed on the print", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "variant-cues-"));
+    try {
+      const audioPath = path.join(dir, "ch000.mp3");
+      await writeSyncMap(audioPath, {
+        version: 1,
+        totalMs: 9000,
+        chunks: [
+          { text: "Имало едно време един крал.", startMs: 0, endMs: 4000 },
+          { text: "Той имал три дъщери.", startMs: 4000, endMs: 9000 },
+        ],
+      });
+
+      const doc = await buildVariantCues(audioPath, "Имало едно време един крал.\n\nТой имал три дъщери.\n");
+
+      expect(doc?.totalMs).toBe(9000);
+      expect(doc?.text?.blocks).toEqual([
+        { start: 0, end: 27, kind: "prose" },
+        { start: 29, end: 49, kind: "prose" },
+      ]);
+      expect(doc?.cues.map((cue) => cue.range)).toEqual([[0, 27], [29, 49]]);
+      expect(doc?.cues.some((cue) => cue.r || cue.wr)).toBe(false);
+      expect(doc?.marks).toBeUndefined();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("has nothing to offer a narration whose timings are gone", async () => {
+    expect(await buildVariantCues("/nonexistent/ch000.mp3", "Text.")).toBeNull();
   });
 });

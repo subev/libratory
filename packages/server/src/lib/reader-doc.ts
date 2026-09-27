@@ -229,15 +229,32 @@ export async function buildCues(chapter: Chapter): Promise<ReaderCues | null> {
   if (!chapter.audioPath) return null;
   const map = await readSyncMap(chapter.audioPath);
   if (!map) return null;
+  const parsed = cuesFromSyncMap(map);
+  return cuesDocument(map.totalMs, parsed, buildText(chapter), await resolveRects(chapter, parsed.cues));
+}
 
-  const { granularity, cues } = cuesFromSyncMap(map);
-  const resolved = await resolveRects(chapter, cues);
-  const text = buildText(chapter);
+// A variant's narration over its own text: a translation or rewrite is not what the print says,
+// so it is read the way a written book is, paragraph blocks and no page rects.
+export async function buildVariantCues(audioPath: string, text: string): Promise<ReaderCues | null> {
+  const map = await readSyncMap(audioPath);
+  if (!map) return null;
+  const trimmed = text.trim();
+  const readerText = trimmed ? { format: READER_FORMAT, text: trimmed, blocks: paragraphBlocks(trimmed) } : null;
+  const parsed = cuesFromSyncMap(map);
+  return cuesDocument(map.totalMs, parsed, readerText, { perCue: parsed.cues.map(() => ({ rects: [], words: null })), marks: undefined });
+}
+
+function cuesDocument(
+  totalMs: number,
+  { granularity, cues }: ReturnType<typeof cuesFromSyncMap>,
+  text: ReaderText | null,
+  resolved: Resolved,
+): ReaderCues {
   const ranges = text?.blocks ? locateChunks(text.text, cues.map((cue) => cue.text)) : [];
 
   return {
     format: READER_FORMAT,
-    totalMs: map.totalMs,
+    totalMs,
     granularity,
     marks: resolved.marks,
     ...(text?.blocks ? { text } : {}),

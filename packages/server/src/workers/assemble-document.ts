@@ -9,7 +9,7 @@ import { languageSlug, translationChunkPreviewDir } from "./synthesize-translati
 import { chapterChunkPreviewDir } from "../lib/chunk-previews.ts";
 import { ensureSyncMap } from "../lib/sync-map.ts";
 import { buildReadaloudEpub, type ReadaloudChapter } from "../lib/readaloud-epub.ts";
-import { buildP2afLayer } from "../lib/p2af.ts";
+import { buildP2afLayer, buildVariantP2afLayer } from "../lib/p2af.ts";
 import { chapterLink } from "../lib/reader-doc.ts";
 import { deferUntilInputsSettle, documentJobKey } from "../lib/output-readiness.ts";
 import type { WorkerUtils } from "graphile-worker";
@@ -275,7 +275,13 @@ async function assembleReadaloud(
       stagingDir,
       outputPath,
       p2af: language
-        ? undefined
+        ? async (exported, cover) => {
+            const layer = await buildVariantP2afLayer(book, language, exported, cover);
+            await log(layer
+              ? `Read-along layer: ${layer.cues.length} chapter(s) over their ${language} text`
+              : `No read-along layer — no ${language} chapter has timing data`);
+            return layer;
+          }
         : async (exported, cover) => {
             const layer = await buildP2afLayer(book, exported, cover);
             await log(layer

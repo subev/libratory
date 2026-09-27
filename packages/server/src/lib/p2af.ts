@@ -1,10 +1,11 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "../db.ts";
-import { chapters, type Book } from "../schema.ts";
+import { chapters, chapterVariants, type Book } from "../schema.ts";
 import { listMarkerSources } from "./marker-sources.ts";
-import { buildCues, buildManifest } from "./reader-doc.ts";
-import type { ReaderCues, ReaderManifest } from "./reader-format.ts";
+import { languageCode } from "./readaloud-epub.ts";
+import { buildCues, buildManifest, buildVariantCues, chapterLink } from "./reader-doc.ts";
+import { READER_FORMAT, type ReaderCues, type ReaderManifest } from "./reader-format.ts";
 
 // The reader documents as they ride inside a container, where every URL is a path relative to
 // book.json rather than a route on this server. The EPUB layer beside them owns the audio, so
@@ -69,4 +70,65 @@ export async function buildP2afLayer(
     cues,
     sources: sources.map((source, index) => ({ path: sourcePath(index), pdfPath: source.pdfPath })),
   };
+}
+
+// A variant's layer: its narration over its own text, with no pages or sources, because the print
+// holds the original's words and not these. Without it the reader imported the export as a plain
+// EPUB — text and no voice — although every chapter's audio was in the file.
+export async function buildVariantP2afLayer(
+  book: Book,
+  key: string,
+  exported: Map<string, ExportedChapter>,
+  cover: string | null,
+): Promise<P2afLayer | null> {
+  const rows = await db
+    .select({ chapter: chapters, variant: chapterVariants })
+    .from(chapterVariants)
+    .innerJoin(chapters, eq(chapterVariants.chapterId, chapters.id))
+    .where(and(eq(chapters.bookId, book.id), eq(chapterVariants.key, key)))
+    .orderBy(asc(chapters.index));
+
+  const translation = rows.find((row) => row.variant.kind === "translation");
+  const manifest: ReaderManifest = {
+    format: READER_FORMAT,
+    book: {
+      id: book.id,
+      title: book.title,
+      author: book.author,
+      language: languageCode(translation ? key : book.language),
+      medianBodyPt: null,
+      cover,
+    },
+    sources: [],
+    pages: [],
+    chapters: [],
+  };
+  const cues: P2afLayer["cues"] = [];
+
+  // Only what the export carries: with no pages behind it, a chapter left out would be an empty entry
+  for (const { chapter, variant } of rows) {
+    const file = exported.get(chapter.id);
+    if (!file) continue;
+    const doc = variant.audioPath && variant.text ? await buildVariantCues(variant.audioPath, variant.text) : null;
+    const link = chapterLink(chapter);
+    const path = `cues/${file.base}.json`;
+    manifest.chapters.push({
+      i: chapter.index,
+      id: chapter.id,
+      title: variant.title ?? chapter.title,
+      audio: doc ? `../audio/${file.audioFile}` : null,
+      cues: doc ? path : null,
+      text: null,
+      durationMs: doc ? variant.audioDurationMs : null,
+      pageStart: null,
+      pageEnd: null,
+      mode: "text",
+      why: "generated",
+      ...(link ? { link: { url: link } } : {}),
+    });
+    if (doc) cues.push({ path, doc });
+  }
+
+  if (cues.length === 0) return null;
+  return { manifest, cues, sources: [] };
 }
