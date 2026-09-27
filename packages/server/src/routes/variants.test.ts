@@ -1,7 +1,12 @@
+import { existsSync } from "node:fs";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { getDb, resetDb, ensureGraphileTables, row as firstRow } from "../../test/setup.ts";
 import { books, chapters, chapterVariants } from "../schema.ts";
 import { eq } from "drizzle-orm";
+import { syncMapPath } from "../lib/sync-map.ts";
 
 const { mockQuickAddJob } = vi.hoisted(() => ({ mockQuickAddJob: vi.fn(async () => {}) }));
 vi.mock("graphile-worker", () => ({ quickAddJob: mockQuickAddJob }));
@@ -115,6 +120,42 @@ describe("variants router", () => {
     const row = await caller.start({ chapterId, key: "Bulgarian", restart: true });
 
     expect(row?.title).toBeNull();
+  });
+
+  it("start with restart removes the narration of the old text, so no export ships it beside the new", async () => {
+    const db = getDb();
+    const { chapterId } = await insertFixture(db);
+    const dir = await mkdtemp(path.join(tmpdir(), "variant-narration-"));
+    const audioPath = path.join(dir, "ch000.m4a");
+    await writeFile(audioPath, "audio");
+    await writeFile(syncMapPath(audioPath), "{}");
+    await db.insert(chapterVariants).values({
+      chapterId, key: "Bulgarian", status: "done", text: "old text",
+      audioPath, audioStatus: "done", audioDurationMs: 1000, synthesizedWith: { voice: "bg-mlx:default", speed: null },
+    });
+
+    try {
+      const row = await caller.start({ chapterId, key: "Bulgarian", restart: true });
+
+      expect(row?.audioPath).toBeNull();
+      expect(row?.audioStatus).toBeNull();
+      expect(row?.synthesizedWith).toBeNull();
+      expect(existsSync(audioPath)).toBe(false);
+      expect(existsSync(syncMapPath(audioPath))).toBe(false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("start refuses to replace the text while that text is being narrated", async () => {
+    const db = getDb();
+    const { chapterId } = await insertFixture(db);
+    await db.insert(chapterVariants).values({ chapterId, key: "Bulgarian", status: "done", text: "old text", audioStatus: "synthesizing" });
+
+    await expect(caller.start({ chapterId, key: "Bulgarian", restart: true })).rejects.toThrow(/being narrated/);
+    const kept = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.chapterId, chapterId)));
+    expect(kept.text).toBe("old text");
+    expect(mockQuickAddJob).not.toHaveBeenCalled();
   });
 
   it("translateMissingTitles queues a job when finished translations lack titles", async () => {

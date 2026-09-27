@@ -10,6 +10,7 @@ import type { WorkerUtils } from "graphile-worker";
 import { queueIndexBook } from "../lib/search-index.ts";
 import { beginTranslationLive, type TranslationLiveHandle } from "../lib/translate-live.ts";
 import { synthesisJobSpec } from "../lib/synthesis-jobs.ts";
+import { NO_NARRATION, removeVariantNarration } from "../lib/variant-narration.ts";
 
 export type TranslatePayload = {
   translationId: string;
@@ -68,8 +69,14 @@ export async function translate(
     let translated = done > 0 ? row.text : "";
     const existingTitle = done > 0 ? row.title : null;
     if (done === 0) {
-      await db.update(chapterVariants).set({ text: "", progress: null, title: null, sourceHash, updatedAt: new Date() })
-        .where(owned);
+      const reset = await db.update(chapterVariants)
+        .set({ text: "", progress: null, title: null, sourceHash, ...NO_NARRATION, updatedAt: new Date() })
+        .where(owned)
+        .returning({ id: chapterVariants.id });
+      if (reset.length > 0 && row.audioPath) {
+        await removeVariantNarration({ bookId, key: row.key, chapterIndex: chapter.index, audioPath: row.audioPath });
+        await chLog(`Removed the ${variantLabel(row)} narration of the previous text`);
+      }
     }
 
     const isTranslation = row.kind === "translation";

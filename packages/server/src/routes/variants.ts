@@ -17,6 +17,7 @@ import { assembleJobKey, inFlightInputs } from "../lib/output-readiness.ts";
 import { stat, unlink, rm } from "node:fs/promises";
 import type { SourceBlock } from "../lib/marker.ts";
 import { synthesisJobSpec } from "../lib/synthesis-jobs.ts";
+import { NO_NARRATION, removeVariantNarration } from "../lib/variant-narration.ts";
 
 const connectionString = env.DATABASE_URL;
 
@@ -215,13 +216,16 @@ export const variantsRouter = router({
       let variantId: string;
       if (existing) {
         const reset = input.restart || existing.status === "done";
+        if (reset && existing.audioStatus === "synthesizing") {
+          throw new Error("This chapter is being narrated from its current text — stop the narration first");
+        }
         const [updated] = await db
           .update(chapterVariants)
           .set({
             status: "pending",
             error: null,
             updatedAt: new Date(),
-            ...(reset ? { text: "", progress: null, title: null } : {}),
+            ...(reset ? { text: "", progress: null, title: null, ...NO_NARRATION } : {}),
             params: {
               ...existing.params,
               ...(input.thinking !== undefined && { thinking: input.thinking }),
@@ -232,6 +236,7 @@ export const variantsRouter = router({
           .returning({ id: chapterVariants.id });
         if (!updated) throw new Error("Failed to update the variant");
         variantId = updated.id;
+        if (reset) await removeVariantNarration({ bookId: chapter.bookId, key: input.key, chapterIndex: chapter.index, audioPath: existing.audioPath });
         await deleteQueuedTranslateJobs([variantId]);
         await appendLog(chapter.bookId, `[Ch ${chapter.index + 1}] ${queuedLogLine(existing, input.key)}`);
       } else {
@@ -303,6 +308,9 @@ export const variantsRouter = router({
 
       let variantId: string;
       if (existing) {
+        if (existing.audioStatus === "synthesizing") {
+          throw new Error("This chapter is being narrated from its current text — stop the narration first");
+        }
         const [updated] = await db
           .update(chapterVariants)
           .set({
@@ -312,12 +320,14 @@ export const variantsRouter = router({
             text: "",
             progress: null,
             title: null,
+            ...NO_NARRATION,
             updatedAt: new Date(),
           })
           .where(eq(chapterVariants.id, existing.id))
           .returning({ id: chapterVariants.id });
         if (!updated) throw new Error("Failed to update the variant");
         variantId = updated.id;
+        await removeVariantNarration({ bookId: chapter.bookId, key, chapterIndex: chapter.index, audioPath: existing.audioPath });
         await deleteQueuedTranslateJobs([variantId]);
       } else {
         const [created] = await db

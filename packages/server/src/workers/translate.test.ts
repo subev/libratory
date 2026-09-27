@@ -1,3 +1,7 @@
+import { existsSync } from "node:fs";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getDb, resetDb, row as firstRow } from "../../test/setup.ts";
 import { books, chapters, chapterVariants } from "../schema.ts";
@@ -184,6 +188,31 @@ describe("translate worker", () => {
       { translationId, bookId },
       { maxAttempts: 1 },
     );
+  });
+
+  it("removes the narration of the previous text when a fresh run starts", async () => {
+    const db = getDb();
+    const { bookId, translationId } = await insertFixture(db);
+    const dir = await mkdtemp(path.join(tmpdir(), "translate-narration-"));
+    const audioPath = path.join(dir, "ch000.m4a");
+    await writeFile(audioPath, "audio");
+    await db.update(chapterVariants)
+      .set({ audioPath, audioStatus: "done", audioDurationMs: 1000 })
+      .where(eq(chapterVariants.id, translationId));
+    mockTranslateChunk.mockImplementation(async () => "BG");
+
+    try {
+      await translate({ translationId, bookId }, helpers);
+
+      const row = firstRow(await db.select().from(chapterVariants).where(eq(chapterVariants.id, translationId)));
+      expect(row.status).toBe("done");
+      expect(row.audioPath).toBeNull();
+      expect(row.audioStatus).toBeNull();
+      expect(existsSync(audioPath)).toBe(false);
+      expect(mockAddJob).not.toHaveBeenCalled();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it("does not enqueue synthesis when no audio was queued", async () => {
