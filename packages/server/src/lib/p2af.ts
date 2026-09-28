@@ -37,6 +37,7 @@ export async function buildP2afLayer(
   book: Book,
   exported: Map<string, ExportedChapter>,
   cover: string | null,
+  translationKeys: string[] = [],
 ): Promise<P2afLayer | null> {
   const manifest = await buildManifest(book);
   // A book with no PDF has no pages to lose, and its layer is cues over text. One that has a PDF
@@ -51,7 +52,7 @@ export async function buildP2afLayer(
   const byId = new Map(rows.map((row) => [row.id, row]));
   const cues: P2afLayer["cues"] = [];
   const bilingual: NonNullable<P2afLayer["bilingual"]> = [];
-  const prepared = await bilingualReferencesForBook(book.id);
+  const prepared = translationKeys.length ? (await bilingualReferencesForBook(book.id)).filter((ref) => translationKeys.includes(ref.key)) : [];
 
   for (const entry of manifest.chapters) {
     // The text lives in the EPUB layer beside this one; a second copy for the reader would be the
@@ -167,6 +168,7 @@ function audioExtension(audioPath: string): string {
 export async function buildTextP2afLayer(
   book: Book,
   exported: { id: string; index: number; title: string; text: string }[],
+  translationKeys: string[] = [],
 ): Promise<P2afLayer> {
   const layer: P2afLayer = {
     manifest: { format: READER_FORMAT,
@@ -174,7 +176,7 @@ export async function buildTextP2afLayer(
       sources: [], pages: [], chapters: [] },
     cues: [], texts: [], sources: [], bilingual: [],
   };
-  const prepared = await bilingualReferencesForBook(book.id);
+  const prepared = translationKeys.length ? (await bilingualReferencesForBook(book.id)).filter((ref) => translationKeys.includes(ref.key)) : [];
   for (const chapter of exported) {
     const text = chapter.text.trim();
     const resource = `text/${chapter.id}.json`;

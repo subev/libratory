@@ -1,7 +1,10 @@
 import { buildBilingualDocument } from "./bilingual-document.ts";
 import type { FastifyInstance } from "fastify";
 
-import { bookForReader, buildCues, buildManifest, buildText, chapterForReader } from "./reader-doc.ts";
+import { eq } from "drizzle-orm";
+import { db } from "../db.ts";
+import { chapterVariants } from "../schema.ts";
+import { bookForReader, buildCues, buildManifest, buildText, buildVariantCues, chapterForReader } from "./reader-doc.ts";
 import { isUuid } from "./uuid.ts";
 
 export function registerReaderRoutes(fastify: FastifyInstance) {
@@ -46,5 +49,17 @@ export function registerReaderRoutes(fastify: FastifyInstance) {
     if (!cues) return reply.code(404).send({ error: "Chapter has no timing map yet" });
 
     return reply.send(cues);
+  });
+
+  // A translation's or rewrite's own recording, timed against its own text
+  fastify.get("/read/variant/:variantId/cues.json", async (request, reply) => {
+    const { variantId } = request.params as { variantId: string };
+    if (!isUuid(variantId)) return reply.code(400).send({ error: "Invalid variant id" });
+    const [variant] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, variantId));
+    if (!variant) return reply.code(404).send({ error: "Variant not found" });
+    const cues = variant.audioStatus === "done" && variant.audioPath && variant.text.trim() ? await buildVariantCues(variant.audioPath, variant.text) : null;
+    if (!cues) return reply.code(404).send({ error: "Variant has no timing map yet" });
+
+    return reply.header("Cache-Control", "no-store").send(cues);
   });
 }

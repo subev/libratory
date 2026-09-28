@@ -9,7 +9,7 @@ function book(overrides: Partial<Book> = {}): Book {
     language: null, searchIndex: null, folderId: null, totalWords: 0, totalDurationMs: 0, outputPath: "/out/book.m4b", downloadUrl: "/download/b",
     assembleQueued: false, files: [{ index: 0, filename: "a.pdf", status: "done", hasRawText: true, rawWords: 10, error: null }],
     chapters: [{ id: "c", index: 0, title: "One", status: "done", selected: true, wordCount: 10, pageStart: 1, pageEnd: 2, durationMs: 1000, hasAudio: true, error: null }],
-    assemblies: [], documents: [], createdAt: new Date(), updatedAt: new Date(),
+    assemblies: [], documents: [], variants: [], createdAt: new Date(), updatedAt: new Date(),
     ...overrides,
   } as Book;
 }
@@ -21,6 +21,9 @@ describe("stageReached", () => {
     const narrating = book({ chapters: [{ ...book().chapters[0]!, status: "synthesizing", hasAudio: false }] });
     expect(stageReached(narrating, "output", idle)).toBeNull();
     expect(stageReached(narrating, "audio", idle)).toBeNull();
+    const lane = book({ variants: [{ key: "German", kind: "translation", label: null, chapters: { total: 1, done: 1, running: 0, failed: 0 }, withAudio: 0, narrating: 1 }] });
+    expect(stageReached(lane, "audio", idle)).toBeNull();
+    expect(stageReached(lane, "output", idle)).toBeNull();
     expect(stageReached(book({ assembleQueued: true }), "output", idle)).toBeNull();
     expect(stageReached(book(), "output", idle)).toEqual({ satisfied: true });
   });

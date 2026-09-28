@@ -4,6 +4,8 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import path from "node:path";
 
+import { attachReaderLayer } from "./epub-reader-layer.ts";
+import type { P2afLayer } from "./p2af.ts";
 import { buildReadaloudEpub, languageCode } from "./readaloud-epub.ts";
 import { bookOutputDir } from "./paths.ts";
 import type { SyncMap } from "./sync-map.ts";
@@ -128,6 +130,48 @@ describe("buildReadaloudEpub", () => {
     const nav = await zipEntry(outputPath, "OEBPS/nav.xhtml");
     expect(nav).toContain('<a href="ch000.xhtml">Intro &lt;1&gt;</a>');
     expect(nav).toContain('<a href="ch001.xhtml">Chapter Two</a>');
+  });
+
+  it.each([[false, false], [true, false], [false, true], [true, true]])("attaches exactly the chosen recordings to bilingual EPUB: %s / %s", async (sourceAudio, targetAudio) => {
+    const base = path.join(baseDir, "plain");
+    await mkdir(path.join(base, "META-INF"), { recursive: true });
+    await mkdir(path.join(base, "EPUB"), { recursive: true });
+    await writeFile(path.join(base, "mimetype"), "application/epub+zip");
+    await writeFile(path.join(base, "META-INF/container.xml"), '<container><rootfiles><rootfile full-path="EPUB/package.opf"/></rootfiles></container>');
+    await writeFile(path.join(base, "EPUB/package.opf"), '<package><manifest><item id="text" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="text"/></spine></package>');
+    await writeFile(path.join(base, "EPUB/chapter.xhtml"), "<html><body>Original text</body></html>");
+    await execFileAsync("zip", ["-X", "-q", "-0", outputPath, "mimetype"], { cwd: base });
+    await execFileAsync("zip", ["-X", "-q", "-r", outputPath, "META-INF", "EPUB"], { cwd: base });
+    const doc = readBilingualDocument(bilingualFixture);
+    const audio: NonNullable<P2afLayer["bilingual"]>[number]["audio"] = [];
+    for (const [side, enabled] of [["source", sourceAudio], ["target", targetAudio]] as const) {
+      const narration = doc[side].narration;
+      if (!narration) throw new Error("Fixture narration missing");
+      if (!enabled) { doc[side].narration = null; continue; }
+      const file = path.join(base, `${side}.m4a`);
+      await writeFile(file, side);
+      narration.audio = `audio/${side}.m4a`;
+      narration.revision = textRevision(side);
+      audio.push({ path: narration.audio, sourcePath: file, mediaType: "audio/mp4" });
+    }
+    const layer: P2afLayer = {
+      manifest: { format: "p2af/1", book: { id: "chosen", title: "Chosen", author: null, language: "en", cover: null, medianBodyPt: null }, sources: [], pages: [],
+        chapters: [{ id: doc.chapterId, i: 0, title: "Example", text: "text/source.json", audio: doc.source.narration?.audio ?? null,
+          cues: null, durationMs: doc.source.narration?.totalMs ?? null, pageStart: null, pageEnd: null, mode: "text",
+          bilingual: [{ key: doc.key, language: doc.target.language, url: "bilingual/selected.json" }] }] },
+      cues: [], sources: [], texts: [{ path: "text/source.json", doc: { format: "p2af/1", text: doc.source.text } }],
+      bilingual: [{ path: "bilingual/selected.json", doc, audio }],
+    };
+    await attachReaderLayer(outputPath, path.join(baseDir, "attach"), layer);
+    const opf = await zipEntry(outputPath, "EPUB/package.opf");
+    expect(opf.includes('href="p2af/audio/source.m4a"')).toBe(sourceAudio);
+    expect(opf.includes('href="p2af/audio/target.m4a"')).toBe(targetAudio);
+    const { stdout } = await execFileAsync("unzip", ["-v", outputPath]);
+    for (const [side, enabled] of [["source", sourceAudio], ["target", targetAudio]] as const) {
+      const line = stdout.split("\n").find((line) => line.includes(`p2af/audio/${side}.m4a`));
+      if (enabled) expect(line).toContain("Stored"); else expect(line).toBeUndefined();
+    }
+    expect(readBilingualDocument(JSON.parse(await zipEntry(outputPath, "EPUB/p2af/bilingual/selected.json")))).toEqual(doc);
   });
 
   it.each([null, "text", "recording", "clock"] as const)("packages bilingual data only when its chapter and recording match (%s)", async (fault) => {

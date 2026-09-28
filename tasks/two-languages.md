@@ -51,6 +51,18 @@ findings, then remove the spike code, temporary viewers and adapters once produc
 and export replace them. The [delivery plan](../docs/two-languages-implementation-plan.md#completion-cleanup)
 tracks this as a completion step; the finished feature must not depend on local spike artifacts.
 
+**Export choice (user feedback, 2026-09-28):** prepared bilingual attachments currently enter
+original-language EPUB exports automatically; the export dialog does not identify or select them.
+Make bilingual export an explicit choice in the existing Export dialog, producing a separately
+labelled EPUB. Let the user choose the included languages and available narration for each, show
+readiness across the selected chapters (sentence pairs, word links and word timing are distinct),
+and explain incomplete chapters before export. Ordinary single-language export must remain an
+explicit option. Persist the selection through queued jobs and output metadata, and expose the
+same choices through assistant/MCP. Reuse the existing EPUB/bilingual document format; this is
+an export selection and packaging change, not a new container format. No implicit generation or
+paid preparation during export. Address alongside reader acceptance before declaring the feature
+complete.
+
 **Status (2026-09-27):** spike, then an [independent review](../docs/two-languages-review.md), then
 a second spike pass that fixed what the review reproduced and tested its token-ID link prompt. The
 architecture held; the first pass's scoring, word locator and timing labels did not. Everything

@@ -39,6 +39,8 @@ export const TOOL_TIERS = {
   redetect_chapters: "confirm",
   assemble_book: "confirm",
   export_book: "confirm",
+  // Pairing sentences is local and free; linking words goes through the AI model
+  prepare_bilingual: "confirm",
   cancel_book: "confirm",
   synthesize_book: "confirm",
   cleanup_chapters: "spend",
@@ -72,6 +74,8 @@ export function tierOf(name: AssistantToolName, input: Record<string, unknown>):
       return input.action === "create" ? "confirm" : "quick";
     case "redetect_chapters":
       return input.llmChapterDetection === true ? "spend" : "confirm";
+    case "prepare_bilingual":
+      return input.stage === "links" ? "spend" : "confirm";
     case "upload_book":
       return input.ocrEngine === "llm" ? "spend" : "confirm";
     case "extract_book":

@@ -1,3 +1,4 @@
+import { bilingualExportSchema, bilingualExportStatus, namedChapters } from "../lib/bilingual-export.ts";
 import { bookFileOrder } from "../lib/book-file-order.ts";
 import { extractionProgress } from "../lib/ocr-progress.ts";
 import { extractionSettingsSchema } from "../lib/extraction-presets.ts";
@@ -169,7 +170,7 @@ export const booksRouter = router({
 
     const documentAgg = (await db.execute(sql`
       SELECT book_id, format, count(*)::int AS count FROM documents GROUP BY book_id, format
-    `)) as unknown as Array<{ book_id: string; format: "pdf" | "epub" | "epub-sync"; count: number }>;
+    `)) as unknown as Array<{ book_id: string; format: "pdf" | "epub" | "epub-sync" | "epub-bilingual"; count: number }>;
 
     const lastLogAgg = (await db.execute(sql`
       SELECT book_id, max(created_at) AS last FROM book_logs GROUP BY book_id
@@ -248,6 +249,7 @@ export const booksRouter = router({
           pdfs: documentRows.find((d) => d.format === "pdf")?.count ?? 0,
           epubs: documentRows.find((d) => d.format === "epub")?.count ?? 0,
           syncedEpubs: documentRows.find((d) => d.format === "epub-sync")?.count ?? 0,
+          bilingualEpubs: documentRows.find((d) => d.format === "epub-bilingual")?.count ?? 0,
         },
         lastActivityAt,
       };
@@ -1063,7 +1065,8 @@ export const booksRouter = router({
     .input(z.object({
       id: z.string().uuid(),
       language: z.string().min(1).optional(),
-      format: z.enum(["pdf", "epub", "epub-sync"]),
+      format: z.enum(["pdf", "epub", "epub-sync", "epub-bilingual"]),
+      bilingual: bilingualExportSchema.optional(),
       waitForAll: z.boolean().optional(),
     }))
     .mutation(async ({ input }) => {
@@ -1071,7 +1074,15 @@ export const booksRouter = router({
       if (!book) throw new Error("Book not found");
       if (book.status === "assembling") throw new Error("Assembly already in progress");
 
-      const waitingFor = input.waitForAll
+      if (input.format !== "epub-bilingual" && input.bilingual) throw new Error("Narration choices require Bilingual EPUB");
+      if (input.format === "epub-bilingual") {
+        if (!input.language || !input.bilingual) throw new Error("Choose a translation and narration options");
+        const ready = await bilingualExportStatus(input.id, input.language);
+        if (!ready.length) throw new Error("Select chapters before exporting Bilingual EPUB");
+        const unpaired = ready.flatMap((chapter) => chapter.paired ? [] : [{ index: chapter.index, title: chapter.title }]);
+        if (unpaired.length) throw new Error(`Pair current sentences first (Bilingual reading in the ${input.language} lane): ${namedChapters(unpaired)}`);
+      }
+      const waitingFor = input.waitForAll && input.format !== "epub-bilingual"
         ? await inFlightInputs(input.id, input.language ?? null, input.format === "epub-sync" ? "audio" : "text")
         : 0;
 
@@ -1127,7 +1138,7 @@ export const booksRouter = router({
           : "No chapters selected");
       }
 
-      const formatLabel = input.format === "epub-sync" ? "synced EPUB" : input.format.toUpperCase();
+      const formatLabel = input.format === "epub-bilingual" ? "Bilingual EPUB" : input.format === "epub-sync" ? "synced EPUB" : input.format.toUpperCase();
       const langLabel = input.language ? ` · ${input.language}` : "";
       await appendLog(input.id, waitingFor > 0
         ? `Queuing ${formatLabel} export once ${waitingFor} chapter${waitingFor !== 1 ? "s" : ""} finish${waitingFor === 1 ? "es" : ""}${langLabel}`
@@ -1140,7 +1151,8 @@ export const booksRouter = router({
           bookId: input.id,
           language: input.language,
           format: input.format,
-          waitForAll: input.waitForAll,
+          bilingual: input.bilingual,
+          waitForAll: input.format === "epub-bilingual" ? false : input.waitForAll,
         },
         { maxAttempts: 1, jobKey: documentJobKey(input.id, input.format, input.language), jobKeyMode: "replace" },
       );
@@ -1157,7 +1169,7 @@ export const booksRouter = router({
         JOIN graphile_worker._private_tasks t ON t.id = j.task_id
         WHERE t.identifier = 'assembleDocument' AND j.payload->>'bookId' = ${input.bookId}
       `)) as unknown as Array<{
-        format: "pdf" | "epub" | "epub-sync";
+        format: "pdf" | "epub" | "epub-sync" | "epub-bilingual";
         language: string | null;
         running: boolean;
         waiting: boolean;

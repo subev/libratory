@@ -309,7 +309,7 @@ export const documents = pgTable("documents", {
   id: uuid("id").primaryKey().defaultRandom(),
   bookId: uuid("book_id").notNull().references(() => books.id, { onDelete: "cascade" }),
   language: text("language"),
-  format: text("format", { enum: ["pdf", "epub", "epub-sync"] }).notNull(),
+  format: text("format", { enum: ["pdf", "epub", "epub-sync", "epub-bilingual"] }).notNull(),
   outputPath: dataPath("output_path").notNull(),
   chapterCount: integer("chapter_count").notNull(),
   chapterSummary: text("chapter_summary").notNull(),

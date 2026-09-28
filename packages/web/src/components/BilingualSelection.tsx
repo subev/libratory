@@ -15,7 +15,7 @@ export function BilingualSelection({ bookId, chapterIds, translationKey, onClose
   const selection = trpc.bilingual.selection.useQuery(input, {
     refetchInterval: (query) => query.state.data?.some((row) => row.status?.busy) ? 2000 : false,
   });
-  const refresh = () => Promise.all([utils.bilingual.selection.invalidate(input), utils.bilingual.status.invalidate()]);
+  const refresh = () => Promise.all([utils.bilingual.selection.invalidate(input), utils.bilingual.status.invalidate(), utils.bilingual.readiness.invalidate(), utils.bilingual.exportStatus.invalidate()]);
   const prepare = trpc.bilingual.prepareSelection.useMutation({ onSuccess: refresh });
   const cancel = trpc.bilingual.cancelSelection.useMutation({ onSuccess: refresh });
   const rows = selection.data ?? [];
@@ -71,7 +71,7 @@ export function BilingualSelection({ bookId, chapterIds, translationKey, onClose
           </li>;
         })}
       </ul>
-      <p className="shrink-0 text-xs text-(--text-muted)">Preparation continues when this panel is closed. Export from the original-language view to include prepared translations.</p>
+      <p className="shrink-0 text-xs text-(--text-muted)">Preparation continues when this panel is closed. Choose Bilingual EPUB in Export to pick the translation and recordings.</p>
     </div>
   </Modal>;
 }

@@ -1,3 +1,4 @@
+import { bilingualExportSchema, bilingualReadiness } from "./bilingual-export.ts";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
@@ -55,7 +56,9 @@ export function createMcpServer(profileId: string): McpServer {
   };
 
   const getBook = (id: string) => loadBook(caller, id);
-  const getSummary = async (id: string) => summarizeBook(await getBook(id));
+  // bilingual: per translation, which selected chapters are paired for two-language reading and
+  // export, and which are not — so an export is offered only when it can run
+  const getSummary = async (id: string) => ({ ...summarizeBook(await getBook(id)), bilingual: await bilingualReadiness(id) });
 
   // The UI hides full extraction until the models are on disk; MCP has no such gate, and without
   // this the Python step fails offline with an error that names nothing the caller can do.
@@ -455,11 +458,23 @@ export function createMcpServer(profileId: string): McpServer {
     {
       description:
         "Narrate every selected chapter with the book's voice, re-narrating ones that already have audio; or only chapterIds, where resume=true continues an interrupted chapter from its finished chunks. " +
+        "With language, narrate that translation's lane instead (its key as get_book lists it under variants), with voice and speed setting the lane's own narrator first — pick one for that language from list_voices; without them the lane keeps its voice, or the book's. " +
         "Then wait_for_book until \"audio\", or assemble_book with waitForAll.",
-      inputSchema: { id: bookId, chapterIds: z.array(chapterId).min(1).optional(), resume: z.boolean().default(false) },
+      inputSchema: {
+        id: bookId, chapterIds: z.array(chapterId).min(1).optional(), resume: z.boolean().default(false),
+        language: z.string().min(1).optional().describe("Narrate this translation or rewrite instead of the original: its key as get_book lists it under variants"),
+        voice: z.string().min(1).optional().describe("Narrator voice id from list_voices for the lane named by language"),
+        speed: z.number().min(0.5).max(2).optional(),
+      },
     },
-    async ({ id, chapterIds, resume }) => {
-      if (chapterIds) for (const chapter of chapterIds) await caller.chapters.queue({ id: chapter, resume });
+    async ({ id, chapterIds, resume, language, voice, speed }) => {
+      if ((voice !== undefined || speed !== undefined) && language === undefined) throw new Error("voice and speed set a lane's narrator: pass language too, or use set_book_settings for the book's voice");
+      if (language !== undefined) {
+        const key = await laneKey(id, language);
+        if (voice !== undefined || speed !== undefined) await caller.variants.setVoice({ bookId: id, key, ...(voice !== undefined ? { voice } : {}), ...(speed !== undefined ? { speed } : {}) });
+        if (chapterIds) for (const chapter of chapterIds) await caller.variants.queueAudio({ chapterId: chapter, key, resume });
+        else await caller.variants.processSelectedAudio({ bookId: id, key });
+      } else if (chapterIds) for (const chapter of chapterIds) await caller.chapters.queue({ id: chapter, resume });
       else await caller.books.processSelected({ id });
       return json(await getSummary(id));
     },
@@ -553,10 +568,11 @@ export function createMcpServer(profileId: string): McpServer {
   server.registerTool(
     "export_book",
     {
-      description: "Export the selected chapters as a document: pdf, epub, or epub-sync (text plus narration, read-along). The result appears under documents in get_book.",
+      description: "Export the selected chapters as a document: pdf, epub, epub-sync (single-language text plus narration), or epub-bilingual (original plus a prepared translation). For epub-bilingual, language selects the translation and bilingual selects available recordings; every selected chapter must already be paired — get_book's bilingual field lists the unpaired ones, and prepare_bilingual pairs them. Offer this export only when unpaired is empty. The result appears under documents in get_book.",
       inputSchema: {
         id: bookId,
-        format: z.enum(["pdf", "epub", "epub-sync"]),
+        format: z.enum(["pdf", "epub", "epub-sync", "epub-bilingual"]),
+        bilingual: bilingualExportSchema.optional(),
         language: z.string().min(1).optional().describe("Export a finished version instead of the original: its key as get_book lists it under variants — a language name such as German, or a rewrite's key. translate_book makes one"),
         waitForAll: z.boolean().default(true),
       },
@@ -565,6 +581,36 @@ export function createMcpServer(profileId: string): McpServer {
       const language = input.language === undefined ? undefined : await laneKey(input.id, input.language);
       await caller.books.exportDocument({ ...input, language });
       return json(await getSummary(input.id));
+    },
+  );
+
+  server.registerTool(
+    "prepare_bilingual",
+    {
+      description:
+        "Prepare two-language reading for the selected chapters of a finished translation, the step before export_book epub-bilingual. " +
+        "stage pairs matches each original sentence with its translated sentence with the local search model (free; needs the search bundle from get_capabilities). " +
+        "stage links asks the AI model to link the words inside matched sentences (costs a few cents per chapter) and needs pairs first. " +
+        "Only missing or stale work is requested; runs in the background — poll get_book's bilingual field.",
+      inputSchema: {
+        id: bookId,
+        language: z.string().min(1).describe("The translation's key as get_book lists it under variants — a language name such as German"),
+        stage: z.enum(["pairs", "links"]),
+        model: modelKeySchema.optional().describe("AI model for stage links; the default model when omitted"),
+        chapterIds: z.array(chapterId).min(1).optional().describe("Only these chapters; the selected chapters when omitted"),
+      },
+    },
+    async ({ id, language, stage, model, chapterIds }) => {
+      const key = await laneKey(id, language);
+      const book = await getBook(id);
+      const ids = chapterIds ?? book.chapters.filter((c) => c.selected).map((c) => c.id);
+      if (ids.length === 0) throw new Error("No chapters selected — select some with update_chapter or pass chapterIds");
+      const results = await caller.bilingual.prepareSelection({ bookId: id, chapterIds: ids, key, stage, ...(model ? { model } : {}) });
+      return json({
+        queued: results.filter((r) => r.queued).length,
+        errors: results.filter((r) => r.error).map((r) => ({ chapterId: r.chapterId, error: r.error })),
+        ...(await getSummary(id)),
+      });
     },
   );
 
@@ -894,14 +940,14 @@ function titleCase(name: string): string {
 // The translations and rewrites a book has, one line per version: the model has to see that
 // "German" exists before it can export it, and that it does not before it offers to
 type VariantRow = Pick<ChapterVariant, "key" | "kind" | "label" | "status" | "audioStatus">;
-export type VariantSummary = { key: string; kind: VariantRow["kind"]; label: string | null; chapters: { total: number; done: number; running: number; failed: number }; withAudio: number };
+export type VariantSummary = { key: string; kind: VariantRow["kind"]; label: string | null; chapters: { total: number; done: number; running: number; failed: number }; withAudio: number; narrating: number };
 
 export function summarizeVariants(rows: VariantRow[]): VariantSummary[] {
   const byKey = new Map<string, VariantSummary>();
   for (const r of rows) {
     let lane = byKey.get(r.key);
     if (!lane) {
-      lane = { key: r.key, kind: r.kind, label: r.label, chapters: { total: 0, done: 0, running: 0, failed: 0 }, withAudio: 0 };
+      lane = { key: r.key, kind: r.kind, label: r.label, chapters: { total: 0, done: 0, running: 0, failed: 0 }, withAudio: 0, narrating: 0 };
       byKey.set(r.key, lane);
     }
     lane.chapters.total += 1;
@@ -909,6 +955,7 @@ export function summarizeVariants(rows: VariantRow[]): VariantSummary[] {
     else if (r.status === "failed") lane.chapters.failed += 1;
     else if (r.status === "pending" || r.status === "translating") lane.chapters.running += 1;
     if (r.audioStatus === "done") lane.withAudio += 1;
+    else if (r.audioStatus === "pending" || r.audioStatus === "synthesizing") lane.narrating += 1;
   }
   return [...byKey.values()];
 }
@@ -1034,8 +1081,10 @@ async function queuedWork(bookId: string): Promise<QueuedWork> {
 const AUDIO_IN_FLIGHT = new Set(["pending", "normalizing", "synthesizing"]);
 const EXTRACTION_IN_FLIGHT = new Set(["pending", "extracting"]);
 
+// A lane's narration counts too: synthesize_book with language runs there, and a caller waiting
+// for "audio" wants that recording as much as the original's
 function audioSettled(book: CompactBook): boolean {
-  return !book.chapters.some((c) => c.selected && AUDIO_IN_FLIGHT.has(c.status));
+  return !book.chapters.some((c) => c.selected && AUDIO_IN_FLIGHT.has(c.status)) && !book.variants.some((lane) => lane.narrating > 0);
 }
 
 export const WAIT_STAGES = ["text", "searchable", "chapters", "audio", "output"] as const;

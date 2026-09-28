@@ -10,17 +10,20 @@ import { chapterChunkPreviewDir } from "../lib/chunk-previews.ts";
 import { ensureSyncMap } from "../lib/sync-map.ts";
 import { buildReadaloudEpub, type ReadaloudChapter } from "../lib/readaloud-epub.ts";
 import { buildP2afLayer, buildVariantP2afLayer, buildTextP2afLayer } from "../lib/p2af.ts";
-import { attachTextReaderLayer } from "../lib/epub-reader-layer.ts";
+import { attachReaderLayer, attachTextReaderLayer } from "../lib/epub-reader-layer.ts";
 import { chapterLink } from "../lib/reader-doc.ts";
 import { deferUntilInputsSettle, documentJobKey } from "../lib/output-readiness.ts";
 import type { WorkerUtils } from "graphile-worker";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import path from "node:path";
 
+import { buildBilingualExportLayer, type BilingualExportOptions } from "../lib/bilingual-export.ts";
+
 export type AssembleDocumentPayload = {
   bookId: string;
   language?: string;
-  format: "pdf" | "epub" | "epub-sync";
+  format: "pdf" | "epub" | "epub-sync" | "epub-bilingual";
+  bilingual?: BilingualExportOptions;
   waitForAll?: boolean;
   waitingSince?: string;
 };
@@ -31,9 +34,9 @@ export async function assembleDocument(
 ) {
   const { bookId, language, format } = payload;
   const log = (msg: string) => appendLog(bookId, msg);
-  const formatLabel = format === "epub-sync" ? "synced EPUB" : format.toUpperCase();
+  const formatLabel = format === "epub-bilingual" ? "Bilingual EPUB" : format === "epub-sync" ? "synced EPUB" : format.toUpperCase();
 
-  if (payload.waitForAll) {
+  if (payload.waitForAll && format !== "epub-bilingual") {
     const deferred = await deferUntilInputsSettle({
       identifier: "assembleDocument",
       payload,
@@ -52,6 +55,14 @@ export async function assembleDocument(
   try {
     const [book] = await db.select().from(books).where(eq(books.id, bookId));
     if (!book) throw new Error(`Book ${bookId} not found`);
+
+    if (format === "epub-bilingual") {
+      if (!language || !payload.bilingual) throw new Error("Choose a translation and narration options for Bilingual EPUB");
+      await assembleBilingual(book, language, payload.bilingual, log);
+      await db.update(books).set({ status: "done", error: null, updatedAt: new Date() }).where(eq(books.id, bookId));
+      await log("Bilingual EPUB export complete");
+      return;
+    }
 
     if (format === "epub-sync") {
       await assembleReadaloud(bookId, book, language ?? null, log);
@@ -346,4 +357,29 @@ function buildChapterSummary(indices: number[]): string {
   }
   ranges.push(start === end ? String(start) : `${start}-${end}`);
   return `Ch ${ranges.join(", ")}`;
+}
+
+async function assembleBilingual(book: typeof books.$inferSelect, key: string, options: BilingualExportOptions, log: (message: string) => Promise<void>) {
+  const { layer, chapters: selected } = await buildBilingualExportLayer(book, key, options);
+  const timestamp = formatTimestamp(new Date());
+  const languages = `${languageSlug(book.language ?? "original")}-${languageSlug(key)}`;
+  const voices = [options.sourceAudio ? "original" : "", options.targetAudio ? languageSlug(key) : ""].filter(Boolean).join("-") || "none";
+  const basename = `${sanitizeFilename(book.title)}_bilingual_${languages}_audio-${voices}_${timestamp}`;
+  const outputPath = path.join(bookOutputDir(book.id), `${basename}.epub`);
+  const workDir = path.join(bookTmpDir(book.id), basename);
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  await mkdir(workDir, { recursive: true });
+  try {
+    const { language, documents: rendered } = renderChapterDocuments(selected.map((chapter) => ({ ...chapter, originalTitle: chapter.title, originalText: chapter.text })));
+    await log(`Exporting ${selected.length} bilingual chapters · ${languages}`);
+    await buildChapterEpub(workDir, { title: book.title, language, documents: rendered }, outputPath);
+    await attachReaderLayer(outputPath, workDir, layer);
+    await db.insert(documents).values({ bookId: book.id, language: key, format: "epub-bilingual",
+      outputPath, chapterIds: JSON.stringify(selected.map((chapter) => chapter.id)), chapterCount: selected.length, chapterSummary: buildChapterSummary(selected.map((chapter) => chapter.index)) });
+  } catch (error) {
+    await rm(outputPath, { force: true });
+    throw error;
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
 }

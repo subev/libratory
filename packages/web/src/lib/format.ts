@@ -1,4 +1,4 @@
-export type DocumentFormat = "pdf" | "epub" | "epub-sync";
+export type DocumentFormat = "pdf" | "epub" | "epub-sync" | "epub-bilingual";
 
 // What the row's chip says: the file's own extension, which is what a reader will look for
 export function formatTag(filename: string | undefined): string {
@@ -6,7 +6,7 @@ export function formatTag(filename: string | undefined): string {
 }
 
 export function documentFormatLabel(format: DocumentFormat): string {
-  return format === "epub-sync" ? "Synced EPUB" : format.toUpperCase();
+  return format === "epub-bilingual" ? "Bilingual EPUB" : format === "epub-sync" ? "Synced EPUB" : format.toUpperCase();
 }
 
 export function pendingExportLabel(pending: { running: boolean; waiting: boolean }): string {

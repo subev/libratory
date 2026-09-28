@@ -544,6 +544,33 @@ export const variantsRouter = router({
       return { queued: queueable.length, deferred };
     }),
 
+  // The tray's Translate runs a whole selection at once, so its stop has to as well
+  stopTranslation: publicProcedure
+    .input(z.object({ bookId: z.string().uuid(), key: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      const bookChapters = db.select({ id: chapters.id }).from(chapters).where(eq(chapters.bookId, input.bookId));
+      const stopped = await db
+        .update(chapterVariants)
+        .set({ status: "suspended", updatedAt: new Date() })
+        .where(and(
+          inArray(chapterVariants.chapterId, bookChapters),
+          eq(chapterVariants.key, input.key),
+          inArray(chapterVariants.status, ["pending", "translating"]),
+        ))
+        .returning({ id: chapterVariants.id });
+      if (stopped.length > 0) {
+        await db.execute(sql`
+          DELETE FROM graphile_worker._private_jobs j
+          USING graphile_worker._private_tasks t
+          WHERE t.id = j.task_id AND t.identifier = 'translate'
+            AND (j.payload ->> 'translationId') IN (${sql.join(stopped.map((row) => sql`${row.id}`), sql`, `)})
+            AND j.locked_at IS NULL
+        `);
+        await appendLog(input.bookId, `Stopped ${input.key} translation (${stopped.length} chapter${stopped.length === 1 ? "" : "s"}); running chapters finish`);
+      }
+      return { stopped: stopped.length };
+    }),
+
   stopAudio: publicProcedure
     .input(z.object({ bookId: z.string().uuid(), key: z.string().min(1) }))
     .mutation(async ({ input }) => {

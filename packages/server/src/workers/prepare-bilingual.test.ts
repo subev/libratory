@@ -21,10 +21,12 @@ vi.mock("../lib/llm.ts", () => ({ resolveLlm: async () => ({ def: { key: "test-m
 vi.mock("graphile-worker", () => ({ quickAddJob: queue }));
 vi.mock("../lib/bilingual-links.ts", async (original) => ({ ...await original<object>(), requestWordLinks: requestLinks }));
 import { z } from "zod";
+import { booksRouter } from "../routes/books.ts";
 import { bilingualRouter } from "../routes/bilingual.ts";
 import { prepareBilingual } from "./prepare-bilingual.ts";
 import { preparation, failPreparation, isPreparationRunning } from "../lib/bilingual-store.ts";
 import { bilingualReferencesForBook, buildBilingualDocument } from "../lib/bilingual-document.ts";
+import { buildBilingualExportLayer } from "../lib/bilingual-export.ts";
 import { buildP2afLayer, buildTextP2afLayer } from "../lib/p2af.ts";
 import { buildCues } from "../lib/reader-doc.ts";
 import { buildReadaloudEpub } from "../lib/readaloud-epub.ts";
@@ -66,6 +68,79 @@ afterEach(async () => {
 });
 
 describe("bilingual jobs and publication", () => {
+  it("keeps default text and synced exports single-language even with prepared links", async () => {
+    const audio = path.join(dir, "source.m4a");
+    await writeFile(audio, "audio");
+    await writeSyncMap(audio, { version: 1, totalMs: 1000, chunks: [{ text: source, startMs: 0, endMs: 1000 }] });
+    await getDb().update(chapters).set({ audioPath: audio, durationMs: 1000 }).where(eq(chapters.id, chapterId));
+    await paired();
+    const book = row(await getDb().select().from(books).where(eq(books.id, bookId)));
+    const text = await buildTextP2afLayer(book, [{ id: chapterId, index: 0, title: "Hello", text: source }]);
+    const sync = await buildP2afLayer(book, new Map([[chapterId, { base: "ch000", audioFile: "ch000.m4a" }]]), null);
+    expect(text.bilingual).toEqual([]);
+    expect(sync?.bilingual).toEqual([]);
+    expect(sync?.manifest.chapters[0]?.bilingual).toEqual([]);
+  });
+
+  it("queues the explicit language and recordings and refuses incomplete bilingual exports", async () => {
+    await paired();
+    const booksCaller = booksRouter.createCaller({});
+    await booksCaller.exportDocument({ id: bookId, format: "epub-bilingual", language: "German",
+      bilingual: { sourceAudio: false, targetAudio: true }, waitForAll: true });
+    expect(queue.mock.calls.at(-1)?.[2]).toMatchObject({ bookId, format: "epub-bilingual", language: "German",
+      bilingual: { sourceAudio: false, targetAudio: true }, waitForAll: false });
+    await expect(booksCaller.exportDocument({ id: bookId, format: "epub-bilingual", language: "French",
+      bilingual: { sourceAudio: false, targetAudio: false } })).rejects.toThrow("Pair current sentences");
+    await expect(booksCaller.exportDocument({ id: bookId, format: "epub", language: "German",
+      bilingual: { sourceAudio: false, targetAudio: false } })).rejects.toThrow("require Bilingual EPUB");
+  });
+
+  it("reports which selected chapters still need pairing, without reading recordings", async () => {
+    await getDb().update(chapters).set({ audioPath: dir }).where(eq(chapters.id, chapterId));
+    const before = await caller.readiness({ bookId });
+    expect(before).toEqual([expect.objectContaining({ key: "German", selected: 1, paired: 0, linked: 0, unpaired: [{ index: 0, title: "Hello" }], untranslated: [] })]);
+    await paired();
+    const after = await caller.readiness({ bookId });
+    expect(after[0]).toMatchObject({ paired: 1, linked: 0, unpaired: [] });
+    const booksCaller = booksRouter.createCaller({});
+    await getDb().update(chapters).set({ customText: "Changed text." }).where(eq(chapters.id, chapterId));
+    await expect(booksCaller.exportDocument({ id: bookId, format: "epub-bilingual", language: "German",
+      bilingual: { sourceAudio: false, targetAudio: false } })).rejects.toThrow("Pair current sentences first (Bilingual reading in the German lane): 1. Hello");
+  });
+
+  it("does not read an unchecked original recording", async () => {
+    await getDb().update(chapters).set({ audioPath: dir }).where(eq(chapters.id, chapterId));
+    await paired();
+    const book = row(await getDb().select().from(books).where(eq(books.id, bookId)));
+    const { layer } = await buildBilingualExportLayer(book, "German", { sourceAudio: false, targetAudio: true });
+    expect(layer.bilingual?.[0]?.doc.source.narration).toBeNull();
+    expect(layer.bilingual?.[0]?.audio).toEqual([]);
+  });
+
+  it.each([[false, false], [true, false], [false, true], [true, true]])("exports chosen bilingual recordings: original %s, translation %s", async (sourceAudio, targetAudio) => {
+    const audio = path.join(dir, "source.m4a"), translated = path.join(dir, "target.m4a");
+    await writeFile(audio, "source audio"); await writeFile(translated, "target audio");
+    await writeSyncMap(audio, { version: 1, totalMs: 1000, chunks: [{ text: source, startMs: 0, endMs: 1000 }] });
+    await writeSyncMap(translated, { version: 1, totalMs: 2000, chunks: [{ text: target, startMs: 0, endMs: 2000 }] });
+    await getDb().update(chapters).set({ selected: true, audioPath: audio, durationMs: 1000 }).where(eq(chapters.id, chapterId));
+    await getDb().update(chapterVariants).set({ audioPath: translated, audioStatus: "done", audioDurationMs: 2000 }).where(eq(chapterVariants.id, variantId));
+    await paired(); await prepareBilingual(await queued("links"));
+    const book = row(await getDb().select().from(books).where(eq(books.id, bookId)));
+    const { layer } = await buildBilingualExportLayer(book, "German", { sourceAudio, targetAudio });
+    expect(layer.bilingual).toHaveLength(1);
+    const doc = layer.bilingual?.[0]?.doc;
+    expect(!!doc?.source.narration).toBe(sourceAudio);
+    expect(!!doc?.target.narration).toBe(targetAudio);
+    expect(doc?.pairs[0]?.links).toHaveLength(1);
+    expect(layer.bilingual?.[0]?.audio).toHaveLength(Number(sourceAudio) + Number(targetAudio));
+    expect(!!layer.manifest.chapters[0]?.audio).toBe(sourceAudio);
+    const status = await caller.exportStatus({ bookId, key: "German" });
+    expect(status[0]).toMatchObject({ paired: true, source: { available: true }, target: { available: true } });
+    await expect(buildBilingualExportLayer(book, "French", { sourceAudio, targetAudio })).rejects.toThrow("Finish");
+    await getDb().update(chapters).set({ customText: "Changed text." }).where(eq(chapters.id, chapterId));
+    await expect(buildBilingualExportLayer(book, "German", { sourceAudio, targetAudio })).rejects.toThrow("Pair current sentences");
+  });
+
   it("packages selected text and saved word links without requiring recordings or PDF geometry", async () => {
     await getDb().update(books).set({ kind: "pdf", pdfPath: "/missing/source.pdf" }).where(eq(books.id, bookId));
     // Unreadable recordings must not be opened by the text export.
@@ -75,7 +150,7 @@ describe("bilingual jobs and publication", () => {
       await paired(); await prepareBilingual(await queued("links"));
       const book = row(await getDb().select().from(books).where(eq(books.id, bookId)));
       const exported = [{ id: chapterId, index: 0, title: "Hello", text: source }];
-      const layer = await buildTextP2afLayer(book, exported);
+      const layer = await buildTextP2afLayer(book, exported, ["German"]);
       expect(layer.manifest.chapters).toHaveLength(1);
       expect(layer.manifest.chapters[0]).toMatchObject({ audio: null, cues: null, text: `text/${chapterId}.json` });
       expect(layer.cues).toEqual([]); expect(layer.sources).toEqual([]);
@@ -83,7 +158,7 @@ describe("bilingual jobs and publication", () => {
       expect(doc?.source.narration).toBeNull(); expect(doc?.target.narration).toBeNull();
       expect(doc?.pairs[0]?.links).toEqual([{ source: [1], target: [1] }]);
       expect(await buildTextP2afLayer(book, [])).toMatchObject({ manifest: { chapters: [] }, bilingual: [] });
-      const stale = await buildTextP2afLayer(book, [{ ...exported[0], id: chapterId, index: 0, title: "Hello", text: "Older exported text." }]);
+      const stale = await buildTextP2afLayer(book, [{ ...exported[0], id: chapterId, index: 0, title: "Hello", text: "Older exported text." }], ["German"]);
       expect(stale.bilingual).toEqual([]);
       expect(stale.texts?.[0]?.doc.text).toBe("Older exported text.");
 
@@ -168,7 +243,7 @@ describe("bilingual jobs and publication", () => {
     const book = row(await getDb().select().from(books).where(eq(books.id, bookId)));
     const outputPath = path.join(dir, "book.epub");
     await buildReadaloudEpub({ title: book.title, language: book.language, chapters: [{ id: chapterId, index: 0, title: chapter.title, audioPath, sync }],
-      stagingDir: path.join(dir, "stage"), outputPath, p2af: (exported, cover) => buildP2afLayer(book, exported, cover) });
+      stagingDir: path.join(dir, "stage"), outputPath, p2af: (exported, cover) => buildP2afLayer(book, exported, cover, ["German"]) });
     const { stdout } = await promisify(execFile)("unzip", ["-p", outputPath, `OEBPS/p2af/bilingual/${variantId}.json`]);
     expect(JSON.parse(stdout).source.text).toBe(source);
   });
@@ -180,7 +255,7 @@ describe("bilingual jobs and publication", () => {
     const build = vi.spyOn(bilingualDocuments, "buildBilingualDocument").mockResolvedValueOnce(null);
     try {
       const book = row(await getDb().select().from(books).where(eq(books.id, bookId)));
-      const layer = await buildP2afLayer(book, new Map([[chapterId, { base: "ch000", audioFile: "ch000.m4a" }]]), null);
+      const layer = await buildP2afLayer(book, new Map([[chapterId, { base: "ch000", audioFile: "ch000.m4a" }]]), null, ["German"]);
       expect(layer?.cues).toHaveLength(1);
       expect(layer?.bilingual).toEqual([]);
       expect(layer?.manifest.chapters[0]?.bilingual).toEqual([]);
@@ -374,7 +449,7 @@ describe("bilingual jobs and publication", () => {
     expect(after?.target.narration?.totalMs).toBe(3000);
     expect((await preparation(variantId))?.pairs?.revision).toBe(revision);
     const book = row(await getDb().select().from(books).where(eq(books.id, bookId)));
-    const layer = await buildP2afLayer(book, new Map([[chapterId, { base: "ch000", audioFile: "ch000.m4a" }]]), null);
+    const layer = await buildP2afLayer(book, new Map([[chapterId, { base: "ch000", audioFile: "ch000.m4a" }]]), null, ["German"]);
     expect(layer?.bilingual).toHaveLength(1);
     expect(layer?.bilingual?.[0]?.doc.source.narration?.audio).toBe("../audio/ch000.m4a");
     expect(layer?.bilingual?.[0]?.audio[0]?.sourcePath).toBe(translated);
@@ -443,7 +518,7 @@ describe("explicit legacy audio conversion", () => {
     expect((await preparation(variantId))?.links).toEqual(prepared?.links);
     expect(after?.target.narration?.qualityNotes.join(" ")).not.toContain("older MP3");
     const book = row(await getDb().select().from(books).where(eq(books.id, bookId)));
-    const layer = await buildP2afLayer(book, new Map([[chapterId, { base: "ch000", audioFile: "ch000.m4a" }]]), null);
+    const layer = await buildP2afLayer(book, new Map([[chapterId, { base: "ch000", audioFile: "ch000.m4a" }]]), null, ["German"]);
     expect(layer?.bilingual?.[0]?.audio[0]).toMatchObject({ sourcePath: variant.audioPath, mediaType: "audio/mp4" });
     expect(await caller.convertAudio({ variantId })).toEqual({ converted: 0 });
     expect(encode).toHaveBeenCalledTimes(2);

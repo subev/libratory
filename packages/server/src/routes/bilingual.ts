@@ -1,3 +1,4 @@
+import { bilingualExportStatus, bilingualReadiness } from "../lib/bilingual-export.ts";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -93,6 +94,9 @@ async function selectedPreparation(input: z.infer<typeof selection>) {
 }
 
 export const bilingualRouter = router({
+  exportStatus: publicProcedure.input(z.object({ bookId: z.string().uuid(), key: z.string().min(1) }))
+    .query(({ input }) => bilingualExportStatus(input.bookId, input.key)),
+  readiness: publicProcedure.input(z.object({ bookId: z.string().uuid() })).query(({ input }) => bilingualReadiness(input.bookId)),
   selection: publicProcedure.input(selection).query(({ input }) => selectedPreparation(input)),
   prepareSelection: publicProcedure.input(selection.extend({ stage: z.enum(["pairs", "links"]), model: modelKeySchema.optional() })).mutation(async ({ input }) => {
     const rows = await selectedPreparation(input);
