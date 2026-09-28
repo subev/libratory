@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "../db.ts";
 import { bilingualPreparations, books, chapters, chapterVariants } from "../schema.ts";
 import { chapterText } from "./chapter-text.ts";
@@ -20,6 +20,13 @@ export async function bilingualContext(variantId: string) {
 export async function preparation(variantId: string) {
   const [row] = await db.select().from(bilingualPreparations).where(eq(bilingualPreparations.variantId, variantId));
   return row ?? null;
+}
+
+export async function isPreparationRunning(variantId: string, stage: PreparationStage, runId: string): Promise<boolean> {
+  const column = bilingualPreparations[jobColumn(stage)];
+  const [row] = await db.select({ active: sql<boolean>`${column}->>'runId' = ${runId} AND ${column}->>'status' = 'running'` })
+    .from(bilingualPreparations).where(eq(bilingualPreparations.variantId, variantId));
+  return row?.active === true;
 }
 
 // Lock the text owners before publication: an edit cannot slip between the revision check and save.

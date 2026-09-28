@@ -1,7 +1,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdir, writeFile, copyFile, rm, readFile } from "node:fs/promises";
-import { randomUUID, createHash } from "node:crypto";
+import { mkdir, writeFile, copyFile, rm } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { fileSha256 } from "./file-sha256.ts";
 import path from "node:path";
 import type { SyncMap } from "./sync-map.ts";
 import type { ExportedChapter, P2afLayer } from "./p2af.ts";
@@ -39,6 +40,8 @@ const LANGUAGE_CODES: Record<string, string> = {
   polish: "pl", czech: "cs", dutch: "nl", hungarian: "hu", swedish: "sv",
   danish: "da", finnish: "fi", norwegian: "no", turkish: "tr", ukrainian: "uk",
   serbian: "sr", croatian: "hr", slovak: "sk", slovenian: "sl", macedonian: "mk",
+  arabic: "ar", hebrew: "he", hindi: "hi", indonesian: "id", japanese: "ja", korean: "ko",
+  persian: "fa", vietnamese: "vi", "chinese (simplified)": "zh-Hans",
 };
 
 // books.language holds an ISO code now and held a language's name before that, and only the names
@@ -322,7 +325,7 @@ async function writeP2afLayer(dir: string, layer: P2afLayer): Promise<void> {
   for (const cue of layer.cues) await writeFile(path.join(dir, cue.path), JSON.stringify(cue.doc));
   for (const source of layer.sources) await copyFile(source.pdfPath, path.join(dir, source.path));
   for (const entry of extensions) {
-    const doc = await readBilingualDocument(entry.doc);
+    const doc = readBilingualDocument(entry.doc);
     if (!/^bilingual\/[a-zA-Z0-9_-]+\.json$/.test(entry.path)) throw new Error("Invalid bilingual export path");
     const chapter = layer.manifest.chapters.find((c) => c.id === doc.chapterId);
     if (!chapter?.bilingual?.some((r) => r.key === doc.key && r.url === entry.path)) throw new Error("Unreferenced bilingual document");
@@ -349,8 +352,7 @@ async function validateBilingualExport(dir: string, layer: P2afLayer): Promise<v
     if (doc.source.narration && doc.source.narration.audio !== chapter?.audio) throw new Error("Bilingual source recording differs from chapter recording");
     for (const lane of [doc.source, doc.target]) {
       if (!lane.narration) continue;
-      const bytes = await readFile(path.resolve(dir, lane.narration.audio));
-      const revision = createHash("sha256").update(bytes).digest("hex");
+      const revision = await fileSha256(path.resolve(dir, lane.narration.audio));
       if (revision !== lane.narration.revision) throw new Error("Bilingual recording revision differs from packaged audio");
     }
   }

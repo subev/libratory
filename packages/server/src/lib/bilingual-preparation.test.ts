@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { alignVectors } from "./bilingual-align.ts";
 import { sentences, tokenize } from "./bilingual-segment.ts";
 import { spanTiming, timeline } from "./bilingual-timing.ts";
-import { linkBatches, parseWordLinks, requestWordLinks } from "./bilingual-links.ts";
+import { linkBatches, parseWordLinks, parseWordLinkBatch, requestWordLinks } from "./bilingual-links.ts";
 import { textRevision } from "./bilingual-format.ts";
 import type { PairArtifact } from "./bilingual-preparation.ts";
 
@@ -21,6 +21,17 @@ function fixture(): PairArtifact {
 }
 
 describe("production bilingual preparation", () => {
+  it("yields to the event loop and stops a large alignment when ownership is lost", async () => {
+    const spans = Array.from({ length: 200 }, (_, i) => ({ start: i * 10, end: i * 10 + 9 }));
+    const vectors = Array.from({ length: 400 }, () => Array.from({ length: 1024 }, () => 1 / 32));
+    let timerRan = false;
+    const timer = setTimeout(() => { timerRan = true; }, 0);
+    try {
+      const result = await alignVectors(spans, spans, vectors, async () => !timerRan);
+      expect(timerRan).toBe(true);
+      expect(result).toBeNull();
+    } finally { clearTimeout(timer); }
+  });
   it("addresses repeated words by their persisted IDs, including reordered links", () => {
     const data = fixture();
     expect(parseWordLinks("p2: 4 = 4\np1: 2 = 2\np2: 3 = 3\np1: 1 = 1", data, data.pairs).p2)
@@ -36,6 +47,26 @@ describe("production bilingual preparation", () => {
   it("resumes only unanswered matched pairs, including completed empty answers", () => {
     const data = fixture();
     expect(linkBatches(data, { p1: [] }).flat().map((p) => p.id)).toEqual(["p2"]);
+  });
+  it("preserves complete valid pairs while rejecting every link in an invalid pair", () => {
+    const data = fixture();
+    const parsed = parseWordLinkBatch("p1: 1 = 1\np2: 3 = 3\np2: 2 = 4", data, data.pairs);
+    expect(parsed.links).toEqual({ p1: [{ source: [1], target: [1] }] });
+    expect(parsed.error).toContain("Saved 1/2 sentence groups");
+    expect(parsed.error).toContain("p2: Token 2 is not in the source sentence");
+    expect(linkBatches(data, parsed.links).flat().map((p) => p.id)).toEqual(["p2"]);
+    expect(parseWordLinkBatch("p1: -", data, data.pairs).links).toEqual({ p1: [] });
+    expect(() => parseWordLinkBatch("p1: -\np3: -", data, data.pairs)).toThrow("unknown pair");
+  });
+  it("ignores unlinked declarations without interpreting their lane, but validates actual links", () => {
+    const data = fixture();
+    data.source.tokens = data.source.tokens.map((t) => ({ ...t, id: t.id + 40 }));
+    data.target.tokens = data.target.tokens.map((t) => ({ ...t, id: t.id + 30 }));
+    expect(parseWordLinks("p1: 41 = 31\np1: 32 = -\np1: - = 42\np2: -", data, data.pairs))
+      .toEqual({ p1: [{ source: [41], target: [31] }], p2: [] });
+    for (const raw of ["p1: 32 = 31\np2: -", "p1: 41 = 42\np2: -", "p1: nonsense = -\np2: -", "p3: 32 = -\np2: -"]) {
+      expect(() => parseWordLinks(raw, data, data.pairs)).toThrow();
+    }
   });
   it("rejects a truncated but otherwise parseable response without retrying", async () => {
     const data = fixture();
@@ -56,13 +87,13 @@ describe("production bilingual preparation", () => {
       expect(sentences(text, language).length).toBeGreaterThan(0);
     }
   });
-  it("leaves a deleted translation sentence one-sided instead of absorbing it", () => {
+  it("leaves a deleted translation sentence one-sided instead of absorbing it", async () => {
     const src = [{ start: 0, end: 10 }, { start: 11, end: 21 }, { start: 22, end: 32 }];
     const tgt = [{ start: 0, end: 10 }, { start: 11, end: 21 }];
-    const pairs = alignVectors(src, tgt, [[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 0, 0], [0, 0, 1]]);
-    expect(pairs.map((p) => p.status)).toEqual(["matched", "source-only", "matched"]);
-    expect(pairs.map((p) => p.id)).toEqual(["p1", "p2", "p3"]);
-    expect(() => alignVectors(src, tgt, [[NaN]])).toThrow("Invalid sentence embedding");
+    const pairs = await alignVectors(src, tgt, [[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 0, 0], [0, 0, 1]]);
+    expect(pairs?.map((p) => p.status)).toEqual(["matched", "source-only", "matched"]);
+    expect(pairs?.map((p) => p.id)).toEqual(["p1", "p2", "p3"]);
+    await expect(alignVectors(src, tgt, [[NaN]])).rejects.toThrow("Invalid sentence embedding");
   });
   it("ends a passage at its final provider word, excluding trailing silence", () => {
     const text = "Hello world.";

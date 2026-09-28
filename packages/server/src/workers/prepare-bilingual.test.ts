@@ -1,4 +1,6 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { eq, sql } from "drizzle-orm";
@@ -20,9 +22,15 @@ vi.mock("../lib/bilingual-links.ts", async (original) => ({ ...await original<ob
 import { z } from "zod";
 import { bilingualRouter } from "../routes/bilingual.ts";
 import { prepareBilingual } from "./prepare-bilingual.ts";
-import { preparation, failPreparation } from "../lib/bilingual-store.ts";
+import { preparation, failPreparation, isPreparationRunning } from "../lib/bilingual-store.ts";
 import { bilingualReferencesForBook, buildBilingualDocument } from "../lib/bilingual-document.ts";
 import { buildP2afLayer } from "../lib/p2af.ts";
+import { buildCues } from "../lib/reader-doc.ts";
+import { buildReadaloudEpub } from "../lib/readaloud-epub.ts";
+import { bookTmpDir } from "../lib/paths.ts";
+import * as bilingualDocuments from "../lib/bilingual-document.ts";
+import { appendLog } from "../lib/log.ts";
+import * as segmentation from "../lib/bilingual-segment.ts";
 import { sweepStrandedWork } from "./sweep.ts";
 
 const caller = bilingualRouter.createCaller({});
@@ -49,9 +57,84 @@ beforeEach(async () => {
   await getDb().insert(chapters).values({ id: chapterId, bookId, index: 0, title: "Hello", rawText: source, cleanText: source, status: "done" });
   await getDb().insert(chapterVariants).values({ id: variantId, chapterId, key: "German", kind: "translation", text: target, status: "done" });
 });
-afterEach(async () => { await rm(dir, { recursive: true, force: true }); });
+afterEach(async () => {
+  await rm(dir, { recursive: true, force: true });
+  await rm(bookTmpDir(bookId), { recursive: true, force: true });
+});
 
 describe("bilingual jobs and publication", () => {
+  it("fails before publishing when generated tokens violate the document format", async () => {
+    const tokenizer = vi.spyOn(segmentation, "tokenize").mockReturnValue([{ id: 1, start: 0, end: 1000 }]);
+    try {
+      await expect(paired()).rejects.toThrow("token range");
+      const saved = await preparation(variantId);
+      expect(saved?.pairs).toBeNull();
+      expect(saved?.pairJob?.status).toBe("failed");
+    } finally { tokenizer.mockRestore(); }
+  });
+  it("does not invent English when a book has no language set", async () => {
+    await getDb().update(books).set({ language: null }).where(eq(books.id, bookId));
+    await paired();
+    expect((await preparation(variantId))?.pairs?.source.language).toBe("und");
+  });
+  it("gives a translation named Hebrew its actual language tag", async () => {
+    await getDb().update(chapterVariants).set({ key: "Hebrew", text: "שלום עולם." }).where(eq(chapterVariants.id, variantId));
+    await paired();
+    expect((await preparation(variantId))?.pairs?.target.language).toBe("he");
+  });
+  it("keeps a voice with an unlocatable chunk but leaves that passage untimed", async () => {
+    const text = "Hello world. Missing text. Good bye.";
+    await getDb().update(chapters).set({ cleanText: text }).where(eq(chapters.id, chapterId));
+    await getDb().update(chapterVariants).set({ text: "Hallo Welt. Fehlender Text. Auf Wiedersehen." }).where(eq(chapterVariants.id, variantId));
+    embed.mockResolvedValueOnce([[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 0, 0], [0, 1, 0], [0, 0, 1]]);
+    const audioPath = path.join(dir, "source.m4a");
+    await writeFile(audioPath, "recording");
+    await writeSyncMap(audioPath, { version: 1, totalMs: 3000, chunks: [
+      { text: "Hello world.", startMs: 0, endMs: 1000 },
+      { text: "Different recorded text.", startMs: 1000, endMs: 2000 },
+      { text: "Good bye.", startMs: 2000, endMs: 3000 },
+    ] });
+    await getDb().update(chapters).set({ audioPath }).where(eq(chapters.id, chapterId));
+    await paired();
+    const doc = await buildBilingualDocument(variantId);
+    expect(doc?.source.narration?.anchors.map((a) => [a.start.ms, a.end.ms])).toEqual([[0, 1000], [null, null], [2000, 3000]]);
+    expect(doc?.source.narration?.qualityNotes).toContain("Some recorded passages could not be matched to the text; timing is unavailable there.");
+  });
+  it.each([true, false])("exports a PDF chapter through real cue construction with unstructured text (edited=%s)", async (edited) => {
+    await getDb().update(books).set({ kind: "pdf", filename: "scan.pdf", pdfPath: path.resolve("test/fixtures/scanned-page.pdf") }).where(eq(books.id, bookId));
+    await mkdir(bookTmpDir(bookId), { recursive: true });
+    await writeFile(path.join(bookTmpDir(bookId), "geometry.json"), JSON.stringify({ version: 4, pages: [{ i: 0, w: 595, h: 842, rot: 0, cropOffset: [0, 0], lines: [] }] }));
+    const audioPath = path.join(dir, "source.m4a");
+    const sync = { version: 1 as const, totalMs: 1000, chunks: [{ text: source, startMs: 0, endMs: 1000 }] };
+    await writeFile(audioPath, "source recording"); await writeSyncMap(audioPath, sync);
+    await getDb().update(chapters).set({ customText: edited ? source : null, sourceBlocks: [{ type: "Text", text: "Old extraction.", included: true, page: 1 }], audioPath }).where(eq(chapters.id, chapterId));
+    await paired();
+    const chapter = row(await getDb().select().from(chapters).where(eq(chapters.id, chapterId)));
+    const cues = await buildCues(chapter);
+    expect(cues?.text?.text).toBe(source);
+    expect(cues?.text?.blocks).toBeUndefined();
+    const book = row(await getDb().select().from(books).where(eq(books.id, bookId)));
+    const outputPath = path.join(dir, "book.epub");
+    await buildReadaloudEpub({ title: book.title, language: book.language, chapters: [{ id: chapterId, index: 0, title: chapter.title, audioPath, sync }],
+      stagingDir: path.join(dir, "stage"), outputPath, p2af: (exported, cover) => buildP2afLayer(book, exported, cover) });
+    const { stdout } = await promisify(execFile)("unzip", ["-p", outputPath, `OEBPS/p2af/bilingual/${variantId}.json`]);
+    expect(JSON.parse(stdout).source.text).toBe(source);
+  });
+  it("logs and omits a concurrently changed optional attachment without failing primary export", async () => {
+    const audioPath = path.join(dir, "source.m4a");
+    await writeSyncMap(audioPath, { version: 1, totalMs: 1000, chunks: [{ text: source, startMs: 0, endMs: 1000 }] });
+    await getDb().update(chapters).set({ audioPath }).where(eq(chapters.id, chapterId));
+    await paired();
+    const build = vi.spyOn(bilingualDocuments, "buildBilingualDocument").mockResolvedValueOnce(null);
+    try {
+      const book = row(await getDb().select().from(books).where(eq(books.id, bookId)));
+      const layer = await buildP2afLayer(book, new Map([[chapterId, { base: "ch000", audioFile: "ch000.m4a" }]]), null);
+      expect(layer?.cues).toHaveLength(1);
+      expect(layer?.bilingual).toEqual([]);
+      expect(layer?.manifest.chapters[0]?.bilingual).toEqual([]);
+      expect(appendLog).toHaveBeenCalledWith(bookId, expect.stringContaining("was omitted"));
+    } finally { build.mockRestore(); }
+  });
   it("prepares and serves existing texts without requiring narration or word links", async () => {
     await paired();
     const saved = await preparation(variantId);
@@ -88,6 +171,21 @@ describe("bilingual jobs and publication", () => {
     const saved = await preparation(variantId);
     expect(saved?.pairs).toBeNull();
     expect(saved?.pairJob).toMatchObject({ status: "failed", error: expect.stringContaining("changed") });
+  });
+  it("checks active ownership without reviving a cancelled run", async () => {
+    const payload = await queued("pairs");
+    expect(await isPreparationRunning(variantId, "pairs", payload.runId)).toBe(false);
+    embed.mockImplementationOnce(async () => {
+      expect(await isPreparationRunning(variantId, "pairs", payload.runId)).toBe(true);
+      expect(await isPreparationRunning(variantId, "pairs", "another-run")).toBe(false);
+      expect(await isPreparationRunning(variantId, "links", payload.runId)).toBe(false);
+      await caller.cancel({ variantId, stage: "pairs" });
+      expect(await isPreparationRunning(variantId, "pairs", payload.runId)).toBe(false);
+      return [[1, 0], [1, 0]];
+    });
+    await prepareBilingual(payload);
+    expect((await preparation(variantId))?.pairs).toBeNull();
+    expect((await preparation(variantId))?.pairJob?.status).toBe("cancelled");
   });
   it("fences a cancelled run from a newer run, including its failure handler", async () => {
     const old = await queued("pairs");
@@ -145,6 +243,24 @@ describe("bilingual jobs and publication", () => {
     expect(result?.links?.byPair).toEqual({});
     expect(result?.linkJob?.status).toBe("failed");
     expect(requestLinks).toHaveBeenCalledTimes(1);
+  });
+  it("saves valid groups from a partially invalid batch before failing, then resumes the rejected group", async () => {
+    await getDb().update(chapters).set({ cleanText: "Hello world. Good bye." }).where(eq(chapters.id, chapterId));
+    await getDb().update(chapterVariants).set({ text: "Hallo Welt. Auf Wiedersehen." }).where(eq(chapterVariants.id, variantId));
+    embed.mockResolvedValueOnce([[1, 0], [0, 1], [1, 0], [0, 1]]);
+    await paired();
+    requestLinks.mockResolvedValueOnce({ ...answer(), record: { ...answer().record, pairIds: ["p1", "p2"], error: "Invalid p2; saved p1" } });
+    await expect(prepareBilingual(await queued("links"))).rejects.toThrow("Invalid p2");
+    const saved = await preparation(variantId);
+    expect(saved?.linkJob?.status).toBe("failed");
+    expect(Object.keys(saved?.links?.byPair ?? {})).toEqual(["p1"]);
+    requestLinks.mockImplementationOnce(async (_artifact, pairs) => {
+      expect(pairs.map((p: { id: string }) => p.id)).toEqual(["p2"]);
+      return { record: { ...answer().record, pairIds: ["p2"], raw: "p2: -" }, links: { p2: [] } };
+    });
+    await prepareBilingual(await queued("links"));
+    expect((await preparation(variantId))?.linkJob?.status).toBe("done");
+    expect(requestLinks).toHaveBeenCalledTimes(2);
   });
   it("removes stale references after edits without deleting saved diagnostics", async () => {
     await paired();

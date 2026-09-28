@@ -83,7 +83,7 @@ on the preparation side. No schema or model experiment replaces the reading cont
 - `lib/bilingual-segment.ts`, `bilingual-align.ts`, `bilingual-timing.ts`: production ports of the
   measured algorithms, with checked indexing and format validation. Scoring remains heuristic.
 - `lib/bilingual-links.ts`: tested token-ID wording, reasoning off, bounded sequential batches,
-  no automatic retries, whole-batch validation and finish-reason rejection. Global persisted lane
+  no automatic retries, per-sentence validation and finish-reason rejection. Global persisted lane
   IDs replace per-sentence temporary IDs. No new model-quality claim is made for that addressing change.
 - `workers/prepare-bilingual.ts`, `lib/bilingual-store.ts`: queued text hashes, run identity,
   publication locks/rechecks, retained completed batches, explicit retry and cancellation. The current
@@ -173,3 +173,28 @@ consume offline. Keep the tested token-ID prompt with reasoning off. Further pai
 large agent fan-outs, heavy downloads and full E2E runs need separate approval under the user's
 standing preferences. The user authorized continuing and committing this preparation checkpoint;
 no push was requested.
+
+## User-reported token error follow-up
+
+The saved failed Flash response mixed lane IDs in unlinked declarations (`p4: 41 = -`)
+and included a real invalid link (`p6: 98 = 99`, both IDs from the target lane).
+Opening sentence-level reading did not cause this. The parser now ignores numeric unlinked
+declarations, which create no stored references, but validates every actual link against its
+own sentence and lane. Valid sentence groups survive an invalid group; the job still fails once,
+and explicit retry requests only missing groups. Unknown pair IDs/unassignable lines and truncated
+responses still reject the whole batch. Replaying the saved response locally preserves nine of ten
+groups and rejects p6. Successful later attempts were left untouched; no paid calls were made.
+
+## Independent review fixes
+
+See [the finding-by-finding response](bilingual-reader-review-response.md) alongside the original
+[bilingual reader review findings](bilingual-reader-review-findings.md). Both blockers and S1–S5
+are addressed in the follow-up checkpoint, including real cue-to-EPUB regression coverage and interruptible
+alignment. The response distinguishes CPU responsiveness from total alignment cost and records
+remaining performance/compatibility work. It also covers the separately reported Flash token-ID error.
+
+The [simplification review](bilingual-reader-simplify-findings.md) was also read. Its missed async
+validation bug is fixed with a synchronous parser and a regression that previously reproduced the
+unhandled rejection/publication. Cancellation queries, streaming file hashing and passage indexes
+are simplified, with shared grapheme/token helpers and speed subscription. The response records
+which suggestions were applied, retained deliberately or deferred to measured long-chapter work.

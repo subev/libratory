@@ -39,6 +39,20 @@ try {
     expect(await page.locator("audio").evaluate((audio) => audio.currentTime)).toBeGreaterThanOrEqual(pausedAt);
     await page.keyboard.press("Space");
     await page.waitForFunction(() => document.querySelector("audio")?.paused);
+    await chosen.click();
+    await page.waitForFunction(() => !document.querySelector("audio")?.paused && Number.isFinite(document.querySelector("audio")?.duration));
+    await page.locator("audio").evaluate((audio) => { audio.currentTime = Math.max(0, audio.duration - 0.03); });
+    await page.waitForFunction(() => document.querySelector("audio")?.ended);
+    await page.keyboard.press("Space");
+    await page.waitForFunction(() => !document.querySelector("audio")?.paused);
+    await page.keyboard.press("Space");
+    await page.waitForFunction(() => document.querySelector("audio")?.paused);
+    if (key === "en-he") {
+      const paragraph = page.locator("p[lang=he]").first();
+      await expect(paragraph).toHaveAttribute("dir", "rtl");
+      await paragraph.evaluate((p) => { p.prepend(document.createTextNode("CNN ")); });
+      expect(await paragraph.evaluate((p) => getComputedStyle(p).direction)).toBe("rtl");
+    }
     const alternate = page.getByRole("checkbox", { name: "Alternate languages by sentence" });
     await expect(alternate).not.toBeChecked();
     if (key === "en-he") {

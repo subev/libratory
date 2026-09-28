@@ -1,14 +1,15 @@
-import { createReadStream } from "node:fs";
-import { createHash } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db.ts";
 import { bilingualPreparations, chapters, chapterVariants } from "../schema.ts";
 import { preparedPairs } from "./bilingual-preparation.ts";
 import { currentPreparation } from "./bilingual-store.ts";
-import { BILINGUAL_FORMAT, readBilingualDocument, textRevision, type BilingualDocument, type BilingualLane, type BilingualPair } from "./bilingual-format.ts";
+import { BILINGUAL_FORMAT, graphemeBoundaries, readBilingualDocument, textRevision, type BilingualDocument, type BilingualLane, type BilingualPair } from "./bilingual-format.ts";
+import { fileSha256 } from "./file-sha256.ts";
 import { readSyncMap, syncMapPath } from "./sync-map.ts";
 import { timeline, spanTiming } from "./bilingual-timing.ts";
+
+class ChangedNarration extends Error {}
 
 export async function bilingualReferencesForBook(bookId: string) {
   const rows = await db.select({
@@ -34,14 +35,14 @@ async function narration(text: string, pairs: BilingualPair[], side: "source" | 
     const map = await readSyncMap(audioPath);
     if (!map || map.totalMs <= 0) return null;
     const tl = timeline(text, map);
-    if (tl.chunks.length !== map.chunks.length) return null;
-    const hash = createHash("sha256");
-    for await (const bytes of createReadStream(audioPath)) hash.update(bytes);
+    if (tl.chunks.length === 0) return null;
+    const revision = await fileSha256(audioPath);
     const after = await stat(audioPath), afterSync = await stat(syncMapPath(audioPath));
-    if (before.mtimeMs !== after.mtimeMs || before.size !== after.size || beforeSync.mtimeMs !== afterSync.mtimeMs || beforeSync.size !== afterSync.size) throw new Error("Narration changed while reading timing");
-    const boundaries = new Set([text.length, ...Array.from(new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(text), (s) => s.index)]);
-    return { revision: hash.digest("hex"), audio: url, totalMs: map.totalMs,
-      qualityNotes: ["Provider word times are not independently verified. Passages without word times use chunk boundaries or estimates."],
+    if (before.mtimeMs !== after.mtimeMs || before.size !== after.size || beforeSync.mtimeMs !== afterSync.mtimeMs || beforeSync.size !== afterSync.size) throw new ChangedNarration("Narration changed while reading timing");
+    const boundaries = graphemeBoundaries(text);
+    return { revision, audio: url, totalMs: map.totalMs,
+      qualityNotes: ["Provider word times are not independently verified. Passages without word times use chunk boundaries or estimates.",
+        ...(tl.chunks.length < map.chunks.length ? ["Some recorded passages could not be matched to the text; timing is unavailable there."] : [])],
       anchors: [
         ...pairs.flatMap((pair) => {
           const range = pair[side];
@@ -62,10 +63,15 @@ export async function buildBilingualDocument(variantId: string, urls?: { source:
   const { context, row, current } = await currentPreparation(variantId);
   if (!current || !row?.pairs) return null;
   const data = row.pairs, pairs = preparedPairs(data, row.links);
-  const [source, target] = await Promise.all([
+  const narrations = await Promise.all([
     narration(context.source, pairs, "source", context.chapter.status === "done" ? context.chapter.audioPath : null, urls?.source ?? `/audio/chapter/${context.chapter.id}`),
     narration(context.target, pairs, "target", context.variant.audioStatus === "done" ? context.variant.audioPath : null, urls?.target ?? `/audio/translation/${variantId}`),
-  ]);
+  ]).catch((error: unknown) => {
+    if (error instanceof ChangedNarration) return null;
+    throw error;
+  });
+  if (!narrations) return null;
+  const [source, target] = narrations;
   const latest = await currentPreparation(variantId);
   if (latest.context.chapter.status !== context.chapter.status || latest.context.variant.audioStatus !== context.variant.audioStatus
     || latest.context.variant.updatedAt.getTime() !== context.variant.updatedAt.getTime()

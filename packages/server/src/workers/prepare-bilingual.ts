@@ -1,6 +1,6 @@
 import { alignVectors } from "../lib/bilingual-align.ts";
 import { sentences, tokenize } from "../lib/bilingual-segment.ts";
-import { bilingualContext, failPreparation, jobColumn, preparation, publishPreparation, type PreparationStage } from "../lib/bilingual-store.ts";
+import { bilingualContext, failPreparation, isPreparationRunning, jobColumn, preparation, publishPreparation, type PreparationStage } from "../lib/bilingual-store.ts";
 import { PAIRING_VERSION, TOKENIZER_VERSION, LINK_PROMPT_VERSION, matchesTexts, type PairArtifact } from "../lib/bilingual-preparation.ts";
 import { BILINGUAL_FORMAT, readBilingualDocument, textRevision, type BilingualPair, type BilingualToken } from "../lib/bilingual-format.ts";
 import { embedTexts } from "../lib/embeddings.ts";
@@ -24,7 +24,7 @@ export async function prepareBilingual({ variantId, runId, stage, bookId, source
     await log("started");
     if (stage === "pairs") {
       if (!(await bundleInstalled("search"))) throw new Error("Install the optional search model bundle before pairing sentences");
-      const sourceLanguage = languageCode(context.language), targetLanguage = languageCode(context.variant.key);
+      const sourceLanguage = context.language ? languageCode(context.language) : "und", targetLanguage = languageCode(context.variant.key);
       const src = sentences(context.source, sourceLanguage), tgt = sentences(context.target, targetLanguage);
       if (src.length * tgt.length > 2_000_000) throw new Error("Chapter is too large to pair; split it into smaller chapters");
       const texts = [...src.map((s) => context.source.slice(s.start, s.end)), ...tgt.map((s) => context.target.slice(s.start, s.end))];
@@ -35,7 +35,8 @@ export async function prepareBilingual({ variantId, runId, stage, bookId, source
         if (result.length !== batch.length) throw new Error("Embedding model returned an incomplete batch");
         vectors.push(...result);
       }
-      const aligned = alignVectors(src, tgt, vectors);
+      const aligned = await alignVectors(src, tgt, vectors, () => isPreparationRunning(variantId, stage, runId));
+      if (!aligned) return;
       const tokens = (text: string, locale: string): BilingualToken[] => tokenize(text, { start: 0, end: text.length }, locale).map((t) => ({ id: t.id, range: [t.start, t.end] }));
       const pairs: BilingualPair[] = aligned.map((p) => ({ id: p.id, status: p.status,
         source: p.s ? [p.s.start, p.s.end] : null, target: p.t ? [p.t.start, p.t.end] : null, linksStatus: "unavailable", links: [] }));

@@ -1,13 +1,14 @@
+import { readingDirection } from "../../lib/reading-lang.ts";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  linkedTokens, passageIndex, pairAtTime, switchNarration, tokenAtTime,
+  linkedTokens, pairAtTime, switchNarration, tokenAtTime,
   type BilingualDocument, type BilingualPair, type BilingualSide,
 } from "../../../../server/src/lib/bilingual-format.ts";
 import type { DocumentSource } from "../../lib/reader-source.ts";
 import type { ReaderChapter, ReaderManifest } from "../../lib/reader-doc.ts";
 import { useAudioTime } from "../../lib/use-audio-time.ts";
 import { usePlayPauseKey } from "../../lib/play-pause-key.ts";
-import { SPEEDS, loadSpeed, saveSpeed } from "../../lib/playback-speed.ts";
+import { SPEEDS, loadSpeed, saveSpeed, subscribeSpeed } from "../../lib/playback-speed.ts";
 import { formatDuration } from "../../lib/format.ts";
 import { followCue } from "../../lib/cue-follow.ts";
 import { languageLabel as language } from "../../lib/voices.ts";
@@ -37,6 +38,7 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
   const [ms, setMs] = useState(Math.max(0, initialMs));
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(loadSpeed);
+  useEffect(() => subscribeSpeed(setSpeed), []);
   const [message, setMessage] = useState<string | null>(null);
   const [following, setFollowing] = useState(true);
   const [inspectMode, setInspectMode] = useState(false);
@@ -46,9 +48,9 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
   const sentence = alternate ? sequences[alternate.first][alternate.index] : null;
   const meaning = useWordMeaning();
   const selection = meaning.selection;
+  const directions = useMemo(() => ({ source: readingDirection(doc.source.language), target: readingDirection(doc.target.language) }), [doc.source.language, doc.target.language]);
   const groups = useMemo(() => paragraphGroups(doc), [doc]);
   const presentation = useMemo(() => ({ source: pairPresentation(doc, "source"), target: pairPresentation(doc, "target") }), [doc]);
-  const timing = useMemo(() => passageIndex(doc), [doc]);
   const firstPair = doc.pairs[0];
   const heading = firstPair?.source && doc.source.text.slice(...firstPair.source).trim() === chapter.title.trim() ? firstPair.id : null;
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -56,7 +58,7 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
   const toolbar = useRef<HTMLDivElement>(null);
   const landing = useRef({ ms: Math.max(0, initialMs), play: false });
   const lane = doc[side];
-  const activePair = pairAtTime(doc, side, ms, timing);
+  const activePair = pairAtTime(doc, side, ms);
   const activeToken = tokenAtTime(lane, ms);
   const counterpart = activePair && activeToken ? linkedTokens(activePair, side, activeToken.id) : null;
   useAudioTime(audioRef, playing, setMs);
@@ -85,9 +87,9 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
     // oxlint-disable-next-line react/exhaustive-effect-dependencies
   }, [activePair?.id, activeToken?.id, side, following, selection]);
   useEffect(() => {
-    const sourceMs = side === "source" ? ms : switchNarration(doc, side, ms, timing)?.ms;
+    const sourceMs = side === "source" ? ms : switchNarration(doc, side, ms)?.ms;
     if (sourceMs !== undefined) onPosition(sharesPrimaryRecording(doc, chapter.audio) ? sourceMs : 0);
-  }, [doc, timing, chapter.audio, side, ms, onPosition]);
+  }, [doc, chapter.audio, side, ms, onPosition]);
 
   function listen(nextSide: BilingualSide, at: number, play: boolean, continuing = false) {
     setMessage(null);
@@ -108,6 +110,7 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
       const audio = audioRef.current;
       if (audio) {
         audio.currentTime = at / 1000;
+        landing.current.play = false;
         if (play) void audio.play().catch(() => setMessage("Playback could not start. Try Play again."));
       }
     } else {
@@ -170,7 +173,7 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
 
   function changeVoice(nextSide: BilingualSide) {
     if (nextSide === side) return;
-    const landing = switchNarration(doc, side, ms, timing);
+    const landing = switchNarration(doc, side, ms);
     if (!lane.narration) { listen(nextSide, 0, false); return; }
     if (!landing) { setMessage("No timed counterpart here. Click a word in the other language to listen there."); return; }
     listen(landing.side, landing.ms, playing);
@@ -284,7 +287,7 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
             <div key={pairs[0]?.id} className="grid gap-3 md:grid-cols-2 md:gap-12" data-testid="bilingual-paragraph">
               {SIDES.map((textSide) => (
                 <div key={textSide} className="min-w-0 max-w-prose px-3">
-                  <p dir="auto" lang={doc[textSide].language} className={`whitespace-normal font-reading leading-relaxed ${pairs.length === 1 && pairs[0]?.id === heading ? "text-2xl font-medium" : "text-lg"}`}>
+                  <p dir={directions[textSide]} lang={doc[textSide].language} className={`whitespace-normal font-reading leading-relaxed ${pairs.length === 1 && pairs[0]?.id === heading ? "text-2xl font-medium" : "text-lg"}`}>
                     {pairs.some((pair) => pair[textSide]) ? pairs.map((pair) => renderPair(pair, textSide)) : <span className="font-sans text-sm text-(--text-muted)">No counterpart for this passage.</span>}
                   </p>
                 </div>
@@ -293,8 +296,8 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
           ))}
         </div>
         {selection && selectedPair && <WordMeaning meaning={meaning}>
-          <p dir="auto" lang={doc[selection.side].language} className="text-xs text-(--text-muted)">{linkedText(doc[selection.side], selected?.[selection.side].length ? selected[selection.side] : [selection.token])}</p>
-          <p dir="auto" lang={doc[selection.side === "source" ? "target" : "source"].language} className="font-reading text-lg">
+          <p dir={directions[selection.side]} lang={doc[selection.side].language} className="text-xs text-(--text-muted)">{linkedText(doc[selection.side], selected?.[selection.side].length ? selected[selection.side] : [selection.token])}</p>
+          <p dir={directions[selection.side === "source" ? "target" : "source"]} lang={doc[selection.side === "source" ? "target" : "source"].language} className="font-reading text-lg">
             {selected?.source.length && selected.target.length ? linkedText(doc[selection.side === "source" ? "target" : "source"], selected[selection.side === "source" ? "target" : "source"]) : selectedPair.status === "uncertain" ? "Pairing uncertain" : selectedPair.linksStatus === "unavailable" ? "Word meanings are not available" : "No equivalent recorded"}
           </p>
           {selectedPair.linksStatus === "partial" && <p className="text-xs text-(--text-muted)">Some word links are missing.</p>}

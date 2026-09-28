@@ -3,6 +3,7 @@
 // search always completes a path; whether a step of it is trustworthy is judged afterwards, against
 // the chapter's own scores, and reported as a status rather than hidden.
 import type { Span } from "./bilingual-segment.ts";
+import { setImmediate } from "node:timers/promises";
 
 export type PairStatus = "matched" | "uncertain" | "source-only" | "target-only";
 export type Pair = { id: string; s: Span | null; t: Span | null; score: number; status: PairStatus };
@@ -21,10 +22,12 @@ const OUTLIER_Z = 4;
 type Vec = (side: "s" | "t", i: number, n: number) => number[];
 type Step = { i: number; j: number; di: number; dj: number };
 
-export function alignVectors(src: Span[], tgt: Span[], vectors: number[][]): Pair[] {
+export async function alignVectors(src: Span[], tgt: Span[], vectors: number[][], keepRunning?: () => Promise<boolean>): Promise<Pair[] | null> {
   if (src.length * tgt.length > 2_000_000) throw new Error("Chapter is too large for sentence alignment; split it into smaller chapters");
   const vec = groupVectors(src, tgt, vectors);
-  const steps = search(src.length, tgt.length, vec).flatMap((step) => splitIdleMembers(step, vec));
+  const path = await search(src.length, tgt.length, vec, keepRunning);
+  if (!path) return null;
+  const steps = path.flatMap((step) => splitIdleMembers(step, vec));
 
   const scored = steps.map((st) => ({ st, score: st.di && st.dj ? cosine(vec("s", st.i, st.di), vec("t", st.j, st.dj)) : 0 }));
   const isOutlier = outlierTest(scored.filter((x) => x.st.di && x.st.dj).map((x) => x.score));
@@ -38,12 +41,21 @@ export function alignVectors(src: Span[], tgt: Span[], vectors: number[][]): Pai
   }));
 }
 
-function search(N: number, M: number, vec: Vec): Step[] {
+async function search(N: number, M: number, vec: Vec, keepRunning?: () => Promise<boolean>): Promise<Step[] | null> {
   const best = Array.from({ length: N + 1 }, () => new Float64Array(M + 1).fill(-Infinity));
   const back = Array.from({ length: N + 1 }, (): ([number, number] | undefined)[] => Array.from({ length: M + 1 }));
   required(best, 0)[0] = 0;
+  let yieldedAt = performance.now(), checkedAt = -Infinity;
 
   for (let i = 0; i <= N; i++) for (let j = 0; j <= M; j++) {
+    if (performance.now() - yieldedAt >= 8) {
+      await setImmediate();
+      if (keepRunning && performance.now() - checkedAt >= 250) {
+        if (!(await keepRunning())) return null;
+        checkedAt = performance.now();
+      }
+      yieldedAt = performance.now();
+    }
     const here = required(required(best, i), j);
     if (here === -Infinity) continue;
     const step = (di: number, dj: number, gain: number) => {

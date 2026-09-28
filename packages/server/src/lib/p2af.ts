@@ -9,6 +9,7 @@ import { languageCode } from "./readaloud-epub.ts";
 import { buildCues, buildManifest, buildVariantCues, chapterLink } from "./reader-doc.ts";
 import { READER_FORMAT, type ReaderCues, type ReaderManifest } from "./reader-format.ts";
 import type { BilingualDocument } from "./bilingual-format.ts";
+import { appendLog } from "./log.ts";
 
 // The reader documents as they ride inside a container, where every URL is a path relative to
 // book.json rather than a route on this server. The EPUB layer beside them owns the audio, so
@@ -73,7 +74,10 @@ export async function buildP2afLayer(
       const extension = variant?.audioPath ? audioExtension(variant.audioPath) : ".m4a";
       const audio = `audio/${ref.variantId}${extension}`;
       const paired = await buildBilingualDocument(ref.variantId, { source: entry.audio, target: audio });
-      if (!paired) throw new Error("Bilingual preparation changed during export; retry with current text");
+      if (!paired) {
+        await appendLog(book.id, `Bilingual attachment for chapter ${entry.i + 1} (${ref.key}) changed during export and was omitted. Export again when preparation/narration finishes.`);
+        continue;
+      }
       const resource = `bilingual/${ref.variantId}.json`;
       bilingual.push({ path: resource, doc: paired, audio: paired.target.narration && variant?.audioPath
         ? [{ path: audio, sourcePath: variant.audioPath, mediaType: extension === ".mp3" ? "audio/mpeg" : "audio/mp4" }] : [] });

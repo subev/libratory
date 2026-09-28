@@ -69,7 +69,7 @@ export async function containerSource(file: Blob): Promise<DocumentSource> {
     cues: (url) => zip.json<ReaderCues>(at(url)),
     text: (url) => zip.json<ReaderText>(at(url)),
     bilingual: async (url) => {
-      const doc = await readBilingualDocument(await zip.json<unknown>(at(url)));
+      const doc = readBilingualDocument(await zip.json<unknown>(at(url)));
       if (closed) throw new Error("This book is closed");
       for (const lane of [doc.source, doc.target]) {
         const audio = lane.narration?.audio;

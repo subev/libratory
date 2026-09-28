@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { execFile } from "node:child_process";
 import { BILINGUAL_FORMAT, bilingualReferences, linkedTokens, parseBilingualDocument, readBilingualDocument, switchNarration, textRevision, tokenAtTime, type BilingualDocument } from "../../../server/src/lib/bilingual-format.ts";
 import { containerSource } from "./reader-source.ts";
+import { readingDirection } from "./reading-lang.ts";
 
 async function fixture(): Promise<BilingualDocument> {
   const sourceText = "turned it off", targetText = "כיבה אותו";
@@ -18,6 +19,11 @@ async function fixture(): Promise<BilingualDocument> {
 }
 
 describe("bilingual contract and playback", () => {
+  it("uses the lane language for direction even when Hebrew starts with a Latin name", () => {
+    expect(readingDirection("he")).toBe("rtl");
+    expect(readingDirection("de")).toBe("ltr");
+    expect(readingDirection("und")).toBe("auto");
+  });
   it("ignores malformed optional references without breaking the ordinary reader", () => {
     const valid = { key: "he", language: "he", url: "bilingual/he.json" };
     expect(bilingualReferences({ wrong: true })).toEqual([]);
@@ -28,7 +34,7 @@ describe("bilingual contract and playback", () => {
     expect(textRevision("abc")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
   });
   it("preserves a discontinuous expression and RTL text with stored IDs", async () => {
-    const doc = await readBilingualDocument(await fixture());
+    const doc = readBilingualDocument(await fixture());
     const pair = doc.pairs[0];
     if (!pair) throw new Error("Missing fixture pair");
     expect(linkedTokens(pair, "source", 0)).toEqual({ source: [0, 2], target: [0] });
@@ -36,7 +42,7 @@ describe("bilingual contract and playback", () => {
   });
   it("rejects stale text instead of retaining old token addresses", async () => {
     const doc = await fixture(); doc.target.text = "כיבה אותה";
-    await expect(readBilingualDocument(doc)).rejects.toThrow(/revision/);
+    expect(() => readBilingualDocument(doc)).toThrow(/revision/);
   });
   it("rejects unknown and cross-pair token IDs", async () => {
     const doc = await fixture(); const link = doc.pairs[0]?.links[0];
@@ -65,6 +71,8 @@ describe("bilingual contract and playback", () => {
     const doc = await fixture();
     expect(switchNarration(doc, "source", 1000)).toEqual({ side: "target", ms: 2500 });
     expect(switchNarration(doc, "source", 0)).toEqual({ side: "target", ms: 2500 });
+    expect(switchNarration(doc, "source", 1900)).toEqual({ side: "target", ms: 2500 });
+    expect(tokenAtTime(doc.source, 1900)).toBeNull();
   });
   it("does not move playback across an uncertain or missing counterpart", async () => {
     const doc = await fixture(), pair = doc.pairs[0];
@@ -75,6 +83,23 @@ describe("bilingual contract and playback", () => {
     expect(switchNarration(doc, "source", 1000)).toBeNull();
     pair.status = "matched"; pair.target = [0, 9]; doc.target.narration = null;
     expect(switchNarration(doc, "source", 1000)).toBeNull();
+  });
+  it("keeps the preceding sentence through silence without spanning an untimed passage", async () => {
+    const doc = await fixture(), first = doc.pairs[0];
+    if (!first || !doc.source.narration || !doc.target.narration) throw new Error("Missing fixture");
+    doc.pairs = [{ ...first, source: [0, 6], target: [0, 4] }, { ...first, id: "p2", source: [7, 13], target: [5, 9] }];
+    doc.source.narration.anchors = [
+      { kind: "passage", range: [0, 6], start: { ms: 200, method: "provider-word" }, end: { ms: 800, method: "provider-word" } },
+      { kind: "passage", range: [7, 13], start: { ms: 1000, method: "provider-word" }, end: { ms: 1800, method: "provider-word" } },
+    ];
+    doc.target.narration.anchors = [
+      { kind: "passage", range: [0, 4], start: { ms: 2500, method: "provider-word" }, end: { ms: 3000, method: "provider-word" } },
+      { kind: "passage", range: [5, 9], start: { ms: 3500, method: "provider-word" }, end: { ms: 4000, method: "provider-word" } },
+    ];
+    expect(switchNarration(doc, "source", 900)).toEqual({ side: "target", ms: 2500 });
+    expect(switchNarration(doc, "source", 1100)).toEqual({ side: "target", ms: 3500 });
+    doc.source.narration.anchors = doc.source.narration.anchors.slice(0, -1);
+    expect(switchNarration(doc, "source", 1900)).toBeNull();
   });
   it("does not highlight a zero-duration word or invent a word between anchors", async () => {
     const doc = await fixture();

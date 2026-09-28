@@ -253,14 +253,14 @@ function cuesDocument(
   text: ReaderText | null,
   resolved: Resolved,
 ): ReaderCues {
-  const ranges = text?.blocks ? locateChunks(text.text, cues.map((cue) => cue.text)) : [];
+  const ranges = text ? locateChunks(text.text, cues.map((cue) => cue.text)) : [];
 
   return {
     format: READER_FORMAT,
     totalMs,
     granularity,
     marks: resolved.marks,
-    ...(text?.blocks ? { text } : {}),
+    ...(text ? { text } : {}),
     cues: cues.map((cue, i) => {
       const cueRects = resolved.perCue[i];
       return {

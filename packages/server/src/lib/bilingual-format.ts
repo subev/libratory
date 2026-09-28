@@ -72,6 +72,14 @@ function inside(inner: TextRange, outer: TextRange): boolean {
   return inner[0] >= outer[0] && inner[1] <= outer[1];
 }
 
+export function tokensIn(lane: Pick<BilingualLane, "tokens">, range: TextRange | null): BilingualToken[] {
+  return range ? lane.tokens.filter((token) => inside(token.range, range)) : [];
+}
+
+export function graphemeBoundaries(text: string): Set<number> {
+  return new Set([text.length, ...Array.from(new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(text), (segment) => segment.index)]);
+}
+
 export function parseBilingualDocument(value: unknown): BilingualDocument {
   const doc = document.parse(value);
   const require = (valid: boolean, message: string) => { if (!valid) throw new Error(`Invalid bilingual document: ${message}`); };
@@ -79,7 +87,7 @@ export function parseBilingualDocument(value: unknown): BilingualDocument {
   require(new Set(doc.pairs.map((p) => p.id)).size === doc.pairs.length, "duplicate pair ID");
   for (const side of ["source", "target"] as const) {
     const lane = doc[side];
-    const boundaries = new Set([lane.text.length, ...Array.from(new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(lane.text), (segment) => segment.index)]);
+    const boundaries = graphemeBoundaries(lane.text);
     const validRange = (r: TextRange) => boundaries.has(r[0]) && boundaries.has(r[1]);
     require(new Set(lane.tokens.map((t) => t.id)).size === lane.tokens.length, "duplicate token ID");
     let end = 0;
@@ -129,36 +137,42 @@ export function textRevision(text: string): string {
   return bytesToHex(sha256(new TextEncoder().encode(text)));
 }
 
-export async function readBilingualDocument(value: unknown): Promise<BilingualDocument> {
+export function readBilingualDocument(value: unknown): BilingualDocument {
   const doc = parseBilingualDocument(value);
-  const hashes = await Promise.all([textRevision(doc.source.text), textRevision(doc.target.text)]);
-  if (hashes[0] !== doc.source.textRevision || hashes[1] !== doc.target.textRevision) throw new Error("Bilingual text revision does not match its content");
+  if (textRevision(doc.source.text) !== doc.source.textRevision || textRevision(doc.target.text) !== doc.target.textRevision) throw new Error("Bilingual text revision does not match its content");
   return doc;
 }
 
+// Loaded timing arrays are immutable; replacing a recording supplies a new array and index.
+const passageIndexes = new WeakMap<BilingualAnchor[], Map<string, BilingualAnchor>>();
+
 export function passageAnchor(lane: BilingualLane, range: TextRange | null): BilingualAnchor | null {
-  if (!range) return null;
-  return lane.narration?.anchors.find((a) => a.kind === "passage" && a.range[0] === range[0] && a.range[1] === range[1]) ?? null;
-}
-
-export function passageIndex(doc: BilingualDocument) {
-  const index = (lane: BilingualLane) => {
-    const result = new Map<string, BilingualAnchor>();
-    for (const anchor of lane.narration?.anchors ?? []) {
+  const anchors = lane.narration?.anchors;
+  if (!range || !anchors) return null;
+  let index = passageIndexes.get(anchors);
+  if (!index) {
+    index = new Map();
+    for (const anchor of anchors) {
       const key = anchor.range.join(":");
-      if (anchor.kind === "passage" && !result.has(key)) result.set(key, anchor);
+      if (anchor.kind === "passage" && !index.has(key)) index.set(key, anchor);
     }
-    return result;
-  };
-  return { source: index(doc.source), target: index(doc.target) };
+    passageIndexes.set(anchors, index);
+  }
+  return index.get(range.join(":")) ?? null;
 }
 
-export function pairAtTime(doc: BilingualDocument, side: BilingualSide, ms: number, index?: ReturnType<typeof passageIndex>): BilingualPair | null {
-  return doc.pairs.find((pair) => {
+export function pairAtTime(doc: BilingualDocument, side: BilingualSide, ms: number): BilingualPair | null {
+  let preceding: BilingualPair | null = null;
+  for (const pair of doc.pairs) {
     const range = pair[side];
-    const anchor = index ? (range ? index[side].get(range.join(":")) : null) : passageAnchor(doc[side], range);
-    return anchor?.start.ms !== null && anchor?.start.ms !== undefined && anchor.end.ms !== null && ms >= anchor.start.ms && ms < anchor.end.ms;
-  }) ?? null;
+    if (!range) continue;
+    const anchor = passageAnchor(doc[side], range);
+    if (!anchor || anchor.start.ms === null || anchor.end.ms === null) { preceding = null; continue; }
+    if (ms < anchor.start.ms) return preceding;
+    if (ms < anchor.end.ms) return pair;
+    preceding = pair;
+  }
+  return ms <= (doc[side].narration?.totalMs ?? 0) ? preceding : null;
 }
 
 export function tokenAtTime(lane: BilingualLane, ms: number): BilingualToken | null {
@@ -173,9 +187,9 @@ export function linkedTokens(pair: BilingualPair, side: BilingualSide, id: numbe
   return { source: [...new Set(links.flatMap((l) => l.source))], target: [...new Set(links.flatMap((l) => l.target))] };
 }
 
-export function switchNarration(doc: BilingualDocument, side: BilingualSide, ms: number, index?: ReturnType<typeof passageIndex>): { side: BilingualSide; ms: number } | null {
+export function switchNarration(doc: BilingualDocument, side: BilingualSide, ms: number): { side: BilingualSide; ms: number } | null {
   const target = side === "source" ? "target" : "source";
-  const pair = pairAtTime(doc, side, ms, index) ?? (ms === 0 ? doc.pairs[0] : null);
+  const pair = pairAtTime(doc, side, ms) ?? (ms === 0 ? doc.pairs[0] : null);
   if (pair?.status !== "matched") return null;
   const at = passageAnchor(doc[target], pair[target])?.start.ms;
   return at === undefined || at === null ? null : { side: target, ms: at };

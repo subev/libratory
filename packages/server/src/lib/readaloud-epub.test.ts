@@ -135,7 +135,7 @@ describe("buildReadaloudEpub", () => {
     const primary = path.join(baseDir, "primary.m4a"), secondary = path.join(baseDir, "secondary.m4a");
     await writeFile(primary, "primary recording");
     await writeFile(secondary, "secondary recording");
-    const doc = await readBilingualDocument(bilingualFixture);
+    const doc = readBilingualDocument(bilingualFixture);
     if (!doc.source.narration || !doc.target.narration) throw new Error("Missing fixture narration");
     doc.source.narration.revision = textRevision("primary recording");
     doc.target.narration.revision = textRevision("secondary recording");
@@ -160,7 +160,7 @@ describe("buildReadaloudEpub", () => {
     expect(opf).not.toContain('<itemref idref="p2af_bilingual');
     expect(await zipEntry(outputPath, "OEBPS/p2af/audio/he.m4a")).toBe("secondary recording");
     expect(await zipEntry(outputPath, "OEBPS/audio/ch000.m4a")).toBe("primary recording");
-    expect(await readBilingualDocument(JSON.parse(await zipEntry(outputPath, "OEBPS/p2af/bilingual/he.json")))).toEqual(doc);
+    expect(readBilingualDocument(JSON.parse(await zipEntry(outputPath, "OEBPS/p2af/bilingual/he.json")))).toEqual(doc);
     const { stdout } = await execFileAsync("unzip", ["-v", outputPath]);
     expect(stdout.split("\n").find((line) => line.includes("p2af/audio/he.m4a"))).toContain("Stored");
   });
