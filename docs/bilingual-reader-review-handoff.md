@@ -288,3 +288,18 @@ visible while its chapter list scrolls. Lint/typecheck and all 1,146 unit/integr
 Next is realistic whole-book export and chapter-transition acceptance, followed by native iPhone
 consumption, MCP/assistant parity and spike cleanup. Selection controls alone do not establish that
 whole-book or native acceptance is complete.
+
+## Whole-selection text acceptance
+
+A disposable copy of the current 69-chapter selection (about 99,617 words, mixed preparation) passed
+the normal text export job and offline prepared/unprepared/final/prepared chapter navigation. The
+export took about 3.06 seconds; import plus browser checks about 1.35 seconds. Original selection
+and book were untouched, and the temporary book was deleted. This is text-only acceptance; no
+whole-book audio-quality or all-audio archive performance claim is implied.
+
+`e2e/fixtures/tiny-book-bilingual-text.epub` is a small maintained synthetic English–Hebrew fixture,
+with a second ordinary chapter and no recordings. Its generator and the reusable chapter-transition
+check are in `e2e/scripts/`. The normative reader and bilingual documents now describe standalone
+text resources explicitly. Any downstream reader must import those resources, not merely ignore
+unknown fields while accepting the manifest. Native bilingual presentation is still pending; its
+interface support scope is a user choice, not an assumption here.

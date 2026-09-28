@@ -36,7 +36,7 @@ provider words may be retained as evidence but cannot receive an active-word hig
 
 Readers verify text hashes and structural/referential integrity before displaying links. Recording
 revisions identify the timing/audio dependency; the reader does not hash entire audio files on
-every open. Export checks the source text against the primary cues, requires source narration to
+every open. Export checks the source text against the primary cue text or text document, requires source narration to
 reference the primary audio, and hashes the actual staged recordings before creating the archive.
 This binds the exported snapshot; it does not check current database state. Production preparation must capture input revisions and reject stale publication.
 An audio replacement must regenerate its anchor projection while preserving text-only mappings.
@@ -70,5 +70,12 @@ Cancelled/failed jobs keep completed batches; only an explicit retry continues w
 answers stay in the database and never enter the reading document.
 
 Original-language synced EPUB exports include current prepared translations for chapters carried
-with primary cues. Translation-only exports remain single-lane. Text-only export without primary
-cues and book-wide preparation controls are still pending.
+with primary cues. Translation-only exports remain single-lane. Original-language text EPUB exports carry selected
+chapter text in `p2af/text/<chapter-id>.json` and current bilingual documents without either
+narration. Their primary `audio`, `cues` and `durationMs` fields are null, and `text` references a
+real `ReaderText` resource. All paths are relative to `book.json`; each resource is declared in the
+EPUB package. Readers can fall back to that original text if the optional pairing cannot be read.
+
+Selection controls call the same persisted per-chapter operations. Status and token estimates are
+available before work; current pairs and completed links are skipped. Cancelling retains completed
+work and retry is explicit. These operations are independent of container decoding.

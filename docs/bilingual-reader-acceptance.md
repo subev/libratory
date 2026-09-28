@@ -141,3 +141,29 @@ export without reading audio or requiring PDF geometry.
 The normal synced export also now passes the book's source language into its EPUB metadata when
 no translation lane was selected. Previously that worker passed null, causing the writer's English
 fallback even for a book whose source language was known.
+
+## Full-selection text export and chapter transitions
+
+A second disposable book copied the existing selection's 69 chapters (about 99,617 whitespace-counted
+words), its completed translation text, and the one current prepared mapping. Audio was deliberately
+omitted. The normal text EPUB job completed in about 3.06 seconds on this machine. Its temporary
+book was deleted; the original book and selection were not changed.
+
+`node e2e/scripts/bilingual-book.mjs` passed offline prepared → unprepared → final → prepared
+chapter transitions, checked the chapter's actual text, word inspection, disabled missing playback,
+and 393 px layout. Import plus these checks took about 1.35 seconds in headless development
+Chromium. This covers a realistic text selection with mixed readiness, not a whole-book acoustic
+accuracy audit or an all-audio archive size/performance guarantee.
+
+A maintained two-chapter synthetic fixture, `e2e/fixtures/tiny-book-bilingual-text.epub`, exercises
+standalone primary text plus the optional English–Hebrew attachment. Its sentences are synthetic;
+it has no audio or acoustic timestamps. Generate it with:
+
+```sh
+pnpm --filter @libratory/server exec tsx ../../e2e/scripts/bilingual-text-fixture.mts
+node e2e/scripts/bilingual-book.mjs e2e/fixtures/tiny-book-bilingual-text.epub
+```
+
+The small fixture also passes the same offline transition check. Consumers must import a chapter's
+`text` reference even when `cues` is null. Simply accepting the manifest while ignoring that resource
+is insufficient compatibility. The format documentation now states this text-only contract explicitly.

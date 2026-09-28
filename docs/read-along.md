@@ -46,6 +46,12 @@ anything it recognises, and say something useful about anything it does not.
   a cover and says where it is, while the server serves none.
 - **`audio` and `cues` are both null for a chapter nobody has narrated.** There is no cue document
   to fetch, and a container cannot carry a path to a file it does not hold.
+- **`text`** optionally names a `ReaderText` JSON resource (`{ "format": "p2af/1", "text": "…" }`,
+  with optional structural blocks). It supports chapters with no narration; text-only EPUBs carry
+  it inside the archive. Null means there is no separate text resource, not that the chapter is empty.
+- **`bilingual`** optionally lists prepared translation documents by key, language and URL. See
+  [the optional bilingual extension](bilingual-format.md). Unknown or unavailable optional
+  attachments must not prevent ordinary chapter reading.
 - **Every URL is relative to `book.json` itself.** Served from `/read/book/:id/book.json` these are
   root-relative and name routes on this server; inside a container they name entries beside it.
 - **`mode`** says whether the chapter can be *marked*, not whether it has pages: `"page"` when
@@ -276,3 +282,11 @@ in because it is what a second implementation of this page is written against.
 
 `/open` reads such a file with no server involved: `lib/reader-source.ts` is the seam, with one
 implementation over HTTP and one over a container. Nothing that draws a page knows which it got.
+
+Original-language **text EPUB** exports also carry `p2af/book.json`, with selected chapters only,
+no pages or recordings, and one `p2af/text/<chapter-id>.json` per chapter. Current bilingual
+attachments accompany them, with null narration in both lanes. These additions are declared in
+the package manifest and kept outside its spine; the ordinary EPUB chapter files and styles remain
+unchanged. This path does not depend on cues or PDF geometry. The parent directory need not be
+`OEBPS`: locate the package through `META-INF/container.xml` and resolve reader resources relative
+to `book.json`, wherever it resides.
