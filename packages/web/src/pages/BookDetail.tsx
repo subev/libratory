@@ -706,7 +706,7 @@ export function BookDetail() {
     {
       id: "epub",
       label: "EPUB",
-      subtitle: "Text only · any e-reader",
+      subtitle: activeVariant ? "Text only · any e-reader" : "Text only · includes prepared bilingual text",
       count: selectedExportable,
       disabled: !canExportDocument || !!pendingExportFor("epub")?.running,
       reason: exportTooltip("epub"),

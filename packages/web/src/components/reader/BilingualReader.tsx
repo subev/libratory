@@ -214,7 +214,7 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
             <Button size="sm" onClick={onExit}>Single language</Button>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Button variant="icon" size="sm" aria-label={playing ? "Pause" : "Play"} title={playing ? "Pause (Space)" : "Play (Space)"} disabled={!lane.narration} onClick={togglePlay}>
+            <Button variant="icon" size="sm" aria-label={playing ? "Pause" : "Play"} title={!lane.narration ? "No narration in this language" : playing ? "Pause (Space)" : "Play (Space)"} disabled={!lane.narration} onClick={togglePlay}>
               {playing ? <IconPause weight="fill" className="h-4 w-4" /> : <IconPlay className="h-4 w-4" />}
             </Button>
             <span className="text-xs text-(--text-muted)">Speak</span>
@@ -260,7 +260,7 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
           onTimeUpdate={() => { if (audioRef.current && !playing) setMs(audioRef.current.currentTime * 1000); }} />
         <h1 className="sr-only">{chapter.title}</h1>
         <div className="mb-6 flex justify-between gap-8 px-3 text-sm font-medium text-(--text-muted) md:grid md:grid-cols-2 md:gap-12">
-          {SIDES.map((s) => <span key={s}>{language(doc[s].language)}{s === side ? " · Audio" : ""}</span>)}
+          {SIDES.map((s) => <span key={s}>{language(doc[s].language)}{s === side && lane.narration ? " · Audio" : ""}</span>)}
         </div>
         <p id="word-navigation" className="sr-only">Left and Right move between words in this language's reading direction. Home and End go to its first and last word. Enter listens from the word; Space pauses or plays.</p>
         <div ref={content} className="space-y-6 pb-16" onWheel={() => setFollowing(false)} onTouchMove={() => setFollowing(false)}

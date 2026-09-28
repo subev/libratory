@@ -196,6 +196,7 @@ function packageOpf(opts: {
     ? [
         `    <item id="p2af_book" href="${P2AF_DIR}/book.json" media-type="application/json"/>`,
         ...p2af.sources.map((src, i) => `    <item id="p2af_src_${i}" href="${P2AF_DIR}/${src.path}" media-type="application/pdf"/>`),
+        ...(p2af.texts ?? []).map((text, i) => `    <item id="p2af_text_${i}" href="${P2AF_DIR}/${text.path}" media-type="application/json"/>`),
         ...p2af.cues.map((cue, i) => `    <item id="p2af_cues_${i}" href="${P2AF_DIR}/${cue.path}" media-type="application/json"/>`),
         ...(p2af.bilingual ?? []).flatMap((entry, i) => [
           `    <item id="p2af_bilingual_${i}" href="${P2AF_DIR}/${entry.path}" media-type="application/json"/>`,
@@ -310,7 +311,7 @@ export async function buildReadaloudEpub(opts: {
 
 // The cues are the bulk of the layer and compress to about a quarter; the PDFs are already
 // compressed and are stored, so a reader can hand their bytes straight to a PDF renderer.
-async function writeP2afLayer(dir: string, layer: P2afLayer): Promise<void> {
+export async function writeP2afLayer(dir: string, layer: P2afLayer): Promise<void> {
   const extensions = layer.bilingual ?? [];
   const paths = extensions.flatMap((entry) => [entry.path, ...entry.audio.map((audio) => audio.path)]);
   if (new Set(paths).size !== paths.length) throw new Error("Duplicate bilingual resource path");
@@ -322,6 +323,11 @@ async function writeP2afLayer(dir: string, layer: P2afLayer): Promise<void> {
   await mkdir(path.join(dir, "cues"), { recursive: true });
   if (layer.sources.length > 0) await mkdir(path.join(dir, "source"), { recursive: true });
   await writeFile(path.join(dir, "book.json"), JSON.stringify(layer.manifest));
+  for (const text of layer.texts ?? []) {
+    if (!/^text\/[a-zA-Z0-9_-]+\.json$/.test(text.path)) throw new Error("Invalid reader text path");
+    await mkdir(path.dirname(path.join(dir, text.path)), { recursive: true });
+    await writeFile(path.join(dir, text.path), JSON.stringify(text.doc));
+  }
   for (const cue of layer.cues) await writeFile(path.join(dir, cue.path), JSON.stringify(cue.doc));
   for (const source of layer.sources) await copyFile(source.pdfPath, path.join(dir, source.path));
   for (const entry of extensions) {
@@ -343,11 +349,12 @@ async function writeP2afLayer(dir: string, layer: P2afLayer): Promise<void> {
   }
 }
 
-async function validateBilingualExport(dir: string, layer: P2afLayer): Promise<void> {
+export async function validateBilingualExport(dir: string, layer: P2afLayer): Promise<void> {
   for (const entry of layer.bilingual ?? []) {
     const doc = entry.doc;
     const chapter = layer.manifest.chapters.find((chapter) => chapter.id === doc.chapterId);
-    const primaryText = layer.cues.find((cue) => cue.path === chapter?.cues)?.doc.text?.text;
+    const primaryText = layer.cues.find((cue) => cue.path === chapter?.cues)?.doc.text?.text
+      ?? layer.texts?.find((text) => text.path === chapter?.text)?.doc.text;
     if (primaryText === undefined || primaryText !== doc.source.text) throw new Error("Bilingual source text differs from chapter text");
     if (doc.source.narration && doc.source.narration.audio !== chapter?.audio) throw new Error("Bilingual source recording differs from chapter recording");
     for (const lane of [doc.source, doc.target]) {

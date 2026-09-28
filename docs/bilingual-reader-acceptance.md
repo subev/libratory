@@ -104,3 +104,40 @@ Checkpoint validation: lint and typecheck pass; 1,142 unit/integration tests pas
 `pnpm test --maxWorkers=2`. The focused real-export browser check passes, including the corrected
 unknown-language label. The repeat profile taken during the test suite was slower on the long
 chapter (frame p95 roughly 67 ms), so use the uncontended first run above as the baseline.
+
+## Normal jobs, revision lifecycle and text-only exports
+
+A disposable synthetic book copied LETTER I.'s text, stored preparation and both recordings into
+its own output directory. Normal HTTP `books.exportDocument` requests ran the production worker,
+and `books.documents` returned the resulting Outputs entries. The original chapter/translation
+rows were compared afterwards and remained unchanged. Cleanup used `books.delete` after workers
+released the temporary book. No translation, word-link or TTS calls were made.
+
+Verified:
+
+- Synced EPUB retained all 52 linked groups and both recordings.
+- A byte-distinct remux of the translation recording changed only its narration revision; sentence
+  pairs and links remained identical. This tests revision handling, not new speech generation.
+- Removing translation audio retained bilingual text and word links in the live reader and export.
+- Editing source text removed its manifest attachment and returned HTTP 409 for the obsolete
+  pairing. Restoring the exact text reused the saved links.
+- Cancelling a queued pairing preserved the 52 completed linked groups. Explicitly re-pairing
+  edited text with the installed local model produced 53 current groups and cleared obsolete word
+  links. No paid linking was requested.
+- With neither recording available, the ordinary EPUB job exported both texts and all saved links.
+  The existing EPUB spine, chapter XHTML and styling remain in place. Its reader extension carries
+  selected chapter text documents and current bilingual attachments, with null narration and no
+  fabricated cue/timestamp data. Plain translated-variant EPUB exports remain monolingual.
+
+`node e2e/scripts/bilingual-text-export.mjs` opens the resulting fully text-only and target-text-only
+files through `/open`, disables networking and checks word meanings, available playback, disabled
+missing playback and switching to ordinary text. Both passed without page errors. The script takes
+an optional artifact directory; its inputs are `lifecycle-text-only.epub` and
+`lifecycle-target-text-only.epub`. Local lifecycle scripts/reports and these user-content artifacts
+are under the gitignored acceptance directory. The maintained regression suite checks packaging,
+manifest declarations, preserved EPUB spine, text revision binding, omitted chapters, and text-only
+export without reading audio or requiring PDF geometry.
+
+The normal synced export also now passes the book's source language into its EPUB metadata when
+no translation lane was selected. Previously that worker passed null, causing the writer's English
+fallback even for a book whose source language was known.

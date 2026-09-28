@@ -243,3 +243,23 @@ retry. Chapters with no attachment can still navigate to a prepared chapter.
 keyboard playback using a generated range-capable WAV fixture. No database or paid provider is used.
 The three saved multilingual examples also pass their existing browser checks. Lint, typecheck and
 all 1,142 unit/integration tests pass. Desktop lifecycle and native acceptance remain open.
+
+## Text-only export and real lifecycle follow-up
+
+Original-language EPUB exports now include selected reader text documents and any current
+bilingual attachments. They carry no narration; the text projection does not read recordings or
+require PDF geometry. The existing Vivliostyle EPUB spine and presentation are preserved, and all
+added resources are declared in its OPF. Synced exports continue carrying available recordings.
+Source EPUB metadata now uses the book's language instead of passing null to the writer.
+
+A disposable copy of LETTER I. passed normal export jobs and Outputs listing, changed-audio revision
+binding without re-linking, missing target audio, fully text-only export, source-edit invalidation,
+exact-text restoration, cancellation retaining completed links, and explicit local re-pairing of
+edited text. The original rows stayed unchanged; the temporary book was deleted. Audio replacement
+was a byte-distinct remux, not new TTS, and model alignment status is not an accuracy judgement.
+
+Both real text-only/partial-audio exports passed offline browser reading, meanings, available
+playback and ordinary text fallback (`node e2e/scripts/bilingual-text-export.mjs`). Lint, typecheck
+and 1,143 unit/integration tests pass. See the acceptance report for artifact locations and limits.
+Next: selection-based preparation, mixed readiness/chapter transitions and whole-book acceptance;
+then native iPhone consumption, assistant/MCP parity and final spike removal.

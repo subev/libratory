@@ -59,13 +59,13 @@ async function narration(text: string, pairs: BilingualPair[], side: "source" | 
   }
 }
 
-export async function buildBilingualDocument(variantId: string, urls?: { source: string; target: string }): Promise<BilingualDocument | null> {
+export async function buildBilingualDocument(variantId: string, options?: { source?: string; target?: string; textOnly?: boolean }): Promise<BilingualDocument | null> {
   const { context, row, current } = await currentPreparation(variantId);
   if (!current || !row?.pairs) return null;
   const data = row.pairs, pairs = preparedPairs(data, row.links);
-  const narrations = await Promise.all([
-    narration(context.source, pairs, "source", context.chapter.status === "done" ? context.chapter.audioPath : null, urls?.source ?? `/audio/chapter/${context.chapter.id}`),
-    narration(context.target, pairs, "target", context.variant.audioStatus === "done" ? context.variant.audioPath : null, urls?.target ?? `/audio/translation/${variantId}`),
+  const narrations = options?.textOnly ? [null, null] : await Promise.all([
+    narration(context.source, pairs, "source", context.chapter.status === "done" ? context.chapter.audioPath : null, options?.source ?? `/audio/chapter/${context.chapter.id}`),
+    narration(context.target, pairs, "target", context.variant.audioStatus === "done" ? context.variant.audioPath : null, options?.target ?? `/audio/translation/${variantId}`),
   ]).catch((error: unknown) => {
     if (error instanceof ChangedNarration) return null;
     throw error;

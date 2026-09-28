@@ -225,14 +225,14 @@ and no additional model call has been made for this plan.
 | Versioned text/token/link/timing contract | Implemented and validated; native interoperability still needs real playback testing. |
 | Web bilingual reader | Working: paragraph flow, click-to-listen, hover meanings, Space, RTL, narration switching and sentence alternation. Measured playback rendering cost reduced; two Tab stops with RTL-aware word navigation and original-reader fallback are implemented. |
 | Per-chapter preparation | Production local pairing and optional model word links, persisted jobs, progress, cancellation, explicit retry and stale-result rejection are implemented. Real long-chapter pairing passed. |
-| Offline export/import | Two real chapters exported through production builders and played offline with both recordings; existing word links survived. Normal export-job lifecycle, text-only export and full-book acceptance remain. |
+| Offline export/import | Two real chapters exported through production builders and played offline with both recordings; existing word links survived. Normal export jobs, text/audio invalidation and fully text-only EPUBs pass real-data checks; full-book acceptance remains. |
 | Whole-book preparation | Selection/scheduling and mixed-readiness acceptance remain. |
 | iPhone bilingual reader | Not implemented here. Primary manifest/cue decoding was checked only. |
 | Assistant/MCP parity | Queued after the reader workflow, not started. |
 | Spike removal | Explicit completion task; preserve fixtures and remove temporary adapter dependencies first. |
 
-**Immediate next step: close the desktop preparation/export lifecycle**, then text-only export and
-whole-book gates above. Keyboard navigation and failure fallback now pass focused browser checks. Keep checking against
+**Immediate next step: selection-based preparation and whole-book acceptance.** Normal export jobs,
+revision handling and text-only EPUBs now have real-data evidence. Keyboard navigation and failure fallback now pass focused browser checks. Keep checking against
 [the real-data baseline](bilingual-reader-acceptance.md). No new model-shopping or prompt sweep
 is needed to proceed. See
 [the handoff](bilingual-reader-review-handoff.md) for verification details.

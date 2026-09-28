@@ -24,9 +24,10 @@ import { bilingualRouter } from "../routes/bilingual.ts";
 import { prepareBilingual } from "./prepare-bilingual.ts";
 import { preparation, failPreparation, isPreparationRunning } from "../lib/bilingual-store.ts";
 import { bilingualReferencesForBook, buildBilingualDocument } from "../lib/bilingual-document.ts";
-import { buildP2afLayer } from "../lib/p2af.ts";
+import { buildP2afLayer, buildTextP2afLayer } from "../lib/p2af.ts";
 import { buildCues } from "../lib/reader-doc.ts";
 import { buildReadaloudEpub } from "../lib/readaloud-epub.ts";
+import { attachTextReaderLayer } from "../lib/epub-reader-layer.ts";
 import { bookTmpDir } from "../lib/paths.ts";
 import * as bilingualDocuments from "../lib/bilingual-document.ts";
 import { appendLog } from "../lib/log.ts";
@@ -63,6 +64,55 @@ afterEach(async () => {
 });
 
 describe("bilingual jobs and publication", () => {
+  it("packages selected text and saved word links without requiring recordings or PDF geometry", async () => {
+    await getDb().update(books).set({ kind: "pdf", pdfPath: "/missing/source.pdf" }).where(eq(books.id, bookId));
+    // Unreadable recordings must not be opened by the text export.
+    await getDb().update(chapters).set({ audioPath: dir }).where(eq(chapters.id, chapterId));
+    await writeSyncMap(dir, { version: 1, totalMs: 1000, chunks: [{ text: source, startMs: 0, endMs: 1000 }] });
+    try {
+      await paired(); await prepareBilingual(await queued("links"));
+      const book = row(await getDb().select().from(books).where(eq(books.id, bookId)));
+      const exported = [{ id: chapterId, index: 0, title: "Hello", text: source }];
+      const layer = await buildTextP2afLayer(book, exported);
+      expect(layer.manifest.chapters).toHaveLength(1);
+      expect(layer.manifest.chapters[0]).toMatchObject({ audio: null, cues: null, text: `text/${chapterId}.json` });
+      expect(layer.cues).toEqual([]); expect(layer.sources).toEqual([]);
+      const doc = layer.bilingual?.[0]?.doc;
+      expect(doc?.source.narration).toBeNull(); expect(doc?.target.narration).toBeNull();
+      expect(doc?.pairs[0]?.links).toEqual([{ source: [1], target: [1] }]);
+      expect(await buildTextP2afLayer(book, [])).toMatchObject({ manifest: { chapters: [] }, bilingual: [] });
+      const stale = await buildTextP2afLayer(book, [{ ...exported[0], id: chapterId, index: 0, title: "Hello", text: "Older exported text." }]);
+      expect(stale.bilingual).toEqual([]);
+      expect(stale.texts?.[0]?.doc.text).toBe("Older exported text.");
+
+      const archive = path.join(dir, "text.epub");
+      await mkdir(path.join(dir, "META-INF")); await mkdir(path.join(dir, "EPUB"));
+      await writeFile(path.join(dir, "mimetype"), "application/epub+zip");
+      await writeFile(path.join(dir, "META-INF/container.xml"), '<container><rootfiles><rootfile full-path="EPUB/content.opf"/></rootfiles></container>');
+      await writeFile(path.join(dir, "EPUB/content.opf"), '<package xmlns="http://www.idpf.org/2007/opf"><metadata/><manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="chapter"/></spine></package>');
+      await writeFile(path.join(dir, "EPUB/chapter.xhtml"), '<html xmlns="http://www.w3.org/1999/xhtml"><body>Hello world.</body></html>');
+      const exec = promisify(execFile);
+      await exec("zip", ["-q", "-0", archive, "mimetype"], { cwd: dir });
+      await exec("zip", ["-q", "-r", archive, "META-INF", "EPUB"], { cwd: dir });
+      await attachTextReaderLayer(archive, dir, layer);
+      const entry = async (name: string) => (await exec("unzip", ["-p", archive, name])).stdout;
+      const manifest = JSON.parse(await entry("EPUB/p2af/book.json"));
+      expect(manifest.chapters[0].audio).toBeNull();
+      expect(JSON.parse(await entry(`EPUB/p2af/${manifest.chapters[0].text}`)).text).toBe(source);
+      expect(JSON.parse(await entry(`EPUB/p2af/${manifest.chapters[0].bilingual[0].url}`))).toEqual(doc);
+      const opf = await entry("EPUB/content.opf");
+      expect(opf).toContain('xmlns="http://www.idpf.org/2007/opf"');
+      expect(opf).toContain('<itemref idref="chapter"');
+      expect(opf).toContain(`href="p2af/bilingual/${variantId}.json"`);
+      expect(opf).toContain(`href="p2af/text/${chapterId}.json"`);
+      expect(await entry("EPUB/chapter.xhtml")).toContain("Hello world.");
+      expect((await exec("unzip", ["-Z1", archive])).stdout.split("\n")[0]).toBe("mimetype");
+      if (!doc) throw new Error("Missing bilingual document");
+      doc.source.text = "Hallo world."; doc.source.textRevision = textRevision(doc.source.text);
+      await expect(attachTextReaderLayer(archive, dir, layer)).rejects.toThrow("Bilingual source text differs from chapter text");
+    } finally { await rm(dir + ".sync.json", { force: true }); }
+  });
+
   it("fails before publishing when generated tokens violate the document format", async () => {
     const tokenizer = vi.spyOn(segmentation, "tokenize").mockReturnValue([{ id: 1, start: 0, end: 1000 }]);
     try {

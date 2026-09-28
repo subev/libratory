@@ -9,7 +9,8 @@ import { languageSlug, translationChunkPreviewDir } from "./synthesize-translati
 import { chapterChunkPreviewDir } from "../lib/chunk-previews.ts";
 import { ensureSyncMap } from "../lib/sync-map.ts";
 import { buildReadaloudEpub, type ReadaloudChapter } from "../lib/readaloud-epub.ts";
-import { buildP2afLayer, buildVariantP2afLayer } from "../lib/p2af.ts";
+import { buildP2afLayer, buildVariantP2afLayer, buildTextP2afLayer } from "../lib/p2af.ts";
+import { attachTextReaderLayer } from "../lib/epub-reader-layer.ts";
 import { chapterLink } from "../lib/reader-doc.ts";
 import { deferUntilInputsSettle, documentJobKey } from "../lib/output-readiness.ts";
 import type { WorkerUtils } from "graphile-worker";
@@ -139,6 +140,11 @@ export async function assembleDocument(
       if (format === "epub") {
         const { language: documentLanguage, documents: chapterDocs } = renderChapterDocuments(docChapters);
         await buildChapterEpub(workDir, { title: book.title, language: documentLanguage, documents: chapterDocs }, outputPath);
+        if (!language) {
+          const layer = await buildTextP2afLayer(book, docChapters);
+          await attachTextReaderLayer(outputPath, workDir, layer);
+          await log(`Reader text: ${layer.manifest.chapters.length} chapters, ${layer.bilingual?.length ?? 0} bilingual attachments`);
+        }
       } else {
         const htmlPath = path.join(workDir, "document.html");
         await writeFile(htmlPath, renderDocumentHtml({ bookTitle: book.title, chapters: docChapters }), "utf-8");
@@ -270,7 +276,7 @@ async function assembleReadaloud(
     await buildReadaloudEpub({
       title: book.title,
       author: book.author,
-      language,
+      language: language ?? book.language,
       chapters: readaloudChapters,
       stagingDir,
       outputPath,

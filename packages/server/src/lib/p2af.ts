@@ -7,7 +7,7 @@ import { chapters, chapterVariants, type Book } from "../schema.ts";
 import { listMarkerSources } from "./marker-sources.ts";
 import { languageCode } from "./readaloud-epub.ts";
 import { buildCues, buildManifest, buildVariantCues, chapterLink } from "./reader-doc.ts";
-import { READER_FORMAT, type ReaderCues, type ReaderManifest } from "./reader-format.ts";
+import { READER_FORMAT, type ReaderCues, type ReaderManifest, type ReaderText } from "./reader-format.ts";
 import type { BilingualDocument } from "./bilingual-format.ts";
 import { appendLog } from "./log.ts";
 
@@ -17,6 +17,7 @@ import { appendLog } from "./log.ts";
 export type P2afLayer = {
   manifest: ReaderManifest;
   cues: { path: string; doc: ReaderCues }[];
+  texts?: { path: string; doc: ReaderText }[];
   sources: { path: string; pdfPath: string }[];
   bilingual?: { path: string; doc: BilingualDocument; audio: { path: string; sourcePath: string; mediaType: "audio/mp4" | "audio/mpeg" }[] }[];
 };
@@ -161,4 +162,39 @@ function audioExtension(audioPath: string): string {
   const ext = path.extname(audioPath).toLowerCase();
   if (ext !== ".mp3" && ext !== ".m4a") throw new Error("Bilingual EPUB audio must be MP3 or AAC");
   return ext;
+}
+
+export async function buildTextP2afLayer(
+  book: Book,
+  exported: { id: string; index: number; title: string; text: string }[],
+): Promise<P2afLayer> {
+  const layer: P2afLayer = {
+    manifest: { format: READER_FORMAT,
+      book: { id: book.id, title: book.title, author: book.author, language: languageCode(book.language ?? "und"), medianBodyPt: null, cover: null },
+      sources: [], pages: [], chapters: [] },
+    cues: [], texts: [], sources: [], bilingual: [],
+  };
+  const prepared = await bilingualReferencesForBook(book.id);
+  for (const chapter of exported) {
+    const text = chapter.text.trim();
+    const resource = `text/${chapter.id}.json`;
+    const entry: ReaderManifest["chapters"][number] = {
+      id: chapter.id, i: chapter.index, title: chapter.title, text: resource,
+      audio: null, cues: null, durationMs: null, pageStart: null, pageEnd: null,
+      mode: "text", why: "generated", bilingual: [],
+    };
+    layer.manifest.chapters.push(entry);
+    layer.texts?.push({ path: resource, doc: { format: READER_FORMAT, text } });
+    for (const ref of prepared.filter((ref) => ref.chapterId === chapter.id)) {
+      const doc = await buildBilingualDocument(ref.variantId, { textOnly: true });
+      if (!doc || doc.source.text !== text) {
+        await appendLog(book.id, `Bilingual attachment for chapter ${chapter.index + 1} (${ref.key}) changed during export and was omitted.`);
+        continue;
+      }
+      const pairedPath = `bilingual/${ref.variantId}.json`;
+      layer.bilingual?.push({ path: pairedPath, doc, audio: [] });
+      entry.bilingual?.push({ key: ref.key, language: ref.language, url: pairedPath });
+    }
+  }
+  return layer;
 }
