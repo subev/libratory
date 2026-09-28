@@ -263,3 +263,28 @@ playback and ordinary text fallback (`node e2e/scripts/bilingual-text-export.mjs
 and 1,143 unit/integration tests pass. See the acceptance report for artifact locations and limits.
 Next: selection-based preparation, mixed readiness/chapter transitions and whole-book acceptance;
 then native iPhone consumption, assistant/MCP parity and final spike removal.
+
+## Selected chapter preparation
+
+In a translation view, select chapters and choose **Bilingual reading** from the chapter action
+tray (under **More** when compact). The panel shows per-chapter readiness/progress/errors, pairs
+missing or stale text locally, and requests remaining word links with a selected model and an
+upfront batch/token estimate. It does not generate translation or audio. Current pairs and completed
+links are skipped, including a completion recheck under the preparation-row lock. Explicit Stop
+cancels selected jobs while retaining completed work; closing the panel leaves jobs running.
+
+The bulk routes reuse the single-chapter queue/cancel functions and persisted job records. Selection
+status reads the scoped chapters/variants/preparations in one query and returns summaries. It rejects
+missing or foreign-book chapter IDs before queueing, deduplicates IDs and accepts at most 1,000
+chapters per request. There is no new umbrella job or automatic retry. Assistant/MCP exposure remains
+deferred, but can use these same operations later.
+
+Three additional regressions cover mixed readiness, cancellation, explicit queue-failure retry,
+estimate parity, cross-book scope and concurrent completion. Focused browser checks verify the
+panel's controls, narrow layout and reader links with mocked APIs. The real chapter tray also opened
+the panel for 69 selected chapters without starting work or changing selection; the controls stay
+visible while its chapter list scrolls. Lint/typecheck and all 1,146 unit/integration tests pass.
+
+Next is realistic whole-book export and chapter-transition acceptance, followed by native iPhone
+consumption, MCP/assistant parity and spike cleanup. Selection controls alone do not establish that
+whole-book or native acceptance is complete.

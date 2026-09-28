@@ -355,3 +355,64 @@ describe("bilingual jobs and publication", () => {
     expect(layer?.manifest.chapters[0]?.bilingual?.[0]?.url).toBe(`bilingual/${variantId}.json`);
   });
 });
+
+describe("selected chapter preparation", () => {
+  it("skips completed and unavailable chapters, deduplicates the selection, and cancels only selected work", async () => {
+    await paired(); await prepareBilingual(await queued("links"));
+    const complete = await preparation(variantId);
+    const missingChapter = crypto.randomUUID(), missingVariant = crypto.randomUUID(), unavailable = crypto.randomUUID();
+    await getDb().insert(chapters).values([
+      { id: missingChapter, bookId, index: 1, title: "Next", rawText: source },
+      { id: unavailable, bookId, index: 2, title: "No translation", rawText: source },
+    ]);
+    await getDb().insert(chapterVariants).values({ id: missingVariant, chapterId: missingChapter, key: "German", text: target, status: "done" });
+    const input = { bookId, key: "German", chapterIds: [chapterId, missingChapter, unavailable, missingChapter] };
+    const statuses = await caller.selection(input);
+    expect(statuses).toHaveLength(3);
+    expect(statuses[0]?.status).toMatchObject({ current: true, linked: 1, batches: 0 });
+    expect(statuses[1]).toMatchObject({ available: true, status: { current: false } });
+    expect(statuses[2]).toMatchObject({ available: false, status: null });
+    queue.mockClear();
+    expect(await caller.prepareSelection({ ...input, stage: "pairs" })).toEqual([{ chapterId: missingChapter, queued: true, error: null }]);
+    expect(queue).toHaveBeenCalledTimes(1);
+    expect(queue.mock.calls[0]?.[2]).toMatchObject({ variantId: missingVariant, stage: "pairs" });
+    expect(queue.mock.calls[0]?.[3]).toMatchObject({ maxAttempts: 1 });
+    expect(await caller.prepareSelection({ ...input, stage: "pairs" })).toEqual([]);
+    await caller.cancelSelection(input);
+    expect((await preparation(missingVariant))?.pairJob?.status).toBe("cancelled");
+    expect(await preparation(variantId)).toEqual(complete);
+  });
+
+  it("rejects a foreign chapter before queueing, and exposes queue failure for an explicit retry", async () => {
+    await paired(); queue.mockClear();
+    await expect(caller.prepareSelection({ bookId: crypto.randomUUID(), chapterIds: [chapterId], key: "German", stage: "links", model: "test-model" })).rejects.toThrow("another book");
+    expect(queue).not.toHaveBeenCalled();
+    const input = { bookId, chapterIds: [chapterId], key: "German", stage: "links" as const, model: "test-model" };
+    const before = await caller.status({ chapterId, key: "German" });
+    const selected = await caller.selection(input);
+    expect(selected[0]?.status?.estimatedInputTokens).toBe(before.estimatedInputTokens);
+    expect(before.estimatedInputTokens).toBeGreaterThan(0);
+    queue.mockRejectedValueOnce(new Error("Queue unavailable"));
+    expect(await caller.prepareSelection(input)).toEqual([{ chapterId, queued: false, error: "Queue unavailable" }]);
+    expect((await preparation(variantId))?.linkJob?.status).toBe("failed");
+    expect((await caller.selection(input))[0]?.status?.current).toBe(true);
+    expect(queue).toHaveBeenCalledTimes(1);
+    expect(await caller.prepareSelection(input)).toEqual([{ chapterId, queued: true, error: null }]);
+    expect(queue).toHaveBeenCalledTimes(2);
+    expect((await preparation(variantId))?.linkJob?.status).toBe("queued");
+  });
+
+  it("rechecks completed work under the lock before bulk pairing can replace it", async () => {
+    await paired();
+    const saved = await preparation(variantId);
+    await getDb().update(bilingualPreparations).set({ pairs: null }).where(eq(bilingualPreparations.variantId, variantId));
+    installed.mockImplementationOnce(async () => {
+      await getDb().update(bilingualPreparations).set({ pairs: saved?.pairs }).where(eq(bilingualPreparations.variantId, variantId));
+      return true;
+    });
+    queue.mockClear();
+    expect(await caller.prepareSelection({ bookId, chapterIds: [chapterId], key: "German", stage: "pairs" })).toEqual([{ chapterId, queued: false, error: null }]);
+    expect(queue).not.toHaveBeenCalled();
+    expect((await preparation(variantId))?.pairs).toEqual(saved?.pairs);
+  });
+});

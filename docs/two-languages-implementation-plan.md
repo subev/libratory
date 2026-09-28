@@ -226,12 +226,12 @@ and no additional model call has been made for this plan.
 | Web bilingual reader | Working: paragraph flow, click-to-listen, hover meanings, Space, RTL, narration switching and sentence alternation. Measured playback rendering cost reduced; two Tab stops with RTL-aware word navigation and original-reader fallback are implemented. |
 | Per-chapter preparation | Production local pairing and optional model word links, persisted jobs, progress, cancellation, explicit retry and stale-result rejection are implemented. Real long-chapter pairing passed. |
 | Offline export/import | Two real chapters exported through production builders and played offline with both recordings; existing word links survived. Normal export jobs, text/audio invalidation and fully text-only EPUBs pass real-data checks; full-book acceptance remains. |
-| Whole-book preparation | Selection/scheduling and mixed-readiness acceptance remain. |
+| Whole-book preparation | Selection controls and shared per-chapter scheduling implemented; mixed-readiness/skip/cancel/retry tests pass. Full-book export and transition acceptance remain. |
 | iPhone bilingual reader | Not implemented here. Primary manifest/cue decoding was checked only. |
 | Assistant/MCP parity | Queued after the reader workflow, not started. |
 | Spike removal | Explicit completion task; preserve fixtures and remove temporary adapter dependencies first. |
 
-**Immediate next step: selection-based preparation and whole-book acceptance.** Normal export jobs,
+**Immediate next step: whole-book export and chapter-transition acceptance.** Selection controls, normal export jobs,
 revision handling and text-only EPUBs now have real-data evidence. Keyboard navigation and failure fallback now pass focused browser checks. Keep checking against
 [the real-data baseline](bilingual-reader-acceptance.md). No new model-shopping or prompt sweep
 is needed to proceed. See

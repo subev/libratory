@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router";
 import { trpc } from "../trpc.ts";
 import { useRunModel } from "../lib/use-llm-models.ts";
 import { ModelBundleNotice, useModelBundle } from "../components/ModelBundleNotice.tsx";
+import { BilingualSelection } from "../components/BilingualSelection.tsx";
 import { ChapterTable } from "../components/ChapterTable.tsx";
 import { SYNTH_BUSY, TEXT_BUSY, variantLabel } from "../lib/chapters.ts";
 import { SynthesizeModal, type SynthSettings } from "../components/SynthesizeModal.tsx";
@@ -184,6 +185,7 @@ export function BookDetail() {
   const [showTranslation, setShowTranslation] = useState(false);
   const [showSynthesize, setShowSynthesize] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [bilingualSelection, setBilingualSelection] = useState<{ bookId: string; chapterIds: string[]; translationKey: string } | null>(null);
   const requestedDialog = searchParams.get("dialog") ?? (searchParams.get("extract") === "1" ? "extract" : null);
   /* eslint-disable react/set-state-in-effect -- the URL is the external system here: the assistant
      panel changes it under a page that is already mounted, so the dialog cannot be initialised from
@@ -631,6 +633,13 @@ export function BookDetail() {
           : activeKind === "translation"
             ? `Translate the selected chapters to ${activeLabel} (finished ones are skipped, stopped ones resume)`
             : `Rewrite the selected chapters as ${activeLabel} (finished ones are skipped, stopped ones resume)`,
+    },
+    {
+      id: "bilingual",
+      label: "Bilingual reading",
+      onClick: () => { if (activeVariant) setBilingualSelection({ bookId: book.id, chapterIds: book.chapters.filter((chapter) => chapter.selected).map((chapter) => chapter.id), translationKey: activeVariant }); },
+      disabled: !activeVariant || activeKind !== "translation" || selectedCount === 0,
+      title: !activeVariant || activeKind !== "translation" ? "Open a translation view to prepare bilingual reading" : selectedCount === 0 ? "Select chapters to prepare" : "Pair selected chapters and optionally link their words",
     },
     {
       id: "cleanup",
@@ -1230,6 +1239,7 @@ export function BookDetail() {
         </TabPanel>
       )}
 
+      {bilingualSelection && <BilingualSelection {...bilingualSelection} onClose={() => setBilingualSelection(null)} />}
       {exportOpen && (
         <ExportModal
           formats={exportFormats}
