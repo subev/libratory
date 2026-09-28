@@ -9,6 +9,47 @@ spike and earlier reviews are historical context, not all new implementation fro
 No paid model or voice calls were made during implementation. Generated recordings, EPUB examples
 and reports remain gitignored local data; the commit does not carry them.
 
+## Current checkpoint — round 2 addressed, 2026-09-28
+
+The user said “review done”; the report was read directly from
+`docs/bilingual-reader-review-round-2.md`. Read
+[the response](bilingual-reader-review-round-2-response.md) for dispositions and evidence. The user
+trial is complete, including confirmation of the M4A seek fix; do not restart the earlier trial
+checklist unless investigating a new issue.
+
+Queued/running preparation no longer expires from the UI after 15 minutes. The chapter's
+**Bilingual reading** controls now offer explicit legacy-MP3 conversion, preserving originals and
+links while updating the active paths for live reading and exports. Unit/integration, focused UI,
+real disposable-copy conversion/export and acoustic-seek checks cover the change. Previously
+exported MP3 EPUBs require re-exporting; reading/importing does not silently convert anything.
+
+**Next:** finish native import compatibility before release, then native bilingual presentation
+within the agreed interface scope. Two questions remain unanswered: approval for the full native
+`./scripts/check.sh` simulator/E2E suite, and whether the new presentation targets iOS 17+ only or
+also the legacy interface. Preserve the native uncommitted fix. Export audio-replacement failures
+remain fail-safe; fully prepared selection polling needs profiling. MCP remains after the reader
+workflow and must include the new `bilingual.convertAudio` operation.
+
+The older sections below are historical. If another review is requested, choose a new report
+filename, put it in the prompt and record it here; round 2's report is complete and preserved.
+
+## Active follow-up — user trial resumed, 2026-09-28
+
+The user continued in the same session and reported the reader is good overall, with a late-chapter
+seek mismatch in both languages. Clicking Bulgarian “Сега всички те се отправиха…” played the
+previous sentence. Browser waveform captures reproduced a legacy VBR MP3 seek error: about 6.7 s
+in Bulgarian and 4.5 s in English near the end. Converting the same recordings to M4A removes that
+measured error; no new TTS was needed despite authorization to try fresh synthesis.
+
+**User confirmation:** the same click works correctly in
+`packages/server/data/tmp/bilingual-acceptance/long-m4a.epub`. The user is arranging an independent
+agent review in parallel. Keep the implementation at this checkpoint while reviewing; do not
+launch another reviewer automatically. This comparison preserves every timing anchor; remaining
+sentence interpolation error is separate. See [the seek audit](bilingual-reader-seek-audit.md)
+for evidence, local scripts and limits. Normal exports still copy legacy MP3s; an explicit production
+conversion path and an acoustic-seek regression remain open before native/MCP continuation.
+Do not apply a guessed offset or silently replace the library's recordings.
+
 ## Resume here — session wrapped, 2026-09-28
 
 **Next session starts with the user's trial, then review.** Give the checklist below in the first
@@ -86,6 +127,11 @@ The acceptance files are gitignored local artifacts, not files available in a fr
 
 ### Review after the user's trial
 
+**Current review output:** `docs/bilingual-reader-review-round-2.md` (reviewer writes this file).
+When the user says **“review done”**, read that file directly, check its reviewed revision/scope,
+and triage the findings. Do not mistake the older review files for this round. No placeholder
+report is created; if the file is absent, check repository status and report that it has not arrived.
+
 First address reported failures and review the changed code inline. Then, if the user wants an
 independent agent, offer this scoped prompt; do not start a fan-out automatically:
 
@@ -99,6 +145,12 @@ independent agent, offer this scoped prompt; do not start a fan-out automaticall
 > compatibility. Separate proven defects from coverage gaps. Do not modify code or user books,
 > run paid calls, download models or run full E2E suites. Native code requires a separate review
 > of that repository's uncommitted changes and handoff; do not infer phone support from web tests.
+> Write the complete report to docs/bilingual-reader-review-round-2.md, including the reviewed
+> commit/range and working-tree scope, prioritized findings with verified file locations and
+> reproduction steps, checks run and remaining verification gaps. Explicitly say if no defects
+> are found. Leave this report uncommitted; do not overwrite previous review reports. End your
+> response by naming the report path. Also read docs/bilingual-reader-seek-audit.md and distinguish
+> the confirmed M4A comparison from the still-unimplemented production legacy-audio conversion.
 
 ### Evidence and unfinished work
 

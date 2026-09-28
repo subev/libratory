@@ -231,18 +231,17 @@ and no additional model call has been made for this plan.
 | Assistant/MCP parity | Queued after the reader workflow, not started. |
 | Spike removal | Explicit completion task; preserve fixtures and remove temporary adapter dependencies first. |
 
-**Immediate next step: user trial, then review.** The session is wrapped. Start the next session
-with the checklist at the top of [the handoff](bilingual-reader-review-handoff.md), collect the
-user's experience, then review the implementation and optionally obtain independent validation.
-After that, continue native reader consumption and compatibility within the agreed interface scope.
-Selection controls, 69-chapter text-only export/navigation, normal export jobs, revision handling
-and text-only EPUBs have real-data evidence. Keyboard navigation and failure fallback pass focused
-browser checks. Keep checking against [the real-data baseline](bilingual-reader-acceptance.md).
-No new model-shopping or prompt sweep is needed.
+**Immediate next step: native compatibility gate, then native bilingual presentation.** User trial
+and round 2 review are complete; see [the response](bilingual-reader-review-round-2-response.md).
+Long-waiting job visibility/exclusion is fixed. Explicit legacy-MP3 conversion updates live/export
+recordings and passes acoustic checks. The native primary-text import fix still needs its full
+simulator gate before release; new interface scope is still a user decision. Preserve both pending
+questions and the uncommitted native work recorded in [the handoff](bilingual-reader-review-handoff.md).
+Continue whole-book audio acceptance after that, then assistant/MCP parity and spike cleanup.
 
 Agent-surface audit (2026-09-28): MCP and the built-in assistant already share the MCP registry.
 Upload/extraction, translation, primary synthesis and export exist. Missing pieces are bilingual
-status/prepare/cancel operations, translated-lane narration controls and per-request translation
+status/prepare/cancel and explicit legacy-audio conversion operations, translated-lane narration controls and per-request translation
 model choice (translation currently inherits book settings). `wait_for_book` must not report
 bilingual work complete just because primary narration finished. Explicit bilingual reader
 navigation should carry the requested translation. Implement these through the existing routes,

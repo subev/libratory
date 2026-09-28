@@ -18,10 +18,15 @@ export function BilingualPreparation({ bookId, chapterId, chapterIndex, translat
   const refresh = () => void utils.bilingual.status.invalidate(input);
   const prepare = trpc.bilingual.prepare.useMutation({ onSuccess: refresh });
   const cancel = trpc.bilingual.cancel.useMutation({ onSuccess: refresh });
+  const convertAudio = trpc.bilingual.convertAudio.useMutation({ onSuccess: () => {
+    refresh();
+    void utils.chapters.invalidate();
+    void utils.variants.invalidate();
+  } });
   const data = status.data;
   const runningStage = data?.pairJob?.status === "queued" || data?.pairJob?.status === "running" ? "pairs" : "links";
   const job = data?.busy ? (runningStage === "pairs" ? data.pairJob : data.linkJob) : null;
-  const error = openError ?? prepare.error?.message ?? cancel.error?.message ?? status.error?.message ?? data?.linkError ?? data?.linkJob?.error ?? data?.pairJob?.error;
+  const error = openError ?? convertAudio.error?.message ?? prepare.error?.message ?? cancel.error?.message ?? status.error?.message ?? data?.linkError ?? data?.linkJob?.error ?? data?.pairJob?.error;
 
   async function open() {
     if (!data?.variantId) return;
@@ -56,6 +61,14 @@ export function BilingualPreparation({ bookId, chapterId, chapterIndex, translat
             title="Keep completed work. The current batch may finish, but its result will be discarded."
             onClick={() => data.variantId && cancel.mutate({ variantId: data.variantId, stage: runningStage })}>Stop</Button> : null}
         </div>
+        {data?.legacyAudio ? <div className="space-y-2">
+          <p className="text-xs text-(--text-muted)">Older MP3 recordings can jump to the wrong words. Convert them locally to M4A; original files and saved word links are kept.</p>
+          <Button size="sm" variant="secondary" disabled={!data.variantId || data.busy || convertAudio.isPending}
+            onClick={() => data.variantId && convertAudio.mutate({ variantId: data.variantId })}>
+            {convertAudio.isPending ? "Converting recordings…" : "Convert recordings for accurate seeking"}
+          </Button>
+        </div> : null}
+        {convertAudio.isSuccess && !data?.legacyAudio ? <p role="status" className="text-xs text-(--text-muted)">Recordings converted. Reopen the reader or export again to use them.</p> : null}
         {data?.current ? <>
           <div className="flex flex-wrap items-center gap-2">
             <ModelPicker value={model} onChange={setModel} testId="bilingual-link-model" />

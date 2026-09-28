@@ -1,3 +1,4 @@
+import path from "node:path";
 import { stat } from "node:fs/promises";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db.ts";
@@ -41,7 +42,8 @@ async function narration(text: string, pairs: BilingualPair[], side: "source" | 
     if (before.mtimeMs !== after.mtimeMs || before.size !== after.size || beforeSync.mtimeMs !== afterSync.mtimeMs || beforeSync.size !== afterSync.size) throw new ChangedNarration("Narration changed while reading timing");
     const boundaries = graphemeBoundaries(text);
     return { revision, audio: url, totalMs: map.totalMs,
-      qualityNotes: ["Provider word times are not independently verified. Passages without word times use chunk boundaries or estimates.",
+      qualityNotes: [...(path.extname(audioPath).toLowerCase() === ".mp3" ? ["This older MP3 may seek to the wrong words, especially late in a chapter. Convert the recordings from the chapter’s Bilingual reading controls, then reopen the reader or export again."] : []),
+        "Provider word times are not independently verified. Passages without word times use chunk boundaries or estimates.",
         ...(tl.chunks.length < map.chunks.length ? ["Some recorded passages could not be matched to the text; timing is unavailable there."] : [])],
       anchors: [
         ...pairs.flatMap((pair) => {

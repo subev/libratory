@@ -29,7 +29,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 900, height: 600 } });
   const errors = [], mutations = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  let status = { variantId: "variant", current: false, pairs: 0, matched: 0, linked: 0, pairJob: null, linkJob: null, busy: false, estimatedInputTokens: 0, batches: 0, linkError: null };
+  let status = { variantId: "variant", legacyAudio: true, current: false, pairs: 0, matched: 0, linked: 0, pairJob: null, linkJob: null, busy: false, estimatedInputTokens: 0, batches: 0, linkError: null };
   await page.route("**/bilingual-test-trpc/**", async (route) => {
     const request = route.request(), url = new URL(request.url());
     const procedure = url.pathname.split("/").at(-1);
@@ -48,6 +48,7 @@ try {
         data = { runId: "run" }; break;
       }
       case "bilingual.cancel": mutations.push(input); status = { ...status, busy: false, linkJob: { status: "cancelled", error: null } }; data = null; break;
+      case "bilingual.convertAudio": mutations.push(input); status = { ...status, legacyAudio: false }; data = { converted: 2 }; break;
       case "bilingual.position": expect(input.ms).toBe(4500); data = { ms: 1200 }; break;
       default: throw new Error(`Unexpected call ${procedure}`);
     }
@@ -67,14 +68,20 @@ try {
   expect(mutations[1]).toEqual({ variantId: "variant", stage: "links", model: "test-model" });
   await page.getByRole("button", { name: "Stop", exact: true }).click();
   await expect(page.getByRole("button", { name: "Stop", exact: true })).toHaveCount(0);
+  await expect(page.getByText(/Older MP3 recordings can jump/)).toBeVisible();
+  expect(mutations).toHaveLength(3);
+  await page.getByRole("button", { name: "Convert recordings for accurate seeking" }).click();
+  await expect(page.getByRole("status")).toContainText("Recordings converted");
+  await expect(page.getByRole("button", { name: "Convert recordings for accurate seeking" })).toHaveCount(0);
+  expect(mutations[3]).toEqual({ variantId: "variant" });
   await page.setViewportSize({ width: 393, height: 852 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(393);
   await page.getByRole("button", { name: "Open bilingual reader" }).click();
   await expect(page).toHaveURL(/books\/book\/read\?chapter=3&with=German&t=1200/);
   expect(await page.locator("body").getAttribute("data-opened")).toBe("yes");
-  expect(mutations).toHaveLength(3);
+  expect(mutations).toHaveLength(4);
   expect(errors).toEqual([]);
-  console.log("Preparation controls: explicit local/model actions, cost estimate, stop, narrow layout and passage-preserving navigation passed (mock API, no paid calls)");
+  console.log("Preparation controls: explicit local/model actions, cost estimate, stop, explicit legacy audio conversion, narrow layout and passage-preserving navigation passed (mock API, no paid calls)");
 } finally {
   await browser.close();
   await rm(harness, { force: true });

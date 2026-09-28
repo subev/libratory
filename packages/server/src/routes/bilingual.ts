@@ -10,13 +10,15 @@ import { bilingualContext, currentPreparation, jobColumn, failPreparation } from
 import { matchesTexts, type BilingualJob } from "../lib/bilingual-preparation.ts";
 import { bundleInstalled } from "../lib/model-bundles.ts";
 import { textRevision, switchNarration } from "../lib/bilingual-format.ts";
+import { convertLegacyBilingualAudio, isLegacyAudio } from "../lib/bilingual-audio.ts";
 import { buildBilingualDocument } from "../lib/bilingual-document.ts";
 import { linkBatches, linkPrompt, wordLinkSystem } from "../lib/bilingual-links.ts";
 import { chapterText } from "../lib/chapter-text.ts";
 import { modelKeySchema, resolveLlm } from "../lib/llm.ts";
 
 const choice = z.object({ variantId: z.string().uuid(), stage: z.enum(["pairs", "links"]) });
-const busy = (job: BilingualJob | null) => job && (job.status === "queued" || job.status === "running") && Date.now() - Date.parse(job.updatedAt) < 15 * 60_000;
+// Queue age is not a failure signal; workers and the startup sweep persist terminal states.
+const busy = (job: BilingualJob | null) => job?.status === "queued" || job?.status === "running";
 
 function summarize(context: Awaited<ReturnType<typeof bilingualContext>>, row: Awaited<ReturnType<typeof currentPreparation>>["row"], current: boolean) {
   const variant = context.variant;
@@ -26,10 +28,8 @@ function summarize(context: Awaited<ReturnType<typeof bilingualContext>>, row: A
   try { if (artifact) batches = linkBatches(artifact, row?.links?.pairRevision === artifact.revision ? row.links.byPair : {}); }
   catch (error) { linkError = error instanceof Error ? error.message : String(error); }
   const estimatedInputTokens = artifact ? Math.ceil(batches.reduce((sum, batch) => sum + linkPrompt(artifact, batch).length + wordLinkSystem(context.language ?? "und", variant.key).length, 0) / 2) : 0;
-  const visible = (job: BilingualJob | null) => job && !busy(job) && (job.status === "running" || job.status === "queued")
-    ? { ...job, status: "failed" as const, error: "Preparation was interrupted. Retry explicitly to continue." } : job;
-  return { variantId: variant.id, current, pairs: current ? row?.pairs?.pairs.length ?? 0 : 0, linked,
-    pairJob: visible(row?.pairJob ?? null), linkJob: visible(row?.linkJob ?? null), busy: !!(busy(row?.pairJob ?? null) || busy(row?.linkJob ?? null)),
+  return { variantId: variant.id, legacyAudio: isLegacyAudio(context.chapter.audioPath) || isLegacyAudio(variant.audioPath), current, pairs: current ? row?.pairs?.pairs.length ?? 0 : 0, linked,
+    pairJob: row?.pairJob ?? null, linkJob: row?.linkJob ?? null, busy: busy(row?.pairJob ?? null) || busy(row?.linkJob ?? null),
     estimatedInputTokens, linkError, batches: batches.length, matched: current ? row?.pairs?.pairs.filter((p) => p.status === "matched").length ?? 0 : 0 };
 }
 
@@ -121,10 +121,11 @@ export const bilingualRouter = router({
 
   status: publicProcedure.input(z.object({ chapterId: z.string().uuid(), key: z.string() })).query(async ({ input }) => {
     const [variant] = await db.select().from(chapterVariants).where(and(eq(chapterVariants.chapterId, input.chapterId), eq(chapterVariants.key, input.key)));
-    if (!variant || variant.kind !== "translation" || variant.status !== "done" || !variant.text.trim()) return { variantId: null, current: false, pairs: 0, linked: 0, pairJob: null, linkJob: null, busy: false, estimatedInputTokens: 0, batches: 0, matched: 0, linkError: null };
+    if (!variant || variant.kind !== "translation" || variant.status !== "done" || !variant.text.trim()) return { variantId: null, legacyAudio: false, current: false, pairs: 0, linked: 0, pairJob: null, linkJob: null, busy: false, estimatedInputTokens: 0, batches: 0, matched: 0, linkError: null };
     const { context, row, current } = await currentPreparation(variant.id);
     return summarize(context, row, current);
   }),
+  convertAudio: publicProcedure.input(z.object({ variantId: z.string().uuid() })).mutation(({ input }) => convertLegacyBilingualAudio(input.variantId)),
   position: publicProcedure.input(z.object({ variantId: z.string().uuid(), ms: z.number().nonnegative() })).query(async ({ input }) => {
     const doc = await buildBilingualDocument(input.variantId);
     return { ms: doc ? switchNarration(doc, "target", input.ms)?.ms ?? 0 : 0 };

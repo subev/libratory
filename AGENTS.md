@@ -38,6 +38,16 @@ Ideas and planned features live as individual markdown files in `tasks/`. Each f
 - **After implementing a feature, check `tasks/` for any related task files and delete them.**
 - When starting work on a task, read the corresponding file first — it may contain design decisions or constraints.
 
+### Review handoffs
+
+When preparing a prompt for another reviewer, explicitly instruct it to write its complete report
+to a named Markdown file in `docs/`, including findings, verified code locations, reproduction
+steps and verification gaps (or explicitly no findings). Record the exact path in the active task
+or handoff. Preserve previous review reports by choosing a new filename for a new round. When the
+user says “review done”, read that recorded file directly; do not ask them to paste the report or
+tell the reviewer to save it. Do not create a placeholder report that could be mistaken for a
+completed review.
+
 ## Voice — how this project speaks in public
 
 There is no team behind this, so nothing written outward says "we". Leave the actor out where the

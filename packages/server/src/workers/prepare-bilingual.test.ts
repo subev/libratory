@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile, readFile, readdir } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { tmpdir } from "node:os";
@@ -8,11 +8,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getDb, resetDb, row, ensureGraphileTables } from "../../test/setup.ts";
 import { books, chapters, chapterVariants, bilingualPreparations } from "../schema.ts";
 import { textRevision } from "../lib/bilingual-format.ts";
-import { writeSyncMap } from "../lib/sync-map.ts";
+import { writeSyncMap, syncMapPath } from "../lib/sync-map.ts";
 import type { PrepareBilingualPayload } from "./prepare-bilingual.ts";
 
-const { embed, requestLinks, queue, installed } = vi.hoisted(() => ({ embed: vi.fn(), requestLinks: vi.fn(), queue: vi.fn(), installed: vi.fn() }));
+const { embed, requestLinks, queue, installed, encode } = vi.hoisted(() => ({ embed: vi.fn(), requestLinks: vi.fn(), queue: vi.fn(), installed: vi.fn(), encode: vi.fn() }));
 vi.mock("../db.ts", async () => { const { getDb } = await import("../../test/setup.ts"); return { get db() { return getDb(); } }; });
+vi.mock("../lib/ffmpeg.ts", () => ({ encodeToM4a: encode }));
 vi.mock("../lib/embeddings.ts", () => ({ embedTexts: embed }));
 vi.mock("../lib/model-bundles.ts", () => ({ bundleInstalled: installed }));
 vi.mock("../lib/log.ts", () => ({ appendLog: vi.fn(async () => {}) }));
@@ -52,6 +53,7 @@ beforeEach(async () => {
   requestLinks.mockReset().mockImplementation(async () => answer());
   installed.mockResolvedValue(true);
   queue.mockReset().mockResolvedValue(undefined);
+  encode.mockReset().mockImplementation(async (input: string, output: string) => writeFile(output, `converted ${await readFile(input, "utf8")}`));
   dir = await mkdtemp(path.join(tmpdir(), "bilingual-job-"));
   bookId = crypto.randomUUID(); chapterId = crypto.randomUUID(); variantId = crypto.randomUUID();
   await getDb().insert(books).values({ id: bookId, title: "Bilingual", kind: "api", language: "English" });
@@ -201,6 +203,30 @@ describe("bilingual jobs and publication", () => {
     installed.mockResolvedValue(false);
     await expect(queued("pairs")).rejects.toThrow("optional search model");
     expect(queue).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["pairs", "queued"], ["links", "queued"], ["pairs", "running"], ["links", "running"],
+  ] as const)("keeps old %s %s work visible, exclusive and cancellable", async (stage, status) => {
+    await paired();
+    const payload = await queued(stage);
+    const field = stage === "pairs" ? "pairJob" : "linkJob";
+    const saved = await preparation(variantId), job = saved?.[field];
+    if (!job) throw new Error("Missing queued job");
+    await getDb().update(bilingualPreparations).set({
+      [field]: { ...job, status, updatedAt: new Date(Date.now() - 60 * 60_000).toISOString() },
+    }).where(eq(bilingualPreparations.variantId, variantId));
+    const selected = { bookId, chapterIds: [chapterId], key: "German" };
+    expect(await caller.status({ chapterId, key: "German" })).toMatchObject({ busy: true, [field]: { status } });
+    expect((await caller.selection(selected))[0]?.status).toMatchObject({ busy: true, [field]: { status } });
+    const calls = queue.mock.calls.length;
+    await expect(caller.prepare({ variantId, stage: stage === "pairs" ? "links" : "pairs" })).rejects.toThrow("already running");
+    expect(await caller.prepareSelection({ ...selected, stage })).toEqual([]);
+    expect(queue).toHaveBeenCalledTimes(calls);
+    await caller.cancelSelection(selected);
+    expect(await caller.status({ chapterId, key: "German" })).toMatchObject({ busy: false, [field]: { status: "cancelled" } });
+    await prepareBilingual(payload);
+    expect(requestLinks).not.toHaveBeenCalled();
+    expect((await preparation(variantId))?.pairs?.revision).toBe(saved?.pairs?.revision);
   });
   it("rejects text changed while queued and marks context failures as failed", async () => {
     const payload = await queued("pairs");
@@ -353,6 +379,71 @@ describe("bilingual jobs and publication", () => {
     expect(layer?.bilingual?.[0]?.doc.source.narration?.audio).toBe("../audio/ch000.m4a");
     expect(layer?.bilingual?.[0]?.audio[0]?.sourcePath).toBe(translated);
     expect(layer?.manifest.chapters[0]?.bilingual?.[0]?.url).toBe(`bilingual/${variantId}.json`);
+  });
+});
+
+describe("explicit legacy audio conversion", () => {
+  async function recordings() {
+    const original = path.join(dir, "source.mp3"), translated = path.join(dir, "target.mp3");
+    await writeFile(original, "original MP3"); await writeFile(translated, "translated MP3");
+    await writeSyncMap(original, { version: 1, totalMs: 1000, chunks: [{ text: source, startMs: 0, endMs: 1000 }] });
+    await writeSyncMap(translated, { version: 1, totalMs: 2000, chunks: [{ text: target, startMs: 0, endMs: 2000 }] });
+    await getDb().update(chapters).set({ audioPath: original, durationMs: 1000 }).where(eq(chapters.id, chapterId));
+    await getDb().update(chapterVariants).set({ audioPath: translated, audioStatus: "done", audioDurationMs: 2000 }).where(eq(chapterVariants.id, variantId));
+    return { original, translated };
+  }
+  it("converts both active recordings explicitly while keeping originals, timing and word links", async () => {
+    const { original, translated } = await recordings();
+    await paired(); await prepareBilingual(await queued("links"));
+    const before = await buildBilingualDocument(variantId), prepared = await preparation(variantId);
+    expect(await caller.status({ chapterId, key: "German" })).toMatchObject({ legacyAudio: true });
+    expect(before?.target.narration?.qualityNotes.join(" ")).toContain("older MP3");
+    expect(encode).not.toHaveBeenCalled();
+    expect(await caller.convertAudio({ variantId })).toEqual({ converted: 2 });
+    expect(await caller.status({ chapterId, key: "German" })).toMatchObject({ legacyAudio: false });
+    expect(await readFile(original, "utf8")).toBe("original MP3");
+    expect(await readFile(translated, "utf8")).toBe("translated MP3");
+    const chapter = row(await getDb().select().from(chapters).where(eq(chapters.id, chapterId)));
+    const variant = row(await getDb().select().from(chapterVariants).where(eq(chapterVariants.id, variantId)));
+    if (!chapter.audioPath || !variant.audioPath) throw new Error("Missing converted recordings");
+    expect(chapter.audioPath).toMatch(/\.m4a$/); expect(variant.audioPath).toMatch(/\.m4a$/);
+    expect(await readFile(syncMapPath(chapter.audioPath), "utf8")).toBe(await readFile(syncMapPath(original), "utf8"));
+    expect(await readFile(syncMapPath(variant.audioPath), "utf8")).toBe(await readFile(syncMapPath(translated), "utf8"));
+    const after = await buildBilingualDocument(variantId);
+    expect(after?.source.narration?.revision).not.toBe(before?.source.narration?.revision);
+    expect(after?.target.narration?.revision).not.toBe(before?.target.narration?.revision);
+    expect(after?.source.narration?.anchors).toEqual(before?.source.narration?.anchors);
+    expect(after?.target.narration?.anchors).toEqual(before?.target.narration?.anchors);
+    expect((await preparation(variantId))?.links).toEqual(prepared?.links);
+    expect(after?.target.narration?.qualityNotes.join(" ")).not.toContain("older MP3");
+    const book = row(await getDb().select().from(books).where(eq(books.id, bookId)));
+    const layer = await buildP2afLayer(book, new Map([[chapterId, { base: "ch000", audioFile: "ch000.m4a" }]]), null);
+    expect(layer?.bilingual?.[0]?.audio[0]).toMatchObject({ sourcePath: variant.audioPath, mediaType: "audio/mp4" });
+    expect(await caller.convertAudio({ variantId })).toEqual({ converted: 0 });
+    expect(encode).toHaveBeenCalledTimes(2);
+  });
+  it("keeps both active originals and removes partial copies when conversion fails", async () => {
+    const { original, translated } = await recordings();
+    encode.mockImplementationOnce(async (_input: string, output: string) => writeFile(output, "converted"))
+      .mockRejectedValueOnce(new Error("encoder failed"));
+    await expect(caller.convertAudio({ variantId })).rejects.toThrow("encoder failed");
+    expect(row(await getDb().select().from(chapters).where(eq(chapters.id, chapterId))).audioPath).toBe(original);
+    expect(row(await getDb().select().from(chapterVariants).where(eq(chapterVariants.id, variantId))).audioPath).toBe(translated);
+    expect((await readdir(dir)).filter((name) => name.includes(".seek-"))).toEqual([]);
+  });
+  it.each(["text", "audio", "timing", "narrating"] as const)("rejects a concurrent %s change without publishing converted recordings", async (change) => {
+    const { original, translated } = await recordings();
+    encode.mockImplementationOnce(async (_input: string, output: string) => {
+      await writeFile(output, "converted");
+      if (change === "text") await getDb().update(chapters).set({ customText: "Edited." }).where(eq(chapters.id, chapterId));
+      if (change === "audio") await writeFile(original, "a different recording");
+      if (change === "timing") await writeSyncMap(original, { version: 1, totalMs: 1200, chunks: [{ text: source, startMs: 0, endMs: 1200 }] });
+      if (change === "narrating") await getDb().update(chapterVariants).set({ audioStatus: "pending" }).where(eq(chapterVariants.id, variantId));
+    });
+    await expect(caller.convertAudio({ variantId })).rejects.toThrow("changed during conversion");
+    expect(row(await getDb().select().from(chapters).where(eq(chapters.id, chapterId))).audioPath).toBe(original);
+    expect(row(await getDb().select().from(chapterVariants).where(eq(chapterVariants.id, variantId))).audioPath).toBe(translated);
+    expect((await readdir(dir)).filter((name) => name.includes(".seek-"))).toEqual([]);
   });
 });
 

@@ -13,14 +13,22 @@ paragraph-sliced PDF pairing is deferred. The chapter modal gets a contextual re
 embedded second reader. The [original brief](../docs/two-languages-design-brief.md) remains background.
 
 **Resume here:** [Reviewed branch handoff](../docs/bilingual-reader-review-handoff.md), on
-`feat/bilingual-reader`. Start the next session by giving the user the trial checklist at the top
-of that handoff; review their feedback before continuing implementation. Word-only clipping was
-tried and removed; keep continuous click-to-listen.
+`feat/bilingual-reader`. User trial and round 2 review are complete; read the current checkpoint
+and [round 2 response](../docs/bilingual-reader-review-round-2-response.md), not the older trial-first
+instructions. Word-only clipping remains removed; keep continuous click-to-listen.
 
-**Current order:** user trial, self-review and optionally independent validation; finish native
-reader compatibility and bilingual presentation (text-only whole-selection export/navigation now
-pass; whole-book audio stress remains); expose the proven workflow through assistant/MCP;
-preserve fixtures and remove the spike. MCP is required but deferred by the user's explicit choice.
+**Independent review:** `docs/bilingual-reader-review-round-2.md` has been read and preserved.
+Future review prompts must name a new output file and record it here; “review done” means read it.
+
+**User-trial follow-up:** [Legacy MP3 seek audit](../docs/bilingual-reader-seek-audit.md).
+The user confirmed the M4A comparison. An explicit per-chapter conversion action now preserves
+originals/links and updates active recordings for live reading and future exports. Acoustic checks
+verify the media seek fix; sentence interpolation accuracy remains a separate limitation.
+
+**Current order:** finish native import compatibility and its full validation gate; implement native
+bilingual presentation within the agreed interface scope; complete whole-book audio acceptance;
+expose the workflow through assistant/MCP, including legacy conversion; preserve fixtures and
+remove the spike. MCP is required but deferred by the user's explicit choice.
 The [plan's status table](../docs/two-languages-implementation-plan.md#current-position-and-next-step)
 is the current completion checklist. PDF-plus-translation is a later extension, not a completion gate.
 The first long-chapter rendering improvement is implemented and measured in the acceptance report.
