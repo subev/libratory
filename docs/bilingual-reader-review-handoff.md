@@ -174,6 +174,21 @@ large agent fan-outs, heavy downloads and full E2E runs need separate approval u
 standing preferences. The user authorized continuing and committing this preparation checkpoint;
 no push was requested.
 
+## Real-data acceptance follow-up
+
+See [real chapter acceptance](bilingual-reader-acceptance.md). The normal local pairing job prepared
+The Three Sisters (253 groups, 8,219 stored tokens across both lanes). Production builders exported
+that chapter and the already word-linked LETTER I.; both passed offline browser playback. No paid
+calls. Long-chapter playback exposed substantial JavaScript cost, so selective rendering is now
+supported by a concrete baseline rather than only a review concern. The report records remaining
+gates and reproducible local artifact checks.
+
+Assistant/MCP parity is an explicit requirement in phase 4 of the delivery plan, including local
+sentence-level and optional word-linked workflows. Audit found preparation/status/cancel,
+translated-lane narration and per-request translation model selection missing from the shared tool
+surface. An implementation estimate of 15–25k coding tokens was presented for user approval;
+do not treat this audit as an implemented capability.
+
 ## User-reported token error follow-up
 
 The saved failed Flash response mixed lane IDs in unlinked declarations (`p4: 41 = -`)

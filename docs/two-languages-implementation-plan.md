@@ -140,6 +140,32 @@ until the user chooses what to retry.
 
 ### 4. Whole-book use, then additional surfaces
 
+**Assistant/MCP parity is part of delivery, not a later UI-only enhancement.** A person must be
+able to supply a PDF and request the bilingual result through the built-in assistant or an external
+MCP client. Both must use the same production operations and persisted jobs as the chapter UI.
+Expose preparation status/estimates, local sentence pairing, optional word links, explicit
+cancel/retry, both lanes' narration and export. Return usable reader/output locations and concise
+progress without sending entire books or mappings back to the agent.
+
+Support two explicit workflows:
+
+- **Local sentence-level:** choose available local translation and TTS providers, use the installed
+  local embedding model, and omit word links. Do not silently use a cloud provider or download a
+  missing model. If a language has no installed local voice, report the limitation and let the person
+  choose text-only for that lane, install a supported local provider, or explicitly authorize cloud
+  narration. Timing precision depends on the actual voice; local does not necessarily mean coarse.
+- **Word-linked:** add word links with an explicitly selected model and available word-timed
+  narrations. Report batch/token estimates and provider choice before paid work. Local LLMs may
+  be selected when capable; do not equate word links with a mandatory cloud provider. Word links
+  and acoustic word timestamps are independent, so report each lane's actual support honestly.
+
+Reuse upload/extraction, chapter review, translation and export tools. Preserve explicit processing
+control and existing assistant approval handling; an overall user request can authorize its stated
+steps, but must not imply permission to change provider, download large models or retry failures.
+Inspect extracted structure and start with an appropriate sample before a costly book-wide run.
+The MCP acceptance gate covers both recipes, missing voices/models, partial preparation and a
+failed optional word-link job without losing the readable sentence-level result.
+
 Apply preparation to a selection with visible chapter progress and explicit costs for paid work.
 Load chapter mapping documents on demand. Exercise chapter transitions, cancellation/resume,
 mixed readiness and a realistic book-size export before claiming whole-book support.
@@ -174,3 +200,11 @@ chapter controls, live documents and normal export attachment. Local checks use 
 responses; a fresh real-data preparation/export acceptance pass remains before declaring its gate
 complete. Phase 4 and text-only exports remain open. See
 [the handoff](bilingual-reader-review-handoff.md) for exact scope and verification.
+
+Agent-surface audit (2026-09-28): MCP and the built-in assistant already share the MCP registry.
+Upload/extraction, translation, primary synthesis and export exist. Missing pieces are bilingual
+status/prepare/cancel operations, translated-lane narration controls and per-request translation
+model choice (translation currently inherits book settings). `wait_for_book` must not report
+bilingual work complete just because primary narration finished. Explicit bilingual reader
+navigation should carry the requested translation. Implement these through the existing routes,
+with tool-tier classification and end-to-end in-memory MCP tests; do not create another pipeline.
