@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><meta name="design_doc_mode" content="canvas"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Noto+Serif+Hebrew:wght@400;600&display=swap" rel="stylesheet"><link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css"><style>
+:root{
+--stack-sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+--stack-display:"Fraunces","Iowan Old Style",Georgia,serif;
+--stack-reading:"Source Serif 4","Noto Serif Hebrew",Georgia,serif;
+--bg-page:light-dark(oklch(.9686 .0091 78.28),#16140f);
+--bg-card:light-dark(oklch(.9885 .0057 84.57),#1e1b14);
+--bg-subtle:light-dark(oklch(.9363 .0218 83.26),rgb(253 241 228/4%));
+--bg-reading:light-dark(oklch(.955 .014 82),#1a1812);
+--bg-selected:light-dark(rgb(226 96 31/10%),rgb(239 119 52/14%));
+--border:light-dark(oklch(.8866 .0404 89.7),rgb(253 241 228/12%));
+--border-input:light-dark(oklch(.82 .042 85),rgb(253 241 228/26%));
+--text-primary:light-dark(oklch(.366 .0251 49.61),#fdf1e4);
+--text-secondary:light-dark(oklch(.4444 .0096 73.64),rgb(253 241 228/82%));
+--text-muted:light-dark(oklch(.5534 .0116 58.07),rgb(253 241 228/62%));
+--text-faint:light-dark(oklch(.64 .01 58),rgb(253 241 228/42%));
+--accent:light-dark(#e2601f,#ef7734);
+--accent-text:light-dark(oklch(.52 .155 45),#ef7734);
+--accent-subtle:light-dark(rgb(226 96 31/12%),rgb(239 119 52/16%));
+--on-accent:#2a1408;
+--cue-linked:light-dark(rgb(226 96 31/15%),rgb(239 119 52/15%));
+--cue-word:light-dark(rgb(226 96 31/42%),rgb(239 119 52/45%));
+--cue-ring:light-dark(#b8480f,#ef7734);
+--insp-bg:light-dark(rgb(58 44 30/11%),rgb(253 241 228/16%));
+--page-paper:#fbf8f1;
+--page-ink:#2a241c;
+--success-text:light-dark(oklch(.43 .105 150),oklch(.8 .13 150));
+--success-bg:light-dark(oklch(.52 .115 150/12%),oklch(.72 .14 150/18%));
+--warning-text:light-dark(oklch(.48 .09 70),oklch(.82 .11 78));
+--warning-bg:rgb(224 145 61/15%);
+--danger-text:light-dark(oklch(.4437 .1613 26.9),oklch(.74 .15 27));
+}
+body{margin:0;background:var(--bg-page);color:var(--text-primary);font-family:var(--stack-sans);-webkit-font-smoothing:antialiased}
+a{color:var(--accent-text);text-decoration:none}a:hover{color:var(--accent)}
+</style></helmet>
+
+<div style="color-scheme:{{ scheme }};background:var(--bg-page);color:var(--text-primary);padding:56px;display:flex;flex-direction:column;gap:80px;min-width:1560px">
+
+  <header style="display:flex;flex-direction:column;gap:10px;max-width:980px">
+    <span style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint)">Libratory · web reader · first pass · 28 Sep 2026</span>
+    <h1 style="margin:0;font-family:var(--stack-display);font-weight:600;font-size:40px;letter-spacing:-.02em">Bilingual reading</h1>
+    <p style="margin:0;font-size:15px;line-height:1.55;color:var(--text-secondary);text-wrap:pretty">Recommended: a <b>Bilingual</b> toggle inside the existing reader that keeps your view and adds the translation. In Column, the page crop stays and the translation runs in a lane beside it. In Text, both are reflowed as paired passages. Rows are aligned by passage. Clicking a word inspects it; listening is always an explicit action. On phones, passages stack in reading order with the transport docked at the bottom. The chapter modal gets one contextual link; the embedded preview is deferred.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
+      <a href="#a1" style="flex:none;white-space:nowrap;font-size:12.5px;font-weight:600;padding:4px 10px;border:1px solid var(--border);border-radius:99px;background:var(--bg-card)">01 Enter</a>
+      <a href="#a2" style="flex:none;white-space:nowrap;font-size:12.5px;font-weight:600;padding:4px 10px;border:1px solid var(--border);border-radius:99px;background:var(--bg-card)">02 Wide reading</a>
+      <a href="#a3" style="flex:none;white-space:nowrap;font-size:12.5px;font-weight:600;padding:4px 10px;border:1px solid var(--border);border-radius:99px;background:var(--bg-card)">03 Narrow</a>
+      <a href="#a4" style="flex:none;white-space:nowrap;font-size:12.5px;font-weight:600;padding:4px 10px;border:1px solid var(--border);border-radius:99px;background:var(--bg-card)">04 Inspection</a>
+      <a href="#a5" style="flex:none;white-space:nowrap;font-size:12.5px;font-weight:600;padding:4px 10px;border:1px solid var(--border);border-radius:99px;background:var(--bg-card)">05 Narration &amp; incomplete data</a>
+      <a href="#a6" style="flex:none;white-space:nowrap;font-size:12.5px;font-weight:600;padding:4px 10px;border:1px solid var(--border);border-radius:99px;background:var(--bg-card)">06 Chapter modal</a>
+      <a href="#a7" style="flex:none;white-space:nowrap;font-size:12.5px;font-weight:600;padding:4px 10px;border:1px solid var(--border);border-radius:99px;background:var(--bg-card)">07 Components</a>
+      <a href="#a8" style="flex:none;white-space:nowrap;font-size:12.5px;font-weight:600;padding:4px 10px;border:1px solid var(--border);border-radius:99px;background:var(--bg-card)">08 Later</a>
+    </div>
+  </header>
+
+  <!-- 01 ENTER -->
+  <section id="a1" data-screen-label="01 Enter bilingual reading" style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:baseline;gap:12px"><span style="font-family:var(--stack-display);font-size:28px;font-weight:600;color:var(--accent-text)">01</span><h2 style="margin:0;font-family:var(--stack-display);font-weight:600;font-size:26px;letter-spacing:-.02em">Enter bilingual reading</h2></div>
+    <div style="display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap">
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:12px;font-weight:600;color:var(--text-muted)">1a · Connected app — picker open from the reader bar</span>
+        <div style="width:900px;height:420px;border:1px solid var(--border);border-radius:12px;background:var(--bg-page);overflow:hidden;position:relative">
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid var(--border)">
+            <span style="flex:none;width:28px;height:28px;display:grid;place-items:center;border-radius:6px;color:var(--text-secondary)"><i class="ph ph-arrow-left" style="font-size:16px"></i></span>
+            <span style="flex:none;width:28px;height:28px;display:grid;place-items:center;border-radius:6px;color:var(--text-secondary)"><i class="ph ph-play" style="font-size:16px"></i></span>
+            <span style="flex:none;display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;border:1px solid var(--border);border-radius:5px;background:var(--bg-card);font-size:13px;white-space:nowrap">3. The Harbour<i class="ph ph-caret-down" style="font-size:11px;color:var(--text-faint)"></i></span>
+            <span style="flex:none;display:flex;align-items:center;gap:4px;height:24px;padding:0 6px;border:1px solid var(--border);border-radius:5px;background:var(--bg-card);font-size:12px">1x<i class="ph ph-caret-down" style="font-size:10px;color:var(--text-faint)"></i></span>
+            <span style="flex:none;font-size:12px;color:var(--text-muted);font-variant-numeric:tabular-nums">02:14 / 09:40</span>
+            <span style="flex:none;display:flex;padding:2px;gap:2px;border-radius:6px;background:var(--bg-subtle)"><span style="padding:3px 9px;font-size:12px;font-weight:600;border-radius:4px;background:var(--accent-subtle);color:var(--accent-text)">Column</span><span style="padding:3px 9px;font-size:12px;font-weight:600;color:var(--text-muted)">Page</span><span style="padding:3px 9px;font-size:12px;font-weight:600;color:var(--text-muted)">Text</span></span>
+            <span style="flex:none;white-space:nowrap;display:flex;align-items:center;gap:6px;height:26px;padding:0 10px;border:1px solid var(--accent);border-radius:6px;background:var(--bg-card);font-size:12.5px;font-weight:600;color:var(--accent-text);box-shadow:0 0 0 3px var(--accent-subtle)"><i class="ph ph-translate" style="font-size:14px"></i>Bilingual<i class="ph ph-caret-down" style="font-size:10px"></i></span>
+          </div>
+          <div style="position:absolute;left:400px;top:50px;width:360px;border:1px solid var(--border);border-radius:10px;background:var(--bg-card);box-shadow:0 12px 32px rgb(0 0 0/16%);padding:6px">
+            <div style="padding:8px 10px 6px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)">Read English alongside</div>
+            <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:7px;background:var(--bg-selected)">
+              <i class="ph ph-check" style="font-size:13px;margin-top:3px;color:var(--accent-text)"></i>
+              <span style="flex:1;min-width:0"><span style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:600">Hebrew</span><span style="flex:none;white-space:nowrap;padding:1px 7px;border-radius:99px;font-size:10.5px;font-weight:600;background:var(--success-bg);color:var(--success-text)">Ready</span></span><span style="display:block;margin-top:2px;font-size:11.5px;color:var(--text-muted)">Paired · word links · narration in both</span></span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:7px">
+              <i class="ph ph-check" style="font-size:13px;margin-top:3px;opacity:0"></i>
+              <span style="flex:1;min-width:0"><span style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:600">Russian</span><span style="flex:none;white-space:nowrap;padding:1px 7px;border-radius:99px;font-size:10.5px;font-weight:600;background:var(--bg-subtle);color:var(--text-secondary)">Text only</span></span><span style="display:block;margin-top:2px;font-size:11.5px;color:var(--text-muted)">Paired · no Russian narration</span></span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:7px;opacity:.9">
+              <i class="ph ph-check" style="font-size:13px;margin-top:3px;opacity:0"></i>
+              <span style="flex:1;min-width:0"><span style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:600;color:var(--text-muted)">German</span><span style="flex:none;white-space:nowrap;padding:1px 7px;border-radius:99px;font-size:10.5px;font-weight:600;background:var(--warning-bg);color:var(--warning-text)">Pairing not ready</span></span><span style="display:block;margin-top:2px;font-size:11.5px;color:var(--text-muted)">Translated, not yet paired with the original. <a href="#a8" style="font-weight:600">Prepare in Chapters</a></span></span>
+            </div>
+            <div style="height:1px;background:var(--border);margin:6px 4px"></div>
+            <div style="padding:6px 10px 8px;font-size:11.5px;line-height:1.45;color:var(--text-muted)">Keeps your view. Column puts the translation beside the page crop. Text pairs both, reflowed. Page switches to Column.</div>
+          </div>
+          <div style="position:absolute;left:24px;right:520px;top:70px;display:flex;flex-direction:column;gap:10px">
+            <span style="height:220px;border-radius:6px;background:var(--bg-reading);border:1px solid var(--border);display:grid;place-items:center;font-size:12px;color:var(--text-faint)">Column view · page 41</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:28px">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <span style="font-size:12px;font-weight:600;color:var(--text-muted)">1b · Offline book file — explains, cannot prepare</span>
+          <div style="width:360px;border:1px solid var(--border);border-radius:10px;background:var(--bg-card);box-shadow:0 12px 32px rgb(0 0 0/10%);padding:6px">
+            <div style="padding:8px 10px 6px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)">Read English alongside</div>
+            <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:7px">
+              <i class="ph ph-check" style="font-size:13px;margin-top:3px;opacity:0"></i>
+              <span style="flex:1;min-width:0"><span style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:600">Hebrew</span><span style="flex:none;white-space:nowrap;padding:1px 7px;border-radius:99px;font-size:10.5px;font-weight:600;background:var(--success-bg);color:var(--success-text)">Ready</span></span><span style="display:block;margin-top:2px;font-size:11.5px;color:var(--text-muted)">Paired · narration in English only</span></span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:7px">
+              <i class="ph ph-check" style="font-size:13px;margin-top:3px;opacity:0"></i>
+              <span style="flex:1;min-width:0"><span style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:600;color:var(--text-muted)">German</span><span style="flex:none;white-space:nowrap;padding:1px 7px;border-radius:99px;font-size:10.5px;font-weight:600;background:var(--bg-subtle);color:var(--text-secondary)">Not in this file</span></span><span style="display:block;margin-top:2px;font-size:11.5px;color:var(--text-muted)">Pairing happens in Libratory before export. This file can't prepare it.</span></span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <span style="font-size:12px;font-weight:600;color:var(--text-muted)">1c · No translation</span>
+          <div style="width:360px;border:1px solid var(--border);border-radius:10px;background:var(--bg-card);padding:14px 16px;display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:13px;font-weight:600">This book has one language</span>
+            <span style="font-size:12px;line-height:1.45;color:var(--text-muted)">Translate chapters to read them side by side. Nothing starts until you ask.</span>
+            <a href="#a8" style="font-size:12.5px;font-weight:600">Translate in Chapters</a>
+            <span style="font-size:11.5px;color:var(--text-faint)">Offline file: link hidden, first line only.</span>
+          </div>
+        </div>
+      </div>
+
+      <ul style="width:340px;margin:28px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:7px;font-size:13px;line-height:1.45;color:var(--text-secondary)">
+        <li><b>Trigger:</b> “Bilingual” button in the reader bar, after the view control. Distinct from the chapter picker (left) and the view control.</li>
+        <li><b>Result:</b> picking a ready translation keeps the current view and adds the translation at the current sentence. Column shows the page crop with a translation lane. Text shows both reflowed. Page moves to Column, because a full page has no single column to align to. The button stays pressed; a second bar row holds language and voice.</li>
+        <li><b>Lists translations only.</b> Rewrites aren't translations and don't appear. Language names, no flags.</li>
+        <li><b>Status is a word:</b> Ready · Text only · Pairing not ready · Not in this file.</li>
+        <li><b>Dismissal:</b> Esc or outside click closes the picker; focus returns to the button. Choice is remembered per book.</li>
+        <li><b>Never starts processing.</b> “Prepare in Chapters” navigates; it doesn't queue work.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 02 WIDE -->
+  <section id="a2" data-screen-label="02 Wide reading and playback" style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap"><span style="font-family:var(--stack-display);font-size:28px;font-weight:600;color:var(--accent-text)">02</span><h2 style="margin:0;font-family:var(--stack-display);font-weight:600;font-size:26px;letter-spacing:-.02em">Wide reading and playback</h2><span style="font-size:12.5px;color:var(--text-muted)">Primary layout · interactive: play, click words, switch voice, scroll away and come back</span></div>
+    <div style="display:flex;gap:28px;align-items:flex-start">
+      <div style="width:1440px;flex:none;border:1px solid var(--border);border-radius:12px;background:var(--bg-page);overflow:hidden">
+        <div style="border-bottom:1px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 16px">
+            <span title="Back to the book" style="flex:none;width:28px;height:28px;display:grid;place-items:center;border-radius:6px;color:var(--text-secondary)"><i class="ph ph-arrow-left" style="font-size:16px"></i></span>
+            <button onClick="{{ togglePlay }}" aria-label="{{ playAria }}" disabled="{{ playDisabled }}" style="flex:none;width:28px;height:28px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:var(--text-primary);cursor:pointer" style-hover="background:var(--bg-subtle)"><i class="{{ playIcon }}" style="font-size:16px"></i></button>
+            <span style="flex:none;display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;border:1px solid var(--border);border-radius:5px;background:var(--bg-card);font-size:13px;white-space:nowrap">{{ chapterName }}<i class="ph ph-caret-down" style="font-size:11px;color:var(--text-faint)"></i></span>
+            <span style="flex:none;display:flex;align-items:center;gap:4px;height:24px;padding:0 6px;border:1px solid var(--border);border-radius:5px;background:var(--bg-card);font-size:12px">1x<i class="ph ph-caret-down" style="font-size:10px;color:var(--text-faint)"></i></span>
+            <span style="flex:none;font-size:12px;color:var(--text-muted);font-variant-numeric:tabular-nums">{{ timeText }}</span>
+            <span style="flex:none;display:flex;padding:2px;gap:2px;border-radius:6px;background:var(--bg-subtle)">
+              <sc-for list="{{ views }}" as="v" hint-placeholder-count="3"><button onClick="{{ v.pick }}" style="flex:none;white-space:nowrap;padding:3px 9px;border:0;font:inherit;font-size:12px;font-weight:600;border-radius:4px;background:{{ v.bg }};color:{{ v.fg }};cursor:pointer">{{ v.label }}</button></sc-for>
+            </span>
+            <button onClick="{{ toggleBi }}" aria-pressed="{{ biOn }}" style="flex:none;white-space:nowrap;display:flex;align-items:center;gap:6px;height:26px;padding:0 10px;border:1px solid {{ biBorder }};border-radius:6px;background:{{ biBg }};font:inherit;font-size:12.5px;font-weight:600;color:{{ biFg }};cursor:pointer"><i class="ph ph-translate" style="font-size:14px"></i>Bilingual</button>
+            <div style="flex:1"></div>
+            <span title="{{ timingTitle }}" style="flex:none;white-space:nowrap;padding:2px 7px;border-radius:4px;background:var(--bg-subtle);font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)">{{ timingLabel }}</span>
+          </div>
+          <sc-if value="{{ biOn }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;align-items:center;gap:10px;padding:6px 16px;border-top:1px solid var(--border);background:var(--bg-subtle)">
+              <span style="flex:none;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)">Read</span>
+              <span style="flex:none;white-space:nowrap;font-size:12.5px;font-weight:600">{{ nameA }}</span>
+              <span style="flex:none;font-size:12px;color:var(--text-faint)">with</span>
+              <span style="flex:none;white-space:nowrap;display:flex;align-items:center;gap:6px;height:24px;padding:0 8px;border:1px solid var(--border-input);border-radius:5px;background:var(--bg-card);font-size:12.5px;font-weight:600">{{ nameB }}<i class="ph ph-caret-down" style="font-size:10px;color:var(--text-faint)"></i></span>
+              <span style="flex:none;width:1px;height:18px;background:var(--border);margin:0 6px"></span>
+              <span style="flex:none;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)">Speak</span>
+              <span style="flex:none;display:flex;padding:2px;gap:2px;border-radius:6px;background:var(--bg-page);border:1px solid var(--border)">
+                <sc-for list="{{ voices }}" as="vo" hint-placeholder-count="2"><button onClick="{{ vo.pick }}" disabled="{{ vo.off }}" title="{{ vo.title }}" style="flex:none;white-space:nowrap;display:flex;align-items:center;gap:5px;padding:3px 10px;border:0;font:inherit;font-size:12px;font-weight:600;border-radius:4px;background:{{ vo.bg }};color:{{ vo.fg }};cursor:{{ vo.cur }}"><i class="{{ vo.icon }}" style="font-size:13px"></i>{{ vo.label }}</button></sc-for>
+              </span>
+              <div style="flex:1"></div>
+              <span style="flex:none;white-space:nowrap;font-size:12px;color:var(--text-muted)">{{ followText }}</span>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="position:relative">
+          <div ref="{{ readRef }}" onScroll="{{ onScroll }}" style="position:relative;height:500px;overflow-y:auto;background:var(--bg-reading)">
+            <sc-if value="{{ showBi }}" hint-placeholder-val="{{ true }}">
+              <div style="display:grid;grid-template-columns:minmax(0,590px) minmax(0,590px);column-gap:64px;justify-content:center;padding:0 40px 120px">
+                <div style="position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;padding:14px 0 10px;background:var(--bg-reading);border-bottom:1px solid var(--border);margin-bottom:22px">
+                  <span style="font-size:13px;font-weight:700">{{ nameA }}</span><span style="font-size:12px;color:var(--text-muted)">Original</span>
+                  <sc-if value="{{ speakA }}"><span style="flex:none;white-space:nowrap;display:flex;align-items:center;gap:4px;padding:1px 7px;border-radius:99px;background:var(--accent-subtle);color:var(--accent-text);font-size:11px;font-weight:600"><i class="ph ph-speaker-high" style="font-size:12px"></i>Speaking</span></sc-if>
+                </div>
+                <div style="position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;padding:14px 0 10px;background:var(--bg-reading);border-bottom:1px solid var(--border);margin-bottom:22px;justify-content:{{ headBJustify }}">
+                  <span style="font-size:13px;font-weight:700">{{ nameB }}</span><span style="font-size:12px;color:var(--text-muted)">Translation</span>
+                  <sc-if value="{{ speakB }}"><span style="flex:none;white-space:nowrap;display:flex;align-items:center;gap:4px;padding:1px 7px;border-radius:99px;background:var(--accent-subtle);color:var(--accent-text);font-size:11px;font-weight:600"><i class="ph ph-speaker-high" style="font-size:12px"></i>Speaking</span></sc-if>
+                </div>
+                <sc-for list="{{ wideRows }}" as="row" hint-placeholder-count="4">
+                  <div style="display:contents">
+                    <div data-row="{{ row.i }}" style="padding-bottom:26px">
+                      <p lang="{{ row.a.lang }}" dir="{{ row.a.dir }}" style="margin:0;font-family:var(--stack-reading);font-size:19px;line-height:1.6;text-wrap:pretty"><sc-for list="{{ row.a.toks }}" as="tk"><span onClick="{{ tk.click }}" style="background:{{ tk.bg }};box-shadow:{{ tk.sh }};text-decoration:{{ tk.td }};text-underline-offset:5px;border-radius:{{ tk.r }};cursor:{{ tk.cur }}">{{ tk.t }}</span></sc-for></p>
+                      <sc-if value="{{ row.noteA }}"><span style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:var(--text-muted)"><i class="ph ph-link-break" style="font-size:13px"></i>No linked counterpart for the sentence being read</span></sc-if>
+                    </div>
+                    <div style="padding-bottom:26px">
+                      <p lang="{{ row.b.lang }}" dir="{{ row.b.dir }}" style="margin:0;font-family:var(--stack-reading);font-size:19px;line-height:1.6;text-wrap:pretty"><sc-for list="{{ row.b.toks }}" as="tk"><span onClick="{{ tk.click }}" style="background:{{ tk.bg }};box-shadow:{{ tk.sh }};text-decoration:{{ tk.td }};text-underline-offset:5px;border-radius:{{ tk.r }};cursor:{{ tk.cur }}">{{ tk.t }}</span></sc-for></p>
+                      <sc-if value="{{ row.noteB }}"><span style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:var(--text-muted)"><i class="ph ph-link-break" style="font-size:13px"></i>No linked counterpart for the sentence being read</span></sc-if>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ showBiCol }}">
+              <div style="display:grid;grid-template-columns:minmax(0,560px) minmax(0,540px);column-gap:56px;justify-content:center;padding:0 40px 120px">
+                <div style="position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;padding:14px 0 10px;background:var(--bg-reading);border-bottom:1px solid var(--border);margin-bottom:14px">
+                  <span style="font-size:13px;font-weight:700">{{ nameA }}</span><span style="font-size:12px;color:var(--text-muted);white-space:nowrap">Column · p. 43, column 2</span>
+                  <sc-if value="{{ speakA }}"><span style="flex:none;white-space:nowrap;display:flex;align-items:center;gap:4px;padding:1px 7px;border-radius:99px;background:var(--accent-subtle);color:var(--accent-text);font-size:11px;font-weight:600"><i class="ph ph-speaker-high" style="font-size:12px"></i>Speaking</span></sc-if>
+                </div>
+                <div style="position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;padding:14px 0 10px;background:var(--bg-reading);border-bottom:1px solid var(--border);margin-bottom:14px;justify-content:{{ headBJustify }}">
+                  <span style="font-size:13px;font-weight:700">{{ nameB }}</span><span style="font-size:12px;color:var(--text-muted)">Translation · reflowed</span>
+                  <sc-if value="{{ speakB }}"><span style="flex:none;white-space:nowrap;display:flex;align-items:center;gap:4px;padding:1px 7px;border-radius:99px;background:var(--accent-subtle);color:var(--accent-text);font-size:11px;font-weight:600"><i class="ph ph-speaker-high" style="font-size:12px"></i>Speaking</span></sc-if>
+                </div>
+                <sc-for list="{{ wideRows }}" as="row" hint-placeholder-count="4">
+                  <div style="display:contents">
+                    <div data-row="{{ row.i }}" style="padding:14px 36px 10px;background:var(--page-paper);color:var(--page-ink);border-left:1px solid var(--border);border-right:1px solid var(--border);box-shadow:0 1px 0 var(--page-paper)">
+                      <p lang="{{ row.a.lang }}" dir="{{ row.a.dir }}" style="margin:0;font-family:'Iowan Old Style',Georgia,serif;font-size:17px;line-height:1.5;text-align:justify;hyphens:auto;text-indent:1.4em"><sc-for list="{{ row.a.toks }}" as="tk"><span onClick="{{ tk.click }}" style="background:{{ tk.bg }};box-shadow:{{ tk.sh }};text-decoration:{{ tk.td }};text-underline-offset:4px;border-radius:{{ tk.r }};cursor:{{ tk.cur }}">{{ tk.t }}</span></sc-for></p>
+                    </div>
+                    <div style="padding:10px 0 22px">
+                      <p lang="{{ row.b.lang }}" dir="{{ row.b.dir }}" style="margin:0;font-family:var(--stack-reading);font-size:18px;line-height:1.55;text-wrap:pretty"><sc-for list="{{ row.b.toks }}" as="tk"><span onClick="{{ tk.click }}" style="background:{{ tk.bg }};box-shadow:{{ tk.sh }};text-decoration:{{ tk.td }};text-underline-offset:5px;border-radius:{{ tk.r }};cursor:{{ tk.cur }}">{{ tk.t }}</span></sc-for></p>
+                      <sc-if value="{{ row.noteB }}"><span style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:var(--text-muted)"><i class="ph ph-link-break" style="font-size:13px"></i>No linked counterpart for the sentence being read</span></sc-if>
+                      <sc-if value="{{ row.noteA }}"><span style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:var(--text-muted)"><i class="ph ph-link-break" style="font-size:13px"></i>No linked counterpart in the original for this sentence</span></sc-if>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ showSingle }}">
+              <div style="max-width:590px;margin:0 auto;padding:30px 40px 120px">
+                <sc-for list="{{ singleRows }}" as="row"><p data-row="{{ row.i }}" lang="{{ row.a.lang }}" dir="{{ row.a.dir }}" style="margin:0 0 26px;font-family:var(--stack-reading);font-size:19px;line-height:1.6;text-wrap:pretty"><sc-for list="{{ row.a.toks }}" as="tk"><span style="background:{{ tk.bg }};border-radius:{{ tk.r }}">{{ tk.t }}</span></sc-for></p></sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ showPages }}">
+              <div style="display:flex;justify-content:center;padding:30px">
+                <div style="width:620px;height:760px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;padding:40px">
+                  <span style="font-size:12px;font-weight:600;color:var(--text-faint)">{{ pageLabel }}</span>
+                  <span style="font-size:13px;color:var(--text-muted);max-width:420px;line-height:1.5">Opens at the passage being read — “{{ anchorText }}”. Choose Bilingual to return to the pairs at the same place.</span>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ popOpen }}">
+              <div style="position:absolute;left:{{ popX }};top:{{ popY }};z-index:5;width:320px;border:1px solid var(--border);border-radius:10px;background:var(--bg-card);box-shadow:0 10px 30px rgb(0 0 0/18%);padding:10px 14px 12px">
+                <div style="display:flex;align-items:center;gap:8px"><span style="flex:none;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)">{{ pop.srcLang }}</span><span style="flex:1;min-width:0;font-size:11.5px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ pop.caption }}</span><button onClick="{{ closePop }}" aria-label="Close" style="flex:none;width:24px;height:24px;display:grid;place-items:center;border:0;border-radius:5px;background:transparent;color:var(--text-muted);cursor:pointer" style-hover="background:var(--bg-subtle)"><i class="ph ph-x" style="font-size:13px"></i></button></div>
+                <div lang="{{ pop.srcCode }}" dir="{{ pop.srcDir }}" style="font-family:var(--stack-reading);font-size:21px;line-height:1.35">{{ pop.srcText }}</div>
+                <div style="height:1px;background:var(--border);margin:10px 0"></div>
+                <sc-if value="{{ pop.has }}">
+                  <span style="display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)">{{ pop.dstLang }}</span>
+                  <div lang="{{ pop.dstCode }}" dir="{{ pop.dstDir }}" style="font-family:var(--stack-reading);font-size:21px;line-height:1.35">{{ pop.dstText }}</div>
+                </sc-if>
+                <sc-if value="{{ pop.none }}">
+                  <span style="display:block;font-size:13.5px;font-weight:600;color:var(--text-secondary)">No linked counterpart</span>
+                  <span style="display:block;margin-top:2px;font-size:12px;line-height:1.45;color:var(--text-muted)">No link was found for this word. That doesn't mean it was left out.</span>
+                </sc-if>
+                <div style="display:flex;align-items:center;gap:8px;margin-top:12px">
+                  <button onClick="{{ listen }}" disabled="{{ pop.listenOff }}" title="{{ pop.listenTitle }}" style="flex:none;white-space:nowrap;display:flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--border-input);border-radius:6px;background:var(--bg-card);font:inherit;font-size:12.5px;font-weight:600;color:{{ pop.listenFg }};cursor:pointer"><i class="ph ph-play" style="font-size:13px"></i>{{ pop.listenLabel }}</button>
+                  <div style="flex:1"></div>
+                  <span style="flex:none;font-size:11px;color:var(--text-faint)">Esc closes</span>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+          <sc-if value="{{ followPaused }}">
+            <button onClick="{{ backToVoice }}" style="position:absolute;left:50%;bottom:18px;transform:translateX(-50%);white-space:nowrap;display:flex;align-items:center;gap:7px;height:32px;padding:0 14px;border:1px solid var(--border);border-radius:99px;background:var(--bg-card);box-shadow:0 6px 18px rgb(0 0 0/14%);font:inherit;font-size:12.5px;font-weight:600;color:var(--accent-text);cursor:pointer"><i class="ph ph-arrow-down" style="font-size:13px"></i>Back to the {{ voiceName }} voice</button>
+          </sc-if>
+          <sc-if value="{{ toast }}">
+            <div role="status" style="position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:6;max-width:560px;padding:8px 14px;border-radius:8px;background:var(--text-primary);color:var(--bg-card);font-size:12.5px;line-height:1.4;box-shadow:0 6px 18px rgb(0 0 0/18%)">{{ toast }}</div>
+          </sc-if>
+        </div>
+      </div>
+      <ul style="width:320px;flex:none;margin:0;padding-left:18px;display:flex;flex-direction:column;gap:7px;font-size:13px;line-height:1.45;color:var(--text-secondary)">
+        <li><b>Column view (default here):</b> the original stays the real page crop. The translation is reflowed in a lane beside it, one passage per paragraph of the crop. Crops are split only at paragraph boundaries from the layout, never mid-line or scaled. When a translation runs longer, blank paper opens under that paragraph so the next pair lines up.</li>
+        <li><b>On the crop:</b> the existing cue rects mark the active sentence and spoken word. Clicking a word rect inspects it. Pages without a text layer mark the paragraph only, and words there can't be inspected. The translation lane still works.</li>
+        <li><b>Rows are passages.</b> Each paragraph pair shares a grid row, so a counterpart is always beside its original. Unequal lengths just make the row taller. No scroll-percentage sync.</li>
+        <li><b>Original left, translation right</b>, whatever the direction. Hebrew is RTL inside its column only; headings, bar and time stay LTR.</li>
+        <li><b>Playback:</b> the active sentence pair is tinted on both sides. Spoken word = <b>filled</b>. Counterpart = <b>outlined</b>. “Speaking” names the voice's language in words.</li>
+        <li><b>Follow:</b> when the active row leaves the band (120px top, 140px bottom), the view scrolls to it. Scrolling by hand pauses following, but playback keeps going, and “Back to the … voice” appears. Pressing it, or Listen from here, resumes following.</li>
+        <li><b>Click a word = inspect</b> (neutral underline, no seek). Dragging selects text as usual. See 04.</li>
+        <li><b>Leaving:</b> Bilingual off → the same view in one language, at the same sentence. Column ↔ Text keeps the pairing and the passage.</li>
+        <li>Try tweaks: Bulgarian–German sample, sentence timing, dark.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 03 NARROW -->
+  <section id="a3" data-screen-label="03 Narrow reading" style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:baseline;gap:12px"><span style="font-family:var(--stack-display);font-size:28px;font-weight:600;color:var(--accent-text)">03</span><h2 style="margin:0;font-family:var(--stack-display);font-weight:600;font-size:26px;letter-spacing:-.02em">Narrow reading</h2></div>
+    <div style="display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap">
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:12px;font-weight:600;color:var(--text-muted)">3a · 393 portrait — recommended: stacked pairs, translation always shown</span>
+        <div style="width:393px;height:800px;border:1px solid var(--border);border-radius:28px;background:var(--bg-reading);overflow:hidden;display:flex;flex-direction:column">
+          <div style="flex:none;display:flex;align-items:center;gap:4px;height:52px;padding:0 6px;border-bottom:1px solid var(--border);background:var(--bg-page)">
+            <span style="flex:none;width:44px;height:44px;display:grid;place-items:center;color:var(--text-secondary)"><i class="ph ph-arrow-left" style="font-size:20px"></i></span>
+            <span style="flex:1;min-width:0;font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">3. The Harbour</span>
+            <span style="flex:none;width:44px;height:44px;display:grid;place-items:center;color:var(--accent-text)"><i class="ph ph-translate" style="font-size:20px"></i></span>
+            <span style="flex:none;width:44px;height:44px;display:grid;place-items:center;color:var(--text-secondary)"><i class="ph ph-dots-three" style="font-size:20px"></i></span>
+          </div>
+          <div style="flex:1;min-height:0;overflow:hidden;padding:18px 20px 0;display:flex;flex-direction:column;gap:22px">
+            <sc-for list="{{ narrowRows }}" as="row" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <p lang="{{ row.a.lang }}" dir="{{ row.a.dir }}" style="margin:0;font-family:var(--stack-reading);font-size:18px;line-height:1.55"><sc-for list="{{ row.a.toks }}" as="tk"><span style="background:{{ tk.bg }};box-shadow:{{ tk.sh }};text-decoration:{{ tk.td }};text-underline-offset:5px;border-radius:{{ tk.r }}">{{ tk.t }}</span></sc-for></p>
+                <div dir="{{ row.b.dir }}" style="display:flex;flex-direction:column;gap:2px">
+                  <span style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)">Hebrew</span>
+                  <p lang="{{ row.b.lang }}" dir="{{ row.b.dir }}" style="margin:0;font-family:var(--stack-reading);font-size:17px;line-height:1.55;color:var(--text-secondary)"><sc-for list="{{ row.b.toks }}" as="tk"><span style="background:{{ tk.bg }};box-shadow:{{ tk.sh }};border-radius:{{ tk.r }}">{{ tk.t }}</span></sc-for></p>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="flex:none;border-top:1px solid var(--border);background:var(--bg-page);padding:8px 12px 22px;display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;align-items:center;gap:8px"><span style="flex:none;font-size:11.5px;color:var(--text-muted);font-variant-numeric:tabular-nums">02:14</span><span style="flex:1;height:3px;border-radius:99px;background:var(--bg-subtle);position:relative"><span style="position:absolute;left:0;top:0;bottom:0;width:23%;border-radius:99px;background:var(--accent)"></span></span><span style="flex:none;font-size:11.5px;color:var(--text-muted);font-variant-numeric:tabular-nums">09:40</span></div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="flex:none;display:flex;padding:2px;gap:2px;border-radius:8px;background:var(--bg-subtle)"><span style="flex:none;white-space:nowrap;display:flex;align-items:center;gap:4px;height:36px;padding:0 10px;border-radius:6px;background:var(--accent-subtle);color:var(--accent-text);font-size:13px;font-weight:600"><i class="ph ph-speaker-high" style="font-size:14px"></i>English</span><span style="flex:none;white-space:nowrap;display:flex;align-items:center;height:36px;padding:0 10px;font-size:13px;font-weight:600;color:var(--text-muted)">Hebrew</span></span>
+              <div style="flex:1"></div>
+              <span style="flex:none;width:44px;height:44px;display:grid;place-items:center;color:var(--text-secondary)"><i class="ph ph-arrow-counter-clockwise" style="font-size:20px"></i></span>
+              <span style="flex:none;width:48px;height:48px;display:grid;place-items:center;border-radius:99px;background:var(--accent);color:var(--on-accent)"><i class="ph ph-pause" style="font-size:22px"></i></span>
+              <span style="flex:none;width:44px;height:44px;display:grid;place-items:center;font-size:14px;font-weight:600;color:var(--text-secondary)">1x</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:12px;font-weight:600;color:var(--text-muted)">3b · 393 · touch inspection as a sheet</span>
+        <div style="width:393px;height:800px;border:1px solid var(--border);border-radius:28px;background:var(--bg-reading);overflow:hidden;display:flex;flex-direction:column;position:relative">
+          <div style="flex:none;display:flex;align-items:center;gap:4px;height:52px;padding:0 6px;border-bottom:1px solid var(--border);background:var(--bg-page)">
+            <span style="flex:none;width:44px;height:44px;display:grid;place-items:center;color:var(--text-secondary)"><i class="ph ph-arrow-left" style="font-size:20px"></i></span>
+            <span style="flex:1;min-width:0;font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">3. The Harbour</span>
+            <span style="flex:none;width:44px;height:44px;display:grid;place-items:center;color:var(--accent-text)"><i class="ph ph-translate" style="font-size:20px"></i></span>
+            <span style="flex:none;width:44px;height:44px;display:grid;place-items:center;color:var(--text-secondary)"><i class="ph ph-dots-three" style="font-size:20px"></i></span>
+          </div>
+          <div style="flex:1;min-height:0;overflow:hidden;padding:18px 20px 0;display:flex;flex-direction:column;gap:22px">
+            <sc-for list="{{ sheetRows }}" as="row" hint-placeholder-count="2">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <p lang="{{ row.a.lang }}" dir="{{ row.a.dir }}" style="margin:0;font-family:var(--stack-reading);font-size:18px;line-height:1.55"><sc-for list="{{ row.a.toks }}" as="tk"><span style="background:{{ tk.bg }};text-decoration:{{ tk.td }};text-underline-offset:5px;border-radius:{{ tk.r }}">{{ tk.t }}</span></sc-for></p>
+                <div dir="{{ row.b.dir }}" style="display:flex;flex-direction:column;gap:2px">
+                  <span style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)">Hebrew</span>
+                  <p lang="{{ row.b.lang }}" dir="{{ row.b.dir }}" style="margin:0;font-family:var(--stack-reading);font-size:17px;line-height:1.55;color:var(--text-secondary)"><sc-for list="{{ row.b.toks }}" as="tk"><span style="background:{{ tk.bg }};text-decoration:{{ tk.td }};text-underline-offset:5px;border-radius:{{ tk.r }}">{{ tk.t }}</span></sc-for></p>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="position:absolute;left:0;right:0;bottom:0;border-radius:14px 14px 0 0;background:var(--bg-card);box-shadow:0 -8px 28px rgb(0 0 0/16%);padding:6px 20px 30px;display:flex;flex-direction:column;gap:6px">
+            <span style="align-self:center;width:36px;height:5px;border-radius:99px;background:var(--border-input);margin-bottom:6px"></span>
+            <div style="display:flex;align-items:center;gap:8px"><span style="flex:none;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)">{{ sheetPop.srcLang }}</span><span style="flex:1;min-width:0;font-size:12px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ sheetPop.caption }}</span><span style="flex:none;width:44px;height:44px;margin-right:-12px;display:grid;place-items:center;color:var(--text-muted)"><i class="ph ph-x" style="font-size:18px"></i></span></div>
+            <div lang="en" style="font-family:var(--stack-reading);font-size:24px">{{ sheetPop.srcText }}</div>
+            <span style="display:block;margin-top:8px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)">{{ sheetPop.dstLang }}</span>
+            <div lang="he" dir="rtl" style="font-family:var(--stack-reading);font-size:24px">{{ sheetPop.dstText }}</div>
+            <span style="display:flex;align-items:center;justify-content:center;gap:8px;height:44px;margin-top:10px;border:1px solid var(--border-input);border-radius:10px;font-size:15px;font-weight:600;color:var(--accent-text);white-space:nowrap"><i class="ph ph-play" style="font-size:16px"></i>Listen from here</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:12px;font-weight:600;color:var(--text-muted)">3a′ · 393 Column view: crop slices with translation between</span>
+        <div style="width:393px;height:800px;border:1px solid var(--border);border-radius:28px;background:var(--bg-reading);overflow:hidden;display:flex;flex-direction:column">
+          <div style="flex:none;display:flex;align-items:center;gap:4px;height:52px;padding:0 6px;border-bottom:1px solid var(--border);background:var(--bg-page)">
+            <span style="flex:none;width:44px;height:44px;display:grid;place-items:center;color:var(--text-secondary)"><i class="ph ph-arrow-left" style="font-size:20px"></i></span>
+            <span style="flex:1;min-width:0;font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">3. The Harbour · p. 43</span>
+            <span style="flex:none;width:44px;height:44px;display:grid;place-items:center;color:var(--accent-text)"><i class="ph ph-translate" style="font-size:20px"></i></span>
+            <span style="flex:none;width:44px;height:44px;display:grid;place-items:center;color:var(--text-secondary)"><i class="ph ph-dots-three" style="font-size:20px"></i></span>
+          </div>
+          <div style="flex:1;min-height:0;overflow:hidden;padding:14px 0 0;display:flex;flex-direction:column;gap:0">
+            <sc-for list="{{ narrowRows }}" as="row" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column">
+                <div style="margin:0 10px;padding:10px 14px 8px;background:var(--page-paper);color:var(--page-ink);border:1px solid var(--border);border-radius:2px">
+                  <p lang="{{ row.a.lang }}" style="margin:0;font-family:'Iowan Old Style',Georgia,serif;font-size:16px;line-height:1.45;text-align:justify;hyphens:auto;text-indent:1.4em"><sc-for list="{{ row.a.toks }}" as="tk"><span style="background:{{ tk.bg }};box-shadow:{{ tk.sh }};border-radius:{{ tk.r }}">{{ tk.t }}</span></sc-for></p>
+                </div>
+                <div dir="{{ row.b.dir }}" style="display:flex;flex-direction:column;gap:2px;padding:10px 20px 16px">
+                  <span style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)">Hebrew</span>
+                  <p lang="{{ row.b.lang }}" dir="{{ row.b.dir }}" style="margin:0;font-family:var(--stack-reading);font-size:17px;line-height:1.55;color:var(--text-secondary)"><sc-for list="{{ row.b.toks }}" as="tk"><span style="background:{{ tk.bg }};box-shadow:{{ tk.sh }};border-radius:{{ tk.r }}">{{ tk.t }}</span></sc-for></p>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="flex:none;border-top:1px solid var(--border);background:var(--bg-page);padding:8px 12px 22px;display:flex;align-items:center;gap:6px">
+            <span style="flex:none;display:flex;padding:2px;gap:2px;border-radius:8px;background:var(--bg-subtle)"><span style="flex:none;white-space:nowrap;display:flex;align-items:center;gap:4px;height:36px;padding:0 10px;border-radius:6px;background:var(--accent-subtle);color:var(--accent-text);font-size:13px;font-weight:600"><i class="ph ph-speaker-high" style="font-size:14px"></i>English</span><span style="flex:none;white-space:nowrap;display:flex;align-items:center;height:36px;padding:0 10px;font-size:13px;font-weight:600;color:var(--text-muted)">Hebrew</span></span>
+            <div style="flex:1"></div>
+            <span style="flex:none;width:48px;height:48px;display:grid;place-items:center;border-radius:99px;background:var(--accent);color:var(--on-accent)"><i class="ph ph-pause" style="font-size:22px"></i></span>
+            <span style="flex:none;width:44px;height:44px;display:grid;place-items:center;font-size:14px;font-weight:600;color:var(--text-secondary)">1x</span>
+          </div>
+        </div>
+        <span style="width:393px;font-size:12px;line-height:1.45;color:var(--text-muted)">The crop is split at its paragraph boundaries, and each passage's translation sits under its slice. The phone keeps the real page type and still reads in order. If a crop renders below legible size, the existing “too small” note suggests Text view.</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:28px">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <span style="font-size:12px;font-weight:600;color:var(--text-muted)">3c · 852 landscape — two columns return · Bulgarian–German, German has no narration</span>
+          <div style="width:852px;height:393px;border:1px solid var(--border);border-radius:28px;background:var(--bg-reading);overflow:hidden;display:flex;flex-direction:column">
+            <div style="flex:none;display:flex;align-items:center;gap:6px;height:48px;padding:0 44px 0 44px;border-bottom:1px solid var(--border);background:var(--bg-page)">
+              <span style="flex:none;width:44px;height:44px;display:grid;place-items:center;color:var(--text-secondary)"><i class="ph ph-arrow-left" style="font-size:20px"></i></span>
+              <span style="flex:none;width:44px;height:44px;display:grid;place-items:center;color:var(--text-primary)"><i class="ph ph-pause" style="font-size:20px"></i></span>
+              <span style="flex:1;min-width:0;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">7. Перонът</span>
+              <span style="flex:none;display:flex;padding:2px;gap:2px;border-radius:8px;background:var(--bg-subtle)"><span style="flex:none;white-space:nowrap;display:flex;align-items:center;gap:4px;height:34px;padding:0 10px;border-radius:6px;background:var(--accent-subtle);color:var(--accent-text);font-size:13px;font-weight:600"><i class="ph ph-speaker-high" style="font-size:14px"></i>Bulgarian</span><span title="No German narration yet" style="flex:none;white-space:nowrap;display:flex;align-items:center;gap:4px;height:34px;padding:0 10px;font-size:13px;font-weight:600;color:var(--text-faint)"><i class="ph ph-speaker-slash" style="font-size:14px"></i>German</span></span>
+              <span style="flex:none;font-size:12px;color:var(--text-muted);font-variant-numeric:tabular-nums">04:02 / 11:18</span>
+              <span style="flex:none;width:44px;height:44px;display:grid;place-items:center;color:var(--accent-text)"><i class="ph ph-translate" style="font-size:20px"></i></span>
+            </div>
+            <div style="flex:1;min-height:0;overflow:hidden;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:32px;padding:16px 60px 0">
+              <sc-for list="{{ landRows }}" as="row" hint-placeholder-count="2">
+                <p lang="{{ row.a.lang }}" dir="{{ row.a.dir }}" style="margin:0 0 16px;font-family:var(--stack-reading);font-size:17px;line-height:1.55"><sc-for list="{{ row.a.toks }}" as="tk"><span style="background:{{ tk.bg }};box-shadow:{{ tk.sh }};border-radius:{{ tk.r }}">{{ tk.t }}</span></sc-for></p>
+                <p lang="{{ row.b.lang }}" dir="{{ row.b.dir }}" style="margin:0 0 16px;font-family:var(--stack-reading);font-size:17px;line-height:1.55"><sc-for list="{{ row.b.toks }}" as="tk"><span style="background:{{ tk.bg }};box-shadow:{{ tk.sh }};border-radius:{{ tk.r }}">{{ tk.t }}</span></sc-for></p>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:28px;align-items:flex-start">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="font-size:12px;font-weight:600;color:var(--text-muted)">3d · Larger text · “Translation: On tap”</span>
+            <div style="width:393px;height:520px;border:1px solid var(--border);border-radius:28px;background:var(--bg-reading);overflow:hidden;display:flex;flex-direction:column">
+              <div style="flex:1;min-height:0;overflow:hidden;padding:22px 20px 0;display:flex;flex-direction:column;gap:20px">
+                <sc-for list="{{ tapRows }}" as="row" hint-placeholder-count="2">
+                  <div style="display:flex;flex-direction:column;gap:4px">
+                    <p lang="en" style="margin:0;font-family:var(--stack-reading);font-size:23px;line-height:1.5"><sc-for list="{{ row.a.toks }}" as="tk"><span style="background:{{ tk.bg }};border-radius:{{ tk.r }}">{{ tk.t }}</span></sc-for></p>
+                    <sc-if value="{{ row.open }}">
+                      <p lang="he" dir="rtl" style="margin:6px 0 0;font-family:var(--stack-reading);font-size:21px;line-height:1.5;color:var(--text-secondary)"><sc-for list="{{ row.b.toks }}" as="tk"><span>{{ tk.t }}</span></sc-for></p>
+                    </sc-if>
+                    <span style="align-self:flex-start;white-space:nowrap;display:flex;align-items:center;gap:6px;height:44px;font-size:15px;font-weight:600;color:var(--accent-text)"><i class="ph ph-translate" style="font-size:16px"></i>{{ row.tapLabel }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+          <ul style="width:400px;margin:28px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:7px;font-size:13px;line-height:1.45;color:var(--text-secondary)">
+            <li><b>Below 700px:</b> passages stack, original then translation, each labelled by language. Two shrunken columns aren't offered.</li>
+            <li><b>Translation always shown</b> by default. The overflow menu has <i>Translation: Shown / On tap</i>. With larger text, On tap saves scrolling. A tap reveals that passage only.</li>
+            <li><b>Transport docked at the bottom</b>, never over the passage. Voice switch sits beside Play. The Bilingual toggle stays in the top bar.</li>
+            <li><b>Tap a word</b> → sheet (3b) with a 44pt Listen button. Tapping outside the sheet, the ×, or swiping it down dismisses it. Long-press is the platform text selection.</li>
+            <li><b>Landscape ≥ 700px:</b> two columns come back, safe-area padding on both sides.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 INSPECTION -->
+  <section id="a4" data-screen-label="04 Word and expression inspection" style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:baseline;gap:12px"><span style="font-family:var(--stack-display);font-size:28px;font-weight:600;color:var(--accent-text)">04</span><h2 style="margin:0;font-family:var(--stack-display);font-weight:600;font-size:26px;letter-spacing:-.02em">Word and expression inspection</h2></div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">
+      <sc-for list="{{ inspCases }}" as="c" hint-placeholder-count="5">
+        <div style="width:360px;display:flex;flex-direction:column;gap:12px;padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--bg-reading)">
+          <span style="font-size:13px;font-weight:700">{{ c.title }}</span>
+          <sc-for list="{{ c.ex }}" as="e">
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <p lang="{{ e.row.a.lang }}" dir="{{ e.row.a.dir }}" style="margin:0;font-family:var(--stack-reading);font-size:17px;line-height:1.55"><sc-for list="{{ e.row.a.toks }}" as="tk"><span style="background:{{ tk.bg }};text-decoration:{{ tk.td }};text-underline-offset:5px;border-radius:{{ tk.r }}">{{ tk.t }}</span></sc-for></p>
+              <p lang="{{ e.row.b.lang }}" dir="{{ e.row.b.dir }}" style="margin:0;font-family:var(--stack-reading);font-size:17px;line-height:1.55;color:var(--text-secondary)"><sc-for list="{{ e.row.b.toks }}" as="tk"><span style="background:{{ tk.bg }};text-decoration:{{ tk.td }};text-underline-offset:5px;border-radius:{{ tk.r }}">{{ tk.t }}</span></sc-for></p>
+              <div style="border:1px solid var(--border);border-radius:10px;background:var(--bg-card);box-shadow:0 8px 22px rgb(0 0 0/10%);padding:10px 14px 12px">
+                <div style="display:flex;align-items:center;gap:8px"><span style="flex:none;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)">{{ e.pop.srcLang }}</span><span style="flex:1;min-width:0;font-size:11.5px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ e.pop.caption }}">{{ e.pop.caption }}</span><i class="ph ph-x" style="font-size:13px;color:var(--text-muted)"></i></div>
+                <div lang="{{ e.pop.srcCode }}" dir="{{ e.pop.srcDir }}" style="font-family:var(--stack-reading);font-size:20px;line-height:1.35">{{ e.pop.srcText }}</div>
+                <div style="height:1px;background:var(--border);margin:8px 0"></div>
+                <sc-if value="{{ e.pop.has }}">
+                  <span style="display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)">{{ e.pop.dstLang }}</span>
+                  <div lang="{{ e.pop.dstCode }}" dir="{{ e.pop.dstDir }}" style="font-family:var(--stack-reading);font-size:20px;line-height:1.35">{{ e.pop.dstText }}</div>
+                </sc-if>
+                <sc-if value="{{ e.pop.none }}">
+                  <span style="display:block;font-size:13.5px;font-weight:600;color:var(--text-secondary)">No linked counterpart</span>
+                  <span style="display:block;margin-top:2px;font-size:12px;line-height:1.45;color:var(--text-muted)">No link was found for this word. That doesn't mean it was left out.</span>
+                </sc-if>
+                <span style="display:flex;align-items:center;gap:6px;margin-top:10px;width:max-content;white-space:nowrap;height:26px;padding:0 9px;border:1px solid var(--border-input);border-radius:6px;font-size:12px;font-weight:600;color:{{ e.pop.listenFg }}"><i class="ph ph-play" style="font-size:12px"></i>{{ e.pop.listenLabel }}</span>
+              </div>
+            </div>
+          </sc-for>
+          <span style="font-size:12px;line-height:1.45;color:var(--text-muted)">{{ c.note }}</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display:grid;grid-template-columns:150px repeat(3,minmax(0,300px));gap:0;border:1px solid var(--border);border-radius:12px;background:var(--bg-card);overflow:hidden;width:max-content">
+      <span style="padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);background:var(--bg-subtle)"></span>
+      <span style="padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);background:var(--bg-subtle)">Mouse</span>
+      <span style="padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);background:var(--bg-subtle)">Keyboard</span>
+      <span style="padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);background:var(--bg-subtle)">Touch</span>
+      <span style="padding:10px 14px;font-size:13px;font-weight:600;border-top:1px solid var(--border)">Inspect</span>
+      <span style="padding:10px 14px;font-size:13px;line-height:1.45;color:var(--text-secondary);border-top:1px solid var(--border)">Click a word (no drag). Playback doesn't move. Hover only previews the underline.</span>
+      <span style="padding:10px 14px;font-size:13px;line-height:1.45;color:var(--text-secondary);border-top:1px solid var(--border)">Tab reaches the passage (one stop per column). ← → move by word, Enter inspects. Focus ring on the word.</span>
+      <span style="padding:10px 14px;font-size:13px;line-height:1.45;color:var(--text-secondary);border-top:1px solid var(--border)">Tap a word → sheet (3b).</span>
+      <span style="padding:10px 14px;font-size:13px;font-weight:600;border-top:1px solid var(--border)">Listen from here</span>
+      <span style="padding:10px 14px;font-size:13px;line-height:1.45;color:var(--text-secondary);border-top:1px solid var(--border)">Button in the popover. Switches the voice to that word's language if it has narration. Starts at the timed word, or at the sentence start when timing is coarse.</span>
+      <span style="padding:10px 14px;font-size:13px;line-height:1.45;color:var(--text-secondary);border-top:1px solid var(--border)">L in the popover, or Shift+Enter on a focused word. Space keeps toggling play/pause.</span>
+      <span style="padding:10px 14px;font-size:13px;line-height:1.45;color:var(--text-secondary);border-top:1px solid var(--border)">44pt button in the sheet.</span>
+      <span style="padding:10px 14px;font-size:13px;font-weight:600;border-top:1px solid var(--border)">Select / copy</span>
+      <span style="padding:10px 14px;font-size:13px;line-height:1.45;color:var(--text-secondary);border-top:1px solid var(--border)">Drag or double-click selects as usual. A click that ends a selection doesn't inspect.</span>
+      <span style="padding:10px 14px;font-size:13px;line-height:1.45;color:var(--text-secondary);border-top:1px solid var(--border)">Shift+arrows from a focused word. ⌘C copies.</span>
+      <span style="padding:10px 14px;font-size:13px;line-height:1.45;color:var(--text-secondary);border-top:1px solid var(--border)">Long-press, the platform selection.</span>
+      <span style="padding:10px 14px;font-size:13px;font-weight:600;border-top:1px solid var(--border)">Dismiss</span>
+      <span style="padding:10px 14px;font-size:13px;line-height:1.45;color:var(--text-secondary);border-top:1px solid var(--border)">× or clicking outside. Clicking another word moves the popover there.</span>
+      <span style="padding:10px 14px;font-size:13px;line-height:1.45;color:var(--text-secondary);border-top:1px solid var(--border)">Esc. Focus returns to the word.</span>
+      <span style="padding:10px 14px;font-size:13px;line-height:1.45;color:var(--text-secondary);border-top:1px solid var(--border)">×, swipe down, or tap outside.</span>
+    </div>
+    <p style="margin:0;max-width:900px;font-size:13px;line-height:1.5;color:var(--text-secondary);text-wrap:pretty"><b>Gesture change, deliberately:</b> the ordinary reader seeks when you tap a passage. In bilingual mode that tap inspects instead, because word lookup is the reason to be there, and seeking by accident loses your place in the voice. Seeking moves to Listen from here. Single-language Text, Column and Page keep tap-to-seek. Inspection is <b>neutral</b> (tinted fill + underline). Playback is <b>accent</b>. Both can show at once without being confused.</p>
+  </section>
+
+  <!-- 05 NARRATION -->
+  <section id="a5" data-screen-label="05 Narration and incomplete data" style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:baseline;gap:12px"><span style="font-family:var(--stack-display);font-size:28px;font-weight:600;color:var(--accent-text)">05</span><h2 style="margin:0;font-family:var(--stack-display);font-weight:600;font-size:26px;letter-spacing:-.02em">Change narration and handle incomplete data</h2></div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:stretch">
+      <div style="width:340px;display:flex;flex-direction:column;gap:8px;padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--bg-card)">
+        <span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)">Switch · counterpart exists</span>
+        <span style="font-size:13px;line-height:1.5;color:var(--text-secondary)">Speaking English at “counting”. Choose Hebrew → Hebrew starts at <b>ספר</b>, the linked word, if its timing is trustworthy. Otherwise it starts at the start of the paired sentence.</span>
+        <span style="font-size:13px;line-height:1.5;color:var(--text-secondary)"><b>Play state is kept:</b> if it was playing, it keeps playing. If paused, it stays paused, positioned there. Never the same timestamp or percentage.</span>
+        <span style="margin-top:auto;align-self:flex-start;padding:6px 10px;border-radius:7px;background:var(--text-primary);color:var(--bg-card);font-size:12px">Now speaking Hebrew, from the same sentence</span>
+      </div>
+      <div style="width:340px;display:flex;flex-direction:column;gap:8px;padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--bg-card)">
+        <span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)">Switch · sentence has no counterpart</span>
+        <span style="font-size:13px;line-height:1.5;color:var(--text-secondary)">Speaking “The timetable on the wall…”, which has no Hebrew link. Hebrew starts at the <b>previous paired sentence</b>. If there isn't one, it starts at the next. The toast says so.</span>
+        <span style="margin-top:auto;align-self:flex-start;padding:6px 10px;border-radius:7px;background:var(--text-primary);color:var(--bg-card);font-size:12px;line-height:1.4">Hebrew has no counterpart for this sentence, so it starts at the previous one</span>
+      </div>
+      <div style="width:340px;display:flex;flex-direction:column;gap:8px;padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--bg-card)">
+        <span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)">Chapter change</span>
+        <span style="font-size:13px;line-height:1.5;color:var(--text-secondary)">The chapter picker keeps bilingual mode, the translation and the voice. If the next chapter lacks that translation, it opens single-language with a note. Autoplay continues in the same voice. If that voice has no narration for the chapter, playback stops.</span>
+        <span style="margin-top:auto;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-subtle);font-size:12px;line-height:1.4;color:var(--text-muted)">Chapter 4 has no Hebrew translation, so it opens in English only.</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,330px));gap:16px">
+      <sc-for list="{{ conditions }}" as="k" hint-placeholder-count="8">
+        <div style="display:flex;flex-direction:column;gap:8px;padding:14px 16px;border:1px solid var(--border);border-radius:12px;background:var(--bg-card)">
+          <span style="font-size:13px;font-weight:700">{{ k.title }}</span>
+          <span style="font-size:12.5px;line-height:1.5;color:var(--text-secondary)">{{ k.body }}</span>
+          <span style="margin-top:auto;display:flex;align-items:center;gap:8px;min-width:0"><span style="flex:none;white-space:nowrap;padding:2px 7px;border-radius:4px;background:{{ k.chipBg }};font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:{{ k.chipFg }}">{{ k.chip }}</span><span title="{{ k.ui }}" style="flex:1;min-width:0;font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ k.ui }}</span></span>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <!-- 06 MODAL -->
+  <section id="a6" data-screen-label="06 Chapter modal access" style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:baseline;gap:12px"><span style="font-family:var(--stack-display);font-size:28px;font-weight:600;color:var(--accent-text)">06</span><h2 style="margin:0;font-family:var(--stack-display);font-weight:600;font-size:26px;letter-spacing:-.02em">Chapter-modal access</h2><span style="font-size:12.5px;color:var(--text-muted)">Required minimum · recommended</span></div>
+    <div style="display:flex;gap:28px;align-items:flex-start">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <sc-for list="{{ modalStates }}" as="m" hint-placeholder-count="3">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:12px;font-weight:600;color:var(--text-muted)">{{ m.label }}</span>
+            <div style="width:980px;border:1px solid var(--border);border-radius:12px;background:var(--bg-card);overflow:hidden">
+              <div style="display:flex;align-items:flex-start;gap:12px;padding:14px 16px 10px">
+                <div style="flex:1;min-width:0"><div style="font-size:16px;font-weight:700">3. The Harbour</div><div style="display:flex;gap:12px;margin-top:3px;font-size:12px;color:var(--text-muted)"><span>9:40</span><span style="color:var(--accent-text)">View PDF · p.41–48</span><span style="color:var(--accent-text)">Open reader</span></div></div>
+                <i class="ph ph-x" style="font-size:18px;color:var(--text-faint)"></i>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-top:1px solid var(--border);background:var(--bg-subtle)">
+                <span style="flex:none;white-space:nowrap;height:26px;padding:0 10px;display:flex;align-items:center;border:1px solid var(--border-input);border-radius:6px;background:var(--bg-card);font-size:12px;font-weight:600">Download</span>
+                <span style="flex:none;width:1px;height:18px;background:var(--border)"></span>
+                <span style="flex:none;white-space:nowrap;height:26px;padding:0 10px;display:flex;align-items:center;border:1px solid var(--border-input);border-radius:6px;background:var(--bg-card);font-size:12px;font-weight:600">Re-synthesize</span>
+                <span style="flex:none;white-space:nowrap;height:26px;padding:0 10px;display:flex;align-items:center;border:1px solid var(--border-input);border-radius:6px;background:var(--bg-card);font-size:12px;font-weight:600">Stop translation</span>
+                <span style="flex:none;white-space:nowrap;height:26px;padding:0 10px;display:flex;align-items:center;border:1px solid var(--border-input);border-radius:6px;background:var(--bg-card);font-size:12px;font-weight:600" title="Review and edit the original and this variant side by side">Compare</span>
+                <div style="flex:1"></div>
+                <span style="flex:none;display:flex;gap:4px"><span style="flex:none;white-space:nowrap;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:600;background:{{ m.origBg }};color:{{ m.origFg }}">Original</span><span style="flex:none;white-space:nowrap;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:600;background:{{ m.heBg }};color:{{ m.heFg }}">Hebrew</span><span style="flex:none;white-space:nowrap;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:600;color:var(--text-muted)">Plain English</span></span>
+                <span title="{{ m.title }}" style="flex:none;white-space:nowrap;display:flex;align-items:center;gap:6px;height:26px;padding:0 10px;border:1px solid var(--border-input);border-radius:6px;background:var(--bg-card);font-size:12px;font-weight:600;color:{{ m.fg }};opacity:{{ m.op }}"><i class="ph ph-translate" style="font-size:13px"></i>Open bilingual reader<i class="ph ph-arrow-up-right" style="font-size:11px"></i></span>
+              </div>
+              <sc-if value="{{ m.hasReason }}"><div style="padding:6px 16px;border-top:1px solid var(--border);font-size:11.5px;color:var(--text-muted)">Tooltip: {{ m.title }}</div></sc-if>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <ul style="width:360px;margin:22px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:7px;font-size:13px;line-height:1.45;color:var(--text-secondary)">
+        <li><b>Placement:</b> right after the variant pills, the reading controls, and away from Re-synthesize and Translate.</li>
+        <li><b>Carries:</b> chapter, the selected translation (the Hebrew pill, or the book's last-used translation from Original), and the passage at the modal's playhead if it has a valid anchor. Opens <code>/books/:id/read?chapter=3&amp;with=he&amp;at=s4</code>.</li>
+        <li><b>Playback:</b> modal narration pauses before navigation. The reader opens paused at that passage, in the voice that was playing.</li>
+        <li><b>Editing:</b> disabled, “Save or discard your edits first.”</li>
+        <li><b>Missing translation:</b> disabled, “No translation of this chapter yet.” Rewrites like Plain English don't count.</li>
+        <li><b>Compare stays as it is:</b> editing and review of a variant. Its tooltip now says “review and edit” to separate it from reading.</li>
+        <li><b>Embedded preview: not recommended.</b> The modal already has its own transport, pills and text views. A second language toolbar would crowd it. Revisit after the reader ships.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 07 COMPONENTS -->
+  <section id="a7" data-screen-label="07 Components" style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:baseline;gap:12px"><span style="font-family:var(--stack-display);font-size:28px;font-weight:600;color:var(--accent-text)">07</span><h2 style="margin:0;font-family:var(--stack-display);font-weight:600;font-size:26px;letter-spacing:-.02em">Components</h2></div>
+    <div style="display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap">
+      <div style="width:560px;display:flex;flex-direction:column;gap:0;border:1px solid var(--border);border-radius:12px;background:var(--bg-reading);overflow:hidden">
+        <span style="padding:10px 16px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);border-bottom:1px solid var(--border)">Text marks · never colour alone</span>
+        <div style="display:grid;grid-template-columns:150px 1fr;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border)"><span style="font-family:var(--stack-reading);font-size:18px"><span style="background:var(--cue-linked)">the ferry had</span></span><span style="font-size:12.5px;color:var(--text-secondary)"><b>Active sentence pair</b> · tint, both sides · <code>--cue-linked</code></span></div>
+        <div style="display:grid;grid-template-columns:150px 1fr;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border)"><span style="font-family:var(--stack-reading);font-size:18px"><span style="background:var(--cue-word);border-radius:3px">ferry</span></span><span style="font-size:12.5px;color:var(--text-secondary)"><b>Spoken word</b> · filled · <code>--cue-word</code></span></div>
+        <div style="display:grid;grid-template-columns:150px 1fr;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border)"><span style="font-family:var(--stack-reading);font-size:18px" dir="rtl"><span style="box-shadow:inset 0 0 0 1.5px var(--cue-ring);border-radius:3px">המעבורת</span></span><span style="font-size:12.5px;color:var(--text-secondary)"><b>Spoken word's counterpart</b> · outlined · <code>--cue-ring</code></span></div>
+        <div style="display:grid;grid-template-columns:150px 1fr;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border)"><span style="font-family:var(--stack-reading);font-size:18px"><span style="background:var(--insp-bg);text-decoration:underline solid var(--text-primary) 2px;text-underline-offset:5px;border-radius:3px">turned</span> the <span style="background:var(--insp-bg);text-decoration:underline solid var(--text-primary) 2px;text-underline-offset:5px;border-radius:3px">off</span></span><span style="font-size:12.5px;color:var(--text-secondary)"><b>Inspected + counterparts</b> · neutral fill + solid underline</span></div>
+        <div style="display:grid;grid-template-columns:150px 1fr;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border)"><span style="font-family:var(--stack-reading);font-size:18px"><span style="background:var(--insp-bg);text-decoration:underline dotted var(--text-primary) 2px;text-underline-offset:5px;border-radius:3px">had</span></span><span style="font-size:12.5px;color:var(--text-secondary)"><b>Inspected, unlinked</b> · dotted underline</span></div>
+        <div style="display:grid;grid-template-columns:150px 1fr;align-items:center;gap:10px;padding:10px 16px"><span style="font-family:var(--stack-reading);font-size:18px"><span style="outline:2px solid var(--accent);outline-offset:2px;border-radius:3px">ferry</span></span><span style="font-size:12.5px;color:var(--text-secondary)"><b>Keyboard focus</b> · 2px accent ring, offset</span></div>
+      </div>
+      <div style="width:620px;display:flex;flex-direction:column;border:1px solid var(--border);border-radius:12px;background:var(--bg-card);overflow:hidden">
+        <span style="padding:10px 16px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);border-bottom:1px solid var(--border)">New pieces · built from existing Button, Dropdown, SegmentedControl, StatusBadge</span>
+        <sc-for list="{{ comps }}" as="cp" hint-placeholder-count="8">
+          <div style="display:grid;grid-template-columns:190px 1fr 60px;gap:12px;padding:9px 16px;border-bottom:1px solid var(--border);font-size:12.5px;line-height:1.45"><code style="font-size:12px;color:var(--text-primary)">{{ cp.name }}</code><span style="color:var(--text-secondary)">{{ cp.what }}</span><a href="{{ cp.href }}" style="font-weight:600;white-space:nowrap">{{ cp.at }}</a></div>
+        </sc-for>
+      </div>
+      <ul style="width:320px;margin:0;padding-left:18px;display:flex;flex-direction:column;gap:7px;font-size:13px;line-height:1.45;color:var(--text-secondary)">
+        <li><b>Screen-reader order:</b> passage 1 original, passage 1 translation, passage 2… Each paragraph has <code>lang</code> and <code>dir</code>. Column headings are <code>aria-hidden</code>. Each passage is labelled “English” or “Hebrew”.</li>
+        <li>Live region announces voice switches and “Following paused”. Word highlights are not announced.</li>
+        <li><b>Dark:</b> tokens are light-dark pairs. Check with the Appearance tweak.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 08 LATER -->
+  <section id="a8" data-screen-label="08 Later: Chapters and Outputs" style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:baseline;gap:12px"><span style="font-family:var(--stack-display);font-size:28px;font-weight:600;color:var(--text-faint)">08</span><h2 style="margin:0;font-family:var(--stack-display);font-weight:600;font-size:26px;letter-spacing:-.02em">Later · supporting designs</h2><span style="font-size:12.5px;color:var(--text-muted)">Annotations only, pending the data contract</span></div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">
+      <div style="width:620px;display:flex;flex-direction:column;border:1px solid var(--border);border-radius:12px;background:var(--bg-card);overflow:hidden">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg-subtle)"><span style="font-size:13px;font-weight:700">Chapters · 3 selected · Hebrew</span><div style="flex:1"></div><span style="flex:none;white-space:nowrap;height:26px;padding:0 10px;display:flex;align-items:center;border:1px solid var(--border-input);border-radius:6px;background:var(--bg-card);font-size:12px;font-weight:600">Pair sentences</span><span style="flex:none;white-space:nowrap;height:26px;padding:0 10px;display:flex;align-items:center;border:1px solid var(--border-input);border-radius:6px;background:var(--bg-card);font-size:12px;font-weight:600">Link words… <span style="margin-left:6px;color:var(--text-muted);font-weight:400">~4 min</span></span></div>
+        <div style="display:grid;grid-template-columns:40px 1fr 140px 150px;gap:10px;padding:8px 16px;border-bottom:1px solid var(--border);font-size:12.5px;align-items:center"><span style="color:var(--text-faint)">3</span><span>The Harbour</span><span style="justify-self:start;padding:1px 7px;border-radius:99px;font-size:10.5px;font-weight:600;background:var(--success-bg);color:var(--success-text)">Paired</span><span style="justify-self:start;padding:1px 7px;border-radius:99px;font-size:10.5px;font-weight:600;background:var(--success-bg);color:var(--success-text)">Words linked</span></div>
+        <div style="display:grid;grid-template-columns:40px 1fr 140px 150px;gap:10px;padding:8px 16px;border-bottom:1px solid var(--border);font-size:12.5px;align-items:center"><span style="color:var(--text-faint)">4</span><span>Nine O'Clock</span><span style="justify-self:start;padding:1px 7px;border-radius:99px;font-size:10.5px;font-weight:600;background:var(--success-bg);color:var(--success-text)">Paired</span><span style="display:flex;align-items:center;gap:6px"><span style="flex:none;padding:1px 7px;border-radius:99px;font-size:10.5px;font-weight:600;background:var(--danger-bg,rgb(200 40 30/10%));color:var(--danger-text)">2 of 9 failed</span><span style="font-size:12px;font-weight:600;color:var(--accent-text)">Retry</span></span></div>
+        <div style="display:grid;grid-template-columns:40px 1fr 140px 150px;gap:10px;padding:8px 16px;font-size:12.5px;align-items:center"><span style="color:var(--text-faint)">5</span><span>Crossing</span><span style="justify-self:start;padding:1px 7px;border-radius:99px;font-size:10.5px;font-weight:600;background:var(--bg-subtle);color:var(--text-secondary)">Pairing 40%</span><span style="font-size:12px;color:var(--text-muted)">Cancel</span></div>
+        <ul style="margin:0;padding:10px 16px 12px 32px;display:flex;flex-direction:column;gap:5px;font-size:12.5px;line-height:1.45;color:var(--text-secondary);border-top:1px solid var(--border)">
+          <li>Scoped to the selected chapters and the translation chosen in the language switcher.</li>
+          <li>Word linking is optional and shows an estimate before it starts. Opening this view starts nothing.</li>
+          <li>Failures are counted per chapter. Retry is explicit, and completed batches are kept.</li>
+        </ul>
+      </div>
+      <div style="width:460px;display:flex;flex-direction:column;border:1px solid var(--border);border-radius:12px;background:var(--bg-card);overflow:hidden">
+        <div style="padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg-subtle);font-size:13px;font-weight:700">Outputs · include in export</div>
+        <div style="display:flex;flex-direction:column;gap:8px;padding:12px 16px;font-size:12.5px">
+          <span style="display:flex;align-items:center;gap:8px"><i class="ph ph-check-square" style="font-size:16px;color:var(--accent-text)"></i>English text<span style="color:var(--text-muted)">· narration</span></span>
+          <span style="display:flex;align-items:center;gap:8px"><i class="ph ph-check-square" style="font-size:16px;color:var(--accent-text)"></i>Hebrew text<span style="color:var(--text-muted)">· narration</span></span>
+          <span style="display:flex;align-items:center;gap:8px;color:var(--text-muted)"><i class="ph ph-warning" style="font-size:15px;color:var(--warning-text)"></i>Ch. 4 has no Hebrew audio (text included) · Ch. 6 has no Hebrew translation</span>
+        </div>
+        <ul style="margin:0;padding:10px 16px 12px 32px;display:flex;flex-direction:column;gap:5px;font-size:12.5px;line-height:1.45;color:var(--text-secondary);border-top:1px solid var(--border)">
+          <li>Pick two texts, then any narrations they have.</li>
+          <li>Missing audio and missing translation are listed separately.</li>
+          <li>No new output type or version label. It's the existing export with a second language.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;sample&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;en-he&quot;,&quot;bg-de&quot;],&quot;default&quot;:&quot;en-he&quot;,&quot;tsType&quot;:&quot;'en-he'|'bg-de'&quot;,&quot;section&quot;:&quot;Wide reader (02)&quot;},&quot;timing&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;word&quot;,&quot;sentence&quot;],&quot;default&quot;:&quot;word&quot;,&quot;tsType&quot;:&quot;'word'|'sentence'&quot;,&quot;section&quot;:&quot;Wide reader (02)&quot;},&quot;appearance&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;}}">
+const RE = /(\d+(?::\d+)?|[\p{L}\p{M}]+(?:[-'’][\p{L}\p{M}]+)*)|(\s+)|([^\s\p{L}\p{M}\d]+)/gu;
+const SAMPLES = {
+  "en-he": {
+    chapter: "3. The Harbour", start: "w18",
+    a: { code: "en", name: "English", dir: "ltr", voice: true },
+    b: { code: "he", name: "Hebrew", dir: "rtl", voice: true },
+    rows: [
+      { a: [{ s: "s1", t: "At 08:30 the ferry had not yet arrived.", l: { "08:30": "w1", ferry: "w2", arrived: "w3", not: "w4", yet: "w5" } },
+            { s: "s2", t: "Mira turned the radio off and listened to the harbour instead.", l: { Mira: "w6", turned: "w7", off: "w7", radio: "w8", listened: "w9", harbour: "w10", instead: "w11" } }],
+        b: [{ s: "s1", t: "בשעה 08:30 המעבורת עדיין לא הגיעה.", l: { "08:30": "w1", "המעבורת": "w2", "הגיעה": "w3", "לא": "w4", "עדיין": "w5" } },
+            { s: "s2", t: "מירה כיבתה את הרדיו והקשיבה לנמל במקום.", l: { "מירה": "w6", "כיבתה": "w7", "הרדיו": "w8", "והקשיבה": "w9", "לנמל": "w10", "במקום": "w11" } }] },
+      { a: [{ s: "s3", t: "Gulls argued over the breakwater.", l: { Gulls: "w12", argued: "w13", breakwater: "w14" } },
+            { s: "s4", t: "A man in a yellow coat was counting crates, then counting them again, as if the number might change.", l: { man: "w15", yellow: "w16", coat: "w17", "counting#1": "w18", crates: "w19", "counting#2": "w20", again: "w21", number: "w22", change: "w23" } }],
+        b: [{ s: "s3", t: "שחפים התווכחו מעל שובר הגלים.", l: { "שחפים": "w12", "התווכחו": "w13", "שובר": "w14", "הגלים": "w14" } },
+            { s: "s4", t: "איש במעיל צהוב ספר ארגזים, ואז ספר אותם שוב, כאילו המספר עשוי להשתנות.", l: { "איש": "w15", "צהוב": "w16", "במעיל": "w17", "ספר#1": "w18", "ארגזים": "w19", "ספר#2": "w20", "שוב": "w21", "המספר": "w22", "להשתנות": "w23" } }] },
+      { a: [{ s: "u1", t: "The timetable on the wall was two summers out of date." },
+            { s: "s5", t: "She had promised to wait until nine.", l: { promised: "w24", wait: "w25", nine: "w26" } },
+            { s: "s6", t: "“Just until nine,” she said aloud, to no one.", l: { nine: "w27", aloud: "w28", said: "w29" } }],
+        b: [{ s: "s5", t: "היא הבטיחה לחכות עד תשע.", l: { "הבטיחה": "w24", "לחכות": "w25", "תשע": "w26" } },
+            { s: "s6", t: "״רק עד תשע״, אמרה בקול, לאף אחד.", l: { "תשע": "w27", "בקול": "w28", "אמרה": "w29" } }] },
+      { a: [{ s: "s7", t: "A quarter of an hour later, the ferry appeared behind the lighthouse, smaller than she remembered.", l: { quarter: "w35", hour: "w35", later: "w35", ferry: "w30", appeared: "w31", lighthouse: "w32", smaller: "w33", remembered: "w34" } },
+            { s: "s8", t: "Mira picked up her bag.", l: { Mira: "w36", picked: "w37", up: "w37", bag: "w38" } }],
+        b: [{ s: "s7", t: "כעבור רבע שעה, המעבורת הופיעה מאחורי המגדלור, קטנה משזכרה.", l: { "כעבור": "w35", "רבע": "w35", "שעה": "w35", "המעבורת": "w30", "הופיעה": "w31", "המגדלור": "w32", "קטנה": "w33", "משזכרה": "w34" } },
+            { s: "s8", t: "מירה הרימה את התיק שלה.", l: { "מירה": "w36", "הרימה": "w37", "התיק": "w38" } }] },
+      { a: [{ s: "s9", t: "The man in the yellow coat stopped counting.", l: { man: "w40", yellow: "w41", coat: "w42", stopped: "w43", counting: "w44" } },
+            { s: "s10", t: "Somewhere behind her, a door closed.", l: { Somewhere: "w47", behind: "w48", door: "w45", closed: "w46" } }],
+        b: [{ s: "s9", t: "האיש במעיל הצהוב הפסיק לספור.", l: { "האיש": "w40", "הצהוב": "w41", "במעיל": "w42", "הפסיק": "w43", "לספור": "w44" } },
+            { s: "s10", t: "איפשהו מאחוריה נסגרה דלת.", l: { "איפשהו": "w47", "מאחוריה": "w48", "דלת": "w45", "נסגרה": "w46" } }] },
+    ],
+  },
+  "bg-de": {
+    chapter: "7. Перонът", start: "w10",
+    a: { code: "bg", name: "Bulgarian", dir: "ltr", voice: true },
+    b: { code: "de", name: "German", dir: "ltr", voice: false },
+    rows: [
+      { a: [{ s: "s1", t: "Влакът закъсня с четиридесет минути.", l: { "Влакът": "w1", "закъсня": "w2", "четиридесет": "w3", "минути": "w4" } },
+            { s: "s2", t: "Никой на перона не изглеждаше изненадан.", l: { "Никой": "w5", "перона": "w6", "изглеждаше": "w7", "изненадан": "w8" } }],
+        b: [{ s: "s1", t: "Der Zug hatte vierzig Minuten Verspätung.", l: { Zug: "w1", "Verspätung": "w2", vierzig: "w3", Minuten: "w4" } },
+            { s: "s2", t: "Niemand auf dem Bahnsteig schien überrascht zu sein.", l: { Niemand: "w5", Bahnsteig: "w6", schien: "w7", "überrascht": "w8" } }] },
+      { a: [{ s: "s3", t: "Тя изключи телефона си и зачака.", l: { "Тя": "w9", "изключи": "w10", "телефона": "w11", "зачака": "w12" } },
+            { s: "s4", t: "Децата стояха твърде близо до ръба на перона.", l: { "Децата": "w13", "стояха": "w14", "твърде": "w15", "близо": "w16", "ръба": "w17", "на": "w17", "перона": "w17" } }],
+        b: [{ s: "s3", t: "Sie schaltete ihr Telefon aus und begann zu warten.", l: { Sie: "w9", schaltete: "w10", aus: "w10", Telefon: "w11", begann: "w12", warten: "w12" } },
+            { s: "s4", t: "Die Kinder standen viel zu nah an der Bahnsteigkante.", l: { Kinder: "w13", standen: "w14", zu: "w15", nah: "w16", Bahnsteigkante: "w17" } }] },
+      { a: [{ s: "s5", t: "Когато влакът най-после пристигна, всички се качиха мълчаливо, сякаш бяха закъснели те, а не той.", l: { "влакът": "w18", "пристигна": "w19", "качиха": "w20", "мълчаливо": "w21" } }],
+        b: [{ s: "s5", t: "Als er endlich kam, stiegen alle schweigend ein.", l: { er: "w18", kam: "w19", stiegen: "w20", ein: "w20", schweigend: "w21" } },
+            { s: "u1", t: "Niemand beschwerte sich." }] },
+    ],
+  },
+};
+const CACHE = {};
+function prep(key) {
+  if (CACHE[key]) return CACHE[key];
+  const S = SAMPLES[key];
+  const seq = { a: [], b: [] }, ids = { a: new Set(), b: new Set() }, sRow = {};
+  const rows = S.rows.map((r, ri) => {
+    const out = {};
+    for (const side of ["a", "b"]) {
+      const toks = [];
+      r[side].forEach((sen, si) => {
+        if (si > 0) toks.push({ t: " ", s: null });
+        ids[side].add(sen.s); sRow[sen.s] = ri;
+        const occ = {}, l = sen.l || {};
+        let wi = 0;
+        for (const m of sen.t.matchAll(RE)) {
+          if (m[1]) {
+            const w = m[1]; occ[w] = (occ[w] || 0) + 1;
+            const g = l[w + "#" + occ[w]] ?? l[w] ?? null;
+            const tk = { t: w, word: true, s: sen.s, g, side, wi, row: ri, id: side + "-" + sen.s + "-" + wi };
+            wi++; toks.push(tk); seq[side].push(tk);
+          } else toks.push({ t: m[0], s: sen.s, side });
+        }
+      });
+      out[side] = toks;
+    }
+    return out;
+  });
+  const paired = new Set([...ids.a].filter((x) => ids.b.has(x)));
+  return (CACHE[key] = { S, rows, seq, paired, sRow });
+}
+function find(P, side, row, word, n = 1) {
+  let k = 0;
+  return P.rows[row][side].find((t) => t.word && t.t === word && ++k === n);
+}
+function joinWords(list) {
+  let out = "", prev = null;
+  for (const t of list) { out += prev === null ? t.t : (t.wi === prev + 1 ? " " : " … ") + t.t; prev = t.wi; }
+  return out;
+}
+function desc(list) {
+  if (list.length === 1) return "1 word";
+  const contig = list.every((t, i) => i === 0 || t.wi === list[i - 1].wi + 1);
+  return contig ? list.length + " words" : "split expression";
+}
+function popInfo(P, insp, timing) {
+  const S = P.S, other = insp.side === "a" ? "b" : "a";
+  const src = P.rows[insp.row][insp.side].filter((t) => t.word && (insp.g ? t.g === insp.g : t.id === insp.id));
+  const dst = insp.g ? P.rows[insp.row][other].filter((t) => t.word && t.g === insp.g) : [];
+  const has = dst.length > 0;
+  const cap = has && !(src.length === 1 && dst.length === 1) ? desc(src) + " → " + desc(dst) : "";
+  const L = S[insp.side];
+  return {
+    srcLang: L.name, srcCode: L.code, srcDir: L.dir, srcText: joinWords(src),
+    dstLang: S[other].name, dstCode: S[other].code, dstDir: S[other].dir, dstText: joinWords(dst),
+    has, none: !has, caption: cap,
+    listenOff: !L.voice, listenFg: L.voice ? "var(--accent-text)" : "var(--text-faint)",
+    listenLabel: L.voice ? "Listen from here" : "No " + L.name + " narration",
+    listenTitle: L.voice ? (timing === "word" ? "Starts " + L.name + " at this word" : "Starts " + L.name + " at the start of this sentence") : "This chapter has no " + L.name + " narration yet",
+  };
+}
+function rowOf(P, ri, ctx, click) {
+  const { voice, cur, timing, insp } = ctx;
+  const paired = cur ? P.paired.has(cur.s) : false;
+  const mk = (side) => P.rows[ri][side].map((tk) => {
+    const spokenSide = side === voice;
+    const inSent = cur && tk.s === cur.s && (spokenSide || paired);
+    const spokenWord = timing === "word" && cur && spokenSide && tk.id === cur.id;
+    const counterpart = timing === "word" && cur && paired && !spokenSide && tk.word && cur.g && tk.g === cur.g;
+    const inspected = insp && tk.word && (tk.id === insp.id || (insp.g && tk.g === insp.g && tk.row === insp.row));
+    return {
+      t: tk.t,
+      bg: inspected ? "var(--insp-bg)" : spokenWord ? "var(--cue-word)" : inSent ? "var(--cue-linked)" : "transparent",
+      sh: counterpart && !inspected ? "inset 0 0 0 1.5px var(--cue-ring)" : "none",
+      td: inspected ? (insp.g ? "underline solid var(--text-primary) 2px" : "underline dotted var(--text-primary) 2px") : "none",
+      r: spokenWord || counterpart || inspected ? "3px" : "0",
+      click: tk.word && click ? (e) => click(e, tk) : undefined,
+      cur: tk.word && click ? "pointer" : "text",
+    };
+  });
+  const S = P.S;
+  const unp = cur && !paired && P.sRow[cur.s] === ri;
+  return {
+    i: ri,
+    a: { lang: S.a.code, dir: S.a.dir, toks: mk("a") },
+    b: { lang: S.b.code, dir: S.b.dir, toks: mk("b") },
+    noteA: !!(unp && voice === "b"), noteB: !!(unp && voice === "a"),
+  };
+}
+const fmt = (ms) => { const s = Math.floor(ms / 1000); return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); };
+
+class Component extends DCLogic {
+  readRef = React.createRef();
+  prog = 0;
+  state = this.initial();
+  initial() {
+    const P = prep(this.props.sample ?? "en-he");
+    return { voice: "a", pos: Math.max(0, P.seq.a.findIndex((t) => t.g === P.S.start)), playing: false, insp: null, popX: "0px", popY: "0px", followPaused: false, toast: null, bi: true, view: "column" };
+  }
+  P() { return prep(this.props.sample ?? "en-he"); }
+  componentDidMount() {
+    this.onKey = (e) => { if (e.key === "Escape" && this.state.insp) this.setState({ insp: null }); };
+    document.addEventListener("keydown", this.onKey);
+  }
+  componentWillUnmount() { document.removeEventListener("keydown", this.onKey); clearInterval(this.timer); clearTimeout(this.tt); }
+  componentDidUpdate(pp, ps) {
+    if (pp.sample !== this.props.sample) { this.play(false); this.setState(this.initial()); return; }
+    const P = this.P();
+    const cur = P.seq[this.state.voice][this.state.pos], prev = P.seq[ps.voice]?.[ps.pos];
+    if (cur && (!prev || prev.s !== cur.s || ps.followPaused !== this.state.followPaused) && !this.state.followPaused) this.scrollTo(P.sRow[cur.s]);
+  }
+  scrollTo(ri) {
+    const c = this.readRef.current; if (!c) return;
+    const el = c.querySelector('[data-row="' + ri + '"]'); if (!el) return;
+    const top = el.offsetTop, bot = top + el.offsetHeight;
+    if (top < c.scrollTop + 60 || top > c.scrollTop + c.clientHeight - 140) { this.prog = Date.now(); c.scrollTo({ top: Math.max(0, top - 70), behavior: "smooth" }); }
+  }
+  play(on) {
+    clearInterval(this.timer);
+    if (on) {
+      this.timer = setInterval(() => this.setState((s) => {
+        const n = s.pos + 1, len = this.P().seq[s.voice].length;
+        if (n >= len) { clearInterval(this.timer); return { playing: false }; }
+        return { pos: n };
+      }), 430);
+    }
+    this.setState({ playing: on });
+  }
+  flash(msg) { clearTimeout(this.tt); this.setState({ toast: msg }); this.tt = setTimeout(() => this.setState({ toast: null }), 3600); }
+  setVoice(side) {
+    const P = this.P(), st = this.state, timing = this.props.timing ?? "word";
+    if (side === st.voice || !P.S[side].voice) return;
+    const seq = P.seq[st.voice], cur = seq[st.pos];
+    let s = cur.s, fallback = false;
+    if (!P.paired.has(s)) {
+      fallback = true;
+      let i = st.pos; while (i >= 0 && !P.paired.has(seq[i].s)) i--;
+      if (i < 0) { i = st.pos; while (i < seq.length && !P.paired.has(seq[i].s)) i++; }
+      s = seq[Math.min(i, seq.length - 1)].s;
+    }
+    const tseq = P.seq[side];
+    let idx = -1;
+    if (!fallback && timing === "word" && cur.g) idx = tseq.findIndex((t) => t.s === s && t.g === cur.g);
+    if (idx < 0) idx = tseq.findIndex((t) => t.s === s);
+    this.setState({ voice: side, pos: idx, followPaused: false });
+    const name = P.S[side].name;
+    this.flash(fallback ? name + " has no counterpart for this sentence, so it starts at the previous one" : "Now speaking " + name + ", from the same sentence");
+  }
+  onTok = (e, tk) => {
+    if (String(window.getSelection?.() || "").trim().length) return;
+    if (this.state.insp && this.state.insp.id === tk.id) { this.setState({ insp: null }); return; }
+    const c = this.readRef.current, cr = c.getBoundingClientRect(), r = e.currentTarget.getBoundingClientRect();
+    const left = Math.max(12, Math.min(r.left - cr.left - 16, cr.width - 344));
+    const top = r.bottom - cr.top + c.scrollTop + 8;
+    this.setState({ insp: { side: tk.side, id: tk.id, g: tk.g, row: tk.row, s: tk.s }, popX: left + "px", popY: top + "px" });
+  };
+  onScroll = () => {
+    if (Date.now() - this.prog < 900 || this.state.followPaused) return;
+    const P = this.P(), cur = P.seq[this.state.voice][this.state.pos], c = this.readRef.current;
+    const el = c && c.querySelector('[data-row="' + P.sRow[cur.s] + '"]'); if (!el) return;
+    const top = el.offsetTop, bot = top + el.offsetHeight;
+    if (bot < c.scrollTop + 50 || top > c.scrollTop + c.clientHeight - 40) this.setState({ followPaused: true });
+  };
+  renderVals() {
+    const key = this.props.sample ?? "en-he", timing = this.props.timing ?? "word";
+    const P = prep(key), S = P.S, st = this.state;
+    const voice = st.voice, cur = P.seq[voice][Math.min(st.pos, P.seq[voice].length - 1)];
+    const ctx = { voice, cur, timing, insp: st.insp };
+    const showBi = st.bi && st.view === "text";
+    const showBiCol = st.bi && st.view === "column";
+    const biOn = showBi || showBiCol;
+    const wideRows = P.rows.map((_, ri) => rowOf(P, ri, ctx, this.onTok));
+    const singleRows = P.rows.map((_, ri) => rowOf(P, ri, { voice, cur, timing, insp: null }, null));
+    const anchorSent = S.rows[P.sRow[cur.s]].a.find((x) => x.s === cur.s) || S.rows[P.sRow[cur.s]].a[0];
+
+    const H = prep("en-he"), B = prep("bg-de");
+    const nCur = H.seq.a.find((t) => t.g === "w8");
+    const narrowRows = [0, 1, 2].map((ri) => rowOf(H, ri, { voice: "a", cur: nCur, timing: "word", insp: null }, null));
+    const sheetTok = find(H, "a", 0, "turned");
+    const sheetInsp = { side: "a", id: sheetTok.id, g: sheetTok.g, row: 0 };
+    const sheetRows = [0, 1].map((ri) => rowOf(H, ri, { voice: null, cur: null, timing: "word", insp: sheetInsp }, null));
+    const lCur = B.seq.a.find((t) => t.g === "w10");
+    const landRows = [0, 1, 2].map((ri) => rowOf(B, ri, { voice: "a", cur: lCur, timing: "word", insp: null }, null));
+    const tCur = H.seq.a.find((t) => t.g === "w14");
+    const tapRows = [0, 1].map((ri) => ({ ...rowOf(H, ri, { voice: "a", cur: tCur, timing: "sentence", insp: null }, null), open: ri === 1, tapLabel: ri === 1 ? "Hide Hebrew" : "Show Hebrew" }));
+
+    const ex = (Pk, side, row, word, n) => {
+      const t = find(Pk, side, row, word, n);
+      const insp = { side, id: t.id, g: t.g, row };
+      return { row: rowOf(Pk, row, { voice: null, cur: null, timing: "word", insp }, null), pop: popInfo(Pk, insp, "word") };
+    };
+    const inspCases = [
+      { title: "Single counterpart", ex: [ex(H, "a", 0, "ferry")], note: "Both sides get a neutral fill and underline, so the pair is visible in either column." },
+      { title: "One word ↔ several words", ex: [ex(H, "a", 1, "breakwater"), ex(B, "b", 1, "Bahnsteigkante")], note: "A compound can link to a phrase, in either direction. The caption states the shape of the link." },
+      { title: "Split expression", ex: [ex(H, "a", 0, "turned"), ex(B, "b", 1, "schaltete")], note: "Inspecting either part marks every part. The popover joins them with “…”." },
+      { title: "Repeated word", ex: [ex(H, "a", 1, "counting", 1)], note: "Only the linked occurrence is marked. The second “counting” and the second ספר stay plain." },
+      { title: "No linked counterpart", ex: [ex(H, "a", 0, "had")], note: "Dotted underline, no counterpart shown. “No linked counterpart”, never “Untranslated”." },
+    ];
+
+    const conditions = [
+      { title: "Both texts and narrations ready", body: "Either language can speak. Only one plays at a time.", chip: "Word timing", chipBg: "var(--bg-subtle)", chipFg: "var(--text-muted)", ui: "Speak: English | Hebrew" },
+      { title: "A narration missing", body: "Both texts stay readable. The missing voice is disabled in Speak, and its tooltip says why. Listen from here on that side says “No German narration”.", chip: "Voice off", chipBg: "var(--bg-subtle)", chipFg: "var(--text-muted)", ui: "German · no narration for this chapter yet" },
+      { title: "Sentences paired, no word links", body: "Sentence pairs follow the voice. Word counterparts aren't drawn or invented. Clicking a word shows its sentence counterpart.", chip: "Sentences only", chipBg: "var(--bg-subtle)", chipFg: "var(--text-muted)", ui: "Word links aren't prepared for this chapter" },
+      { title: "Word links, coarse timing", body: "Manual inspection works fully. Playback highlights sentences only. A quiet badge, and no claim of word sync.", chip: "Sentence timing", chipBg: "var(--bg-subtle)", chipFg: "var(--text-muted)", ui: "Word timings in this recording aren't reliable" },
+      { title: "Uncertain / unmatched passage", body: "Text stays in place. The other column gets no tint. When it's spoken, a quiet note sits under the other side.", chip: "No link", chipBg: "var(--bg-subtle)", chipFg: "var(--text-muted)", ui: "No linked counterpart for the sentence being read" },
+      { title: "Partial or failed link batch", body: "Everything that linked stays usable. One note above the affected passages. The rest of the book isn't blocked.", chip: "Partial", chipBg: "var(--warning-bg)", chipFg: "var(--warning-text)", ui: "Pages 44–46 aren't linked yet. Retry in Chapters." },
+      { title: "Text edited after preparation", body: "Old pairs are dropped for that chapter. The current text reads in both columns without links, like an unprepared pair.", chip: "Needs pairing", chipBg: "var(--warning-bg)", chipFg: "var(--warning-text)", ui: "Edited since pairing, so links are hidden" },
+      { title: "Narration replaced", body: "Text links keep working. Highlight timing uses only timings that belong to the new recording. If there are none yet, it's sentence-level or off.", chip: "Retiming", chipBg: "var(--bg-subtle)", chipFg: "var(--text-muted)", ui: "New recording. Highlights follow sentences for now." },
+    ];
+
+    const modalStates = [
+      { label: "6a · Available: Hebrew pill selected", origBg: "transparent", origFg: "var(--text-muted)", heBg: "var(--accent-subtle)", heFg: "var(--accent-text)", fg: "var(--accent-text)", op: 1, title: "Read this chapter with Hebrew side by side, at the current passage", hasReason: false },
+      { label: "6b · While editing: disabled", origBg: "var(--accent-subtle)", origFg: "var(--accent-text)", heBg: "transparent", heFg: "var(--text-muted)", fg: "var(--text-faint)", op: 0.7, title: "Save or discard your edits first", hasReason: true },
+      { label: "6c · No translation for this chapter: disabled", origBg: "var(--accent-subtle)", origFg: "var(--accent-text)", heBg: "transparent", heFg: "var(--text-faint)", fg: "var(--text-faint)", op: 0.7, title: "No translation of this chapter yet. Rewrites don't count.", hasReason: true },
+    ];
+
+    const comps = [
+      { name: "BilingualToggle", what: "Pressed-state button + translation picker (Dropdown). Status per translation via StatusBadge.", at: "01", href: "#a1" },
+      { name: "BilingualBar", what: "Second bar row: Read [original] with [translation ▾] · Speak segmented · follow status.", at: "02", href: "#a2" },
+      { name: "SpeakSwitch", what: "SegmentedControl with speaker glyph on the active voice; disabled options carry a reason.", at: "02 · 03", href: "#a2" },
+      { name: "PassagePairs", what: "Grid of passage rows (wide) or stacked pairs (narrow); owns follow band and scroll-away detection.", at: "02 · 03", href: "#a2" },
+      { name: "LinkedToken", what: "One word: spoken / counterpart / inspected / focus marks; click → inspect.", at: "07", href: "#a7" },
+      { name: "InspectPopover", what: "Source · counterpart(s) · Listen from here. Sheet variant under 700px.", at: "04", href: "#a4" },
+      { name: "FollowPill", what: "“Back to the … voice” when following is paused by manual scroll.", at: "02", href: "#a2" },
+      { name: "TimingBadge", what: "Existing granularity badge, extended: Word timing / Sentence timing / Sentences only.", at: "02 · 05", href: "#a5" },
+    ];
+
+    const views = [["column", "Column"], ["page", "Page"], ["text", "Text"]].map(([id, label]) => ({
+      label, bg: st.view === id ? "var(--accent-subtle)" : "transparent", fg: st.view === id ? "var(--accent-text)" : "var(--text-muted)",
+      pick: () => this.setState({ view: id, insp: null }),
+    }));
+    const voices = ["a", "b"].map((side) => {
+      const L = S[side], sel = voice === side;
+      return {
+        label: L.name, off: !L.voice, title: L.voice ? "Speak " + L.name : "No " + L.name + " narration for this chapter yet",
+        icon: !L.voice ? "ph ph-speaker-slash" : sel ? "ph ph-speaker-high" : "ph ph-speaker-none",
+        bg: sel ? "var(--accent-subtle)" : "transparent", fg: sel ? "var(--accent-text)" : L.voice ? "var(--text-secondary)" : "var(--text-faint)",
+        cur: L.voice ? "pointer" : "not-allowed", pick: () => this.setVoice(side),
+      };
+    });
+    const pop = st.insp ? popInfo(P, st.insp, timing) : popInfo(H, sheetInsp, "word");
+
+    return {
+      scheme: this.props.appearance === "dark" ? "dark" : "light",
+      chapterName: S.chapter, nameA: S.a.name, nameB: S.b.name, voiceName: S[voice].name,
+      timeText: fmt(134000 + st.pos * 430) + " / 09:40",
+      playIcon: st.playing ? "ph-fill ph-pause" : "ph ph-play", playAria: st.playing ? "Pause" : "Play",
+      playDisabled: false,
+      togglePlay: () => this.play(!st.playing),
+      views, showBi, showBiCol, biOn, showSingle: st.view === "text" && !st.bi, showPages: st.view === "page" || (st.view === "column" && !st.bi),
+      pageLabel: st.view === "page" ? "Page view · page 43" : "Column view · page 43, column 2", anchorText: anchorSent.t,
+      toggleBi: () => biOn ? this.setState({ bi: false, insp: null }) : this.setState({ bi: true, view: st.view === "page" ? "column" : st.view }),
+      biBorder: biOn ? "var(--accent)" : "var(--border-input)", biBg: biOn ? "var(--bg-selected)" : "var(--bg-card)", biFg: biOn ? "var(--accent-text)" : "var(--text-primary)",
+      timingLabel: timing === "word" ? "Word timing" : "Sentence timing",
+      timingTitle: timing === "word" ? "Words are highlighted as they're spoken" : "Word timings in this recording aren't reliable, so highlights follow sentences",
+      voices, speakA: voice === "a", speakB: voice === "b", headBJustify: S.b.dir === "rtl" ? "flex-end" : "flex-start",
+      followText: st.followPaused ? "Following paused" : st.playing ? "Following the voice" : "Paused",
+      wideRows, singleRows, readRef: this.readRef, onScroll: this.onScroll,
+      popOpen: !!st.insp && biOn, pop, popX: st.popX, popY: st.popY,
+      closePop: () => this.setState({ insp: null }),
+      listen: () => {
+        const i = st.insp; if (!i || !S[i.side].voice) return;
+        const seq = P.seq[i.side];
+        let idx = timing === "word" ? seq.findIndex((t) => t.id === i.id) : -1;
+        if (idx < 0) idx = seq.findIndex((t) => t.s === i.s);
+        this.setState({ voice: i.side, pos: idx, insp: null, followPaused: false });
+        this.play(true);
+      },
+      followPaused: st.followPaused && biOn,
+      backToVoice: () => this.setState({ followPaused: false }),
+      toast: st.toast,
+      narrowRows, sheetRows, sheetPop: popInfo(H, sheetInsp, "word"), landRows, tapRows,
+      inspCases, conditions, modalStates, comps,
+    };
+  }
+}
+</script>
+</body>
+</html>

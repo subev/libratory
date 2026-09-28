@@ -7,6 +7,8 @@ import path from "node:path";
 import { buildReadaloudEpub, languageCode } from "./readaloud-epub.ts";
 import { bookOutputDir } from "./paths.ts";
 import type { SyncMap } from "./sync-map.ts";
+import { readBilingualDocument, textRevision } from "./bilingual-format.ts";
+import bilingualFixture from "./fixtures/bilingual.json";
 
 const execFileAsync = promisify(execFile);
 
@@ -126,5 +128,40 @@ describe("buildReadaloudEpub", () => {
     const nav = await zipEntry(outputPath, "OEBPS/nav.xhtml");
     expect(nav).toContain('<a href="ch000.xhtml">Intro &lt;1&gt;</a>');
     expect(nav).toContain('<a href="ch001.xhtml">Chapter Two</a>');
+  });
+
+  it.each([null, "text", "recording", "clock"] as const)("packages bilingual data only when its chapter and recording match (%s)", async (fault) => {
+    await mkdir(baseDir, { recursive: true });
+    const primary = path.join(baseDir, "primary.m4a"), secondary = path.join(baseDir, "secondary.m4a");
+    await writeFile(primary, "primary recording");
+    await writeFile(secondary, "secondary recording");
+    const doc = await readBilingualDocument(bilingualFixture);
+    if (!doc.source.narration || !doc.target.narration) throw new Error("Missing fixture narration");
+    doc.source.narration.revision = textRevision("primary recording");
+    doc.target.narration.revision = textRevision("secondary recording");
+    if (fault === "recording") doc.target.narration.revision = "0".repeat(64);
+    if (fault === "clock") doc.source.narration.audio = doc.target.narration.audio;
+    const build = () => buildReadaloudEpub({
+      title: "Bilingual fixture", language: "en", stagingDir: path.join(baseDir, "staging"), outputPath,
+      chapters: [{ id: doc.chapterId, index: 0, title: "Example", audioPath: primary, sync: sync([doc.source.text], 2000) }],
+      p2af: async () => ({
+        manifest: { format: "p2af/1", book: { id: "book", title: "Example", author: null, language: "en", cover: null, medianBodyPt: null }, sources: [], pages: [], chapters: [{ id: doc.chapterId, i: 0, title: "Example", audio: "../audio/ch000.m4a", cues: "cues/ch000.json", text: null, durationMs: 2000, pageStart: null, pageEnd: null, mode: "text", bilingual: [{ key: "he", language: "he", url: "bilingual/he.json" }] }] },
+        sources: [], cues: [{ path: "cues/ch000.json", doc: { format: "p2af/1", totalMs: 2000, granularity: "sentence", text: { format: "p2af/1", text: fault === "text" ? "A newer chapter revision" : doc.source.text }, cues: [] } }], bilingual: [{ path: "bilingual/he.json", doc, audio: [{ path: "audio/he.m4a", sourcePath: secondary, mediaType: "audio/mp4" }] }],
+      }),
+    });
+    if (fault) {
+      await expect(build()).rejects.toThrow(fault === "text" ? "source text differs" : fault === "clock" ? "source recording differs" : "recording revision differs");
+      return;
+    }
+    await build();
+    const opf = await zipEntry(outputPath, "OEBPS/package.opf");
+    expect(opf).toContain('href="p2af/bilingual/he.json" media-type="application/json"');
+    expect(opf).toContain('href="p2af/audio/he.m4a" media-type="audio/mp4"');
+    expect(opf).not.toContain('<itemref idref="p2af_bilingual');
+    expect(await zipEntry(outputPath, "OEBPS/p2af/audio/he.m4a")).toBe("secondary recording");
+    expect(await zipEntry(outputPath, "OEBPS/audio/ch000.m4a")).toBe("primary recording");
+    expect(await readBilingualDocument(JSON.parse(await zipEntry(outputPath, "OEBPS/p2af/bilingual/he.json")))).toEqual(doc);
+    const { stdout } = await execFileAsync("unzip", ["-v", outputPath]);
+    expect(stdout.split("\n").find((line) => line.includes("p2af/audio/he.m4a"))).toContain("Stored");
   });
 });

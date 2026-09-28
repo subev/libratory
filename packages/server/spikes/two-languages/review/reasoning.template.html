@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flash word mapping comparison</title>
+<style>
+body{font:16px/1.6 system-ui;margin:32px auto;padding:0 16px;max-width:1100px;background:#faf6ed;color:#30291f}
+h1{font-size:26px}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:12px;border-bottom:1px solid #c9bdab}th{font-size:14px}
+.scroll{overflow:auto}.note{color:#625644;font-size:14px}a{color:#744300}summary{cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere}
+</style>
+<h1>Flash word mapping comparison</h1>
+<p>Same token-ID prompt and ten sentence pairs per language pairing. Three runs per setting. Audio is reused.</p>
+<div class="scroll"><table><thead><tr><th>Languages</th><th>Setting / playback</th><th>Completed</th><th>Checks per run</th><th>Invalid lines</th><th>Broad counterpart warnings</th><th>Seconds per run</th><th>Total output tokens</th></tr></thead><tbody id="runs"></tbody></table></div>
+<p class="note">Scores cover 19 selected semantic checks per pairing, not overall accuracy or precision. Incomplete responses are unscored. An output cap includes reasoning and final text. Empty rows mean no results saved yet.</p>
+<p class="note">Broad counterpart warnings are a separate, post-hoc check: one reasoning run grouped “small boy” and “small girl” as whole phrases, making each adjective also highlight the translated noun. Whole-phrase meaning is correct, but word-level highlighting is too broad.</p>
+<p class="note">These fixtures and checks are agent-authored, not native-reviewed. Better text mapping does not improve the stored audio timings: Hebrew has uniformly spaced intervals, while Bulgarian and German contain zero-duration words.</p>
+<details><summary>Measurements and selected error probes</summary><pre id="details"></pre></details>
+<script>
+const data=__DATA__;
+const variants={baseline:{label:'Reasoning off',file:'view.html'},reasoning:{label:'Reasoning · 8,192 cap',file:'view-reasoning.html'},'reasoning-large':{label:'Reasoning · 81,920 cap',file:'view-reasoning-large.html'}};
+document.getElementById('runs').innerHTML=data.flatMap((e,languageIndex)=>e.variants.map(v=>{
+ const setting={...variants[v.variant],file:variants[v.variant].file+'?language='+languageIndex},runs=v.runs;
+ return `<tr><td>${e.key==='en-he'?'English–Hebrew':'Bulgarian–German'}</td><td><a href="${setting.file}">${setting.label}</a></td><td>${runs.filter(r=>r.completed).length}/${runs.length}</td><td>${runs.map(r=>r.completed?r.checksPassed+'/'+r.checksTotal:'Unscored').join(', ')||'Pending'}</td><td>${runs.map(r=>r.invalid.length).join(', ')||'—'}</td><td>${runs.map(r=>r.completed?r.posthocOverbroadCounterparts.length:'Unscored').join(', ')||'—'}</td><td>${runs.map(r=>(r.ms/1000).toFixed(1)).join(', ')||'—'}</td><td>${runs.reduce((n,r)=>n+r.tokensOut,0).toLocaleString()}</td></tr>`;
+})).join('');
+document.getElementById('details').textContent=JSON.stringify(data.map(e=>({...e,variants:e.variants.map(v=>({...v,runs:v.runs.map(({readable,...r})=>r)}))})),null,2);
+</script></html>

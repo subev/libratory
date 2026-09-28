@@ -115,6 +115,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
         version: 1.30.0(zod@4.5.4)
+      '@noble/hashes':
+        specifier: 2.3.0
+        version: 2.3.0
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@7.0.2)
@@ -173,6 +176,9 @@ importers:
       '@ai-sdk/react':
         specifier: ^4.0.97
         version: 4.0.97(react@19.2.8)(zod@4.5.4)
+      '@noble/hashes':
+        specifier: 2.3.0
+        version: 2.3.0
       '@phosphor-icons/react':
         specifier: ^2.1.10
         version: 2.1.10(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -206,6 +212,9 @@ importers:
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1
+      zod:
+        specifier: ^4.5.4
+        version: 4.5.4
     devDependencies:
       '@tailwindcss/vite':
         specifier: ^4.3.3

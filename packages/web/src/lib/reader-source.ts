@@ -1,5 +1,6 @@
 import { fetchCues, fetchManifest, fetchText, type ReaderCues, type ReaderManifest, type ReaderText } from "./reader-doc.ts";
 import { Zip } from "./zip.ts";
+import { readBilingualDocument, type BilingualDocument } from "../../../server/src/lib/bilingual-format.ts";
 
 // The reader consumes two documents and never knew where they came from; this is the seam that
 // makes that literally true. A server answers over HTTP, a container answers out of a zip, and a
@@ -8,6 +9,7 @@ export type DocumentSource = {
   manifest(): Promise<ReaderManifest>;
   cues(url: string): Promise<ReaderCues>;
   text(url: string): Promise<ReaderText>;
+  bilingual(url: string): Promise<BilingualDocument>;
   // Where the bytes for a URL in the manifest actually are, for <audio> and pdf.js
   resolve(url: string | null | undefined): string | undefined;
   close(): void;
@@ -18,6 +20,11 @@ export function httpSource(bookId: string): DocumentSource {
     manifest: () => fetchManifest(bookId),
     cues: (url) => fetchCues(url),
     text: (url) => fetchText(url),
+    bilingual: async (url) => {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Bilingual document unavailable (${response.status})`);
+      return readBilingualDocument(await response.json());
+    },
     resolve: (url) => url ?? undefined,
     close: () => {},
   };
@@ -45,6 +52,7 @@ export async function containerSource(file: Blob): Promise<DocumentSource> {
   // Audio and PDFs are stored rather than deflated, so a URL for each is a slice of the file
   // and costs no reading — which is what lets every one of them be handed out up front.
   const urls = new Map<string, string>();
+  let closed = false;
   const wanted = [
     ...manifest.sources.map((source) => source.url),
     ...manifest.chapters.flatMap((chapter) => (chapter.audio ? [chapter.audio] : [])),
@@ -60,7 +68,21 @@ export async function containerSource(file: Blob): Promise<DocumentSource> {
     manifest: async () => manifest,
     cues: (url) => zip.json<ReaderCues>(at(url)),
     text: (url) => zip.json<ReaderText>(at(url)),
+    bilingual: async (url) => {
+      const doc = await readBilingualDocument(await zip.json<unknown>(at(url)));
+      if (closed) throw new Error("This book is closed");
+      for (const lane of [doc.source, doc.target]) {
+        const audio = lane.narration?.audio;
+        if (!audio || urls.has(audio)) continue;
+        if (!zip.has(at(audio))) { lane.narration = null; continue; }
+        // Audio references, like every p2af URL, are relative to book.json, not this document.
+        const blobUrl = await zip.url(at(audio));
+        if (closed) { zip.close(); throw new Error("This book is closed"); }
+        urls.set(audio, blobUrl);
+      }
+      return doc;
+    },
     resolve: (url) => (url ? urls.get(url) : undefined),
-    close: () => zip.close(),
+    close: () => { closed = true; urls.clear(); zip.close(); },
   };
 }

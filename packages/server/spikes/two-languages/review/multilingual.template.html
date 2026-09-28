@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Multilingual word pairing review</title>
+<style>
+body{font:16px system-ui;margin:24px auto;padding:0 16px;max-width:1150px;background:#faf6ed;color:#30291f}
+header{position:sticky;top:0;background:#faf6ed;padding:12px 0;border-bottom:1px solid #c9bdab;z-index:2}
+h1{font-size:22px}select{font:inherit;padding:6px}audio{width:100%}.controls,.row{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.row{padding:16px 0;border-bottom:1px solid #ded4c4}.text{font:21px/1.8 Georgia,serif;white-space:pre-wrap;unicode-bidi:plaintext}
+.tok{cursor:pointer;border-radius:3px}.tok:hover,.peer{background:#ffd68e}.active{background:#ef994b}.selected{text-decoration:underline}
+.label{font:12px system-ui;color:#766752}.note{font-size:14px;color:#625644}summary{cursor:pointer}li{margin:6px 0}
+@media(max-width:650px){.controls,.row{grid-template-columns:1fr;gap:12px}}
+</style>
+<header><h1>Word pairing across languages</h1><label>Languages <select id="language"></select></label> <label>Run <select id="run"></select></label>
+<p class="note"><a href="comparison.html">Results table</a> · <a href="view.html">Flash without reasoning</a> · <a href="view-reasoning.html">Reasoning: 8,192-token limit</a> · <a href="view-reasoning-large.html">Reasoning: 81,920-token limit</a></p>
+<p class="note">Hover or focus a word to inspect its direct links. Click a timed word to play from it. Play either recording to follow its mapped counterpart.</p>
+<div class="controls"><div><p id="sourceLabel"></p><audio id="source" controls></audio></div><div><p id="targetLabel"></p><audio id="target" controls></audio></div></div></header>
+<p id="stats"></p><main id="rows"></main><details><summary>Targeted checks and timing coverage</summary><pre id="checks"></pre></details>
+<script>
+const DATA=__DATA__;
+const $=id=>document.getElementById(id);
+let current=DATA[0], result=null;
+const esc=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const audioSide={s:'source',t:'target'};
+function textSide(side){return side==='s'?current.sourceText:current.targetText}
+function tokens(pair,side){return side==='s'?pair.sTokens:pair.tTokens}
+function tokenHTML(pair,side){
+  const text=textSide(side), range=pair[side];let html='',at=range.start;
+  for(const token of tokens(pair,side)){html+=esc(text.slice(at,token.start));html+=`<span tabindex="0" class="tok" data-side="${side}" data-pair="${pair.id}" data-token="${token.id}" title="token ${token.id}">${esc(text.slice(token.start,token.end))}</span>`;at=token.end}
+  return html+esc(text.slice(at,range.end));
+}
+function mark(side,pairId,id,cls){document.querySelectorAll(`.tok[data-side="${side}"][data-pair="${pairId}"][data-token="${id}"]`).forEach(el=>el.classList.add(cls))}
+function peers(side,pairId,id){
+  const other=side==='s'?'t':'s';
+  for(const l of result?.links??[])if(l.pairId===pairId&&l[side].includes(id))for(const token of l[other])mark(other,pairId,token,'peer');
+}
+function clear(){document.querySelectorAll('.peer,.active,.selected').forEach(el=>el.classList.remove('peer','active','selected'))}
+function inspect(el){if(!el)return;clear();el.classList.add('selected');peers(el.dataset.side,el.dataset.pair,Number(el.dataset.token))}
+function render(){
+  $('source').pause();$('target').pause();
+  current=DATA[Number($('language').value)];
+  result=current.runs[Number($('run').value)]??current.runs[0]??null;
+  for(const side of ['source','target']){const a=current.audio[side];$(''+side).src=a?.file??'';$(side+'Label').textContent=(side==='source'?current.from:current.to)+(a?.uniformIntervals?' — uniformly spaced provider timestamps; accuracy unverified':a?.zeroDurationWords.length?` — ${a.zeroDurationWords.length} zero-duration words`:'')}
+  $('rows').innerHTML=current.pairs.map(p=>`<div class="row"><div><div class="label">${p.id} · ${esc(current.from)}</div><div class="text" lang="${current.sourceLocale}" dir="${current.sourceLocale==='he'?'rtl':'ltr'}">${tokenHTML(p,'s')}</div></div><div><div class="label">${p.id} · ${esc(current.to)}</div><div class="text" lang="${current.targetLocale}" dir="${current.targetLocale==='he'?'rtl':'ltr'}">${tokenHTML(p,'t')}</div></div></div>`).join('');
+  $('stats').textContent=result?(result.completed?`${result.passed}/${result.total} targeted checks recovered; ${result.invalid.length} invalid lines. These checks do not measure overall precision.`:`Incomplete run — semantic quality unscored. ${result.missing.length} pairs missing. ${result.errors.join('; ')}`)+` Flash reasoning ${result.thinking?'on':'off'}; ${(result.ms/1000).toFixed(1)} s; ${result.tokensOut} output tokens (${result.reasoningTokens} reasoning).`:'No model run saved.';
+  $('checks').textContent=JSON.stringify({checks:result?.checks,audio:Object.fromEntries(Object.entries(current.audio).map(([k,v])=>[k,v&&{locatedWords:v.locatedWords,reportedWords:v.reportedWords,untimedTokens:v.untimedTokens,uniformIntervals:v.uniformIntervals,zeroDurationWords:v.zeroDurationWords}]))},null,2);
+}
+$('language').innerHTML=DATA.map((d,i)=>`<option value="${i}">${esc(d.from)} / ${esc(d.to)}</option>`).join('');
+const languageIndex=Number(new URLSearchParams(location.search).get('language'));
+if(Number.isInteger(languageIndex)&&DATA[languageIndex])$('language').value=String(languageIndex);
+$('run').innerHTML=[0,1,2].map(i=>`<option value="${i}">${i+1}</option>`).join('');
+$('language').onchange=render;$('run').onchange=render;
+document.addEventListener('mouseover',e=>inspect(e.target.closest('.tok')));
+document.addEventListener('focusin',e=>inspect(e.target.closest('.tok')));
+document.addEventListener('click',e=>{const el=e.target.closest('.tok');if(!el)return;const side=el.dataset.side,p=current.pairs.find(p=>p.id===el.dataset.pair),t=p&&tokens(p,side).find(t=>t.id===Number(el.dataset.token));if(!t)return;
+  const recording=current.audio[audioSide[side]],w=recording?.words.find(w=>w.start<t.end&&t.start<w.end);if(!w)return;
+  const audio=$(audioSide[side]);audio.currentTime=w.startMs/1000;audio.play().catch(console.error);
+});
+for(const side of ['s','t']){
+ const audio=$(audioSide[side]);audio.onplay=()=>$(audioSide[side==='s'?'t':'s']).pause();
+ audio.addEventListener('timeupdate',()=>{if(audio.paused)return;clear();const ms=audio.currentTime*1000,words=current.audio[audioSide[side]]?.words??[];
+   for(const w of words.filter(w=>w.startMs<=ms&&ms<w.endMs))for(const p of current.pairs)for(const t of tokens(p,side))if(w.start<t.end&&t.start<w.end){mark(side,p.id,t.id,'active');peers(side,p.id,t.id)}
+ });
+}
+render();
+</script></html>

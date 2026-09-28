@@ -76,11 +76,11 @@ function span(elements: Element[], viewTop: number): Span | null {
 // jump: land the cue now and without animation — a new chapter or view has nothing on screen
 // whose movement would mean anything, and sliding there from the last one only jiggles.
 // Returns whether there was a cue to place at all.
-export function followCue(band: FollowBand, { jump = false } = {}): boolean {
+export function followCue(band: FollowBand, { jump = false, root = document }: { jump?: boolean; root?: ParentNode } = {}): boolean {
   watchGestures();
   if (!jump && Date.now() - lastGesture < PAUSE_MS) return false;
 
-  const all = (selector: string) => [...document.querySelectorAll(selector)];
+  const all = (selector: string) => [...root.querySelectorAll(selector)];
   const marks = all('[data-testid="cue-rect"], [data-testid="text-cue-active"]');
   const firstMark = marks[0];
   if (!firstMark) return false;

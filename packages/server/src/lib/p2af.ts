@@ -6,6 +6,7 @@ import { listMarkerSources } from "./marker-sources.ts";
 import { languageCode } from "./readaloud-epub.ts";
 import { buildCues, buildManifest, buildVariantCues, chapterLink } from "./reader-doc.ts";
 import { READER_FORMAT, type ReaderCues, type ReaderManifest } from "./reader-format.ts";
+import type { BilingualDocument } from "./bilingual-format.ts";
 
 // The reader documents as they ride inside a container, where every URL is a path relative to
 // book.json rather than a route on this server. The EPUB layer beside them owns the audio, so
@@ -14,6 +15,7 @@ export type P2afLayer = {
   manifest: ReaderManifest;
   cues: { path: string; doc: ReaderCues }[];
   sources: { path: string; pdfPath: string }[];
+  bilingual?: { path: string; doc: BilingualDocument; audio: { path: string; sourcePath: string; mediaType: "audio/mp4" | "audio/mpeg" }[] }[];
 };
 
 export const P2AF_DIR = "p2af";

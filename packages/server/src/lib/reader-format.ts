@@ -34,6 +34,7 @@ export type ReaderChapter = {
   why?: ReaderUnmapped;
   // Where a chapter written from something on the web came from. Absolute, unlike every other URL here
   link?: { url: string };
+  bilingual?: { key: string; language: string; url: string }[];
 };
 
 export type ReaderManifest = {
