@@ -10,7 +10,7 @@ import { bilingualContext, currentPreparation, jobColumn, failPreparation } from
 import { matchesTexts, type BilingualJob } from "../lib/bilingual-preparation.ts";
 import { bundleInstalled } from "../lib/model-bundles.ts";
 import { textRevision, switchNarration } from "../lib/bilingual-format.ts";
-import { convertLegacyBilingualAudio, isLegacyAudio } from "../lib/bilingual-audio.ts";
+import { conversionBlocked, convertLegacyBilingualAudio, isLegacyAudio } from "../lib/bilingual-audio.ts";
 import { buildBilingualDocument } from "../lib/bilingual-document.ts";
 import { linkBatches, linkPrompt, wordLinkSystem } from "../lib/bilingual-links.ts";
 import { chapterText } from "../lib/chapter-text.ts";
@@ -28,7 +28,7 @@ function summarize(context: Awaited<ReturnType<typeof bilingualContext>>, row: A
   try { if (artifact) batches = linkBatches(artifact, row?.links?.pairRevision === artifact.revision ? row.links.byPair : {}); }
   catch (error) { linkError = error instanceof Error ? error.message : String(error); }
   const estimatedInputTokens = artifact ? Math.ceil(batches.reduce((sum, batch) => sum + linkPrompt(artifact, batch).length + wordLinkSystem(context.language ?? "und", variant.key).length, 0) / 2) : 0;
-  return { variantId: variant.id, legacyAudio: isLegacyAudio(context.chapter.audioPath) || isLegacyAudio(variant.audioPath), current, pairs: current ? row?.pairs?.pairs.length ?? 0 : 0, linked,
+  return { variantId: variant.id, legacyAudio: isLegacyAudio(context.chapter.audioPath) || isLegacyAudio(variant.audioPath), convertBlocked: conversionBlocked(context), current, pairs: current ? row?.pairs?.pairs.length ?? 0 : 0, linked,
     pairJob: row?.pairJob ?? null, linkJob: row?.linkJob ?? null, busy: busy(row?.pairJob ?? null) || busy(row?.linkJob ?? null),
     estimatedInputTokens, linkError, batches: batches.length, matched: current ? row?.pairs?.pairs.filter((p) => p.status === "matched").length ?? 0 : 0 };
 }
@@ -121,7 +121,7 @@ export const bilingualRouter = router({
 
   status: publicProcedure.input(z.object({ chapterId: z.string().uuid(), key: z.string() })).query(async ({ input }) => {
     const [variant] = await db.select().from(chapterVariants).where(and(eq(chapterVariants.chapterId, input.chapterId), eq(chapterVariants.key, input.key)));
-    if (!variant || variant.kind !== "translation" || variant.status !== "done" || !variant.text.trim()) return { variantId: null, legacyAudio: false, current: false, pairs: 0, linked: 0, pairJob: null, linkJob: null, busy: false, estimatedInputTokens: 0, batches: 0, matched: 0, linkError: null };
+    if (!variant || variant.kind !== "translation" || variant.status !== "done" || !variant.text.trim()) return { variantId: null, legacyAudio: false, convertBlocked: null, current: false, pairs: 0, linked: 0, pairJob: null, linkJob: null, busy: false, estimatedInputTokens: 0, batches: 0, matched: 0, linkError: null };
     const { context, row, current } = await currentPreparation(variant.id);
     return summarize(context, row, current);
   }),

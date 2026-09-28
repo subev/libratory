@@ -63,7 +63,8 @@ export function BilingualPreparation({ bookId, chapterId, chapterIndex, translat
         </div>
         {data?.legacyAudio ? <div className="space-y-2">
           <p className="text-xs text-(--text-muted)">Older MP3 recordings can jump to the wrong words. Convert them locally to M4A; original files and saved word links are kept.</p>
-          <Button size="sm" variant="secondary" disabled={!data.variantId || data.busy || convertAudio.isPending}
+          <Button size="sm" variant="secondary" disabled={!data.variantId || !!data.convertBlocked || convertAudio.isPending}
+            title={data.convertBlocked ?? "Convert existing MP3 recordings locally; preserve their timing and saved word links."}
             onClick={() => data.variantId && convertAudio.mutate({ variantId: data.variantId })}>
             {convertAudio.isPending ? "Converting recordings…" : "Convert recordings for accurate seeking"}
           </Button>

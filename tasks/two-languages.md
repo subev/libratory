@@ -41,6 +41,11 @@ acceptance now covers chapter lifecycle, selection controls, long-chapter profil
 text export/navigation. Native bilingual consumption, whole-book audio acceptance, MCP and spike
 cleanup remain; this task is not complete. See the handoff for current commands and review limits.
 
+**Conversion review follow-up:** [Dispositions](../docs/bilingual-reader-review-83d4d97-response.md).
+One-sided conversion and the disabled-control reason are fixed. Before closing this feature,
+track retained MP3/map and seek-copy ownership so explicit audio deletion and re-synthesis clean
+up obsolete generated recordings; preserve the current backup promise until that lifecycle exists.
+
 **Completion cleanup:** preserve useful fixtures/tests in the maintained suite and keep research
 findings, then remove the spike code, temporary viewers and adapters once production preparation
 and export replace them. The [delivery plan](../docs/two-languages-implementation-plan.md#completion-cleanup)

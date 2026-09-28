@@ -392,6 +392,32 @@ describe("explicit legacy audio conversion", () => {
     await getDb().update(chapterVariants).set({ audioPath: translated, audioStatus: "done", audioDurationMs: 2000 }).where(eq(chapterVariants.id, variantId));
     return { original, translated };
   }
+  it.each(["suspended", "failed", "pending"] as const)("converts only the translation when the original is %s and has no recording", async (status) => {
+    await recordings();
+    await getDb().update(chapters).set({ status, audioPath: null, durationMs: null }).where(eq(chapters.id, chapterId));
+    await expect(caller.convertAudio({ variantId })).resolves.toEqual({ converted: 1 });
+    expect(encode).toHaveBeenCalledTimes(1);
+    expect(row(await getDb().select().from(chapters).where(eq(chapters.id, chapterId)))).toMatchObject({ status, audioPath: null });
+  });
+
+  it("converts only the original when translation narration is absent", async () => {
+    await recordings();
+    await getDb().update(chapterVariants).set({ audioStatus: "pending", audioPath: null }).where(eq(chapterVariants.id, variantId));
+    await expect(caller.convertAudio({ variantId })).resolves.toEqual({ converted: 1 });
+    expect(encode).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["source", "target"] as const)("reports and enforces the same blocked reason while the %s MP3 is being narrated", async (side) => {
+    await recordings();
+    if (side === "source") await getDb().update(chapters).set({ status: "synthesizing" }).where(eq(chapters.id, chapterId));
+    else await getDb().update(chapterVariants).set({ audioStatus: "synthesizing" }).where(eq(chapterVariants.id, variantId));
+    const status = await caller.status({ chapterId, key: "German" });
+    expect(status.convertBlocked).toMatch(/Finish or stop/);
+    if (!status.convertBlocked) throw new Error("Expected a blocked reason");
+    await expect(caller.convertAudio({ variantId })).rejects.toThrow(status.convertBlocked);
+    expect(encode).not.toHaveBeenCalled();
+  });
+
   it("converts both active recordings explicitly while keeping originals, timing and word links", async () => {
     const { original, translated } = await recordings();
     await paired(); await prepareBilingual(await queued("links"));

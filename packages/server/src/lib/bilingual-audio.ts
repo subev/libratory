@@ -13,19 +13,28 @@ import { appendLog } from "./log.ts";
 
 export const isLegacyAudio = (audioPath: string | null) => path.extname(audioPath ?? "").toLowerCase() === ".mp3";
 
+export function conversionBlocked({ chapter, variant }: Pick<Awaited<ReturnType<typeof bilingualContext>>, "chapter" | "variant">): string | null {
+  if (variant.status !== "done") return "Finish translation before converting recordings";
+  if (isLegacyAudio(chapter.audioPath) && (chapter.status === "pending" || chapter.status === "normalizing" || chapter.status === "synthesizing")) {
+    return "Finish or stop original narration before converting its recording";
+  }
+  if (isLegacyAudio(variant.audioPath) && (variant.audioStatus === "pending" || variant.audioStatus === "synthesizing")) {
+    return "Finish or stop translation narration before converting its recording";
+  }
+  return null;
+}
+
 // Only the explicit conversion action changes the active recordings. The MP3 originals stay intact.
 export async function convertLegacyBilingualAudio(variantId: string) {
   const before = await bilingualContext(variantId);
-  if (before.chapter.status !== "done" || before.variant.audioStatus === "pending" || before.variant.audioStatus === "synthesizing") {
-    throw new Error("Finish or stop narration before converting recordings");
-  }
+  const blocked = conversionBlocked(before);
+  if (blocked) throw new Error(blocked);
   const converted: { side: "source" | "target"; original: string; audio: string; revision: string; syncRevision: string }[] = [];
   let published = false;
   try {
     for (const side of ["source", "target"] as const) {
       const original = side === "source" ? before.chapter.audioPath : before.variant.audioPath;
       if (!original || !isLegacyAudio(original)) continue;
-      if (side === "target" && before.variant.audioStatus !== "done") throw new Error("Finish translation narration before converting it");
       if (!(await readSyncMap(original))) throw new Error("Recording has no usable timing map; narrate it again to enable accurate seeking");
       const audio = path.join(path.dirname(original), `${path.basename(original, path.extname(original))}.seek-${randomUUID()}.m4a`);
       const entry = { side, original, audio, revision: await fileSha256(original), syncRevision: await fileSha256(syncMapPath(original)) };

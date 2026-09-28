@@ -29,7 +29,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 900, height: 600 } });
   const errors = [], mutations = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  let status = { variantId: "variant", legacyAudio: true, current: false, pairs: 0, matched: 0, linked: 0, pairJob: null, linkJob: null, busy: false, estimatedInputTokens: 0, batches: 0, linkError: null };
+  let status = { variantId: "variant", legacyAudio: true, convertBlocked: "Finish or stop original narration before converting its recording", current: false, pairs: 0, matched: 0, linked: 0, pairJob: null, linkJob: null, busy: false, estimatedInputTokens: 0, batches: 0, linkError: null };
   await page.route("**/bilingual-test-trpc/**", async (route) => {
     const request = route.request(), url = new URL(request.url());
     const procedure = url.pathname.split("/").at(-1);
@@ -58,6 +58,10 @@ try {
   await page.goto(`${origin}/bilingual-control-check`);
   await page.locator("summary").click();
   await expect(page.getByRole("button", { name: "Pair sentences", exact: true })).toBeEnabled();
+  const conversion = page.getByRole("button", { name: "Convert recordings for accurate seeking" });
+  await expect(conversion).toBeDisabled();
+  await expect(conversion).toHaveAttribute("title", status.convertBlocked);
+  status = { ...status, convertBlocked: null };
   expect(mutations).toEqual([]);
   await expect(page.getByRole("button", { name: "Open bilingual reader" })).toBeDisabled();
   await page.getByRole("button", { name: "Pair sentences", exact: true }).click();
