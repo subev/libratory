@@ -1,9 +1,20 @@
+import { buildBilingualDocument } from "./bilingual-document.ts";
 import type { FastifyInstance } from "fastify";
 
 import { bookForReader, buildCues, buildManifest, buildText, chapterForReader } from "./reader-doc.ts";
 import { isUuid } from "./uuid.ts";
 
 export function registerReaderRoutes(fastify: FastifyInstance) {
+  fastify.get("/read/bilingual/:variantId.json", async (request, reply) => {
+    const { variantId } = request.params as { variantId: string };
+    if (!isUuid(variantId)) return reply.code(400).send({ error: "Invalid translation id" });
+    try {
+      const doc = await buildBilingualDocument(variantId);
+      return doc ? reply.header("Cache-Control", "no-store").send(doc) : reply.code(409).send({ error: "Pairing is missing or stale. Prepare the chapter again." });
+    } catch (error) {
+      return reply.code(409).send({ error: error instanceof Error ? error.message : "Bilingual reading unavailable" });
+    }
+  });
   fastify.get("/read/book/:bookId/book.json", async (request, reply) => {
     const { bookId } = request.params as { bookId: string };
     if (!isUuid(bookId)) return reply.code(400).send({ error: "Invalid book id" });

@@ -1,3 +1,4 @@
+import { prepareBilingual } from "./prepare-bilingual.ts";
 import { run, makeWorkerUtils, type Runner, type TaskList } from "graphile-worker";
 import { sql } from "drizzle-orm";
 import { db } from "../db.ts";
@@ -87,10 +88,12 @@ const TASK_LISTS: { [N in PoolName]: Record<TasksOf<N>, TaskList[string]> } = {
     assembleDocument: wrapTask("assembleDocument", (payload, helpers) => assembleDocument(payload as any, helpers)),
   },
   index: {
+    alignBilingual: wrapTask("alignBilingual", prepareBilingual),
     indexBook: wrapTask("indexBook", indexBook),
     embedChunks: wrapTask("embedChunks", (payload) => embedChunks(payload as any)),
   },
   translate: {
+    linkBilingual: wrapTask("linkBilingual", prepareBilingual),
     translate: wrapTask("translate", translate),
     translateTitles: wrapTask("translateTitles", (payload) => translateTitles(payload as any)),
     cleanup: wrapTask("cleanup", (payload) => cleanup(payload as any)),

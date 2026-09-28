@@ -585,7 +585,7 @@ function extraBody(def: LlmModelDef, opts: LlmChatOptions) {
   return { [openAiCompatName(def)]: body };
 }
 
-function callSettings(def: LlmModelDef, opts: LlmChatOptions) {
+export function callSettings(def: LlmModelDef, opts: LlmChatOptions) {
   const providerOptions = extraBody(def, opts);
   return {
     ...(def.supportsTemperature ? { temperature: opts.temperature ?? (def.provider === "deepseek" ? 1.0 : undefined) } : {}),

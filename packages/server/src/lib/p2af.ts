@@ -1,3 +1,5 @@
+import path from "node:path";
+import { buildBilingualDocument, bilingualReferencesForBook } from "./bilingual-document.ts";
 import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "../db.ts";
@@ -46,11 +48,14 @@ export async function buildP2afLayer(
   const rows = await db.select().from(chapters).where(eq(chapters.bookId, book.id)).orderBy(asc(chapters.index));
   const byId = new Map(rows.map((row) => [row.id, row]));
   const cues: P2afLayer["cues"] = [];
+  const bilingual: NonNullable<P2afLayer["bilingual"]> = [];
+  const prepared = await bilingualReferencesForBook(book.id);
 
   for (const entry of manifest.chapters) {
     // The text lives in the EPUB layer beside this one; a second copy for the reader would be the
     // whole book again, so the container's chapters point at no text document.
     entry.text = null;
+    entry.bilingual = [];
     const file = exported.get(entry.id);
     const chapter = byId.get(entry.id);
     const doc = file && chapter ? await buildCues(chapter) : null;
@@ -63,6 +68,17 @@ export async function buildP2afLayer(
     entry.audio = `../audio/${file.audioFile}`;
     entry.cues = path;
     cues.push({ path, doc });
+    for (const ref of prepared.filter((r) => r.chapterId === entry.id)) {
+      const [variant] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, ref.variantId));
+      const extension = variant?.audioPath ? audioExtension(variant.audioPath) : ".m4a";
+      const audio = `audio/${ref.variantId}${extension}`;
+      const paired = await buildBilingualDocument(ref.variantId, { source: entry.audio, target: audio });
+      if (!paired) throw new Error("Bilingual preparation changed during export; retry with current text");
+      const resource = `bilingual/${ref.variantId}.json`;
+      bilingual.push({ path: resource, doc: paired, audio: paired.target.narration && variant?.audioPath
+        ? [{ path: audio, sourcePath: variant.audioPath, mediaType: extension === ".mp3" ? "audio/mpeg" : "audio/mp4" }] : [] });
+      entry.bilingual.push({ key: ref.key, language: ref.language, url: resource });
+    }
   }
 
   if (cues.length === 0) return null;
@@ -70,6 +86,7 @@ export async function buildP2afLayer(
   return {
     manifest,
     cues,
+    bilingual,
     sources: sources.map((source, index) => ({ path: sourcePath(index), pdfPath: source.pdfPath })),
   };
 }
@@ -134,4 +151,10 @@ export async function buildVariantP2afLayer(
 
   if (cues.length === 0) return null;
   return { manifest, cues, sources: [] };
+}
+
+function audioExtension(audioPath: string): string {
+  const ext = path.extname(audioPath).toLowerCase();
+  if (ext !== ".mp3" && ext !== ".m4a") throw new Error("Bilingual EPUB audio must be MP3 or AAC");
+  return ext;
 }

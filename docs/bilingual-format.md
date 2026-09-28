@@ -54,3 +54,21 @@ the file closes.
 This is a client projection, not the proposed preparation database schema. Raw answers, costs and
 job diagnostics do not belong here. The extension should receive a compatibility review before
 being treated as a stable native-reader contract.
+
+## Production preparation
+
+`bilingual_preparations` stores the text pairing artifact, independent word-link batches and their
+jobs for each completed translation. The current producer is `bge-m3-dp/1`, using persisted
+`intl-segmenter-word/1` tokens and the `token-ids/1` word-link prompt. These producer versions are
+independent of `p2af-bilingual/1`; changing an algorithm need not change the reading format.
+
+A queued job captures text hashes. Publication checks current text and run identity under row locks;
+word links additionally bind to the pairing artifact revision. Text edits make references unavailable
+until preparation is repeated. Audio changes preserve the text artifact: live/export builders read
+sync maps anew and hash recording bytes. Export checks those hashes again on the staged files.
+Cancelled/failed jobs keep completed batches; only an explicit retry continues work. Raw model
+answers stay in the database and never enter the reading document.
+
+Original-language synced EPUB exports include current prepared translations for chapters carried
+with primary cues. Translation-only exports remain single-lane. Text-only export without primary
+cues and book-wide preparation controls are still pending.

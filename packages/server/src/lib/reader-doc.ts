@@ -1,3 +1,4 @@
+import { bilingualReferencesForBook } from "./bilingual-document.ts";
 import { bookFileOrder } from "./book-file-order.ts";
 import { asc, eq } from "drizzle-orm";
 
@@ -85,6 +86,7 @@ export async function buildManifest(book: Book): Promise<ReaderManifest> {
 
   const rows = await db.select().from(chapters).where(eq(chapters.bookId, book.id)).orderBy(asc(chapters.index));
 
+  const bilingual = await bilingualReferencesForBook(book.id);
   return {
     format: READER_FORMAT,
     book: {
@@ -112,6 +114,7 @@ export async function buildManifest(book: Book): Promise<ReaderManifest> {
         pageStart: chapter.pageStart === null ? null : offset + chapter.pageStart - 1,
         pageEnd: chapter.pageEnd === null ? null : offset + chapter.pageEnd - 1,
         ...chapterMode(chapter),
+        bilingual: bilingual.filter((r) => r.chapterId === chapter.id).map(({ key, language, url }) => ({ key, language, url })),
         ...(link ? { link: { url: link } } : {}),
       };
     }),

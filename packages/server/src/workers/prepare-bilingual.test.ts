@@ -1,0 +1,191 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { eq, sql } from "drizzle-orm";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getDb, resetDb, row, ensureGraphileTables } from "../../test/setup.ts";
+import { books, chapters, chapterVariants, bilingualPreparations } from "../schema.ts";
+import { textRevision } from "../lib/bilingual-format.ts";
+import { writeSyncMap } from "../lib/sync-map.ts";
+import type { PrepareBilingualPayload } from "./prepare-bilingual.ts";
+
+const { embed, requestLinks, queue, installed } = vi.hoisted(() => ({ embed: vi.fn(), requestLinks: vi.fn(), queue: vi.fn(), installed: vi.fn() }));
+vi.mock("../db.ts", async () => { const { getDb } = await import("../../test/setup.ts"); return { get db() { return getDb(); } }; });
+vi.mock("../lib/embeddings.ts", () => ({ embedTexts: embed }));
+vi.mock("../lib/model-bundles.ts", () => ({ bundleInstalled: installed }));
+vi.mock("../lib/log.ts", () => ({ appendLog: vi.fn(async () => {}) }));
+vi.mock("../lib/llm.ts", () => ({ resolveLlm: async () => ({ def: { key: "test-model" } }), modelKeySchema: z.string(), callSettings: () => ({}) }));
+vi.mock("graphile-worker", () => ({ quickAddJob: queue }));
+vi.mock("../lib/bilingual-links.ts", async (original) => ({ ...await original<object>(), requestWordLinks: requestLinks }));
+import { z } from "zod";
+import { bilingualRouter } from "../routes/bilingual.ts";
+import { prepareBilingual } from "./prepare-bilingual.ts";
+import { preparation, failPreparation } from "../lib/bilingual-store.ts";
+import { bilingualReferencesForBook, buildBilingualDocument } from "../lib/bilingual-document.ts";
+import { buildP2afLayer } from "../lib/p2af.ts";
+import { sweepStrandedWork } from "./sweep.ts";
+
+const caller = bilingualRouter.createCaller({});
+const source = "Hello world.", target = "Hallo Welt.";
+let bookId: string, chapterId: string, variantId: string, dir: string;
+
+async function queued(stage: "pairs" | "links"): Promise<PrepareBilingualPayload> {
+  await caller.prepare({ variantId, stage });
+  return queue.mock.calls.at(-1)?.[2] as PrepareBilingualPayload;
+}
+async function paired() { await prepareBilingual(await queued("pairs")); }
+const answer = () => ({ record: { pairIds: ["p1"], model: "test-model", raw: "p1: 1 = 1", error: null, inputTokens: 10, outputTokens: 5 }, links: { p1: [{ source: [1], target: [1] }] } });
+
+beforeEach(async () => {
+  await resetDb(getDb());
+  vi.clearAllMocks();
+  embed.mockReset().mockResolvedValue([[1, 0], [1, 0]]);
+  requestLinks.mockReset().mockImplementation(async () => answer());
+  installed.mockResolvedValue(true);
+  queue.mockReset().mockResolvedValue(undefined);
+  dir = await mkdtemp(path.join(tmpdir(), "bilingual-job-"));
+  bookId = crypto.randomUUID(); chapterId = crypto.randomUUID(); variantId = crypto.randomUUID();
+  await getDb().insert(books).values({ id: bookId, title: "Bilingual", kind: "api", language: "English" });
+  await getDb().insert(chapters).values({ id: chapterId, bookId, index: 0, title: "Hello", rawText: source, cleanText: source, status: "done" });
+  await getDb().insert(chapterVariants).values({ id: variantId, chapterId, key: "German", kind: "translation", text: target, status: "done" });
+});
+afterEach(async () => { await rm(dir, { recursive: true, force: true }); });
+
+describe("bilingual jobs and publication", () => {
+  it("prepares and serves existing texts without requiring narration or word links", async () => {
+    await paired();
+    const saved = await preparation(variantId);
+    expect(saved?.pairJob?.status).toBe("done");
+    expect(saved?.pairs?.source.textRevision).toBe(textRevision(source));
+    expect(await bilingualReferencesForBook(bookId)).toHaveLength(1);
+    const doc = await buildBilingualDocument(variantId);
+    expect(doc?.source.narration).toBeNull();
+    expect(doc?.pairs[0]?.linksStatus).toBe("unavailable");
+    expect(queue).toHaveBeenCalledWith(expect.anything(), "alignBilingual", expect.anything(), expect.objectContaining({ maxAttempts: 1 }));
+    expect(requestLinks).not.toHaveBeenCalled();
+  });
+  it("refuses a missing optional model without downloading or queueing", async () => {
+    installed.mockResolvedValue(false);
+    await expect(queued("pairs")).rejects.toThrow("optional search model");
+    expect(queue).not.toHaveBeenCalled();
+  });
+  it("rejects text changed while queued and marks context failures as failed", async () => {
+    const payload = await queued("pairs");
+    await getDb().update(chapters).set({ customText: "Changed." }).where(eq(chapters.id, chapterId));
+    await expect(prepareBilingual(payload)).rejects.toThrow("Text changed");
+    expect((await preparation(variantId))?.pairJob?.status).toBe("failed");
+    const next = await queued("pairs");
+    await getDb().update(chapterVariants).set({ status: "failed" }).where(eq(chapterVariants.id, variantId));
+    await expect(prepareBilingual(next)).rejects.toThrow("completed translation");
+    expect((await preparation(variantId))?.pairJob?.status).toBe("failed");
+  });
+  it("never publishes pairs when text changes during embedding", async () => {
+    embed.mockImplementationOnce(async () => {
+      await getDb().update(chapterVariants).set({ text: "Anderer Text." }).where(eq(chapterVariants.id, variantId));
+      return [[1, 0], [1, 0]];
+    });
+    await paired();
+    const saved = await preparation(variantId);
+    expect(saved?.pairs).toBeNull();
+    expect(saved?.pairJob).toMatchObject({ status: "failed", error: expect.stringContaining("changed") });
+  });
+  it("fences a cancelled run from a newer run, including its failure handler", async () => {
+    const old = await queued("pairs");
+    await caller.cancel({ variantId, stage: "pairs" });
+    const next = await queued("pairs");
+    await prepareBilingual(old);
+    await failPreparation(variantId, "pairs", old.runId, "old failure");
+    expect((await preparation(variantId))?.pairJob).toMatchObject({ runId: next.runId, status: "queued" });
+    await prepareBilingual(next);
+    expect(embed).toHaveBeenCalledTimes(1);
+  });
+  it("discards an in-flight word batch after cancellation and retries only explicitly", async () => {
+    await paired();
+    requestLinks.mockImplementationOnce(async () => {
+      await caller.cancel({ variantId, stage: "links" });
+      return answer();
+    });
+    await prepareBilingual(await queued("links"));
+    expect((await preparation(variantId))?.linkJob?.status).toBe("cancelled");
+    expect((await preparation(variantId))?.links).toBeNull();
+    await prepareBilingual(await queued("links"));
+    expect((await buildBilingualDocument(variantId))?.pairs[0]?.links).toHaveLength(1);
+    expect(requestLinks).toHaveBeenCalledTimes(2);
+    await prepareBilingual(await queued("links"));
+    expect(requestLinks).toHaveBeenCalledTimes(2);
+  });
+  it("retains a completed batch when a later call fails and resumes only the missing batch", async () => {
+    const longSource = `One ${"one ".repeat(199).trim()}. Two ${"two ".repeat(199).trim()}.`;
+    const longTarget = `Eins ${"eins ".repeat(199).trim()}. Zwei ${"zwei ".repeat(199).trim()}.`;
+    await getDb().update(chapters).set({ cleanText: longSource }).where(eq(chapters.id, chapterId));
+    await getDb().update(chapterVariants).set({ text: longTarget }).where(eq(chapterVariants.id, variantId));
+    embed.mockResolvedValueOnce([[1, 0], [0, 1], [1, 0], [0, 1]]);
+    await paired();
+    expect((await caller.status({ chapterId, key: "German" })).batches).toBe(2);
+    requestLinks.mockResolvedValueOnce(answer()).mockRejectedValueOnce(new Error("provider unavailable"));
+    await expect(prepareBilingual(await queued("links"))).rejects.toThrow("provider unavailable");
+    expect((await preparation(variantId))?.links?.byPair.p1).toHaveLength(1);
+    requestLinks.mockImplementationOnce(async (_artifact, pairs) => {
+      expect(pairs.map((p: { id: string }) => p.id)).toEqual(["p2"]);
+      return { record: { ...answer().record, pairIds: ["p2"], raw: "p2: -" }, links: { p2: [] } };
+    });
+    await prepareBilingual(await queued("links"));
+    expect(Object.keys((await preparation(variantId))?.links?.byPair ?? {})).toEqual(["p1", "p2"]);
+    expect(requestLinks).toHaveBeenCalledTimes(3);
+  });
+  it("keeps invalid raw answers for diagnosis, fails once and preserves prior batches", async () => {
+    await paired();
+    const saved = await preparation(variantId);
+    if (!saved?.pairs) throw new Error("no pairs");
+    await getDb().update(bilingualPreparations).set({ links: { pairRevision: saved.pairs.revision, promptVersion: "token-ids/1", byPair: {}, batches: [{ ...answer().record, pairIds: [], raw: "previous batch" }] } }).where(eq(bilingualPreparations.variantId, variantId));
+    requestLinks.mockResolvedValueOnce({ record: { ...answer().record, raw: "broken", error: "Invalid batch" }, links: null });
+    await expect(prepareBilingual(await queued("links"))).rejects.toThrow("Invalid batch");
+    const result = await preparation(variantId);
+    expect(result?.links?.batches.map((b) => b.raw)).toEqual(["previous batch", "broken"]);
+    expect(result?.links?.byPair).toEqual({});
+    expect(result?.linkJob?.status).toBe("failed");
+    expect(requestLinks).toHaveBeenCalledTimes(1);
+  });
+  it("removes stale references after edits without deleting saved diagnostics", async () => {
+    await paired();
+    await getDb().update(chapters).set({ customText: "Changed." }).where(eq(chapters.id, chapterId));
+    expect(await bilingualReferencesForBook(bookId)).toEqual([]);
+    expect(await buildBilingualDocument(variantId)).toBeNull();
+    expect((await preparation(variantId))?.pairs).not.toBeNull();
+  });
+  it("marks enqueue failures and interrupted runs failed, preserving pairs", async () => {
+    await paired();
+    queue.mockRejectedValueOnce(new Error("queue offline"));
+    await expect(queued("links")).rejects.toThrow("queue offline");
+    expect((await preparation(variantId))?.linkJob?.status).toBe("failed");
+    await queued("links");
+    await ensureGraphileTables(getDb());
+    await getDb().execute(sql`UPDATE chapters SET status = 'done'`);
+    await sweepStrandedWork();
+    expect((await preparation(variantId))?.linkJob?.status).toBe("failed");
+    expect((await preparation(variantId))?.pairs).not.toBeNull();
+  });
+  it("derives fresh timing after audio replacement and attaches both lanes to normal export", async () => {
+    const audio = path.join(dir, "source.m4a"), translated = path.join(dir, "target.m4a");
+    await writeFile(audio, "source audio"); await writeFile(translated, "target audio");
+    await writeSyncMap(audio, { version: 1, totalMs: 1000, chunks: [{ text: source, startMs: 0, endMs: 1000 }] });
+    await writeSyncMap(translated, { version: 1, totalMs: 2000, chunks: [{ text: target, startMs: 0, endMs: 2000 }] });
+    await getDb().update(chapters).set({ audioPath: audio, durationMs: 1000 }).where(eq(chapters.id, chapterId));
+    await getDb().update(chapterVariants).set({ audioPath: translated, audioStatus: "done", audioDurationMs: 2000 }).where(eq(chapterVariants.id, variantId));
+    await paired();
+    const before = await buildBilingualDocument(variantId);
+    const revision = (await preparation(variantId))?.pairs?.revision;
+    await writeFile(translated, "replacement audio");
+    await writeSyncMap(translated, { version: 1, totalMs: 3000, chunks: [{ text: target, startMs: 0, endMs: 3000 }] });
+    const after = await buildBilingualDocument(variantId);
+    expect(after?.target.narration?.revision).not.toBe(before?.target.narration?.revision);
+    expect(after?.target.narration?.totalMs).toBe(3000);
+    expect((await preparation(variantId))?.pairs?.revision).toBe(revision);
+    const book = row(await getDb().select().from(books).where(eq(books.id, bookId)));
+    const layer = await buildP2afLayer(book, new Map([[chapterId, { base: "ch000", audioFile: "ch000.m4a" }]]), null);
+    expect(layer?.bilingual).toHaveLength(1);
+    expect(layer?.bilingual?.[0]?.doc.source.narration?.audio).toBe("../audio/ch000.m4a");
+    expect(layer?.bilingual?.[0]?.audio[0]?.sourcePath).toBe(translated);
+    expect(layer?.manifest.chapters[0]?.bilingual?.[0]?.url).toBe(`bilingual/${variantId}.json`);
+  });
+});

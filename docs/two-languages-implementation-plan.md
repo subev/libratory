@@ -168,5 +168,9 @@ A second-model review is most useful once the contract, sample EPUB and playback
 concrete, before treating the format as stable. It is not a prerequisite for beginning the slice,
 and no additional model call has been made for this plan.
 
-This pass preserves the design and sets scope; it does not change application behaviour or claim
-that these milestones are implemented.
+Implementation status (2026-09-28): phases 1–2 are implemented for the narrated-primary EPUB
+path, including sentence alternation. Phase 3 now has production storage/jobs, revision fencing,
+chapter controls, live documents and normal export attachment. Local checks use mocked model
+responses; a fresh real-data preparation/export acceptance pass remains before declaring its gate
+complete. Phase 4 and text-only exports remain open. See
+[the handoff](bilingual-reader-review-handoff.md) for exact scope and verification.

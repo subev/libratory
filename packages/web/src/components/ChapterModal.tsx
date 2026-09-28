@@ -1,3 +1,4 @@
+import { BilingualPreparation } from "./BilingualPreparation.tsx";
 import { StructuredText } from "./reader/StructuredText.tsx";
 import type { ReaderText } from "../lib/reader-doc.ts";
 import { useState, useRef, useEffect, useCallback, useMemo, memo, Fragment, type ReactNode } from "react";
@@ -112,7 +113,7 @@ function ChapterModalBody({
   const [speed, setSpeed] = useState(loadSpeed);
   useEffect(() => subscribeSpeed(setSpeed), []);
   const [manifest, setManifest] = useState<ReaderManifest | null>(null);
-  const playerRef = useRef<{ seek: (ms: number) => void; toggle: () => boolean } | null>(null);
+  const playerRef = useRef<{ seek: (ms: number) => void; toggle: () => boolean; pause: () => void; position: () => number } | null>(null);
   const [editText, setEditText] = useState("");
 
   const lang = readingLang(language, variant);
@@ -755,6 +756,12 @@ function ChapterModalBody({
           )}
         </div>
 
+        {isTranslationKind && variant ? <BilingualPreparation
+          key={`${chapter.id}:${variant.key}`} bookId={bookId} chapterId={chapter.id} chapterIndex={chapter.index}
+          translationKey={variant.key} position={() => playerRef.current?.position() ?? 0}
+          onOpen={() => { playerRef.current?.pause(); onClose(); }}
+        /> : null}
+
         {chapterAudio || fullChapter?.chunkPreviews.length ? (
           <ChunkPreviewPanel
             chunkPreviews={fullChapter?.chunkPreviews ?? NO_PREVIEWS}
@@ -906,7 +913,7 @@ const ChunkPreviewPanel = memo(function ChunkPreviewPanel({
   onHover: (url: string | null) => void;
   isSynthesizing: boolean;
   onTime: (ms: number) => void;
-  playerRef: React.RefObject<{ seek: (ms: number) => void; toggle: () => boolean } | null>;
+  playerRef: React.RefObject<{ seek: (ms: number) => void; toggle: () => boolean; pause: () => void; position: () => number } | null>;
   // Whether the open view marks the words, and so needs a position finer than timeupdate's
   follows: boolean;
   playbackRate: number;
@@ -982,6 +989,8 @@ const ChunkPreviewPanel = memo(function ChunkPreviewPanel({
 
   useEffect(() => {
     playerRef.current = {
+      pause: () => audioRef.current?.pause(),
+      position: () => syncMode || chunkPreviews.length === 0 ? (audioRef.current?.currentTime ?? 0) * 1000 : 0,
       seek: (ms: number) => {
         const audio = audioRef.current;
         if (!audio) return;
@@ -998,7 +1007,7 @@ const ChunkPreviewPanel = memo(function ChunkPreviewPanel({
       },
     };
     return () => { playerRef.current = null; };
-  }, [playerRef, onTime, audioSrc]);
+  }, [playerRef, onTime, audioSrc, syncMode, chunkPreviews.length]);
 
   function handleTimeUpdate() {
     const audio = audioRef.current;

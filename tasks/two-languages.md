@@ -17,8 +17,10 @@ embedded second reader. The [original brief](../docs/two-languages-design-brief.
 
 **Implementation started:** [First-slice report](../docs/two-languages-implementation-progress.md).
 The web reader and EPUB export/import now consume an optional bilingual document. Three saved
-examples exercise it without paid calls. Production preparation, normal manifest attachment and
-chapter-modal entry remain next; this task is not complete.
+examples exercise it without paid calls. Production per-chapter preparation, normal manifest/export
+attachment and chapter-modal entry are now implemented and tested with mocked models. Real-data
+acceptance, whole-book selection/profiling, native consumption and spike cleanup remain; this task
+is not complete. See the handoff for current commands and review limits.
 
 **Completion cleanup:** preserve useful fixtures/tests in the maintained suite and keep research
 findings, then remove the spike code, temporary viewers and adapters once production preparation

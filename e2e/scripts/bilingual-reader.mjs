@@ -11,7 +11,7 @@ try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    await page.goto("http://127.0.0.1:3033/open");
+    await page.goto("http://localhost:3033/open");
     await page.locator("input[type=file]").setInputFiles(path.join(samples, `${key}.epub`));
     await expect(page.getByTestId("bilingual-reader")).toBeVisible();
     await expect(page.getByRole("combobox", { name: "Read with", exact: true })).toHaveValue(key);
@@ -129,7 +129,7 @@ try {
     await page.close();
   }
   const touch = await browser.newPage({ viewport: { width: 393, height: 852 }, hasTouch: true, isMobile: true });
-  await touch.goto("http://127.0.0.1:3033/open");
+  await touch.goto("http://localhost:3033/open");
   await touch.locator("input[type=file]").setInputFiles(path.join(samples, "en-he.epub"));
   await touch.getByRole("combobox", { name: "Read with", exact: true }).selectOption("en-he");
   const word = touch.getByRole("button", { name: "Listen from turned", exact: true });
