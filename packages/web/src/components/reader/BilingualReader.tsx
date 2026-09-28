@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   linkedTokens, passageIndex, pairAtTime, switchNarration, tokenAtTime,
   type BilingualDocument, type BilingualPair, type BilingualSide,
@@ -11,7 +11,7 @@ import { SPEEDS, loadSpeed, saveSpeed } from "../../lib/playback-speed.ts";
 import { formatDuration } from "../../lib/format.ts";
 import { followCue } from "../../lib/cue-follow.ts";
 import { languageLabel as language } from "../../lib/voices.ts";
-import { paragraphGroups, pairPresentation, listenPosition, linkedText, sharesPrimaryRecording } from "../../lib/bilingual-reading.ts";
+import { paragraphGroups, pairPresentation, listenPosition, linkedText, sharesPrimaryRecording, sentenceSequence, sentenceStartIndex } from "../../lib/bilingual-reading.ts";
 import { WordMeaning, useWordMeaning } from "./WordMeaning.tsx";
 import { Button } from "../Button.tsx";
 import { IconPause, IconPlay } from "../icons.tsx";
@@ -40,6 +40,10 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
   const [message, setMessage] = useState<string | null>(null);
   const [following, setFollowing] = useState(true);
   const [inspectMode, setInspectMode] = useState(false);
+  const [alternate, setAlternate] = useState<{ first: BilingualSide; index: number } | null>(null);
+  const completed = useRef<typeof alternate>(null);
+  const sequences = useMemo(() => ({ source: sentenceSequence(doc, "source"), target: sentenceSequence(doc, "target") }), [doc]);
+  const sentence = alternate ? sequences[alternate.first][alternate.index] : null;
   const meaning = useWordMeaning();
   const selection = meaning.selection;
   const groups = useMemo(() => paragraphGroups(doc), [doc]);
@@ -60,10 +64,19 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
     if (!audio?.getAttribute("src")) return false;
+    if (landing.current.play) {
+      landing.current.play = false;
+      audio.pause();
+      return true;
+    }
+    if (alternate && !sentence) {
+      setMessage("No timed sentence pair here. Click another sentence or turn off alternating playback.");
+      return true;
+    }
     if (audio.paused) void audio.play().catch(() => setMessage("Playback could not start. Try Play again."));
     else audio.pause();
     return true;
-  }, []);
+  }, [alternate, sentence]);
   usePlayPauseKey(togglePlay);
 
   useEffect(() => {
@@ -76,10 +89,20 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
     if (sourceMs !== undefined) onPosition(sharesPrimaryRecording(doc, chapter.audio) ? sourceMs : 0);
   }, [doc, timing, chapter.audio, side, ms, onPosition]);
 
-  function listen(nextSide: BilingualSide, at: number, play: boolean) {
+  function listen(nextSide: BilingualSide, at: number, play: boolean, continuing = false) {
     setMessage(null);
-    meaning.dismiss();
-    setFollowing(true);
+    if (!continuing) completed.current = null;
+    if (alternate && !continuing) {
+      const index = sentenceStartIndex(doc, nextSide, at);
+      setAlternate({ first: nextSide, index });
+      if (!sequences[nextSide][index]) {
+        landing.current.play = false;
+        audioRef.current?.pause();
+        setMessage("Alternating playback needs a matched sentence with timing in both languages here.");
+        return;
+      }
+    }
+    if (!continuing) { meaning.dismiss(); setFollowing(true); }
     landing.current = { ms: at, play };
     if (nextSide === side) {
       const audio = audioRef.current;
@@ -93,6 +116,56 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
       setSide(nextSide);
     }
     setMs(at);
+  }
+
+  function finishSentence() {
+    if (!alternate || completed.current === alternate) return;
+    completed.current = alternate;
+    const audio = audioRef.current;
+    audio?.pause();
+    if (audio && sentence) { audio.currentTime = sentence.endMs / 1000; setMs(sentence.endMs); }
+    const index = alternate.index + 1;
+    const next = sequences[alternate.first][index];
+    setAlternate({ first: alternate.first, index });
+    if (!next) {
+      landing.current.play = false;
+      setPlaying(false);
+      setMessage(index >= sequences[alternate.first].length
+        ? "End of chapter. Click a sentence to listen again."
+        : "Alternating playback stopped: the next passage has no reliable timed pair. Click a sentence to continue, or turn off alternating playback.");
+      return;
+    }
+    listen(next.side, next.startMs, true, true);
+  }
+
+  const advanceSentence = useEffectEvent(finishSentence);
+  useEffect(() => {
+    if (!playing || !sentence) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const check = () => {
+      const audio = audioRef.current;
+      if (!audio || audio.paused) return;
+      const remaining = sentence.endMs - audio.currentTime * 1000;
+      if (remaining <= 0) { advanceSentence(); return; }
+      timer = setTimeout(check, Math.max(1, Math.min(50, remaining / audio.playbackRate)));
+    };
+    timer = setTimeout(check, 0);
+    return () => clearTimeout(timer);
+  }, [playing, sentence]);
+
+  function enableAlternation(enabled: boolean) {
+    if (!enabled) { setAlternate(null); setMessage(null); return; }
+    const at = audioRef.current?.currentTime ? audioRef.current.currentTime * 1000 : ms;
+    const index = sentenceStartIndex(doc, side, at);
+    const start = sequences[side][index];
+    setAlternate({ first: side, index });
+    if (!start) {
+      audioRef.current?.pause();
+      landing.current.play = false;
+      setMessage("Alternating playback needs a matched sentence with timing in both languages here.");
+      return;
+    }
+    listen(side, start.startMs, playing, true);
   }
 
   function changeVoice(nextSide: BilingualSide) {
@@ -176,6 +249,12 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
           <div className="flex flex-wrap items-center gap-3 text-xs text-(--text-muted)">
             <span>{inspectMode ? "Tap a word for its meaning · Space to play/pause" : "Click to listen · Space to play/pause · Hover or hold for meaning"}</span>
             <Button variant={inspectMode ? "primary" : "ghost"} size="sm" aria-pressed={inspectMode} onClick={() => { setInspectMode(!inspectMode); meaning.dismiss(); }}>Meanings on tap</Button>
+            <label className="flex items-center gap-2" title="Play each paired passage in both languages, starting with the selected voice">
+              <input type="checkbox" className="accent-(--accent)" checked={alternate !== null}
+                disabled={!doc.source.narration || !doc.target.narration}
+                onChange={(event) => enableAlternation(event.target.checked)} />
+              Alternate languages by sentence
+            </label>
             <details>
               <summary className="cursor-pointer hover:text-(--text-primary)">Timing details</summary>
               <div className="max-w-prose space-y-2 py-2">{lane.narration?.qualityNotes.map((note) => <p key={note}>{note}</p>)}</div>
@@ -185,7 +264,7 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
         </div>
 
         <audio key={side} ref={audioRef} src={source.resolve(lane.narration?.audio)} preload="metadata"
-          onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)}
+          onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { if (alternate) finishSentence(); else setPlaying(false); }}
           onError={() => { setPlaying(false); setMessage("This narration could not be loaded. Both texts remain available."); }}
           onLoadedMetadata={() => {
             const audio = audioRef.current;

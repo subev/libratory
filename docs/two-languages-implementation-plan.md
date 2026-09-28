@@ -149,6 +149,15 @@ PDF-plus-translation using real multi-column and page-spanning examples. Revisit
 or prompts when labelled failures justify it; keep model/prompt versions replaceable without
 changing the reading contract or regenerating audio.
 
+### Completion cleanup
+
+Once production preparation, reader access and export pass their gates, move useful labelled
+fixtures and deterministic regression tests into the maintained test suite. Keep the research
+findings as documentation, then remove `packages/server/spikes/two-languages/` and its temporary
+viewers and export adapter. Update commands and references so the finished feature has no runtime
+or verification dependency on spike files, hard-coded chapter IDs or saved local experiment output.
+Remove the completed task file after the implementation and this cleanup are finished.
+
 ## Review and verification
 
 Use focused unit and browser checks at each gate; no paid reruns or full E2E suite are needed just

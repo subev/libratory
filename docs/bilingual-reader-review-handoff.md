@@ -46,6 +46,18 @@ A “Play clicked word only” experiment was implemented and then **removed at 
 its acoustic boundaries felt too imprecise. Keep continuous click-to-listen; do not reintroduce word
 clipping or its checkbox as part of the next implementation slice.
 
+## Sentence alternation follow-up
+
+An unchecked “Alternate languages by sentence” checkbox plays the selected language, its matched
+counterpart, then the next sentence in the same order. Enabling it restarts the current sentence
+without starting audio if paused. Clicking a word or selecting a voice resets the sequence to that
+language and passage. Space pauses/resumes. Unchecking continues the current recording normally.
+Sentence groups use existing paired passages (a merge can contain more than one sentence).
+Missing/uncertain pairs or unusable timings stop with an explanation; the final pair stops the
+chapter rather than looping or changing chapters. Both narrations must be available to enable it.
+The word-only clipping experiment remains removed. The follow-up passed 149 web tests, repository
+lint/typecheck and focused browser checks for order, pause/resume, disabling the mode and chapter end.
+
 ## Review findings addressed
 
 - Punctuation absorption is capped at the next token: contractions and separate punctuation tokens

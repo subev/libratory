@@ -20,6 +20,11 @@ The web reader and EPUB export/import now consume an optional bilingual document
 examples exercise it without paid calls. Production preparation, normal manifest attachment and
 chapter-modal entry remain next; this task is not complete.
 
+**Completion cleanup:** preserve useful fixtures/tests in the maintained suite and keep research
+findings, then remove the spike code, temporary viewers and adapters once production preparation
+and export replace them. The [delivery plan](../docs/two-languages-implementation-plan.md#completion-cleanup)
+tracks this as a completion step; the finished feature must not depend on local spike artifacts.
+
 **Status (2026-09-27):** spike, then an [independent review](../docs/two-languages-review.md), then
 a second spike pass that fixed what the review reproduced and tested its token-ID link prompt. The
 architecture held; the first pass's scoring, word locator and timing labels did not. Everything

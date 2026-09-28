@@ -65,3 +65,25 @@ export function pairPresentation(doc: BilingualDocument, side: BilingualSide) {
 export function sharesPrimaryRecording(doc: BilingualDocument, audio: string | null): boolean {
   return audio !== null && doc.source.narration?.audio === audio;
 }
+
+export type SentencePlayback = { side: BilingualSide; pairId: string; startMs: number; endMs: number };
+
+export function sentenceSequence(doc: BilingualDocument, first: BilingualSide): (SentencePlayback | null)[] {
+  const other = first === "source" ? "target" : "source";
+  return doc.pairs.flatMap((pair) => {
+    const clips = ([first, other] as const).map((side): SentencePlayback | null => {
+      const anchor = passageAnchor(doc[side], pair[side]);
+      if (pair.status !== "matched" || !anchor || anchor.start.ms === null || anchor.end.ms === null || anchor.end.ms <= anchor.start.ms) return null;
+      return { side, pairId: pair.id, startMs: anchor.start.ms, endMs: anchor.end.ms };
+    });
+    return clips.every((clip) => clip !== null) ? clips : [null, null];
+  });
+}
+
+export function sentenceStartIndex(doc: BilingualDocument, side: BilingualSide, ms: number): number {
+  const index = doc.pairs.findIndex((pair) => {
+    const anchor = passageAnchor(doc[side], pair[side]);
+    return anchor?.start.ms !== null && anchor?.start.ms !== undefined && anchor.end.ms !== null && ms < anchor.end.ms;
+  });
+  return index < 0 ? -1 : index * 2;
+}

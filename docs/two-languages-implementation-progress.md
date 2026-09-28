@@ -107,3 +107,8 @@ Production job publication guards remain part of the next slice, not a completed
 
 The word-only playback experiment was removed after user testing found its boundaries too
 imprecise. Continuous click-to-listen and Space pause/play remain the intended behavior.
+
+Sentence alternation is now an opt-in checkbox in the reader: selected language, counterpart, next
+sentence. It uses each recording's own passage anchors, preserves pause/resume, stops at incomplete
+pairs and chapter end, and returns to continuous playback when unchecked. It does not add word
+clipping, narration generation or a new alignment pass.

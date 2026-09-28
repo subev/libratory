@@ -1,5 +1,6 @@
 import { chromium, expect } from "@playwright/test";
 import path from "node:path";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -38,6 +39,60 @@ try {
     expect(await page.locator("audio").evaluate((audio) => audio.currentTime)).toBeGreaterThanOrEqual(pausedAt);
     await page.keyboard.press("Space");
     await page.waitForFunction(() => document.querySelector("audio")?.paused);
+    const alternate = page.getByRole("checkbox", { name: "Alternate languages by sentence" });
+    await expect(alternate).not.toBeChecked();
+    if (key === "en-he") {
+      const doc = JSON.parse(await readFile(path.join(samples, `${key}.json`), "utf8"));
+      const anchor = (pair, side) => doc[side].narration.anchors.find((a) => a.kind === "passage" && a.range[0] === pair[side][0] && a.range[1] === pair[side][1]);
+      await page.locator("audio").evaluate((audio, start) => { audio.currentTime = start / 1000; }, anchor(doc.pairs[0], "source").start.ms);
+      await alternate.check();
+      expect(await page.locator("audio").evaluate((audio) => audio.paused)).toBe(true);
+      await page.getByRole("button", { name: "Play", exact: true }).click();
+      await page.waitForFunction(() => !document.querySelector("audio")?.paused);
+      await page.keyboard.press("Space");
+      await page.waitForFunction(() => document.querySelector("audio")?.paused);
+      await expect(page.getByRole("button", { name: "English", exact: true })).toHaveAttribute("aria-pressed", "true");
+      await page.keyboard.press("Space");
+      await page.waitForFunction(() => !document.querySelector("audio")?.paused);
+      await page.getByTestId("bilingual-paragraph").first().dispatchEvent("wheel", { deltaY: 100 });
+      for (const [pairIndex, current, next] of [[0, "source", "target"], [0, "target", "source"], [1, "source", "target"]]) {
+        await page.locator("audio").evaluate((audio, end) => { audio.currentTime = (end - 60) / 1000; }, anchor(doc.pairs[pairIndex], current).end.ms);
+        await expect(page.getByRole("button", { name: next === "source" ? "English" : "Hebrew", exact: true })).toHaveAttribute("aria-pressed", "true");
+        await page.waitForFunction(() => !document.querySelector("audio")?.paused && document.querySelector("audio")?.readyState >= 2);
+        const nextPair = current === "target" ? pairIndex + 1 : pairIndex;
+        const at = anchor(doc.pairs[nextPair], next);
+        const time = await page.locator("audio").evaluate((audio) => audio.currentTime * 1000);
+        expect(time).toBeGreaterThanOrEqual(at.start.ms - 30);
+        expect(time).toBeLessThan(at.end.ms);
+      }
+      await expect(page.getByRole("button", { name: "Back to the voice", exact: true })).toBeVisible();
+      await alternate.uncheck();
+      const end = anchor(doc.pairs[1], "target").end.ms;
+      await page.locator("audio").evaluate((audio, end) => { audio.currentTime = (end - 60) / 1000; }, end);
+      await page.waitForFunction((end) => {
+        const audio = document.querySelector("audio");
+        return audio && !audio.paused && audio.currentTime * 1000 > end + 150;
+      }, end);
+      await expect(page.getByRole("button", { name: "Hebrew", exact: true })).toHaveAttribute("aria-pressed", "true");
+      await page.getByRole("button", { name: "Pause", exact: true }).click();
+      await alternate.check();
+      const last = doc.pairs.at(-1);
+      const token = doc.source.tokens.find((token) => token.range[0] >= last.source[0] && token.range[1] <= last.source[1]);
+      await page.locator(`[data-token="source:${token.id}"]`).click();
+      await expect(page.getByRole("button", { name: "English", exact: true })).toHaveAttribute("aria-pressed", "true");
+      await page.waitForFunction(() => !document.querySelector("audio")?.paused && document.querySelector("audio")?.readyState >= 2);
+      await page.locator("audio").evaluate((audio, end) => { audio.currentTime = (end - 60) / 1000; }, anchor(last, "source").end.ms);
+      await expect(page.getByRole("button", { name: "Hebrew", exact: true })).toHaveAttribute("aria-pressed", "true");
+      await page.waitForFunction(() => !document.querySelector("audio")?.paused && document.querySelector("audio")?.readyState >= 2);
+      await page.locator("audio").evaluate((audio, end) => { audio.currentTime = (end - 60) / 1000; }, anchor(last, "target").end.ms);
+      await expect(page.getByRole("status")).toHaveText("End of chapter. Click a sentence to listen again.");
+      expect(await page.locator("audio").evaluate((audio) => audio.paused)).toBe(true);
+      await alternate.uncheck();
+      // Re-enter from a clicked source word so the ordinary checks keep their initial context.
+      await chosen.click();
+      await page.getByRole("button", { name: "Pause", exact: true }).click();
+      console.log("Alternation: paused enable, Space pause/resume and source/target/next-source order, continuous playback after unchecking and chapter-end stop passed");
+    }
     await page.getByRole("button", { name: voice, exact: true }).click();
     await page.waitForFunction(() => document.querySelector("audio")?.readyState >= 1);
     await page.getByRole("button", { name: "Play", exact: true }).click();
