@@ -9,6 +9,125 @@ spike and earlier reviews are historical context, not all new implementation fro
 No paid model or voice calls were made during implementation. Generated recordings, EPUB examples
 and reports remain gitignored local data; the commit does not carry them.
 
+## Resume here — session wrapped, 2026-09-28
+
+**Next session starts with the user's trial, then review.** Give the checklist below in the first
+reply, before starting another implementation slice. The user explicitly asked to try the work
+first and may then ask another agent to validate it. Do not launch that review now, run paid
+provider jobs, or assume the native full simulator suite is approved. This section supersedes the
+older “next” instructions in the chronological notes below.
+
+### Where the work stands
+
+Implementation checkpoint: `8d4a768` on `feat/bilingual-reader`. Latest commits:
+
+- `d57e783`: keyboard word navigation and optional-document failure recovery.
+- `5d5a7d4`: ordinary text EPUB exports carry prepared bilingual text.
+- `8617787`: preparation for selected chapters with progress, estimates, Stop and explicit retry.
+- `8d4a768`: real 69-chapter text export/navigation acceptance and a maintained tiny fixture.
+
+Desktop preparation, reading and offline export are working and tested. This is **not completion
+of the whole feature**. Whole-book audio stress, native bilingual presentation, assistant/MCP
+parity and spike cleanup remain. The native compatibility work also found a standalone-primary-text
+import regression; its fix is uncommitted in the native client's `feat/bilingual-reader` branch.
+That client's own `docs/handoff.md` records the files, checks and pending approvals. Do not discard
+that working tree or claim the phone has bilingual reading yet.
+
+### User trial — start here next session
+
+Allow about 10–15 minutes. The saved examples need no model calls or new narration.
+Open **http://localhost:3033/open** in Brave. If development services are stopped, run `pnpm dev`
+from the repository with its existing Postgres service available; do not start a second copy if
+already running. All paths below are relative to `/Users/petur/repos/libratory`.
+
+1. **Reading and controls:** choose
+   `packages/server/data/tmp/bilingual-acceptance/linked.epub` in the file picker. It contains
+   LETTER I. with linked words and both recordings. It should open bilingual by default. Click a
+   word in either language: playback should continue from there. Press Space to pause/resume.
+   Hover another word: its equivalent should appear above it when there is room. Try switching
+   the speaking language and check that it stays at the corresponding passage.
+2. **Alternation:** enable **Alternate languages by sentence**. Listen through two or three
+   groups: selected language, counterpart, next group. Space should pause/resume. Uncheck to
+   continue normally. The removed word-only clipping checkbox must stay absent.
+3. **Keyboard and RTL:** Tab into each language, then use Left/Right, Home/End and Enter.
+   There should be one remembered word Tab stop per language, rather than hundreds. Space still
+   controls playback. Optionally open `packages/server/data/tmp/bilingual-reader/en-he.epub`
+   to check Hebrew direction and `bg-de.epub` beside it for Bulgarian–German. These research
+   recordings have known timing limitations; judge navigation separately from acoustic precision.
+4. **Text and partial audio:** open
+   `packages/server/data/tmp/bilingual-acceptance/lifecycle-text-only.epub`. Both texts and
+   meanings should work without playable audio. Then open `lifecycle-target-text-only.epub`
+   from the same directory: the source recording should play while the translation remains
+   readable without its own recording. Opening a new file should clear the previous file's
+   chapter/language/time selection.
+5. **Preparation panel:** in a book's **Chapters** tab, switch to its Bulgarian translation,
+   select one or two chapters and choose **Bilingual reading** from the action tray (**More**
+   on a narrow window). Check readiness, estimates and the **Read** links. Opening this panel
+   must not start processing. An already prepared example is **The Frog King, or Iron Henry
+   (1812)** in the Grimm book. This inspection is enough for the first trial. Optionally use
+   **Pair missing sentences** on an unprepared chapter if the local search model is installed.
+   **Link remaining words** is a separate, explicit model call and may cost money; it is not
+   required for this trial. Avoid the individual chapter's **Re-pair sentences** on good work:
+   it replaces its pairs and drops its previous word links. The bulk missing-work action skips
+   current work. Closing the panel leaves jobs running; **Stop preparation** is the stop action.
+6. **Export and chapter changes:** optionally select a small sample, return to the book's
+   **original-language view**, and export **EPUB** (text only) or **Synced EPUB** (available
+   recordings). Open the result from Outputs through `/open`. Translation-only exports remain
+   monolingual. For a ready-made larger check, open
+   `packages/server/data/tmp/bilingual-acceptance/whole-book-text.epub`: navigate from a
+   prepared chapter to an unprepared one, then the last chapter and back. Ordinary chapters
+   should stay readable. This is 69 chapters of text, not a whole-book audio stress test.
+
+For feedback, record the file/chapter, language being spoken, action and expected/actual result;
+a screenshot and approximate audio time help. Say whether the problem is the chosen translation
+link, where the audio starts/highlights, or the interface. These are separate failure modes.
+The acceptance files are gitignored local artifacts, not files available in a fresh clone.
+`e2e/fixtures/tiny-book-bilingual-text.epub` is the committed, synthetic text-only fallback fixture.
+
+### Review after the user's trial
+
+First address reported failures and review the changed code inline. Then, if the user wants an
+independent agent, offer this scoped prompt; do not start a fan-out automatically:
+
+> Read AGENTS.md, docs/bilingual-reader-review-handoff.md (current checkpoint first),
+> docs/bilingual-reader-acceptance.md and docs/bilingual-reader-review-response.md. Review
+> a647de8..8d4a768 for the latest desktop changes; inspect earlier implementation where needed.
+> The complete feature base is f1d0493af11dc88a3d956185536f6db8538ef04f. Prioritize concrete
+> correctness/regression findings with severity, verified file locations and reproduction steps.
+> Check stale text/audio bindings, selection scope and concurrent completion, cancellation and
+> partial failure, optional-document recovery, keyboard/RTL behavior, and text-only export/import
+> compatibility. Separate proven defects from coverage gaps. Do not modify code or user books,
+> run paid calls, download models or run full E2E suites. Native code requires a separate review
+> of that repository's uncommitted changes and handoff; do not infer phone support from web tests.
+
+### Evidence and unfinished work
+
+At `8d4a768`, lint and typecheck pass; `pnpm test --maxWorkers=2` passes **1,146 tests**
+(957 server, 151 web, 38 desktop). Focused browser checks cover saved multilingual examples,
+keyboard/failure recovery, selection controls, real partial-audio/text exports and mixed chapter
+navigation. The 69-chapter text export passed through a normal export job using a disposable copy;
+the original books and selection were unchanged, and the copy was deleted. See
+[the acceptance report](bilingual-reader-acceptance.md) for evidence and limits. Do not rerun the
+local lifecycle scripts casually: they create/mutate disposable test books.
+
+The native shared primary-text import fix passes strict formatting, **279 Kit tests**, and a
+build for a generic iOS Simulator destination. No simulator was booted. Its required full
+`./scripts/check.sh` is **not run**, pending the user's approval for the full simulator/E2E suite,
+so that fix remains uncommitted. A separate unanswered scope decision is whether new bilingual UI
+starts on iOS/iPadOS 17+ or also includes the older 15.6–16 interface. Neither decision is implied
+by this session wrap-up.
+
+After trial/review: finish native compatibility and bilingual reading within the agreed interface
+scope; complete whole-book audio acceptance; expose the proven workflow through assistant/MCP;
+then preserve useful research fixtures and remove spike code/adapters. MCP is required and remains
+explicitly deferred until the reader workflow is ready. No new model-shopping or prompt sweep is
+needed to resume. Do not push, merge or release as part of this handoff.
+
+## Earlier implementation notes
+
+The sections below retain the chronology and supporting detail. Test counts and “next” steps
+inside them describe their checkpoints; use the resume section above for the current order.
+
 ## Scope and entry points
 
 This slice adds an optional bilingual document to `p2af/1`, packages it with an EPUB, and reads it

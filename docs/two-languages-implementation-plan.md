@@ -227,16 +227,18 @@ and no additional model call has been made for this plan.
 | Per-chapter preparation | Production local pairing and optional model word links, persisted jobs, progress, cancellation, explicit retry and stale-result rejection are implemented. Real long-chapter pairing passed. |
 | Offline export/import | Two real chapters exported through production builders and played offline with both recordings; existing word links survived. Normal export jobs, text/audio invalidation and fully text-only EPUBs pass real-data checks; 69-chapter text-only export/navigation also pass; whole-book audio stress remains. |
 | Whole-book preparation | Selection controls and shared per-chapter scheduling implemented; mixed-readiness/skip/cancel/retry tests pass. 69-chapter text-only export and offline transitions pass; full-book audio stress remains. |
-| iPhone bilingual reader | Not implemented here. Primary manifest/cue decoding was checked only. |
+| iPhone bilingual reader | Bilingual presentation pending. Shared standalone-primary-text import fix is uncommitted in the native client; Kit tests and a generic simulator build pass, full simulator gate and interface scope remain pending. |
 | Assistant/MCP parity | Queued after the reader workflow, not started. |
 | Spike removal | Explicit completion task; preserve fixtures and remove temporary adapter dependencies first. |
 
-**Immediate next step: native reader consumption and compatibility.** Selection controls, 69-chapter
-text-only export/navigation, normal export jobs,
-revision handling and text-only EPUBs now have real-data evidence. Keyboard navigation and failure fallback now pass focused browser checks. Keep checking against
-[the real-data baseline](bilingual-reader-acceptance.md). No new model-shopping or prompt sweep
-is needed to proceed. See
-[the handoff](bilingual-reader-review-handoff.md) for verification details.
+**Immediate next step: user trial, then review.** The session is wrapped. Start the next session
+with the checklist at the top of [the handoff](bilingual-reader-review-handoff.md), collect the
+user's experience, then review the implementation and optionally obtain independent validation.
+After that, continue native reader consumption and compatibility within the agreed interface scope.
+Selection controls, 69-chapter text-only export/navigation, normal export jobs, revision handling
+and text-only EPUBs have real-data evidence. Keyboard navigation and failure fallback pass focused
+browser checks. Keep checking against [the real-data baseline](bilingual-reader-acceptance.md).
+No new model-shopping or prompt sweep is needed.
 
 Agent-surface audit (2026-09-28): MCP and the built-in assistant already share the MCP registry.
 Upload/extraction, translation, primary synthesis and export exist. Missing pieces are bilingual

@@ -13,10 +13,13 @@ paragraph-sliced PDF pairing is deferred. The chapter modal gets a contextual re
 embedded second reader. The [original brief](../docs/two-languages-design-brief.md) remains background.
 
 **Resume here:** [Reviewed branch handoff](../docs/bilingual-reader-review-handoff.md), on
-`feat/bilingual-reader`. Word-only clipping was tried and removed; keep continuous click-to-listen.
+`feat/bilingual-reader`. Start the next session by giving the user the trial checklist at the top
+of that handoff; review their feedback before continuing implementation. Word-only clipping was
+tried and removed; keep continuous click-to-listen.
 
-**Current order:** implement native reader consumption and compatibility (text-only whole-selection
-export/navigation now pass; whole-book audio stress remains); implement iPhone consumption; expose the proven workflow through assistant/MCP;
+**Current order:** user trial, self-review and optionally independent validation; finish native
+reader compatibility and bilingual presentation (text-only whole-selection export/navigation now
+pass; whole-book audio stress remains); expose the proven workflow through assistant/MCP;
 preserve fixtures and remove the spike. MCP is required but deferred by the user's explicit choice.
 The [plan's status table](../docs/two-languages-implementation-plan.md#current-position-and-next-step)
 is the current completion checklist. PDF-plus-translation is a later extension, not a completion gate.
@@ -26,8 +29,9 @@ The first long-chapter rendering improvement is implemented and measured in the 
 The web reader and EPUB export/import now consume an optional bilingual document. Three saved
 examples exercise it without paid calls. Production per-chapter preparation, normal manifest/export
 attachment and chapter-modal entry are now implemented and tested with mocked models. Real-data
-acceptance, whole-book selection/profiling, native consumption and spike cleanup remain; this task
-is not complete. See the handoff for current commands and review limits.
+acceptance now covers chapter lifecycle, selection controls, long-chapter profiling and 69-chapter
+text export/navigation. Native bilingual consumption, whole-book audio acceptance, MCP and spike
+cleanup remain; this task is not complete. See the handoff for current commands and review limits.
 
 **Completion cleanup:** preserve useful fixtures/tests in the maintained suite and keep research
 findings, then remove the spike code, temporary viewers and adapters once production preparation
