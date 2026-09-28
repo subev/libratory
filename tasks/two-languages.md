@@ -15,6 +15,13 @@ embedded second reader. The [original brief](../docs/two-languages-design-brief.
 **Resume here:** [Reviewed branch handoff](../docs/bilingual-reader-review-handoff.md), on
 `feat/bilingual-reader`. Word-only clipping was tried and removed; keep continuous click-to-listen.
 
+**Current order:** finish reader keyboard navigation and failure fallback; close desktop preparation/export lifecycle
+and whole-book use; implement iPhone consumption; expose the proven workflow through assistant/MCP;
+preserve fixtures and remove the spike. MCP is required but deferred by the user's explicit choice.
+The [plan's status table](../docs/two-languages-implementation-plan.md#current-position-and-next-step)
+is the current completion checklist. PDF-plus-translation is a later extension, not a completion gate.
+The first long-chapter rendering improvement is implemented and measured in the acceptance report.
+
 **Implementation started:** [First-slice report](../docs/two-languages-implementation-progress.md).
 The web reader and EPUB export/import now consume an optional bilingual document. Three saved
 examples exercise it without paid calls. Production per-chapter preparation, normal manifest/export

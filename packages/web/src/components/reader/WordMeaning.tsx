@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode, type PointerEvent, type FocusEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode, type PointerEvent, type FocusEvent } from "react";
 import { createPortal } from "react-dom";
 import type { BilingualSide } from "../../../../server/src/lib/bilingual-format.ts";
 
@@ -12,11 +12,12 @@ export function useWordMeaning() {
   const held = useRef(false);
   const origin = useRef({ x: 0, y: 0 });
   const tooltip = useRef<HTMLDivElement | null>(null);
-  const cancelClose = () => { if (closeTimer.current) clearTimeout(closeTimer.current); };
-  const cancelHold = () => { if (holdTimer.current) clearTimeout(holdTimer.current); };
-  const dismiss = () => { cancelClose(); cancelHold(); setSelection(null); };
-  const show = (address: Address, anchor: HTMLElement) => { cancelClose(); setSelection({ ...address, anchor }); };
-  const scheduleClose = () => { cancelClose(); closeTimer.current = setTimeout(() => setSelection(null), 180); };
+  const cancelClose = useCallback(() => { if (closeTimer.current) clearTimeout(closeTimer.current); }, []);
+  const cancelHold = useCallback(() => { if (holdTimer.current) clearTimeout(holdTimer.current); }, []);
+  const dismiss = useCallback(() => { cancelClose(); cancelHold(); setSelection(null); }, [cancelClose, cancelHold]);
+  const show = useCallback((address: Address, anchor: HTMLElement) => { cancelClose(); setSelection({ ...address, anchor }); }, [cancelClose]);
+  const scheduleClose = useCallback(() => { cancelClose(); closeTimer.current = setTimeout(() => setSelection(null), 180); }, [cancelClose]);
+  const consumeHold = useCallback(() => { const value = held.current; held.current = false; return value; }, []);
 
   useEffect(() => () => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
@@ -41,29 +42,29 @@ export function useWordMeaning() {
     };
   }, [selection]);
 
+  const handlers = useCallback((address: Address) => ({
+    onPointerEnter: (event: PointerEvent<HTMLButtonElement>) => { if (event.pointerType === "mouse") show(address, event.currentTarget); },
+    onPointerLeave: (event: PointerEvent<HTMLButtonElement>) => { cancelHold(); if (event.pointerType !== "touch") scheduleClose(); },
+    onFocus: (event: FocusEvent<HTMLButtonElement>) => { if (event.currentTarget.matches(":focus-visible")) show(address, event.currentTarget); },
+    onBlur: scheduleClose,
+    onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {
+      cancelHold(); held.current = false;
+      if (event.pointerType !== "touch") return;
+      origin.current = { x: event.clientX, y: event.clientY };
+      const anchor = event.currentTarget;
+      holdTimer.current = setTimeout(() => { held.current = true; show(address, anchor); }, 450);
+    },
+    onPointerMove: (event: PointerEvent<HTMLButtonElement>) => {
+      if (event.pointerType === "touch" && Math.hypot(event.clientX - origin.current.x, event.clientY - origin.current.y) > 10) dismiss();
+    },
+    onPointerUp: cancelHold,
+    onPointerCancel: dismiss,
+    onContextMenu: (event: React.MouseEvent<HTMLButtonElement>) => { if (held.current) event.preventDefault(); },
+  }), [cancelHold, dismiss, scheduleClose, show]);
+
   return {
-    selection, show, dismiss, cancelClose, scheduleClose,
+    selection, show, dismiss, cancelClose, scheduleClose, consumeHold, handlers,
     setTooltip: (node: HTMLDivElement | null) => { tooltip.current = node; },
-    consumeHold: () => { const value = held.current; held.current = false; return value; },
-    handlers: (address: Address) => ({
-      onPointerEnter: (event: PointerEvent<HTMLButtonElement>) => { if (event.pointerType === "mouse") show(address, event.currentTarget); },
-      onPointerLeave: (event: PointerEvent<HTMLButtonElement>) => { cancelHold(); if (event.pointerType !== "touch") scheduleClose(); },
-      onFocus: (event: FocusEvent<HTMLButtonElement>) => { if (event.currentTarget.matches(":focus-visible")) show(address, event.currentTarget); },
-      onBlur: scheduleClose,
-      onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {
-        cancelHold(); held.current = false;
-        if (event.pointerType !== "touch") return;
-        origin.current = { x: event.clientX, y: event.clientY };
-        const anchor = event.currentTarget;
-        holdTimer.current = setTimeout(() => { held.current = true; show(address, anchor); }, 450);
-      },
-      onPointerMove: (event: PointerEvent<HTMLButtonElement>) => {
-        if (event.pointerType === "touch" && Math.hypot(event.clientX - origin.current.x, event.clientY - origin.current.y) > 10) dismiss();
-      },
-      onPointerUp: cancelHold,
-      onPointerCancel: dismiss,
-      onContextMenu: (event: React.MouseEvent<HTMLButtonElement>) => { if (held.current) event.preventDefault(); },
-    }),
   };
 }
 

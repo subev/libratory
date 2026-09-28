@@ -35,9 +35,11 @@ export function linkedText(lane: BilingualLane, ids: number[]): string {
   }).join("");
 }
 
+export type PairLayout = { tokens: { token: BilingualToken; before: string; text: string }[]; after: string };
+
 export function pairPresentation(doc: BilingualDocument, side: BilingualSide) {
   const lane = doc[side];
-  const result = new Map<string, { tokens: { token: BilingualToken; before: string; text: string }[]; after: string }>();
+  const result = new Map<string, PairLayout>();
   let tokenIndex = 0;
   const pairs = doc.pairs.filter((pair) => pair[side]);
   for (const [index, pair] of pairs.entries()) {

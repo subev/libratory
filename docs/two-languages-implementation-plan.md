@@ -138,9 +138,37 @@ inside the reading surface.
 re-prepared and re-narrated with the correct independent invalidation. Failed work stays visible
 until the user chooses what to retry.
 
-### 4. Whole-book use, then additional surfaces
+### 4. Finish the desktop workflow and whole-book use
 
-**Assistant/MCP parity is part of delivery, not a later UI-only enhancement.** A person must be
+The first measured rendering fix isolates unchanged sentence passages from playback ticks;
+see the before/after acceptance report. Finish reader failure/fallback behavior and keyboard
+navigation without thousands of word tab stops, and retain long-chapter checks as work continues.
+
+Close the real per-chapter lifecycle gate: normal UI export/import, text edits followed by
+re-pairing, audio replacement without unnecessary re-linking, cancellation and explicit retry.
+Support text-only bilingual exports and missing/partial narration without inventing timing.
+
+Apply preparation to a selection with visible chapter progress and explicit costs for paid work.
+Load chapter mapping documents on demand. Exercise chapter transitions, cancellation/resume,
+mixed readiness and a realistic book-size export before claiming whole-book support. Optimize
+alignment, status queries or storage only where measurements justify it.
+
+### 5. iPhone reader consumption
+
+Hand off the proven extension specification and reproducible fixtures, then implement native
+bilingual import, rendering, word inspection, independent narration switching and sentence
+alternation. Verify actual offline playback, RTL, partial data and ordinary monolingual imports.
+The existing Swift decoder check establishes only primary-lane decoding; it is not native
+bilingual support. The overall desktop-to-phone feature is not done until this gate passes.
+
+### 6. Assistant and MCP coverage
+
+**Sequencing confirmed by the user:** keep this on the completion list and implement it after the
+reader/preparation/export experience is ready. It is not the next slice and no MCP implementation
+budget approval is pending. Keep production operations reusable now so this stage exposes the
+working workflow rather than creating another pipeline.
+
+A person must be
 able to supply a PDF and request the bilingual result through the built-in assistant or an external
 MCP client. Both must use the same production operations and persisted jobs as the chapter UI.
 Expose preparation status/estimates, local sentence pairing, optional word links, explicit
@@ -166,14 +194,10 @@ Inspect extracted structure and start with an appropriate sample before a costly
 The MCP acceptance gate covers both recipes, missing voices/models, partial preparation and a
 failed optional word-link job without losing the readable sentence-level result.
 
-Apply preparation to a selection with visible chapter progress and explicit costs for paid work.
-Load chapter mapping documents on demand. Exercise chapter transitions, cancellation/resume,
-mixed readiness and a realistic book-size export before claiming whole-book support.
-
-Hand off the proven extension specification and fixtures for native consumption. Then evaluate
-PDF-plus-translation using real multi-column and page-spanning examples. Revisit alignment scoring
-or prompts when labelled failures justify it; keep model/prompt versions replaceable without
-changing the reading contract or regenerating audio.
+PDF-plus-translation remains a separate extension, not a gate for completing this reflowed bilingual
+reader. Evaluate it later with real multi-column and page-spanning examples. Revisit alignment
+scoring or prompts when labelled failures justify it; keep model/prompt versions replaceable
+without changing the reading contract or regenerating audio.
 
 ### Completion cleanup
 
@@ -194,12 +218,24 @@ A second-model review is most useful once the contract, sample EPUB and playback
 concrete, before treating the format as stable. It is not a prerequisite for beginning the slice,
 and no additional model call has been made for this plan.
 
-Implementation status (2026-09-28): phases 1–2 are implemented for the narrated-primary EPUB
-path, including sentence alternation. Phase 3 now has production storage/jobs, revision fencing,
-chapter controls, live documents and normal export attachment. Local checks use mocked model
-responses; a fresh real-data preparation/export acceptance pass remains before declaring its gate
-complete. Phase 4 and text-only exports remain open. See
-[the handoff](bilingual-reader-review-handoff.md) for exact scope and verification.
+## Current position and next step
+
+| Area | Status |
+| --- | --- |
+| Versioned text/token/link/timing contract | Implemented and validated; native interoperability still needs real playback testing. |
+| Web bilingual reader | Working: paragraph flow, click-to-listen, hover meanings, Space, RTL, narration switching and sentence alternation. Measured playback rendering cost reduced; keyboard navigation and failure fallback remain. |
+| Per-chapter preparation | Production local pairing and optional model word links, persisted jobs, progress, cancellation, explicit retry and stale-result rejection are implemented. Real long-chapter pairing passed. |
+| Offline export/import | Two real chapters exported through production builders and played offline with both recordings; existing word links survived. Normal export-job lifecycle, text-only export and full-book acceptance remain. |
+| Whole-book preparation | Selection/scheduling and mixed-readiness acceptance remain. |
+| iPhone bilingual reader | Not implemented here. Primary manifest/cue decoding was checked only. |
+| Assistant/MCP parity | Queued after the reader workflow, not started. |
+| Spike removal | Explicit completion task; preserve fixtures and remove temporary adapter dependencies first. |
+
+**Immediate next step: finish reader keyboard navigation and failure fallback**, then close the
+desktop lifecycle and whole-book gates above. Keep checking against
+[the real-data baseline](bilingual-reader-acceptance.md). No new model-shopping or prompt sweep
+is needed to proceed. See
+[the handoff](bilingual-reader-review-handoff.md) for verification details.
 
 Agent-surface audit (2026-09-28): MCP and the built-in assistant already share the MCP registry.
 Upload/extraction, translation, primary synthesis and export exist. Missing pieces are bilingual

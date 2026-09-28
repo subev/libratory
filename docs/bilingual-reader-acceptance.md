@@ -48,9 +48,29 @@ production/mobile performance guarantee:
 The first-run numbers above are retained as the baseline; subsequent runs vary with machine load.
 Layout time was under 1 ms in these samples. The large JavaScript cost and the current render path
 support addressing whole-chapter reconciliation before making a whole-book performance claim.
-Next: isolate static passage rendering from playback ticks, preserve interaction behavior, and
-repeat this exact comparison. Do not change alignment scoring or add storage columns to solve a
-client rendering problem.
+That diagnosis led to the passage-rendering change below. Alignment scoring and storage were not
+changed to solve a client rendering problem.
+
+## Passage rendering improvement
+
+Sentence text now lives in a memoized `BilingualPassage`. Event handlers remain stable across
+ordinary playback ticks; speaking, counterpart and inspected token props change only for affected
+passages. The reader shell still updates its clock and performs timing lookups. Voice changes,
+inspection mode and sentence alternation refresh the callbacks with their current state.
+
+The same uncontended five-second development-build samples after the change:
+
+| Chapter | JavaScript before | JavaScript after | Frame p95 before | Frame p95 after |
+| --- | ---: | ---: | ---: | ---: |
+| The Three Sisters | 3.26–3.41 s | 0.85–0.88 s | 50 ms | 16.8 ms |
+| LETTER I. | 1.38 s | 0.49–0.52 s | 16.8 ms | 16.8 ms |
+
+The first long-chapter rendering bottleneck is substantially reduced (about 74% less JavaScript
+time in that sample). These short desktop samples do not establish whole-book or iPhone performance.
+No binary-search timeline, virtualization or delegated-event framework was needed for this gain.
+The existing three-language-pair browser checks cover click/hover, touch inspection, language
+switches, Space after playback end and sentence alternation. The real-export script also checks
+highlight movement between the first and last timed words, including removing the old mark.
 
 ## Reproduction and remaining gates
 

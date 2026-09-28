@@ -138,8 +138,9 @@ changing tests or their timeouts.
   was run. The research samples retain their previously generated links and recordings.
 - No native bilingual reader. Existing Swift decoder compatibility
   was checked for primary manifests/cues, not native import/playback.
-- Every word remains a tab stop. The reader still reconciles the chapter during playback; nested
-  scans are removed, but long-chapter profiling and more selective rendering remain necessary.
+- Every word remains a tab stop. Sentence passages now skip reconciliation when their text,
+  highlights and interactions are unchanged; the first real long-chapter before/after is recorded.
+  The reader shell still updates on ticks, and larger-book/mobile profiling remains open.
 - Mapping quality evidence comes from small, partly self-labelled examples. Provider timings are
   unverified, including suspiciously uniform Hebrew intervals and zero-duration words. Zero-duration
   anchors never become active-word highlights.
@@ -183,11 +184,27 @@ calls. Long-chapter playback exposed substantial JavaScript cost, so selective r
 supported by a concrete baseline rather than only a review concern. The report records remaining
 gates and reproducible local artifact checks.
 
-Assistant/MCP parity is an explicit requirement in phase 4 of the delivery plan, including local
+Assistant/MCP parity is an explicit requirement in phase 6 of the delivery plan, including local
 sentence-level and optional word-linked workflows. Audit found preparation/status/cancel,
 translated-lane narration and per-request translation model selection missing from the shared tool
-surface. An implementation estimate of 15–25k coding tokens was presented for user approval;
-do not treat this audit as an implemented capability.
+surface. The user clarified that this belongs after the rest of the reader workflow is ready;
+the earlier budget question is superseded, not pending. Do not start MCP work next or treat this
+audit as an implemented capability. Next is keyboard navigation and failure fallback, then desktop lifecycle
+and whole-book acceptance, native consumption, MCP parity and final cleanup.
+
+## Playback rendering follow-up
+
+`BilingualPassage` memoizes sentence text, with stable word/meaning handlers and link arrays.
+Ordinary playback updates highlighted passages rather than reconstructing every word button.
+The same 8,219-token chapter now spends about 0.85–0.88 seconds running JavaScript per five-second
+playback sample, down from 3.26–3.41 seconds. Frame p95 fell from 50 ms to about 16.8 ms in headless
+Chromium on the development build. No React Compiler is enabled. No virtualization, imperative
+DOM highlighting or custom comparison that ignores callbacks was introduced.
+
+Voice changes and alternation still update handlers when their state changes. Existing browser
+checks cover hover, keyboard, touch and alternation; the real-export script now also seeks between
+distant words and checks that exactly one active-word mark moves to the correct token. See the
+acceptance report for measurements and remaining limits.
 
 ## User-reported token error follow-up
 

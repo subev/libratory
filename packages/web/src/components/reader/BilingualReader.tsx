@@ -14,11 +14,13 @@ import { followCue } from "../../lib/cue-follow.ts";
 import { languageLabel as language } from "../../lib/voices.ts";
 import { paragraphGroups, pairPresentation, listenPosition, linkedText, sharesPrimaryRecording, sentenceSequence, sentenceStartIndex } from "../../lib/bilingual-reading.ts";
 import { WordMeaning, useWordMeaning } from "./WordMeaning.tsx";
+import { BilingualPassage } from "./BilingualPassage.tsx";
 import { Button } from "../Button.tsx";
 import { IconPause, IconPlay } from "../icons.tsx";
 
 const BAND = { top: 160, bottom: 100, landing: 0.3 };
 const SIDES = ["source", "target"] as const;
+const NO_TOKENS: readonly number[] = [];
 
 type Props = {
   doc: BilingualDocument;
@@ -47,6 +49,7 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
   const sequences = useMemo(() => ({ source: sentenceSequence(doc, "source"), target: sentenceSequence(doc, "target") }), [doc]);
   const sentence = alternate ? sequences[alternate.first][alternate.index] : null;
   const meaning = useWordMeaning();
+  const { dismiss: dismissMeaning, show: showMeaning, consumeHold } = meaning;
   const selection = meaning.selection;
   const directions = useMemo(() => ({ source: readingDirection(doc.source.language), target: readingDirection(doc.target.language) }), [doc.source.language, doc.target.language]);
   const groups = useMemo(() => paragraphGroups(doc), [doc]);
@@ -60,7 +63,11 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
   const lane = doc[side];
   const activePair = pairAtTime(doc, side, ms);
   const activeToken = tokenAtTime(lane, ms);
-  const counterpart = activePair && activeToken ? linkedTokens(activePair, side, activeToken.id) : null;
+  const speakingPair = activeToken ? doc.pairs.find((pair) => {
+    const range = pair[side];
+    return range && activeToken.range[0] >= range[0] && activeToken.range[1] <= range[1];
+  }) : null;
+  const counterpart = useMemo(() => activePair && activeToken ? linkedTokens(activePair, side, activeToken.id) : null, [activePair, activeToken, side]);
   useAudioTime(audioRef, playing, setMs);
 
   const togglePlay = useCallback(() => {
@@ -91,7 +98,7 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
     if (sourceMs !== undefined) onPosition(sharesPrimaryRecording(doc, chapter.audio) ? sourceMs : 0);
   }, [doc, chapter.audio, side, ms, onPosition]);
 
-  function listen(nextSide: BilingualSide, at: number, play: boolean, continuing = false) {
+  const listen = useCallback((nextSide: BilingualSide, at: number, play: boolean, continuing = false) => {
     setMessage(null);
     if (!continuing) completed.current = null;
     if (alternate && !continuing) {
@@ -104,7 +111,7 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
         return;
       }
     }
-    if (!continuing) { meaning.dismiss(); setFollowing(true); }
+    if (!continuing) { dismissMeaning(); setFollowing(true); }
     landing.current = { ms: at, play };
     if (nextSide === side) {
       const audio = audioRef.current;
@@ -119,7 +126,7 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
       setSide(nextSide);
     }
     setMs(at);
-  }
+  }, [alternate, doc, dismissMeaning, sequences, side]);
 
   function finishSentence() {
     if (!alternate || completed.current === alternate) return;
@@ -180,45 +187,16 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
   }
 
   const selectedPair = doc.pairs.find((pair) => pair.id === selection?.pair);
-  const selected = selectedPair && selection ? linkedTokens(selectedPair, selection.side, selection.token) : null;
-  const renderPair = (pair: BilingualPair, textSide: BilingualSide) => {
-    const textLane = doc[textSide], range = pair[textSide];
-    if (!range) return null;
-    const layout = presentation[textSide].get(pair.id);
-    if (!layout) return null;
-    const pieces: ReactNode[] = [];
-    for (const { token, before, text } of layout.tokens) {
-      pieces.push(before);
-      const speaking = textSide === side && activeToken?.id === token.id;
-      const linked = textSide !== side && counterpart?.[textSide].includes(token.id);
-      const inspected = selection?.pair === pair.id && (selected?.[textSide].includes(token.id) || (selection.side === textSide && selection.token === token.id));
-      pieces.push(
-        <button
-          key={token.id}
-          type="button"
-          aria-label={`Listen from ${textLane.text.slice(...token.range)}`}
-          aria-describedby={selection?.side === textSide && selection.token === token.id ? "word-meaning" : undefined}
-          className={`inline cursor-pointer select-text rounded-sm hover:bg-(--accent)/18 ${speaking ? "bg-(--accent)/35" : ""} ${linked ? "underline decoration-(--accent-text) decoration-2 underline-offset-4" : ""} ${inspected ? "bg-(--accent)/18" : ""}`}
-          data-testid={speaking ? "reader-word" : undefined}
-          data-token={`${textSide}:${token.id}`}
-          {...meaning.handlers({ pair: pair.id, side: textSide, token: token.id })}
-          onClick={(event) => {
-            if (meaning.consumeHold() || window.getSelection()?.toString()) return;
-            if (inspectMode) { meaning.show({ pair: pair.id, side: textSide, token: token.id }, event.currentTarget); return; }
-            const at = listenPosition(textLane, pair, textSide, token.id);
-            if (!at) { setMessage(`No narration timing here in ${language(textLane.language)}.`); return; }
-            listen(textSide, at.ms, true);
-            if (!at.word) setMessage("Word timing is unavailable here; playing from the sentence start.");
-          }}
-        >{text}</button>,
-      );
-    }
-    pieces.push(layout.after);
-    const active = activePair?.id === pair.id && (textSide === side || pair.status === "matched");
-    return <span key={pair.id} className={active ? "rounded-sm bg-(--accent)/10" : undefined}
-      title={pair.status === "uncertain" ? "Pairing uncertain" : undefined}
-      data-testid={activePair?.id === pair.id && textSide === side ? "text-cue-active" : undefined}>{pieces}</span>;
-  };
+  const selected = useMemo(() => selectedPair && selection ? linkedTokens(selectedPair, selection.side, selection.token) : null, [selectedPair, selection]);
+  const activateWord = useCallback((pair: BilingualPair, textSide: BilingualSide, token: number, anchor: HTMLButtonElement) => {
+    if (consumeHold() || window.getSelection()?.toString()) return;
+    if (inspectMode) { showMeaning({ pair: pair.id, side: textSide, token }, anchor); return; }
+    const textLane = doc[textSide];
+    const at = listenPosition(textLane, pair, textSide, token);
+    if (!at) { setMessage(`No narration timing here in ${language(textLane.language)}.`); return; }
+    listen(textSide, at.ms, true);
+    if (!at.word) setMessage("Word timing is unavailable here; playing from the sentence start.");
+  }, [doc, inspectMode, listen, consumeHold, showMeaning]);
 
   return (
     <div className="min-h-screen bg-(--bg-reading) px-4 py-3" data-testid="bilingual-reader">
@@ -288,7 +266,16 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
               {SIDES.map((textSide) => (
                 <div key={textSide} className="min-w-0 max-w-prose px-3">
                   <p dir={directions[textSide]} lang={doc[textSide].language} className={`whitespace-normal font-reading leading-relaxed ${pairs.length === 1 && pairs[0]?.id === heading ? "text-2xl font-medium" : "text-lg"}`}>
-                    {pairs.some((pair) => pair[textSide]) ? pairs.map((pair) => renderPair(pair, textSide)) : <span className="font-sans text-sm text-(--text-muted)">No counterpart for this passage.</span>}
+                    {pairs.some((pair) => pair[textSide]) ? pairs.map((pair) => (
+                      <BilingualPassage key={pair.id} pair={pair} lane={doc[textSide]} side={textSide} layout={presentation[textSide].get(pair.id)}
+                        active={activePair === pair && (textSide === side || pair.status === "matched")}
+                        current={activePair === pair && textSide === side}
+                        speakingToken={speakingPair === pair && textSide === side ? activeToken?.id ?? null : null}
+                        linked={activePair === pair && textSide !== side ? counterpart?.[textSide] ?? NO_TOKENS : NO_TOKENS}
+                        inspected={selectedPair === pair ? selected?.[textSide] ?? NO_TOKENS : NO_TOKENS}
+                        meaningToken={selectedPair === pair && selection?.side === textSide ? selection.token : null}
+                        handlers={meaning.handlers} onActivate={activateWord} />
+                    )) : <span className="font-sans text-sm text-(--text-muted)">No counterpart for this passage.</span>}
                   </p>
                 </div>
               ))}

@@ -58,10 +58,29 @@ try {
       await page.keyboard.press("Space");
       await page.waitForFunction(() => document.querySelector("audio")?.paused);
     }
+    const timedWords = doc.source.narration.anchors.flatMap((anchor) => {
+      if (anchor.kind !== "word" || anchor.start.ms === null || anchor.end.ms === null || anchor.end.ms <= anchor.start.ms) return [];
+      const token = doc.source.tokens.find((t) => t.range[0] >= anchor.range[0] && t.range[1] <= anchor.range[1]);
+      return token ? [{ id: token.id, ms: (anchor.start.ms + anchor.end.ms) / 2 }] : [];
+    });
+    const first = timedWords[0], last = timedWords.at(-1);
+    if (first && last && first.id !== last.id) {
+      await page.locator(`[data-token="source:${first.id}"]`).click();
+      await page.waitForFunction(() => !document.querySelector("audio")?.paused);
+      await page.keyboard.press("Space");
+      await page.waitForFunction(() => document.querySelector("audio")?.paused);
+      await page.getByTestId("bilingual-paragraph").first().dispatchEvent("wheel", { deltaY: 100 });
+      for (const word of [last, first]) {
+        await page.locator("audio").evaluate((audio, ms) => { audio.currentTime = ms / 1000; }, word.ms);
+        await expect(page.getByTestId("reader-word")).toHaveCount(1);
+        await expect(page.getByTestId("reader-word")).toHaveAttribute("data-token", `source:${word.id}`);
+      }
+    }
     if (key === "linked") {
       const pair = doc.pairs.find((p) => p.links.length > 0);
       const id = pair?.links[0]?.source[0];
       if (id === undefined) throw new Error("No saved links");
+      await page.mouse.move(0, 0);
       await page.locator(`[data-token="source:${id}"]`).hover();
       await expect(page.getByRole("tooltip")).toBeVisible();
       expect(await page.getByRole("tooltip").textContent()).not.toContain("No equivalent recorded");
