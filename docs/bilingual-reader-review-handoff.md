@@ -189,8 +189,7 @@ sentence-level and optional word-linked workflows. Audit found preparation/statu
 translated-lane narration and per-request translation model selection missing from the shared tool
 surface. The user clarified that this belongs after the rest of the reader workflow is ready;
 the earlier budget question is superseded, not pending. Do not start MCP work next or treat this
-audit as an implemented capability. Next is keyboard navigation and failure fallback, then desktop lifecycle
-and whole-book acceptance, native consumption, MCP parity and final cleanup.
+audit as an implemented capability. Next is desktop lifecycle and whole-book acceptance, native consumption, MCP parity and final cleanup.
 
 ## Playback rendering follow-up
 
@@ -230,3 +229,17 @@ validation bug is fixed with a synchronous parser and a regression that previous
 unhandled rejection/publication. Cancellation queries, streaming file hashing and passage indexes
 are simplified, with shared grapheme/token helpers and speed subscription. The response records
 which suggestions were applied, retained deliberately or deferred to measured long-chapter work.
+
+## Keyboard and recovery follow-up
+
+The reader now remembers one word Tab stop per language. Left/Right move within that language's
+reading direction (reversed for RTL); Home/End reach the first/last word. Enter listens and Space
+pauses/plays. Hover/focus meanings remain available; playback never moves keyboard focus.
+
+A failed, invalid, wrong-chapter or missing bilingual attachment opens the original reader with a
+notice. An explicit retry preserves the current original recording position; there is no automatic
+retry. Chapters with no attachment can still navigate to a prepared chapter.
+`node e2e/scripts/bilingual-resilience.mjs` checks these paths, two Tab stops, LTR/RTL navigation and
+keyboard playback using a generated range-capable WAV fixture. No database or paid provider is used.
+The three saved multilingual examples also pass their existing browser checks. Lint, typecheck and
+all 1,142 unit/integration tests pass. Desktop lifecycle and native acceptance remain open.

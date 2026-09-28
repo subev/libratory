@@ -14,11 +14,12 @@ type Props = {
   linked: readonly number[];
   inspected: readonly number[];
   meaningToken: number | null;
+  tabStop: number | null;
   handlers: ReturnType<typeof useWordMeaning>["handlers"];
   onActivate: (pair: BilingualPair, side: BilingualSide, token: number, anchor: HTMLButtonElement) => void;
 };
 
-export const BilingualPassage = memo(function BilingualPassage({ pair, lane, side, layout, active, current, speakingToken, linked, inspected, meaningToken, handlers, onActivate }: Props) {
+export const BilingualPassage = memo(function BilingualPassage({ pair, lane, side, layout, active, current, speakingToken, linked, inspected, meaningToken, tabStop, handlers, onActivate }: Props) {
   if (!layout) return null;
   const pieces: ReactNode[] = [];
   for (const { token, before, text } of layout.tokens) {
@@ -28,8 +29,9 @@ export const BilingualPassage = memo(function BilingualPassage({ pair, lane, sid
       <button
         key={token.id}
         type="button"
+        tabIndex={tabStop === token.id ? 0 : -1}
+        aria-describedby={meaningToken === token.id ? "word-meaning word-navigation" : "word-navigation"}
         aria-label={`Listen from ${lane.text.slice(...token.range)}`}
-        aria-describedby={meaningToken === token.id ? "word-meaning" : undefined}
         className={`inline cursor-pointer select-text rounded-sm hover:bg-(--accent)/18 ${speaking ? "bg-(--accent)/35" : ""} ${linked.includes(token.id) ? "underline decoration-(--accent-text) decoration-2 underline-offset-4" : ""} ${selected ? "bg-(--accent)/18" : ""}`}
         data-testid={speaking ? "reader-word" : undefined}
         data-token={`${side}:${token.id}`}

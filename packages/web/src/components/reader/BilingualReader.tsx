@@ -15,6 +15,7 @@ import { languageLabel as language } from "../../lib/voices.ts";
 import { paragraphGroups, pairPresentation, listenPosition, linkedText, sharesPrimaryRecording, sentenceSequence, sentenceStartIndex } from "../../lib/bilingual-reading.ts";
 import { WordMeaning, useWordMeaning } from "./WordMeaning.tsx";
 import { BilingualPassage } from "./BilingualPassage.tsx";
+import { useWordNavigation } from "../../lib/reader-word-navigation.ts";
 import { Button } from "../Button.tsx";
 import { IconPause, IconPlay } from "../icons.tsx";
 
@@ -49,6 +50,7 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
   const sequences = useMemo(() => ({ source: sentenceSequence(doc, "source"), target: sentenceSequence(doc, "target") }), [doc]);
   const sentence = alternate ? sequences[alternate.first][alternate.index] : null;
   const meaning = useWordMeaning();
+  const navigation = useWordNavigation(doc);
   const { dismiss: dismissMeaning, show: showMeaning, consumeHold } = meaning;
   const selection = meaning.selection;
   const directions = useMemo(() => ({ source: readingDirection(doc.source.language), target: readingDirection(doc.target.language) }), [doc.source.language, doc.target.language]);
@@ -260,7 +262,9 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
         <div className="mb-6 flex justify-between gap-8 px-3 text-sm font-medium text-(--text-muted) md:grid md:grid-cols-2 md:gap-12">
           {SIDES.map((s) => <span key={s}>{language(doc[s].language)}{s === side ? " · Audio" : ""}</span>)}
         </div>
-        <div ref={content} className="space-y-6 pb-16" onWheel={() => setFollowing(false)} onTouchMove={() => setFollowing(false)}>
+        <p id="word-navigation" className="sr-only">Left and Right move between words in this language's reading direction. Home and End go to its first and last word. Enter listens from the word; Space pauses or plays.</p>
+        <div ref={content} className="space-y-6 pb-16" onWheel={() => setFollowing(false)} onTouchMove={() => setFollowing(false)}
+          onFocusCapture={navigation.onFocusCapture} onKeyDown={navigation.onKeyDown}>
           {groups.map((pairs) => (
             <div key={pairs[0]?.id} className="grid gap-3 md:grid-cols-2 md:gap-12" data-testid="bilingual-paragraph">
               {SIDES.map((textSide) => (
@@ -274,6 +278,7 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
                         linked={activePair === pair && textSide !== side ? counterpart?.[textSide] ?? NO_TOKENS : NO_TOKENS}
                         inspected={selectedPair === pair ? selected?.[textSide] ?? NO_TOKENS : NO_TOKENS}
                         meaningToken={selectedPair === pair && selection?.side === textSide ? selection.token : null}
+                        tabStop={navigation.stops[textSide].pair === pair ? navigation.stops[textSide].token : null}
                         handlers={meaning.handlers} onActivate={activateWord} />
                     )) : <span className="font-sans text-sm text-(--text-muted)">No counterpart for this passage.</span>}
                   </p>

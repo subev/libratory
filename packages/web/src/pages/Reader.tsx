@@ -40,20 +40,20 @@ type View = (typeof VIEWS)[number]["id"];
 // One document per URL, remembered by the URL it came from: a chapter change reads as empty during
 // render rather than through an effect, and coming back to a view whose document is already in hand
 // refetches nothing.
-function useReaderDoc<T>(url: string | null, load: (url: string) => Promise<T>) {
-  const [loaded, setLoaded] = useState<{ url: string; load: (url: string) => Promise<T>; data: T | null; error: string | null } | null>(null);
+function useReaderDoc<T>(url: string | null, load: (url: string) => Promise<T>, attempt = 0) {
+  const [loaded, setLoaded] = useState<{ url: string; load: (url: string) => Promise<T>; attempt: number; data: T | null; error: string | null } | null>(null);
 
   useEffect(() => {
-    if (!url || (loaded?.url === url && loaded.load === load)) return;
+    if (!url || (loaded?.url === url && loaded.load === load && loaded.attempt === attempt)) return;
     let live = true;
     load(url)
-      .then((data) => { if (live) setLoaded({ url, load, data, error: null }); })
+      .then((data) => { if (live) setLoaded({ url, load, attempt, data, error: null }); })
       // A chapter's own failure, not the reader's — the picker has to stay usable
-      .catch((err: Error) => { if (live) setLoaded({ url, load, data: null, error: err.message }); });
+      .catch((err: Error) => { if (live) setLoaded({ url, load, attempt, data: null, error: err.message }); });
     return () => { live = false; };
-  }, [url, load, loaded?.url, loaded?.load]);
+  }, [url, load, attempt, loaded?.url, loaded?.load, loaded?.attempt]);
 
-  return loaded?.url === url && loaded.load === load ? { data: loaded.data, error: loaded.error } : { data: null, error: null };
+  return loaded?.url === url && loaded.load === load && loaded.attempt === attempt ? { data: loaded.data, error: loaded.error } : { data: null, error: null };
 }
 
 // What the reader is showing, which is not always what the engine timed: a page with no text layer
@@ -91,6 +91,7 @@ export function ReaderFor(props: ReaderProps) {
   const { source, bookId } = props;
   const [loaded, setLoaded] = useState<{ source: DocumentSource; manifest: ReaderManifest | null; error: string | null } | null>(null);
   const [params, setParams] = useSearchParams();
+  const [bilingualAttempt, setBilingualAttempt] = useState(0);
   const position = useRef(0);
   const rememberPosition = useCallback((ms: number) => { position.current = ms; }, []);
   useEffect(() => {
@@ -106,7 +107,7 @@ export function ReaderFor(props: ReaderProps) {
   const refs = bilingualReferences(chapter?.bilingual);
   const key = params.get("with") ?? refs[0]?.key ?? "";
   const ref = refs.find((r) => r.key === key);
-  const result = useReaderDoc(ref?.url ?? null, source.bilingual);
+  const result = useReaderDoc(ref?.url ?? null, source.bilingual, bilingualAttempt);
   const setLanguage = (key: string) => setParams((old) => {
     const next = new URLSearchParams(old);
     next.set("with", key);
@@ -134,14 +135,18 @@ export function ReaderFor(props: ReaderProps) {
       onChapter={(index) => { position.current = 0; setParams({ chapter: String(index), with: key }); }}
     />
   );
-  if (key) return <ReaderShell bookId={bookId} title={manifest.book.title}>
-    <p className="mb-3 text-sm" role="status">{!ref ? "Bilingual pairing is not available for this chapter." : result.error ? `Bilingual reading unavailable: ${result.error}` : doc ? "The bilingual document belongs to a different chapter or translation." : "Loading bilingual text…"}</p>
+  if (key && ref && !doc && !result.error) return <ReaderShell bookId={bookId} title={manifest.book.title}>
+    <p className="mb-3 text-sm" role="status">Loading bilingual text…</p>
     {controls}<Button size="sm" onClick={() => setLanguage("")}>Continue in single language</Button>
   </ReaderShell>;
-  return <SingleReader key={manifest.book.id} {...props} initialManifest={manifest} bilingualControls={controls} onPosition={rememberPosition} />;
+  const notice = key ? <div className={NOTE_BANNER}>
+    <p role="status">{!ref ? "Bilingual pairing is not available for this chapter." : result.error ? `Bilingual reading unavailable: ${result.error}` : "The bilingual document belongs to a different chapter or translation."} Showing the original reader.</p>
+    {ref && <Button size="sm" onClick={() => { setLanguage(key); setBilingualAttempt((attempt) => attempt + 1); }}>Try bilingual again</Button>}
+  </div> : null;
+  return <SingleReader key={manifest.book.id} {...props} initialManifest={manifest} bilingualControls={controls} bilingualNotice={notice} onPosition={rememberPosition} />;
 }
 
-function SingleReader({ source, bookId, live = false, initialManifest, bilingualControls, onPosition }: ReaderProps & { initialManifest: ReaderManifest; bilingualControls: React.ReactNode; onPosition: (ms: number) => void }) {
+function SingleReader({ source, bookId, live = false, initialManifest, bilingualControls, bilingualNotice, onPosition }: ReaderProps & { initialManifest: ReaderManifest; bilingualControls: React.ReactNode; bilingualNotice: React.ReactNode; onPosition: (ms: number) => void }) {
   const id = bookId;
   const [searchParams, setSearchParams] = useSearchParams();
   const [manifest, setManifest] = useState<ReaderManifest>(initialManifest);
@@ -292,6 +297,7 @@ function SingleReader({ source, bookId, live = false, initialManifest, bilingual
 
   return (
     <ReaderShell bookId={id} title={manifest.book.title} pinnedBack>
+      {bilingualNotice}
       <div className="sticky top-0 z-10 -mx-4 mb-4 border-b border-(--border) bg-(--bg-page)/95 px-4 py-2 backdrop-blur">
         <div className="flex flex-wrap items-center gap-3">
           {bilingualControls}
