@@ -353,9 +353,16 @@ export async function validateBilingualExport(dir: string, layer: P2afLayer): Pr
   for (const entry of layer.bilingual ?? []) {
     const doc = entry.doc;
     const chapter = layer.manifest.chapters.find((chapter) => chapter.id === doc.chapterId);
+    // A chapter with no narration and no text document of its own has nothing to hold the
+    // pairing against; its own text is the only text it carries.
+    if (chapter && !chapter.cues && !chapter.text) continue;
     const primaryText = layer.cues.find((cue) => cue.path === chapter?.cues)?.doc.text?.text
       ?? layer.texts?.find((text) => text.path === chapter?.text)?.doc.text;
-    if (primaryText === undefined || primaryText !== doc.source.text) throw new Error("Bilingual source text differs from chapter text");
+    // The same words, not the same bytes: the pairing ran on the chapter's text with its paragraph
+    // breaks, while a printed chapter's cues carry the text with breaks rebuilt from the page
+    // blocks. A reader maps between the two by skipping whitespace; a changed word must still fail.
+    const words = (text: string) => text.replace(/\s+/g, " ").trim();
+    if (primaryText === undefined || words(primaryText) !== words(doc.source.text)) throw new Error("Bilingual source text differs from chapter text");
     if (doc.source.narration && doc.source.narration.audio !== chapter?.audio) throw new Error("Bilingual source recording differs from chapter recording");
     for (const lane of [doc.source, doc.target]) {
       if (!lane.narration) continue;

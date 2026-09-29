@@ -38,6 +38,9 @@ export async function buildP2afLayer(
   exported: Map<string, ExportedChapter>,
   cover: string | null,
   translationKeys: string[] = [],
+  // The explicit bilingual export's choices: which chapters carry their pairing even without a
+  // narration of their own, and whether the translation's audio rides along (it does by default)
+  options: { targetAudio?: boolean; chapters?: Set<string> } = {},
 ): Promise<P2afLayer | null> {
   const manifest = await buildManifest(book);
   // A book with no PDF has no pages to lose, and its layer is cues over text. One that has a PDF
@@ -62,20 +65,26 @@ export async function buildP2afLayer(
     const file = exported.get(entry.id);
     const chapter = byId.get(entry.id);
     const doc = file && chapter ? await buildCues(chapter) : null;
-    if (!file || !doc) {
+    if (file && doc) {
+      const path = `cues/${file.base}.json`;
+      entry.audio = `../audio/${file.audioFile}`;
+      entry.cues = path;
+      cues.push({ path, doc });
+    } else {
       entry.audio = null;
       entry.cues = null;
-      continue;
     }
-    const path = `cues/${file.base}.json`;
-    entry.audio = `../audio/${file.audioFile}`;
-    entry.cues = path;
-    cues.push({ path, doc });
+    // A selected chapter with no narration of its own still carries its pages and its translation:
+    // the reader shows both texts and plays whichever recording the file has. A chapter the
+    // export left out carries neither.
+    if (!file && !options.chapters?.has(entry.id)) continue;
     for (const ref of prepared.filter((r) => r.chapterId === entry.id)) {
       const [variant] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, ref.variantId));
       const extension = variant?.audioPath ? audioExtension(variant.audioPath) : ".m4a";
       const audio = `audio/${ref.variantId}${extension}`;
-      const paired = await buildBilingualDocument(ref.variantId, { source: entry.audio, target: audio });
+      const paired = await buildBilingualDocument(ref.variantId, {
+        source: entry.audio ?? "", target: audio, sourceAudio: entry.audio !== null, targetAudio: options.targetAudio !== false,
+      });
       if (!paired) {
         await appendLog(book.id, `Bilingual attachment for chapter ${entry.i + 1} (${ref.key}) changed during export and was omitted. Export again when preparation/narration finishes.`);
         continue;

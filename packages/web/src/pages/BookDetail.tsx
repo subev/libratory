@@ -1304,7 +1304,7 @@ export function BookDetail() {
             originalLanguage={book.language} translationLanes={translationLanes.map((lane) => ({ key: lane.key, label: variantLabel(lane) }))}
             exportTranslation={exportTranslation} onTranslation={setBilingualKey}
             bilingualAudio={bilingualAudio} onAudio={setBilingualAudio} bilingualRows={bilingualRows}
-            selectedCount={selectedCount} bilingualReason={bilingualReason}
+            selectedCount={selectedCount} bilingualReason={bilingualReason} pages={hasChapterPages}
             onPrepare={() => { setReturnToExport(true); setExportOpen(false); openPairing(exportTranslation); }} /> : undefined}
           value={pickedExport}
           onChange={setExportFormat}

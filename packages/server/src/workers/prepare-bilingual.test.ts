@@ -108,6 +108,34 @@ describe("bilingual jobs and publication", () => {
       bilingual: { sourceAudio: false, targetAudio: false } })).rejects.toThrow("Pair current sentences first (Bilingual reading in the German lane): 1. Hello");
   });
 
+  it("carries the translation without its recording, and a chapter without narration, in the page layer", async () => {
+    const translated = path.join(dir, "target.m4a");
+    await writeFile(translated, "target audio");
+    await writeSyncMap(translated, { version: 1, totalMs: 2000, chunks: [{ text: target, startMs: 0, endMs: 2000 }] });
+    await getDb().update(chapterVariants).set({ audioPath: translated, audioStatus: "done", audioDurationMs: 2000 }).where(eq(chapterVariants.id, variantId));
+    const audio = path.join(dir, "source.m4a");
+    await writeFile(audio, "source audio");
+    await writeSyncMap(audio, { version: 1, totalMs: 1000, chunks: [{ text: source, startMs: 0, endMs: 1000 }] });
+    await getDb().update(chapters).set({ audioPath: audio, durationMs: 1000 }).where(eq(chapters.id, chapterId));
+    await paired();
+    const book = row(await getDb().select().from(books).where(eq(books.id, bookId)));
+    const silent = await buildP2afLayer(book, new Map([[chapterId, { base: "ch000", audioFile: "ch000.m4a" }]]), null, ["German"], { targetAudio: false });
+    expect(silent?.bilingual?.[0]?.doc.source.narration?.totalMs).toBe(1000);
+    expect(silent?.bilingual?.[0]?.doc.target.narration).toBeNull();
+    expect(silent?.bilingual?.[0]?.audio).toEqual([]);
+    // Nothing narrated at all is no layer; one narrated chapter carries the un-narrated one too.
+    expect(await buildP2afLayer(book, new Map(), null, ["German"])).toBeNull();
+    const other = row(await getDb().insert(chapters).values({ bookId, index: 1, title: "Second", rawText: "Second chapter.", status: "done", selected: true, audioPath: audio, durationMs: 1000 }).returning());
+    const leftOut = await buildP2afLayer(book, new Map([[other.id, { base: "ch001", audioFile: "ch001.m4a" }]]), null, ["German"]);
+    expect(leftOut?.manifest.chapters.find((entry) => entry.id === chapterId)?.bilingual).toEqual([]);
+    const withSecond = await buildP2afLayer(book, new Map([[other.id, { base: "ch001", audioFile: "ch001.m4a" }]]), null, ["German"], { chapters: new Set([chapterId]) });
+    const first = withSecond?.manifest.chapters.find((entry) => entry.id === chapterId);
+    expect(first?.audio).toBeNull();
+    expect(first?.bilingual).toHaveLength(1);
+    expect(withSecond?.bilingual?.[0]?.doc.source.narration).toBeNull();
+    expect(withSecond?.bilingual?.[0]?.doc.target.narration?.totalMs).toBe(2000);
+  });
+
   it("does not read an unchecked original recording", async () => {
     await getDb().update(chapters).set({ audioPath: dir }).where(eq(chapters.id, chapterId));
     await paired();

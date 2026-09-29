@@ -3,7 +3,7 @@ import { Button } from "../Button.tsx";
 import type { bilingualExportStatus, BilingualExportOptions as AudioChoice } from "../../../../server/src/lib/bilingual-export.ts";
 
 export function BilingualExportOptions({ originalLanguage, translationLanes, exportTranslation, onTranslation,
-  bilingualAudio, onAudio, bilingualRows, selectedCount, bilingualReason, onPrepare }: {
+  bilingualAudio, onAudio, bilingualRows, selectedCount, bilingualReason, onPrepare, pages }: {
   originalLanguage: string | null;
   translationLanes: { key: string; label: string }[];
   exportTranslation: string;
@@ -15,6 +15,8 @@ export function BilingualExportOptions({ originalLanguage, translationLanes, exp
   bilingualReason?: string;
   // Opens the pairing panel for the unpaired chapters; the export dialog comes back afterwards
   onPrepare?: () => void;
+  // A printed book: its pages ride along with the original recording
+  pages?: boolean;
 }) {
   const translationId = useId();
   const unpaired = bilingualRows.filter((row) => !row.paired);
@@ -38,7 +40,8 @@ export function BilingualExportOptions({ originalLanguage, translationLanes, exp
     <p className="text-xs text-(--text-muted)">{bilingualRows.filter((row) => row.paired).length}/{selectedCount} chapters paired.
       Word links in {bilingualRows.reduce((sum, row) => sum + row.linkedGroups, 0)}/{bilingualRows.reduce((sum, row) => sum + row.matchedGroups, 0)} matched sentence groups.
       Word timing present: original {bilingualRows.filter((row) => row.source.words).length}/{selectedCount}, translation {bilingualRows.filter((row) => row.target.words).length}/{selectedCount}.
-      Chapters without recordings remain readable. Uncheck both for text only.</p>
+      Chapters without recordings remain readable. Uncheck both for text only.
+      {pages && (bilingualAudio.sourceAudio ? " The original pages come along, for reading the print beside the translation." : " Include the original recording to bring the pages along.")}</p>
     {bilingualRows.some((row) => bilingualAudio.sourceAudio && row.source.legacy || bilingualAudio.targetAudio && row.target.legacy) &&
       <p className="text-xs text-(--warning-text)">Older MP3 recordings may seek inaccurately. Convert them in Bilingual reading before exporting.</p>}
     {bilingualReason && <p role="status" className="text-xs text-(--text-muted)">{bilingualReason}</p>}

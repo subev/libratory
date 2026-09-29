@@ -11,7 +11,7 @@ import { ensureSyncMap } from "../lib/sync-map.ts";
 import { buildReadaloudEpub, type ReadaloudChapter } from "../lib/readaloud-epub.ts";
 import { buildP2afLayer, buildVariantP2afLayer, buildTextP2afLayer } from "../lib/p2af.ts";
 import { attachReaderLayer, attachTextReaderLayer } from "../lib/epub-reader-layer.ts";
-import { chapterLink } from "../lib/reader-doc.ts";
+import { buildManifest, chapterLink } from "../lib/reader-doc.ts";
 import { deferUntilInputsSettle, documentJobKey } from "../lib/output-readiness.ts";
 import type { WorkerUtils } from "graphile-worker";
 import { mkdir, writeFile, rm } from "node:fs/promises";
@@ -359,21 +359,56 @@ function buildChapterSummary(indices: number[]): string {
   return `Ch ${ranges.join(", ")}`;
 }
 
+// Two shapes of file. A printed book exported with its original recording takes the synced
+// EPUB's route, so the reader gets the pages, the cues and the pairing together and can show
+// the print beside the translation. Anything else — no print, or no original recording — is
+// the two texts with whatever recordings were chosen.
 async function assembleBilingual(book: typeof books.$inferSelect, key: string, options: BilingualExportOptions, log: (message: string) => Promise<void>) {
-  const { layer, chapters: selected } = await buildBilingualExportLayer(book, key, options);
   const timestamp = formatTimestamp(new Date());
   const languages = `${languageSlug(book.language ?? "original")}-${languageSlug(key)}`;
   const voices = [options.sourceAudio ? "original" : "", options.targetAudio ? languageSlug(key) : ""].filter(Boolean).join("-") || "none";
-  const basename = `${sanitizeFilename(book.title)}_bilingual_${languages}_audio-${voices}_${timestamp}`;
+  const withPages = options.sourceAudio && (await buildManifest(book)).pages.length > 0;
+  const basename = `${sanitizeFilename(book.title)}_bilingual_${languages}_audio-${voices}${withPages ? "_pages" : ""}_${timestamp}`;
   const outputPath = path.join(bookOutputDir(book.id), `${basename}.epub`);
   const workDir = path.join(bookTmpDir(book.id), basename);
   await mkdir(path.dirname(outputPath), { recursive: true });
   await mkdir(workDir, { recursive: true });
   try {
-    const { language, documents: rendered } = renderChapterDocuments(selected.map((chapter) => ({ ...chapter, originalTitle: chapter.title, originalText: chapter.text })));
-    await log(`Exporting ${selected.length} bilingual chapters · ${languages}`);
-    await buildChapterEpub(workDir, { title: book.title, language, documents: rendered }, outputPath);
-    await attachReaderLayer(outputPath, workDir, layer);
+    let selected: { id: string; index: number }[];
+    if (withPages) {
+      const rows = await db.select().from(chapters)
+        .where(and(eq(chapters.bookId, book.id), eq(chapters.selected, true))).orderBy(asc(chapters.index));
+      // The pairing was checked at the route; here only the recordings can be missing, and a
+      // chapter without one keeps its pages and both texts.
+      const narrated: ReadaloudChapter[] = [];
+      for (const ch of rows) {
+        if (ch.status !== "done" || !ch.audioPath || !ch.durationMs) continue;
+        const sync = await ensureSyncMap(ch.audioPath, chapterChunkPreviewDir(book.id, ch.index), ch.durationMs);
+        if (!sync) continue;
+        narrated.push({ id: ch.id, index: ch.index, title: ch.title, audioPath: ch.audioPath, sync, link: chapterLink(ch) });
+      }
+      if (narrated.length === 0) throw new Error("No selected chapter has a timed original recording; uncheck the original recording to export the texts alone");
+      selected = rows.map((ch) => ({ id: ch.id, index: ch.index }));
+      await log(`Exporting ${rows.length} bilingual chapters with their pages · ${languages}`);
+      await buildReadaloudEpub({
+        title: book.title, author: book.author, language: book.language, chapters: narrated,
+        stagingDir: workDir, outputPath,
+        p2af: async (exported, cover) => {
+          const layer = await buildP2afLayer(book, exported, cover, [key], { targetAudio: options.targetAudio, chapters: new Set(rows.map((ch) => ch.id)) });
+          if (!layer) throw new Error("The pages could not be packaged; export again after the book's pages have been built");
+          const missing = rows.filter((ch) => !layer.manifest.chapters.find((entry) => entry.id === ch.id)?.bilingual?.length);
+          if (missing.length) throw new Error(`The pairing or a recording changed since it was checked; prepare again and export: ${missing.slice(0, 3).map((ch) => `${ch.index + 1}. ${ch.title}`).join(", ")}${missing.length > 3 ? ` and ${missing.length - 3} more` : ""}`);
+          return layer;
+        },
+      });
+    } else {
+      const { layer, chapters: exported } = await buildBilingualExportLayer(book, key, options);
+      selected = exported;
+      const { language, documents: rendered } = renderChapterDocuments(exported.map((chapter) => ({ ...chapter, originalTitle: chapter.title, originalText: chapter.text })));
+      await log(`Exporting ${exported.length} bilingual chapters · ${languages}`);
+      await buildChapterEpub(workDir, { title: book.title, language, documents: rendered }, outputPath);
+      await attachReaderLayer(outputPath, workDir, layer);
+    }
     await db.insert(documents).values({ bookId: book.id, language: key, format: "epub-bilingual",
       outputPath, chapterIds: JSON.stringify(selected.map((chapter) => chapter.id)), chapterCount: selected.length, chapterSummary: buildChapterSummary(selected.map((chapter) => chapter.index)) });
   } catch (error) {

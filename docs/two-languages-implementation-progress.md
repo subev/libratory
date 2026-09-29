@@ -168,3 +168,14 @@ inside an untimed stretch starts at the next timed clip after the last passage t
 `sentenceSequence` keeps two entries per pair with nulls for the skipped sides; `nextSentenceIndex`
 finds the next playable one. A book with no language set now infers its original lane's language
 from the text (script counting) instead of writing `und`.
+
+## The pages come along (2026-09-29)
+
+A printed book's Bilingual EPUB now takes the synced EPUB's route when the original recording is
+included: the file carries the pages, the original's cues with their page rects, the pairing and
+whichever recordings were chosen, so a reader can show the print beside the translation with the
+same following and zoom it gives a single language. A selected chapter without a narration of its
+own keeps its pages and both texts. Without the original recording, or for a book with no pages,
+the file is the two texts as before; the picker says which it will be. The exporter's text guard
+compares words rather than bytes, since a printed chapter's cues rebuild paragraph breaks from
+the page blocks while the pairing ran on the chapter's text.
