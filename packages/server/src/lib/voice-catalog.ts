@@ -157,6 +157,19 @@ export function engineForVoiceId(voiceId: string): VoiceEngine {
   return ENGINE_PREFIXES.find((entry) => voiceId.startsWith(entry.prefix))?.engine ?? "kokoro";
 }
 
+// Whether a recording made with this voice carries a time for every word — what word
+// highlighting and word-level two-language reading need; without it a chapter reads at sentence
+// level. Cartesia and ElevenLabs return word timestamps with the audio. Kokoro's come from its
+// English tokenizer, so only its English voices have them; its espeak-backed languages return
+// phonemes with no token structure. Pocket, KugelAudio, the Bulgarian narrators and the macOS
+// voices give chunk boundaries only.
+export function voiceHasWordTiming(voiceId: string, language?: string | null): boolean {
+  const engine = engineForVoiceId(voiceId);
+  if (engine === "cartesia" || engine === "elevenlabs") return true;
+  if (engine === "kokoro") return (language ?? languageOfStaticVoice(voiceId)) === "en";
+  return false;
+}
+
 export function normalizeVoiceId(voiceId: string): string {
   return voiceId.includes(":") ? voiceId : `kokoro:${voiceId}`;
 }

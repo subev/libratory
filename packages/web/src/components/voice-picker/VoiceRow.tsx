@@ -1,14 +1,18 @@
 import { memo } from "react";
 
-import { voiceBlockedByMissingMlx, type Voice } from "../../lib/voices.ts";
+import { voiceBlockedByMissingMlx, voiceHasWordTiming, type Voice } from "../../lib/voices.ts";
 import { Button } from "../Button.tsx";
 import { IconCheck, IconPause, IconPlay, IconSpinner } from "../icons.tsx";
 import { trpc } from "../../trpc.ts";
 import { useVoicePicker } from "./context.tsx";
 
+// Word timing is the difference between words lighting up as they are read and sentences
+// doing so, and between word-level and sentence-level two-language reading; said on every row
+// because it is the one thing a listener cannot hear in the preview.
 function describe(voice: Voice): string {
   const parts: string[] = [];
   if (voice.gender) parts.push(voice.gender === "F" ? "Female" : "Male");
+  parts.push(voiceHasWordTiming(voice.id, voice.language) ? "Word timing" : "Sentence timing");
   if (voice.note) parts.push(voice.note);
   return parts.join(" · ");
 }

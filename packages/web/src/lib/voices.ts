@@ -21,6 +21,7 @@ export {
   kokoroVoiceGroups,
   narratorVoices,
   engineForVoiceId,
+  voiceHasWordTiming,
   normalizeVoiceId,
   sayVoiceToEntry,
   cartesiaVoiceToEntry,

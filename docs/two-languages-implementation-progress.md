@@ -179,3 +179,14 @@ own keeps its pages and both texts. Without the original recording, or for a boo
 the file is the two texts as before; the picker says which it will be. The exporter's text guard
 compares words rather than bytes, since a printed chapter's cues rebuild paragraph breaks from
 the page blocks while the pairing ran on the chapter's text.
+
+## Which voices time their words (2026-09-29)
+
+Word highlighting and word-level two-language reading need a time for every word, and a
+listener cannot hear in a preview whether a voice gives one. The catalog now says so per voice
+(`wordTiming`), the picker prints "Word timing" or "Sentence timing" on every row, and `list_voices`
+carries the flag. The facts, from the engines: Cartesia and ElevenLabs return word timestamps with
+the audio; Kokoro's come from its English tokenizer, so only its English voices have them, and its
+espeak-backed languages (French, Spanish, Italian, Portuguese, Hindi) do not; Pocket, KugelAudio,
+the two Bulgarian narrators and the macOS voices give chunk boundaries only. A Bulgarian lane meant
+for word-level reading therefore needs a cloud voice today.

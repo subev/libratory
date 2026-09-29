@@ -711,6 +711,7 @@ export function createMcpServer(profileId: string): McpServer {
     {
       description:
         "Every narrator voice this installation can use, with the language each reads: local engines (Kokoro, Pocket TTS, the Bulgarian and multilingual MLX narrators, installed macOS voices) " +
+        "and whether its recordings carry word timing (wordTiming: true — words light up as read, and two-language reading links words; false means sentence level: Kokoro's non-English voices, Pocket, KugelAudio, the Bulgarian narrators and macOS voices). " +
         "and cloud ones behind a configured key (Cartesia, ElevenLabs — metered). Filter by language code to find a voice for a book.",
       inputSchema: {
         language: z.string().trim().min(2).max(8).optional().describe("ISO code, e.g. en, bg"),
