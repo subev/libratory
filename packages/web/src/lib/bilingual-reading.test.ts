@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import fixture from "../../../server/src/lib/fixtures/bilingual.json";
 import { parseBilingualDocument } from "../../../server/src/lib/bilingual-format.ts";
-import { linkedText, listenPosition, paragraphGroups, pairPresentation, sharesPrimaryRecording, sentenceSequence, sentenceStartIndex } from "./bilingual-reading.ts";
+import { linkedText, listenPosition, paragraphGroups, pairPresentation, sharesPrimaryRecording, sentenceSequence, sentenceStartIndex, nextSentenceIndex } from "./bilingual-reading.ts";
 
 describe("bilingual reading presentation", () => {
   it("groups sentences by real paragraph gaps without changing their addresses", () => {
@@ -61,14 +61,17 @@ describe("sentence alternation", () => {
     expect(sentenceStartIndex(doc, "target", 3000)).toBe(0);
     expect(sentenceStartIndex(doc, "source", 2000)).toBe(-1);
   });
-  it("retains a stop for uncertain or untimed pairs instead of skipping them", () => {
+  it("alternates an uncertain pair and plays the timed side of a half-timed one", () => {
     const doc = parseBilingualDocument(fixture), pair = doc.pairs[0];
     if (!pair) throw new Error("Missing fixture pair");
     pair.status = "uncertain";
-    expect(sentenceSequence(doc, "source")).toEqual([null, null]);
-    pair.status = "matched";
+    expect(sentenceSequence(doc, "source").map((clip) => clip?.side)).toEqual(["source", "target"]);
     doc.target.narration = null;
-    expect(sentenceSequence(doc, "source")).toEqual([null, null]);
+    const sequence = sentenceSequence(doc, "source");
+    expect(sequence.map((clip) => clip?.side ?? null)).toEqual(["source", null]);
+    expect(nextSentenceIndex(sequence, 0)).toBe(0);
+    expect(nextSentenceIndex(sequence, 1)).toBe(-1);
+    expect(nextSentenceIndex(sequence, -1)).toBe(-1);
   });
   it("moves to the next pair after both versions, never back to the first pair", () => {
     const doc = parseBilingualDocument(fixture), pair = doc.pairs[0];

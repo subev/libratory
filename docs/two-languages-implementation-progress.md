@@ -156,3 +156,15 @@ Cartesia was out of credits), pair (local), link (DeepSeek), export with both re
 the web reader. Only Cartesia and ElevenLabs return word timestamps for
 Bulgarian; the local Bulgarian narrators do not, so a Bulgarian lane narrated locally reads at
 sentence granularity.
+
+## Alternation never stops mid-chapter (2026-09-29)
+
+A listener on headphones hit a wall: sentence alternation stopped at a pair the pairing model had
+marked *uncertain*, although both recordings had timing for it, and asked them to choose another
+passage. The rule is now: a pair alternates on whatever timing it has. An uncertain pairing is still
+heard in both voices; a side without usable timing is skipped and the other side is heard; a pair
+with neither is passed over. Only the end of the chapter ends the run, and turning alternation on
+inside an untimed stretch starts at the next timed clip after the last passage the voice passed.
+`sentenceSequence` keeps two entries per pair with nulls for the skipped sides; `nextSentenceIndex`
+finds the next playable one. A book with no language set now infers its original lane's language
+from the text (script counting) instead of writing `und`.

@@ -12,7 +12,7 @@ import { SPEEDS, loadSpeed, saveSpeed, subscribeSpeed } from "../../lib/playback
 import { formatDuration } from "../../lib/format.ts";
 import { followCue } from "../../lib/cue-follow.ts";
 import { languageLabel as language } from "../../lib/voices.ts";
-import { paragraphGroups, pairPresentation, listenPosition, linkedText, sharesPrimaryRecording, sentenceSequence, sentenceStartIndex } from "../../lib/bilingual-reading.ts";
+import { paragraphGroups, pairPresentation, listenPosition, linkedText, sharesPrimaryRecording, sentenceSequence, sentenceStartIndex, nextSentenceIndex } from "../../lib/bilingual-reading.ts";
 import { WordMeaning, useWordMeaning } from "./WordMeaning.tsx";
 import { BilingualPassage } from "./BilingualPassage.tsx";
 import { useWordNavigation } from "../../lib/reader-word-navigation.ts";
@@ -104,12 +104,12 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
     setMessage(null);
     if (!continuing) completed.current = null;
     if (alternate && !continuing) {
-      const index = sentenceStartIndex(doc, nextSide, at);
+      const index = nextSentenceIndex(sequences[nextSide], sentenceStartIndex(doc, nextSide, at));
       setAlternate({ first: nextSide, index });
-      if (!sequences[nextSide][index]) {
+      if (index < 0) {
         landing.current.play = false;
         audioRef.current?.pause();
-        setMessage("Alternating playback needs a matched sentence with timing in both languages here.");
+        setMessage("Nothing timed remains from here. Click an earlier sentence, or turn off alternating playback.");
         return;
       }
     }
@@ -136,15 +136,14 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
     const audio = audioRef.current;
     audio?.pause();
     if (audio && sentence) { audio.currentTime = sentence.endMs / 1000; setMs(sentence.endMs); }
-    const index = alternate.index + 1;
-    const next = sequences[alternate.first][index];
+    // An untimed side is skipped, not a stop; only the end of the chapter ends the run.
+    const index = nextSentenceIndex(sequences[alternate.first], alternate.index + 1);
+    const next = index < 0 ? undefined : sequences[alternate.first][index];
     setAlternate({ first: alternate.first, index });
     if (!next) {
       landing.current.play = false;
       setPlaying(false);
-      setMessage(index >= sequences[alternate.first].length
-        ? "End of chapter. Click a sentence to listen again."
-        : "Alternating playback stopped: the next passage has no reliable timed pair. Click a sentence to continue, or turn off alternating playback.");
+      setMessage("End of chapter. Click a sentence to listen again.");
       return;
     }
     listen(next.side, next.startMs, true, true);
@@ -168,13 +167,13 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
   function enableAlternation(enabled: boolean) {
     if (!enabled) { setAlternate(null); setMessage(null); return; }
     const at = audioRef.current?.currentTime ? audioRef.current.currentTime * 1000 : ms;
-    const index = sentenceStartIndex(doc, side, at);
-    const start = sequences[side][index];
+    const index = nextSentenceIndex(sequences[side], sentenceStartIndex(doc, side, at));
+    const start = index < 0 ? undefined : sequences[side][index];
     setAlternate({ first: side, index });
     if (!start) {
       audioRef.current?.pause();
       landing.current.play = false;
-      setMessage("Alternating playback needs a matched sentence with timing in both languages here.");
+      setMessage("Nothing timed remains from here. Click an earlier sentence, or turn off alternating playback.");
       return;
     }
     listen(side, start.startMs, playing, true);

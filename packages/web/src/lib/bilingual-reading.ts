@@ -70,16 +70,24 @@ export function sharesPrimaryRecording(doc: BilingualDocument, audio: string | n
 
 export type SentencePlayback = { side: BilingualSide; pairId: string; startMs: number; endMs: number };
 
+// Two entries per pair, in the order they are heard. A side without usable timing is null and is
+// skipped, not a stop: a listener on headphones must not be halted by one untimed sentence, and an
+// uncertain pairing still has two recordings worth hearing in turn.
 export function sentenceSequence(doc: BilingualDocument, first: BilingualSide): (SentencePlayback | null)[] {
   const other = first === "source" ? "target" : "source";
-  return doc.pairs.flatMap((pair) => {
-    const clips = ([first, other] as const).map((side): SentencePlayback | null => {
+  return doc.pairs.flatMap((pair) =>
+    ([first, other] as const).map((side): SentencePlayback | null => {
       const anchor = passageAnchor(doc[side], pair[side]);
-      if (pair.status !== "matched" || !anchor || anchor.start.ms === null || anchor.end.ms === null || anchor.end.ms <= anchor.start.ms) return null;
+      if (!anchor || anchor.start.ms === null || anchor.end.ms === null || anchor.end.ms <= anchor.start.ms) return null;
       return { side, pairId: pair.id, startMs: anchor.start.ms, endMs: anchor.end.ms };
-    });
-    return clips.every((clip) => clip !== null) ? clips : [null, null];
-  });
+    }));
+}
+
+// The first playable entry at or after `from`, or -1 when nothing timed remains in the chapter.
+export function nextSentenceIndex(sequence: (SentencePlayback | null)[], from: number): number {
+  if (from < 0) return -1;
+  const offset = sequence.slice(from).findIndex((clip) => clip !== null);
+  return offset < 0 ? -1 : from + offset;
 }
 
 export function sentenceStartIndex(doc: BilingualDocument, side: BilingualSide, ms: number): number {

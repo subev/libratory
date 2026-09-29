@@ -1,3 +1,4 @@
+import { inferLanguage } from "../lib/document-html.ts";
 import { alignVectors } from "../lib/bilingual-align.ts";
 import { sentences, tokenize } from "../lib/bilingual-segment.ts";
 import { bilingualContext, failPreparation, isPreparationRunning, jobColumn, preparation, publishPreparation, type PreparationStage } from "../lib/bilingual-store.ts";
@@ -24,7 +25,7 @@ export async function prepareBilingual({ variantId, runId, stage, bookId, source
     await log("started");
     if (stage === "pairs") {
       if (!(await bundleInstalled("search"))) throw new Error("Install the optional search model bundle before pairing sentences");
-      const sourceLanguage = context.language ? languageCode(context.language) : "und", targetLanguage = languageCode(context.variant.key);
+      const sourceLanguage = context.language ? languageCode(context.language) : inferLanguage(context.source.slice(0, 2000)), targetLanguage = languageCode(context.variant.key);
       const src = sentences(context.source, sourceLanguage), tgt = sentences(context.target, targetLanguage);
       if (src.length * tgt.length > 2_000_000) throw new Error("Chapter is too large to pair; split it into smaller chapters");
       const texts = [...src.map((s) => context.source.slice(s.start, s.end)), ...tgt.map((s) => context.target.slice(s.start, s.end))];
