@@ -29,6 +29,26 @@ export class CartesiaAbortedError extends Error {
   }
 }
 
+// A 402 is the account running dry, and its JSON body used to reach the chapter's error verbatim.
+// Cartesia has no balance endpoint for an ordinary key, so this refusal is the only place the
+// remaining credits are ever stated.
+export function cartesiaErrorMessage(status: number, body: string): string {
+  let parsed: { error_code?: unknown; message?: unknown } | null = null;
+  try {
+    parsed = JSON.parse(body) as { error_code?: unknown; message?: unknown };
+  } catch {
+    parsed = null;
+  }
+  const message = typeof parsed?.message === "string" ? parsed.message : body.trim();
+  if (status === 402 || parsed?.error_code === "quota_exceeded") {
+    const needs = /requires approximately (\d+) credits/.exec(message)?.[1];
+    const has = /you have (\d+) remaining/.exec(message)?.[1];
+    const amounts = needs && has ? `: the next chunk needs about ${needs} credits and ${has} are left` : "";
+    return `Cartesia is out of credits${amounts}. Top up or change plan at play.cartesia.ai/subscription, or pick a local voice`;
+  }
+  return `Cartesia TTS error ${status}: ${message.slice(0, 300)}`;
+}
+
 function apiKey(): string {
   if (!env.CARTESIA_API_KEY) throw new Error("CARTESIA_API_KEY is not set — add a key under Settings → Cloud voices");
   return env.CARTESIA_API_KEY;
@@ -122,7 +142,7 @@ async function synthesizeChunkPcm(voiceId: string, language: string | null, text
   });
   if (!res.ok || !res.body) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Cartesia TTS error ${res.status}: ${body.slice(0, 300)}`);
+    throw new Error(cartesiaErrorMessage(res.status, body));
   }
 
   const audio: Buffer[] = [];
