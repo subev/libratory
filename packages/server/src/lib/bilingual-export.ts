@@ -9,6 +9,8 @@ import { buildTextP2afLayer, type P2afLayer } from "./p2af.ts";
 import { buildVariantCues } from "./reader-doc.ts";
 import { chapterText } from "./chapter-text.ts";
 import { readSyncMap } from "./sync-map.ts";
+import { languageCode } from "./readaloud-epub.ts";
+import { outputChapters } from "./output-readiness.ts";
 
 export const bilingualExportSchema = z.object({
   sourceAudio: z.boolean(),
@@ -16,14 +18,15 @@ export const bilingualExportSchema = z.object({
 });
 export type BilingualExportOptions = z.infer<typeof bilingualExportSchema>;
 
-async function selectedRows(bookId: string, key: string) {
+async function selectedRows(bookId: string, key: string, chapterIds?: readonly string[] | null) {
   return db.select({ chapter: chapters, variant: chapterVariants, preparation: bilingualPreparations }).from(chapters)
     .leftJoin(chapterVariants, and(eq(chapterVariants.chapterId, chapters.id), eq(chapterVariants.key, key)))
     .leftJoin(bilingualPreparations, eq(bilingualPreparations.variantId, chapterVariants.id))
-    .where(and(eq(chapters.bookId, bookId), eq(chapters.selected, true))).orderBy(asc(chapters.index));
+    .where(outputChapters(bookId, chapterIds)).orderBy(asc(chapters.index));
 }
 
-async function audioStatus(file: string | null) {
+// Whether a recording exists and carries word times — what live word links need
+export async function recordingStatus(file: string | null) {
   const exists = file ? await stat(file).then((info) => info.isFile(), () => false) : false;
   const sync = file && exists ? await readSyncMap(file) : null;
   return { available: !!sync && sync.totalMs > 0,
@@ -31,16 +34,16 @@ async function audioStatus(file: string | null) {
     legacy: !!file && path.extname(file).toLowerCase() === ".mp3" };
 }
 
-export async function bilingualExportStatus(bookId: string, key: string) {
-  const [rows, refs] = await Promise.all([selectedRows(bookId, key), bilingualReferencesForBook(bookId)]);
+export async function bilingualExportStatus(bookId: string, key: string, chapterIds?: readonly string[] | null) {
+  const [rows, refs] = await Promise.all([selectedRows(bookId, key, chapterIds), bilingualReferencesForBook(bookId)]);
   const prepared = new Set(refs.filter((ref) => ref.key === key).map((ref) => ref.chapterId));
   return Promise.all(rows.map(async ({ chapter, variant, preparation }) => ({
-    id: chapter.id, index: chapter.index, title: chapter.title, paired: prepared.has(chapter.id),
+    id: chapter.id, index: chapter.index, title: chapter.title, translated: variant?.status === "done", paired: prepared.has(chapter.id),
     matchedGroups: prepared.has(chapter.id) ? preparation?.pairs?.pairs.filter((pair) => pair.status === "matched").length ?? 0 : 0,
     linkedGroups: prepared.has(chapter.id) && preparation?.links?.pairRevision === preparation?.pairs?.revision
       ? Object.values(preparation?.links?.byPair ?? {}).filter((links) => links.length > 0).length : 0,
-    source: await audioStatus(chapter.status === "done" ? chapter.audioPath : null),
-    target: await audioStatus(variant?.audioStatus === "done" ? variant.audioPath : null),
+    source: await recordingStatus(chapter.status === "done" ? chapter.audioPath : null),
+    target: await recordingStatus(variant?.audioStatus === "done" ? variant.audioPath : null),
   })));
 }
 
@@ -64,11 +67,14 @@ export async function bilingualReadiness(bookId: string) {
         ? Object.values(preparation?.links?.byPair ?? {}).filter((entry) => entry.length > 0).length : 0;
       return matched > 0 && links >= matched;
     });
+    const named = ({ chapter }: (typeof rows)[number]) => ({ id: chapter.id, index: chapter.index, title: chapter.title });
     return {
-      key, language: refs.find((ref) => ref.key === key)?.language ?? key,
+      // A code before and after pairing: the prepared document's own, else the key's
+      key, language: refs.find((ref) => ref.key === key)?.language ?? languageCode(key),
       selected: rows.length, paired: paired.length, linked: linked.length,
-      untranslated: rows.filter(({ variant }) => !variant || variant.status !== "done").map(({ chapter }) => ({ index: chapter.index, title: chapter.title })),
-      unpaired: rows.filter(({ chapter, variant }) => variant?.status === "done" && !prepared.has(chapter.id)).map(({ chapter }) => ({ index: chapter.index, title: chapter.title })),
+      untranslated: rows.filter(({ variant }) => !variant || variant.status !== "done").map(named),
+      unpaired: rows.filter(({ chapter, variant }) => variant?.status === "done" && !prepared.has(chapter.id)).map(named),
+      unlinked: paired.filter((row) => !linked.includes(row)).map(named),
     };
   }));
 }
@@ -78,8 +84,8 @@ export function namedChapters(rows: { index: number; title: string }[]): string 
   return rows.length > 3 ? `${names.join(", ")} and ${rows.length - 3} more` : names.join(", ");
 }
 
-export async function buildBilingualExportLayer(book: Book, key: string, options: BilingualExportOptions) {
-  const rows = await selectedRows(book.id, key);
+export async function buildBilingualExportLayer(book: Book, key: string, options: BilingualExportOptions, chapterIds?: readonly string[] | null) {
+  const rows = await selectedRows(book.id, key, chapterIds);
   if (!rows.length) throw new Error("Select chapters to export");
   const exported = rows.map(({ chapter }) => ({ id: chapter.id, index: chapter.index,
     title: chapter.title, text: chapterText(chapter).trim() }));

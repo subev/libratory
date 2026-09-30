@@ -165,7 +165,12 @@ async function main() {
     }
 
     const mimeType = document.format === "pdf" ? "application/pdf" : "application/epub+zip";
-    return reply.type(mimeType).sendFile(path.relative(outputDir, document.outputPath), outputDir);
+    // inline keeps a PDF opening in the tab; the name is what a client that saves it gets, where the
+    // bare id was before
+    return reply
+      .type(mimeType)
+      .header("content-disposition", contentDisposition("inline", path.basename(document.outputPath)))
+      .sendFile(path.relative(outputDir, document.outputPath), outputDir);
   });
 
   fastify.get("/audio/chapter/:chapterId", async (request, reply) => {

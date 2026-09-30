@@ -12,7 +12,7 @@ import { buildReadaloudEpub, type ReadaloudChapter } from "../lib/readaloud-epub
 import { buildP2afLayer, buildVariantP2afLayer, buildTextP2afLayer } from "../lib/p2af.ts";
 import { attachReaderLayer, attachTextReaderLayer } from "../lib/epub-reader-layer.ts";
 import { buildManifest, chapterLink } from "../lib/reader-doc.ts";
-import { deferUntilInputsSettle, documentJobKey } from "../lib/output-readiness.ts";
+import { deferUntilInputsSettle, documentJobKey, outputChapters } from "../lib/output-readiness.ts";
 import type { WorkerUtils } from "graphile-worker";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import path from "node:path";
@@ -26,13 +26,15 @@ export type AssembleDocumentPayload = {
   bilingual?: BilingualExportOptions;
   waitForAll?: boolean;
   waitingSince?: string;
+  // Only these chapters; the selection when absent
+  chapterIds?: string[];
 };
 
 export async function assembleDocument(
   payload: AssembleDocumentPayload,
   { addJob }: { addJob: WorkerUtils["addJob"] },
 ) {
-  const { bookId, language, format } = payload;
+  const { bookId, language, format, chapterIds } = payload;
   const log = (msg: string) => appendLog(bookId, msg);
   const formatLabel = format === "epub-bilingual" ? "Bilingual EPUB" : format === "epub-sync" ? "synced EPUB" : format.toUpperCase();
 
@@ -40,7 +42,7 @@ export async function assembleDocument(
     const deferred = await deferUntilInputsSettle({
       identifier: "assembleDocument",
       payload,
-      jobKey: documentJobKey(bookId, format, language),
+      jobKey: documentJobKey(bookId, format, language, chapterIds),
       language,
       needs: format === "epub-sync" ? "audio" : "text",
       addJob,
@@ -58,14 +60,14 @@ export async function assembleDocument(
 
     if (format === "epub-bilingual") {
       if (!language || !payload.bilingual) throw new Error("Choose a translation and narration options for Bilingual EPUB");
-      await assembleBilingual(book, language, payload.bilingual, log);
+      await assembleBilingual(book, language, payload.bilingual, log, chapterIds);
       await db.update(books).set({ status: "done", error: null, updatedAt: new Date() }).where(eq(books.id, bookId));
       await log("Bilingual EPUB export complete");
       return;
     }
 
     if (format === "epub-sync") {
-      await assembleReadaloud(bookId, book, language ?? null, log);
+      await assembleReadaloud(bookId, book, language ?? null, log, chapterIds);
       await db.update(books).set({ status: "done", error: null, updatedAt: new Date() }).where(eq(books.id, bookId));
       await log("Synced EPUB export complete");
       return;
@@ -90,8 +92,7 @@ export async function assembleDocument(
         .from(chapterVariants)
         .innerJoin(chapters, eq(chapterVariants.chapterId, chapters.id))
         .where(and(
-          eq(chapters.bookId, bookId),
-          eq(chapters.selected, true),
+          outputChapters(bookId, chapterIds),
           eq(chapterVariants.key, language),
         ))
         .orderBy(asc(chapters.index));
@@ -110,7 +111,7 @@ export async function assembleDocument(
       const selectedChapters = await db
         .select()
         .from(chapters)
-        .where(and(eq(chapters.bookId, bookId), eq(chapters.selected, true)))
+        .where(outputChapters(bookId, chapterIds))
         .orderBy(asc(chapters.index));
       selectedCount = selectedChapters.length;
       docChapters = selectedChapters
@@ -194,6 +195,7 @@ async function assembleReadaloud(
   book: typeof books.$inferSelect,
   language: string | null,
   log: (msg: string) => Promise<void>,
+  chapterIds?: string[],
 ) {
   type Candidate = { id: string; index: number; title: string; audioPath: string | null; durationMs: number | null; chunkDir: string; link?: string };
 
@@ -213,8 +215,7 @@ async function assembleReadaloud(
       .from(chapterVariants)
       .innerJoin(chapters, eq(chapterVariants.chapterId, chapters.id))
       .where(and(
-        eq(chapters.bookId, bookId),
-        eq(chapters.selected, true),
+        outputChapters(bookId, chapterIds),
         eq(chapterVariants.key, language),
       ))
       .orderBy(asc(chapters.index));
@@ -233,7 +234,7 @@ async function assembleReadaloud(
     const rows = await db
       .select()
       .from(chapters)
-      .where(and(eq(chapters.bookId, bookId), eq(chapters.selected, true), eq(chapters.status, "done")))
+      .where(and(outputChapters(bookId, chapterIds), eq(chapters.status, "done")))
       .orderBy(asc(chapters.index));
     candidates = rows.map((ch) => ({
       id: ch.id,
@@ -363,7 +364,7 @@ function buildChapterSummary(indices: number[]): string {
 // EPUB's route, so the reader gets the pages, the cues and the pairing together and can show
 // the print beside the translation. Anything else — no print, or no original recording — is
 // the two texts with whatever recordings were chosen.
-async function assembleBilingual(book: typeof books.$inferSelect, key: string, options: BilingualExportOptions, log: (message: string) => Promise<void>) {
+async function assembleBilingual(book: typeof books.$inferSelect, key: string, options: BilingualExportOptions, log: (message: string) => Promise<void>, chapterIds?: string[]) {
   const timestamp = formatTimestamp(new Date());
   const languages = `${languageSlug(book.language ?? "original")}-${languageSlug(key)}`;
   const voices = [options.sourceAudio ? "original" : "", options.targetAudio ? languageSlug(key) : ""].filter(Boolean).join("-") || "none";
@@ -377,7 +378,7 @@ async function assembleBilingual(book: typeof books.$inferSelect, key: string, o
     let selected: { id: string; index: number }[];
     if (withPages) {
       const rows = await db.select().from(chapters)
-        .where(and(eq(chapters.bookId, book.id), eq(chapters.selected, true))).orderBy(asc(chapters.index));
+        .where(outputChapters(book.id, chapterIds)).orderBy(asc(chapters.index));
       // The pairing was checked at the route; here only the recordings can be missing, and a
       // chapter without one keeps its pages and both texts.
       const narrated: ReadaloudChapter[] = [];
@@ -389,7 +390,7 @@ async function assembleBilingual(book: typeof books.$inferSelect, key: string, o
       }
       if (narrated.length === 0) throw new Error("No selected chapter has a timed original recording; uncheck the original recording to export the texts alone");
       selected = rows.map((ch) => ({ id: ch.id, index: ch.index }));
-      await log(`Exporting ${rows.length} bilingual chapters with their pages · ${languages}`);
+      await log(`Exporting ${rows.length} bilingual chapter${rows.length === 1 ? "" : "s"} with their pages · ${languages}`);
       await buildReadaloudEpub({
         title: book.title, author: book.author, language: book.language, chapters: narrated,
         stagingDir: workDir, outputPath,
@@ -402,10 +403,10 @@ async function assembleBilingual(book: typeof books.$inferSelect, key: string, o
         },
       });
     } else {
-      const { layer, chapters: exported } = await buildBilingualExportLayer(book, key, options);
+      const { layer, chapters: exported } = await buildBilingualExportLayer(book, key, options, chapterIds);
       selected = exported;
       const { language, documents: rendered } = renderChapterDocuments(exported.map((chapter) => ({ ...chapter, originalTitle: chapter.title, originalText: chapter.text })));
-      await log(`Exporting ${exported.length} bilingual chapters · ${languages}`);
+      await log(`Exporting ${exported.length} bilingual chapter${exported.length === 1 ? "" : "s"} · ${languages}`);
       await buildChapterEpub(workDir, { title: book.title, language, documents: rendered }, outputPath);
       await attachReaderLayer(outputPath, workDir, layer);
     }

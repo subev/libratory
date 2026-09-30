@@ -206,3 +206,12 @@ Needs Postgres, the BGE-M3 bundle and the book above. Every LLM step is well und
 on the default model. The Cartesia takes are reused, never regenerated (`cartesia.ts` pins its
 model). Spike code keeps non-null assertions and hard-coded chapter ids; rewrite under the repo's
 type rules when built.
+
+## The second language outside Libratory's reader
+
+An `epub-bilingual` export's pages are the original only (`lang` of the book); the translation,
+pairs and links live in `OEBPS/p2af/bilingual/*.json`. Apple Books or any other reader shows an
+ordinary single-language book. The MCP dogfood of 2026-09-30 (finding 20) had the user open the export
+and ask whether it had been translated at all. The tool descriptions now say so; the open decision is
+whether the export should also carry the translation in its pages — interleaved paragraphs, or a
+second spine item per chapter — for readers without the p2af layer.
