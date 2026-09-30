@@ -90,7 +90,7 @@ describe("bilingual jobs and publication", () => {
     expect(queue.mock.calls.at(-1)?.[2]).toMatchObject({ bookId, format: "epub-bilingual", language: "German",
       bilingual: { sourceAudio: false, targetAudio: true }, waitForAll: false });
     await expect(booksCaller.exportDocument({ id: bookId, format: "epub-bilingual", language: "French",
-      bilingual: { sourceAudio: false, targetAudio: false } })).rejects.toThrow("Pair current sentences");
+      bilingual: { sourceAudio: false, targetAudio: false } })).rejects.toThrow("No finished French translation for 1. Hello — translate them first or leave them out");
     await expect(booksCaller.exportDocument({ id: bookId, format: "epub", language: "German",
       bilingual: { sourceAudio: false, targetAudio: false } })).rejects.toThrow("require Bilingual EPUB");
   });
@@ -98,10 +98,10 @@ describe("bilingual jobs and publication", () => {
   it("reports which selected chapters still need pairing, without reading recordings", async () => {
     await getDb().update(chapters).set({ audioPath: dir }).where(eq(chapters.id, chapterId));
     const before = await caller.readiness({ bookId });
-    expect(before).toEqual([expect.objectContaining({ key: "German", selected: 1, paired: 0, linked: 0, unpaired: [{ index: 0, title: "Hello" }], untranslated: [] })]);
+    expect(before).toEqual([expect.objectContaining({ key: "German", selected: 1, paired: 0, linked: 0, unpaired: [{ id: chapterId, index: 0, title: "Hello" }], untranslated: [] })]);
     await paired();
     const after = await caller.readiness({ bookId });
-    expect(after[0]).toMatchObject({ paired: 1, linked: 0, unpaired: [] });
+    expect(after[0]).toMatchObject({ paired: 1, linked: 0, unpaired: [], unlinked: [{ id: chapterId, index: 0, title: "Hello" }] });
     const booksCaller = booksRouter.createCaller({});
     await getDb().update(chapters).set({ customText: "Changed text." }).where(eq(chapters.id, chapterId));
     await expect(booksCaller.exportDocument({ id: bookId, format: "epub-bilingual", language: "German",
@@ -440,6 +440,22 @@ describe("bilingual jobs and publication", () => {
     await prepareBilingual(await queued("links"));
     expect((await preparation(variantId))?.linkJob?.status).toBe("done");
     expect(requestLinks).toHaveBeenCalledTimes(2);
+  });
+  it("links the batches after an invalid one instead of stopping there", async () => {
+    const longSource = `One ${"one ".repeat(199).trim()}. Two ${"two ".repeat(199).trim()}.`;
+    const longTarget = `Eins ${"eins ".repeat(199).trim()}. Zwei ${"zwei ".repeat(199).trim()}.`;
+    await getDb().update(chapters).set({ cleanText: longSource }).where(eq(chapters.id, chapterId));
+    await getDb().update(chapterVariants).set({ text: longTarget }).where(eq(chapterVariants.id, variantId));
+    embed.mockResolvedValueOnce([[1, 0], [0, 1], [1, 0], [0, 1]]);
+    await paired();
+    requestLinks
+      .mockResolvedValueOnce({ record: { ...answer().record, raw: "p1: 99 = 1", error: "Saved 0/1 sentence groups. p1: Token 99 is not in the source sentence. Retry to link the remaining groups." }, links: {} })
+      .mockResolvedValueOnce({ record: { ...answer().record, pairIds: ["p2"], raw: "p2: -" }, links: { p2: [] } });
+    await expect(prepareBilingual(await queued("links"))).rejects.toThrow("Token 99");
+    const saved = await preparation(variantId);
+    expect(requestLinks).toHaveBeenCalledTimes(2);
+    expect(Object.keys(saved?.links?.byPair ?? {})).toEqual(["p2"]);
+    expect(saved?.linkJob?.status).toBe("failed");
   });
   it("removes stale references after edits without deleting saved diagnostics", async () => {
     await paired();

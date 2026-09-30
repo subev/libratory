@@ -56,15 +56,25 @@ export async function prepareBilingual({ variantId, runId, stage, bookId, source
       const links = initial?.links?.pairRevision === artifact.revision ? structuredClone(initial.links)
         : { pairRevision: artifact.revision, promptVersion: LINK_PROMPT_VERSION, byPair: {}, batches: [] };
       const batches = linkBatches(artifact, links.byPair);
+      // An invalid answer fails its batch, not the ones after it: stopping there let a sentence group
+      // the model always answered wrongly block the rest of the chapter, retry after retry, because
+      // the retry's first batch starts with that same group. A provider error still ends the run.
+      const incomplete: string[] = [];
       for (const [i, batch] of batches.entries()) {
         if (!(await publish({ job: { done: i, total: batches.length } }))) return;
         const result = await requestWordLinks(artifact, batch, job.model);
         links.batches.push(result.record);
         if (result.links) Object.assign(links.byPair, result.links);
         if (!(await publish({ links, job: { done: i + 1, total: batches.length } }))) return;
-        if (result.record.error) throw new Error(result.record.error);
+        if (result.record.error) {
+          incomplete.push(result.record.error);
+          await log(`batch ${i + 1}/${batches.length} incomplete: ${result.record.error}`);
+          continue;
+        }
         await log(`linked batch ${i + 1}/${batches.length}`);
       }
+      if (incomplete.length === 1) throw new Error(incomplete[0]);
+      if (incomplete.length > 1) throw new Error(`${incomplete.length} of ${batches.length} batches incomplete: ${incomplete.slice(0, 3).join(" | ")}`);
       if (!(await publish({ links, job: { status: "done", done: batches.length, total: batches.length } }))) return;
       await log("word links ready");
     }
