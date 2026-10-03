@@ -5,7 +5,7 @@
     "@vivliostyle/cli": "11.2.0"
   },
   "overrides": {
-    "dompurify": "^3.4.13",
+    "dompurify": "^3.4.16",
     "prismjs": "^1.30.0",
     "trim": "0.0.3",
     "uuid": "14.0.2",

@@ -129,7 +129,7 @@ typing-inspection==0.4.4
     # via
     #   fastapi
     #   pydantic
-urllib3==2.7.0
+urllib3==2.8.0
     # via requests
 uvicorn==0.52.4
     # via pocket-tts
