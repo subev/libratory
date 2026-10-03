@@ -30,8 +30,8 @@
     "lint:fix": "oxlint packages scripts e2e --fix"
   },
   "devDependencies": {
-    "oxlint": "^1.82.0",
-    "oxlint-tailwindcss": "^1.11.0",
+    "oxlint": "^1.86.0",
+    "oxlint-tailwindcss": "^1.14.0",
     "typescript": "^7.0.2"
   },
   "engines": {
@@ -69,7 +69,7 @@
     }
   },
   "dependencies": {
-    "defuddle": "^0.19.3",
+    "defuddle": "^0.19.4",
     "linkedom": "^0.18.13"
   }
 }
