@@ -1,3 +1,4 @@
+import { bilingualExportSchema, bilingualExportStatus, namedChapters } from "../lib/bilingual-export.ts";
 import { bookFileOrder } from "../lib/book-file-order.ts";
 import { extractionProgress } from "../lib/ocr-progress.ts";
 import { extractionSettingsSchema } from "../lib/extraction-presets.ts";
@@ -25,7 +26,8 @@ import { translationChunkPreviewDir } from "../workers/synthesize-translation.ts
 import { insertSuspendedChapters, resetChaptersKeepingInserted } from "../lib/insert-chapters.ts";
 import { isGarbled, replaceFileWords } from "../lib/ocr-text-layer.ts";
 import { countAsciiNonAscii } from "../lib/token-estimate.ts";
-import { assembleJobKey, documentJobKey, inFlightInputs } from "../lib/output-readiness.ts";
+import { assembleJobKey, documentJobKey, inFlightInputs, outputChapters } from "../lib/output-readiness.ts";
+import { owedJobs } from "../lib/owed-jobs.ts";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { mkdir, unlink, rm } from "node:fs/promises";
@@ -58,20 +60,10 @@ async function reloadBook(id: string): Promise<Book> {
 
 // Assemble jobs have no per-row DB state; the queue is the only signal that one is
 // pending but not yet running (books.status only flips once the worker picks it up).
+// Only the M4B: document exports have pendingDocumentExports, and counting them here announced an
+// EPUB as an audiobook being assembled.
 async function hasQueuedAssembleJob(bookId: string): Promise<boolean> {
-  const [probe] = (await db.execute(
-    sql`SELECT to_regclass('graphile_worker._private_jobs') AS jobs_table`,
-  )) as unknown as Array<{ jobs_table: string | null }>;
-  if (!probe?.jobs_table) return false;
-
-  const rows = (await db.execute(sql`
-    SELECT 1
-    FROM graphile_worker._private_jobs j
-    JOIN graphile_worker._private_tasks t ON t.id = j.task_id
-    WHERE t.identifier IN ('assemble', 'assembleDocument') AND j.payload->>'bookId' = ${bookId}
-    LIMIT 1
-  `)) as unknown as unknown[];
-  return rows.length > 0;
+  return (await owedJobs(bookId)).has("assemble");
 }
 
 export function computeBookStatus(book: Book, statuses: readonly Chapter["status"][]): string {
@@ -169,7 +161,7 @@ export const booksRouter = router({
 
     const documentAgg = (await db.execute(sql`
       SELECT book_id, format, count(*)::int AS count FROM documents GROUP BY book_id, format
-    `)) as unknown as Array<{ book_id: string; format: "pdf" | "epub" | "epub-sync"; count: number }>;
+    `)) as unknown as Array<{ book_id: string; format: "pdf" | "epub" | "epub-sync" | "epub-bilingual"; count: number }>;
 
     const lastLogAgg = (await db.execute(sql`
       SELECT book_id, max(created_at) AS last FROM book_logs GROUP BY book_id
@@ -248,6 +240,7 @@ export const booksRouter = router({
           pdfs: documentRows.find((d) => d.format === "pdf")?.count ?? 0,
           epubs: documentRows.find((d) => d.format === "epub")?.count ?? 0,
           syncedEpubs: documentRows.find((d) => d.format === "epub-sync")?.count ?? 0,
+          bilingualEpubs: documentRows.find((d) => d.format === "epub-bilingual")?.count ?? 0,
         },
         lastActivityAt,
       };
@@ -1063,16 +1056,35 @@ export const booksRouter = router({
     .input(z.object({
       id: z.string().uuid(),
       language: z.string().min(1).optional(),
-      format: z.enum(["pdf", "epub", "epub-sync"]),
+      format: z.enum(["pdf", "epub", "epub-sync", "epub-bilingual"]),
+      bilingual: bilingualExportSchema.optional(),
       waitForAll: z.boolean().optional(),
+      // Only these chapters, whatever is selected
+      chapterIds: z.array(z.string().uuid()).min(1).optional(),
     }))
     .mutation(async ({ input }) => {
       const [book] = await db.select().from(books).where(eq(books.id, input.id));
       if (!book) throw new Error("Book not found");
       if (book.status === "assembling") throw new Error("Assembly already in progress");
+      const which = input.chapterIds ? "chosen" : "selected";
+      if (input.chapterIds) {
+        const found = await db.select({ id: chapters.id }).from(chapters).where(outputChapters(input.id, input.chapterIds));
+        if (found.length !== new Set(input.chapterIds).size) throw new Error("A chapter is not in this book");
+      }
 
-      const waitingFor = input.waitForAll
-        ? await inFlightInputs(input.id, input.language ?? null, input.format === "epub-sync" ? "audio" : "text")
+      if (input.format !== "epub-bilingual" && input.bilingual) throw new Error("Narration choices require Bilingual EPUB");
+      if (input.format === "epub-bilingual") {
+        if (!input.language || !input.bilingual) throw new Error("Choose a translation and narration options");
+        const ready = await bilingualExportStatus(input.id, input.language, input.chapterIds);
+        if (!ready.length) throw new Error("Select chapters before exporting Bilingual EPUB");
+        // Untranslated first: pairing cannot help a chapter that has no translation to pair with
+        const untranslated = ready.filter((chapter) => !chapter.translated);
+        if (untranslated.length) throw new Error(`No finished ${input.language} translation for ${namedChapters(untranslated)} — translate them first or leave them out`);
+        const unpaired = ready.filter((chapter) => !chapter.paired);
+        if (unpaired.length) throw new Error(`Pair current sentences first (Bilingual reading in the ${input.language} lane): ${namedChapters(unpaired)}`);
+      }
+      const waitingFor = input.waitForAll && input.format !== "epub-bilingual"
+        ? await inFlightInputs(input.id, input.language ?? null, input.format === "epub-sync" ? "audio" : "text", input.chapterIds)
         : 0;
 
       let exportable: number;
@@ -1084,8 +1096,7 @@ export const booksRouter = router({
             .from(chapterVariants)
             .innerJoin(chapters, eq(chapterVariants.chapterId, chapters.id))
             .where(and(
-              eq(chapters.bookId, input.id),
-              eq(chapters.selected, true),
+              outputChapters(input.id, input.chapterIds),
               eq(chapterVariants.key, input.language),
               eq(chapterVariants.audioStatus, "done"),
             ));
@@ -1094,13 +1105,13 @@ export const booksRouter = router({
           const rows = await db
             .select({ id: chapters.id })
             .from(chapters)
-            .where(and(eq(chapters.bookId, input.id), eq(chapters.selected, true), eq(chapters.status, "done")));
+            .where(and(outputChapters(input.id, input.chapterIds), eq(chapters.status, "done")));
           exportable = rows.length;
         }
         if (exportable === 0 && waitingFor === 0) {
           throw new Error(input.language
-            ? `No selected chapters have finished ${input.language} audio`
-            : "No selected chapters have finished audio");
+            ? `No ${which} chapters have finished ${input.language} audio`
+            : `No ${which} chapters have finished audio`);
         }
       } else if (input.language) {
         const rows = await db
@@ -1108,8 +1119,7 @@ export const booksRouter = router({
           .from(chapterVariants)
           .innerJoin(chapters, eq(chapterVariants.chapterId, chapters.id))
           .where(and(
-            eq(chapters.bookId, input.id),
-            eq(chapters.selected, true),
+            outputChapters(input.id, input.chapterIds),
             eq(chapterVariants.key, input.language),
             eq(chapterVariants.status, "done"),
           ));
@@ -1118,16 +1128,16 @@ export const booksRouter = router({
         const rows = await db
           .select({ id: chapters.id })
           .from(chapters)
-          .where(and(eq(chapters.bookId, input.id), eq(chapters.selected, true)));
+          .where(outputChapters(input.id, input.chapterIds));
         exportable = rows.length;
       }
       if (exportable === 0 && waitingFor === 0) {
         throw new Error(input.language
-          ? `No selected chapters have a finished ${input.language} translation`
+          ? `No ${which} chapters have a finished ${input.language} translation`
           : "No chapters selected");
       }
 
-      const formatLabel = input.format === "epub-sync" ? "synced EPUB" : input.format.toUpperCase();
+      const formatLabel = input.format === "epub-bilingual" ? "Bilingual EPUB" : input.format === "epub-sync" ? "synced EPUB" : input.format.toUpperCase();
       const langLabel = input.language ? ` · ${input.language}` : "";
       await appendLog(input.id, waitingFor > 0
         ? `Queuing ${formatLabel} export once ${waitingFor} chapter${waitingFor !== 1 ? "s" : ""} finish${waitingFor === 1 ? "es" : ""}${langLabel}`
@@ -1140,9 +1150,11 @@ export const booksRouter = router({
           bookId: input.id,
           language: input.language,
           format: input.format,
-          waitForAll: input.waitForAll,
+          bilingual: input.bilingual,
+          waitForAll: input.format === "epub-bilingual" ? false : input.waitForAll,
+          ...(input.chapterIds ? { chapterIds: input.chapterIds } : {}),
         },
-        { maxAttempts: 1, jobKey: documentJobKey(input.id, input.format, input.language), jobKeyMode: "replace" },
+        { maxAttempts: 1, jobKey: documentJobKey(input.id, input.format, input.language, input.chapterIds), jobKeyMode: "replace" },
       );
       return { success: true };
     }),
@@ -1157,7 +1169,7 @@ export const booksRouter = router({
         JOIN graphile_worker._private_tasks t ON t.id = j.task_id
         WHERE t.identifier = 'assembleDocument' AND j.payload->>'bookId' = ${input.bookId}
       `)) as unknown as Array<{
-        format: "pdf" | "epub" | "epub-sync";
+        format: "pdf" | "epub" | "epub-sync" | "epub-bilingual";
         language: string | null;
         running: boolean;
         waiting: boolean;

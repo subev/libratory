@@ -16,7 +16,9 @@ export function registerMcpRoutes(fastify: FastifyInstance, trustedHosts: Readon
       if (!isTrustedHost(request.headers.host, trustedHosts)) {
         return reply.code(403).send({ jsonrpc: "2.0", error: { code: -32000, message: "Host not allowed" }, id: null });
       }
-      const server = createMcpServer(profileIdFromHeader(request.headers["x-profile-id"]));
+      // The address the client used, so a result's download link works as given
+      const origin = request.headers.host ? `${request.protocol}://${request.headers.host}` : undefined;
+      const server = createMcpServer(profileIdFromHeader(request.headers["x-profile-id"]), { origin });
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
       reply.hijack();
       reply.raw.on("close", () => {

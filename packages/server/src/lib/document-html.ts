@@ -108,7 +108,12 @@ function normalizeForComparison(value: string): string {
 }
 
 export function inferDocumentLanguage(chapters: DocumentChapter[]): string {
-  const sample = chapters.map((ch) => ch.text.slice(0, 2000)).join(" ");
+  return inferLanguage(chapters.map((ch) => ch.text.slice(0, 2000)).join(" "));
+}
+
+// Script counting only: enough to tell the two languages this app is used with apart, and "und"
+// rather than a guess for anything else.
+export function inferLanguage(sample: string): string {
   const cyrillic = sample.match(/[Ѐ-ӿ]/g)?.length ?? 0;
   const latin = sample.match(/[A-Za-z]/g)?.length ?? 0;
   if (cyrillic > latin * 2 && cyrillic > 20) return "bg";

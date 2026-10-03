@@ -4,7 +4,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { and, eq, ne } from "drizzle-orm";
 
 import { ensureGraphileTables, getDb, resetDb, row } from "../../test/setup.ts";
-import { books, chapters, chapterVariants, folders, notes, profiles, DEFAULT_PROFILE_ID } from "../schema.ts";
+import { bilingualPreparations, books, chapters, chapterVariants, folders, notes, profiles, DEFAULT_PROFILE_ID } from "../schema.ts";
 
 vi.mock("../db.ts", async () => {
   const { getDb } = await import("../../test/setup.ts");
@@ -12,6 +12,7 @@ vi.mock("../db.ts", async () => {
 });
 
 vi.mock("graphile-worker", () => ({ quickAddJob: vi.fn(async () => {}) }));
+import { quickAddJob } from "graphile-worker";
 
 import { createMcpServer } from "./mcp-server.ts";
 
@@ -97,6 +98,23 @@ describe("placing a book", () => {
   });
 });
 
+describe("finding a book", () => {
+  it("names the copies in other profiles and leaves the folder list out of a search", async () => {
+    const tedi = row(await getDb().insert(profiles).values({ name: "Tedi" }).returning());
+    const call = await connect();
+    await call("create_book", { title: "Frankenstein", chapters: [chapter("One")], folder: "Classics" });
+    const theirs = await call("create_book", { title: "Frankenstein (1888)", chapters: [chapter("One")], profile: "Tedi" });
+
+    const found = await call("list_books", { query: "frankenstein" });
+    expect(found.books).toHaveLength(1);
+    expect(found).not.toHaveProperty("folders");
+    expect(found.elsewhere).toEqual([{ id: theirs.id, title: "Frankenstein (1888)", profile: "Tedi" }]);
+    // Naming a profile asks about that one alone
+    expect(await call("list_books", { query: "frankenstein", profile: tedi.id })).not.toHaveProperty("elsewhere");
+    expect((await call("list_books")).folders).toHaveLength(1);
+  });
+});
+
 describe("notes", () => {
   it("saves on a book and in the library, and reads them back", async () => {
     const call = await connect();
@@ -126,6 +144,80 @@ describe("get_book", () => {
     expect(full.chapters.map((c: { id: string }) => c.id).sort()).toEqual(rows.map((r) => r.id).sort());
     expect(full.logs.length).toBeGreaterThan(0);
     expect(await call("get_book", { id: created.id })).not.toHaveProperty("logs");
+
+    const polled = await call("get_book", { id: created.id, logsOnly: true });
+    expect(polled).not.toHaveProperty("chapters");
+    expect(polled.logs.length).toBeGreaterThan(0);
+    // No recording yet, so nothing to say about its word times
+    expect(full.chapters.map((c: { wordTiming: boolean | null }) => c.wordTiming)).toEqual([null, null]);
+  });
+});
+
+describe("a translation and its export", () => {
+  it("reads a chapter's translation and exports only the named chapters", async () => {
+    const call = await connect();
+    const created = await call("create_book", { title: "Rules", chapters: [chapter("One"), chapter("Two")] });
+    const [one, two] = (await call("get_book", { id: created.id })).chapters as { id: string }[];
+    await call("translate_book", { id: created.id, language: "German", chapterIds: [one!.id] });
+    await getDb().update(chapterVariants).set({ status: "done", text: "Der Kindergarten öffnet um sieben." }).where(eq(chapterVariants.chapterId, one!.id));
+
+    expect(await call("get_chapter", { id: one!.id, language: "german" })).toMatchObject({ language: "German", status: "done", text: "Der Kindergarten öffnet um sieben." });
+    await expect(call("get_chapter", { id: two!.id, language: "German" })).rejects.toThrow(/has no German version/);
+    expect((await call("get_book", { id: created.id })).variants[0].chapterIndexes).toEqual([0]);
+
+    const bilingual = { sourceAudio: false, targetAudio: false };
+    await expect(call("export_book", { id: created.id, format: "epub-bilingual", language: "German", bilingual, chapterIds: [two!.id] }))
+      .rejects.toThrow(`No finished German translation for 2. Two (${two!.id})`);
+    await expect(call("export_book", { id: created.id, format: "epub-bilingual", language: "German", bilingual, chapterIds: [one!.id] }))
+      .rejects.toThrow(/Not paired yet: 1. One .* prepare_bilingual stage "pairs"/);
+
+    vi.mocked(quickAddJob).mockClear();
+    const exported = await call("export_book", { id: created.id, format: "epub", chapterIds: [two!.id] });
+    expect(exported.next).toBe('wait_for_book until "document"');
+    expect(vi.mocked(quickAddJob)).toHaveBeenCalledWith(expect.anything(), "assembleDocument", expect.objectContaining({ chapterIds: [two!.id] }), expect.anything());
+    // Another chapter's export is another document, not a replacement of the first job
+    await call("export_book", { id: created.id, format: "epub", chapterIds: [one!.id] });
+    const keys = vi.mocked(quickAddJob).mock.calls.map(([, , , spec]) => spec?.jobKey);
+    expect(new Set(keys).size).toBe(2);
+    await expect(call("export_book", { id: created.id, format: "epub", chapterIds: [crypto.randomUUID()] })).rejects.toThrow(/not in this book/);
+  });
+
+  it("adds up what the word links cost and says how far a run has got", async () => {
+    const call = await connect();
+    const created = await call("create_book", { title: "Rules", chapters: [chapter("One")] });
+    await call("translate_book", { id: created.id, language: "German" });
+    const [variant] = await getDb().update(chapterVariants).set({ status: "done", text: "Der Kindergarten öffnet um sieben." }).returning();
+    const batch = { pairIds: ["p1"], model: "flash", raw: "", error: null, inputTokens: 1200, outputTokens: 300 };
+    await getDb().insert(bilingualPreparations).values({
+      variantId: variant!.id,
+      links: { pairRevision: "r1", promptVersion: "v1", byPair: {}, batches: [batch, { ...batch, error: "Token 438 is not in the target sentence" }] },
+      linkJob: { status: "running", runId: "run", model: "flash", done: 3, total: 8, error: null, updatedAt: new Date().toISOString() },
+    });
+
+    const lane = (await call("get_book", { id: created.id })).bilingual[0];
+    // The failed batch was billed too
+    expect(lane.linkSpend).toEqual({ batches: 2, inputTokens: 2400, outputTokens: 600, models: ["flash"] });
+
+    const waited = await call("wait_for_book", { id: created.id, until: "bilingual", language: "German", timeoutSeconds: 1 });
+    expect(waited).toMatchObject({ satisfied: false, reason: "timeout", inProgress: ["One (links): 3/8 batches"] });
+  });
+
+  it("prices a metered narration without queueing it or changing the lane's voice", async () => {
+    const call = await connect();
+    const created = await call("create_book", { title: "Rules", chapters: [chapter("One")] });
+    const [one] = (await call("get_book", { id: created.id })).chapters as { id: string }[];
+    await call("translate_book", { id: created.id, language: "German" });
+    await getDb().update(chapterVariants).set({ status: "done", text: "Der Kindergarten öffnet um sieben." }).where(eq(chapterVariants.chapterId, one!.id));
+    vi.mocked(quickAddJob).mockClear();
+
+    const voice = "cartesia:fcbecbcc-0cef-4615-8b5a-712fe1b39dd0";
+    const priced = await call("synthesize_book", { id: created.id, language: "German", voice, dryRun: true });
+    expect(priced).toEqual({ dryRun: true, estimate: { voice, engine: "Cartesia", characters: 34, billing: "Cartesia bills about one credit per character" } });
+    expect(vi.mocked(quickAddJob)).not.toHaveBeenCalled();
+    const [book] = await getDb().select().from(books).where(eq(books.id, created.id));
+    expect(book?.variantVoices ?? {}).toEqual({});
+    // A local voice bills nothing
+    expect((await call("synthesize_book", { id: created.id, dryRun: true })).estimate).toMatchObject({ metered: false });
   });
 });
 
@@ -138,7 +230,7 @@ describe("translate_book", () => {
     expect(queued.key).toBe("German");
     expect(queued.queued).toBe(2);
     expect(queued.variants).toEqual([
-      { key: "German", kind: "translation", label: null, chapters: { total: 2, done: 0, running: 2, failed: 0 }, withAudio: 0 },
+      { key: "German", kind: "translation", label: null, chapters: { total: 2, done: 0, running: 2, failed: 0 }, error: null, failedAt: null, withAudio: 0, narrating: 0, audioFailed: 0, audioError: null, audioFailedAt: null },
     ]);
     expect((await call("get_book", { id: created.id })).variants).toHaveLength(1);
 

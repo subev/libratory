@@ -2,11 +2,13 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdir, writeFile, copyFile, rm } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
+import { fileSha256 } from "./file-sha256.ts";
 import path from "node:path";
 import type { SyncMap } from "./sync-map.ts";
 import type { ExportedChapter, P2afLayer } from "./p2af.ts";
 import { P2AF_DIR } from "./p2af.ts";
 import { generateCover } from "./cover.ts";
+import { readBilingualDocument } from "./bilingual-format.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -38,6 +40,8 @@ const LANGUAGE_CODES: Record<string, string> = {
   polish: "pl", czech: "cs", dutch: "nl", hungarian: "hu", swedish: "sv",
   danish: "da", finnish: "fi", norwegian: "no", turkish: "tr", ukrainian: "uk",
   serbian: "sr", croatian: "hr", slovak: "sk", slovenian: "sl", macedonian: "mk",
+  arabic: "ar", hebrew: "he", hindi: "hi", indonesian: "id", japanese: "ja", korean: "ko",
+  persian: "fa", vietnamese: "vi", "chinese (simplified)": "zh-Hans",
 };
 
 // books.language holds an ISO code now and held a language's name before that, and only the names
@@ -192,7 +196,12 @@ function packageOpf(opts: {
     ? [
         `    <item id="p2af_book" href="${P2AF_DIR}/book.json" media-type="application/json"/>`,
         ...p2af.sources.map((src, i) => `    <item id="p2af_src_${i}" href="${P2AF_DIR}/${src.path}" media-type="application/pdf"/>`),
+        ...(p2af.texts ?? []).map((text, i) => `    <item id="p2af_text_${i}" href="${P2AF_DIR}/${text.path}" media-type="application/json"/>`),
         ...p2af.cues.map((cue, i) => `    <item id="p2af_cues_${i}" href="${P2AF_DIR}/${cue.path}" media-type="application/json"/>`),
+        ...(p2af.bilingual ?? []).flatMap((entry, i) => [
+          `    <item id="p2af_bilingual_${i}" href="${P2AF_DIR}/${entry.path}" media-type="application/json"/>`,
+          ...entry.audio.map((audio, j) => `    <item id="p2af_bilingual_audio_${i}_${j}" href="${P2AF_DIR}/${audio.path}" media-type="${audio.mediaType}"/>`),
+        ]),
       ].join("\n")
     : "";
 
@@ -285,11 +294,13 @@ export async function buildReadaloudEpub(opts: {
     await copyFile(ch.audioPath, path.join(stagingDir, "OEBPS", "audio", `${ch.base}${ch.audioExt}`));
   }
 
+  if (p2af) await validateBilingualExport(path.join(stagingDir, "OEBPS", P2AF_DIR), p2af);
+
   // EPUB OCF: mimetype must be first and stored; audio is already compressed, so store it too
   await rm(outputPath, { force: true });
   const zipOpts = { cwd: stagingDir, timeout: 600_000, maxBuffer: 16 * 1024 * 1024 };
   await execFileAsync("zip", ["-X", "-q", "-0", outputPath, "mimetype"], zipOpts);
-  const storedDirs = ["OEBPS/audio", ...(p2af?.sources.length ? [`OEBPS/${P2AF_DIR}/source`] : [])];
+  const storedDirs = ["OEBPS/audio", ...(p2af?.sources.length ? [`OEBPS/${P2AF_DIR}/source`] : []), ...(p2af?.bilingual?.some((entry) => entry.audio.length) ? [`OEBPS/${P2AF_DIR}/audio`] : [])];
   await execFileAsync(
     "zip",
     ["-X", "-q", "-9", "-r", outputPath, "META-INF", "OEBPS", ...storedDirs.flatMap((dir) => ["-x", `${dir}/*`])],
@@ -300,10 +311,63 @@ export async function buildReadaloudEpub(opts: {
 
 // The cues are the bulk of the layer and compress to about a quarter; the PDFs are already
 // compressed and are stored, so a reader can hand their bytes straight to a PDF renderer.
-async function writeP2afLayer(dir: string, layer: P2afLayer): Promise<void> {
+export async function writeP2afLayer(dir: string, layer: P2afLayer): Promise<void> {
+  const extensions = layer.bilingual ?? [];
+  const paths = extensions.flatMap((entry) => [entry.path, ...entry.audio.map((audio) => audio.path)]);
+  if (new Set(paths).size !== paths.length) throw new Error("Duplicate bilingual resource path");
+  for (const chapter of layer.manifest.chapters) {
+    for (const ref of chapter.bilingual ?? []) {
+      if (!extensions.some((entry) => entry.path === ref.url && entry.doc.chapterId === chapter.id && entry.doc.key === ref.key)) throw new Error("Missing bilingual export document");
+    }
+  }
   await mkdir(path.join(dir, "cues"), { recursive: true });
   if (layer.sources.length > 0) await mkdir(path.join(dir, "source"), { recursive: true });
   await writeFile(path.join(dir, "book.json"), JSON.stringify(layer.manifest));
+  for (const text of layer.texts ?? []) {
+    if (!/^text\/[a-zA-Z0-9_-]+\.json$/.test(text.path)) throw new Error("Invalid reader text path");
+    await mkdir(path.dirname(path.join(dir, text.path)), { recursive: true });
+    await writeFile(path.join(dir, text.path), JSON.stringify(text.doc));
+  }
   for (const cue of layer.cues) await writeFile(path.join(dir, cue.path), JSON.stringify(cue.doc));
   for (const source of layer.sources) await copyFile(source.pdfPath, path.join(dir, source.path));
+  for (const entry of extensions) {
+    const doc = readBilingualDocument(entry.doc);
+    if (!/^bilingual\/[a-zA-Z0-9_-]+\.json$/.test(entry.path)) throw new Error("Invalid bilingual export path");
+    const chapter = layer.manifest.chapters.find((c) => c.id === doc.chapterId);
+    if (!chapter?.bilingual?.some((r) => r.key === doc.key && r.url === entry.path)) throw new Error("Unreferenced bilingual document");
+    for (const lane of [doc.source, doc.target]) {
+      const url = lane.narration?.audio;
+      if (url && url !== chapter.audio && !entry.audio.some((audio) => audio.path === url)) throw new Error("Missing bilingual export audio");
+    }
+    await mkdir(path.dirname(path.join(dir, entry.path)), { recursive: true });
+    await writeFile(path.join(dir, entry.path), JSON.stringify(doc));
+    for (const audio of entry.audio) {
+      if (!/^audio\/[a-zA-Z0-9_-]+\.(m4a|mp3)$/.test(audio.path)) throw new Error("Invalid bilingual audio path");
+      await mkdir(path.dirname(path.join(dir, audio.path)), { recursive: true });
+      await copyFile(audio.sourcePath, path.join(dir, audio.path));
+    }
+  }
+}
+
+export async function validateBilingualExport(dir: string, layer: P2afLayer): Promise<void> {
+  for (const entry of layer.bilingual ?? []) {
+    const doc = entry.doc;
+    const chapter = layer.manifest.chapters.find((chapter) => chapter.id === doc.chapterId);
+    // A chapter with no narration and no text document of its own has nothing to hold the
+    // pairing against; its own text is the only text it carries.
+    if (chapter && !chapter.cues && !chapter.text) continue;
+    const primaryText = layer.cues.find((cue) => cue.path === chapter?.cues)?.doc.text?.text
+      ?? layer.texts?.find((text) => text.path === chapter?.text)?.doc.text;
+    // The same words, not the same bytes: the pairing ran on the chapter's text with its paragraph
+    // breaks, while a printed chapter's cues carry the text with breaks rebuilt from the page
+    // blocks. A reader maps between the two by skipping whitespace; a changed word must still fail.
+    const words = (text: string) => text.replace(/\s+/g, " ").trim();
+    if (primaryText === undefined || words(primaryText) !== words(doc.source.text)) throw new Error("Bilingual source text differs from chapter text");
+    if (doc.source.narration && doc.source.narration.audio !== chapter?.audio) throw new Error("Bilingual source recording differs from chapter recording");
+    for (const lane of [doc.source, doc.target]) {
+      if (!lane.narration) continue;
+      const revision = await fileSha256(path.resolve(dir, lane.narration.audio));
+      if (revision !== lane.narration.revision) throw new Error("Bilingual recording revision differs from packaged audio");
+    }
+  }
 }

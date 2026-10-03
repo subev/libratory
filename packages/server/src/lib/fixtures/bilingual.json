@@ -1,0 +1,141 @@
+{
+  "format": "p2af-bilingual/1",
+  "chapterId": "chapter",
+  "key": "he",
+  "tokenizer": "fixture/1",
+  "source": {
+    "id": "original",
+    "language": "en",
+    "text": "turned it off",
+    "textRevision": "784b26aee50ca19e23a53bfedd9cb54e102650afe1e5bb5353ca20ca7863d8c4",
+    "tokens": [
+      {
+        "id": 0,
+        "range": [
+          0,
+          6
+        ]
+      },
+      {
+        "id": 1,
+        "range": [
+          7,
+          9
+        ]
+      },
+      {
+        "id": 2,
+        "range": [
+          10,
+          13
+        ]
+      }
+    ],
+    "narration": {
+      "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "audio": "../audio/ch000.m4a",
+      "totalMs": 2000,
+      "qualityNotes": [
+        "Synthetic timings for contract tests"
+      ],
+      "anchors": [
+        {
+          "kind": "passage",
+          "range": [
+            0,
+            13
+          ],
+          "start": {
+            "ms": 200,
+            "method": "provider-word"
+          },
+          "end": {
+            "ms": 1800,
+            "method": "provider-word"
+          }
+        }
+      ]
+    }
+  },
+  "target": {
+    "id": "he",
+    "language": "he",
+    "text": "כיבה אותו",
+    "textRevision": "df87c943780940fc9f9171ee1ffbb531f3074efed14debae99cd120876eacca5",
+    "tokens": [
+      {
+        "id": 0,
+        "range": [
+          0,
+          4
+        ]
+      },
+      {
+        "id": 1,
+        "range": [
+          5,
+          9
+        ]
+      }
+    ],
+    "narration": {
+      "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "audio": "audio/he.m4a",
+      "totalMs": 5000,
+      "qualityNotes": [
+        "Synthetic timings for contract tests"
+      ],
+      "anchors": [
+        {
+          "kind": "passage",
+          "range": [
+            0,
+            9
+          ],
+          "start": {
+            "ms": 2500,
+            "method": "provider-word"
+          },
+          "end": {
+            "ms": 4000,
+            "method": "provider-word"
+          }
+        }
+      ]
+    }
+  },
+  "pairs": [
+    {
+      "id": "p1",
+      "status": "matched",
+      "source": [
+        0,
+        13
+      ],
+      "target": [
+        0,
+        9
+      ],
+      "linksStatus": "ready",
+      "links": [
+        {
+          "source": [
+            0,
+            2
+          ],
+          "target": [
+            0
+          ]
+        },
+        {
+          "source": [
+            1
+          ],
+          "target": [
+            1
+          ]
+        }
+      ]
+    }
+  ]
+}

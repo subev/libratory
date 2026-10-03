@@ -75,5 +75,19 @@
     "version": "4.57.6",
     "expires": "2026-10-08",
     "reason": "The app does not save user-provided tokenizers/processors or chat templates through save_pretrained. Marker currently requires Transformers 4; remove with its migration."
+  },
+  {
+    "id": "GHSA-x9r9-c232-4q39",
+    "package": "transformers",
+    "version": "4.57.6",
+    "expires": "2026-10-08",
+    "reason": "No upstream fix is published. The app never calls generate(custom_generate=...) or load_custom_generate, and every Python subprocess runs with HF_HUB_OFFLINE=1, so no remote module can be fetched. Track with the Transformers 5 migration in tasks/security-ml-upgrades.md."
+  },
+  {
+    "id": "PYSEC-2026-4174",
+    "package": "transformers",
+    "version": "4.57.6",
+    "expires": "2026-10-08",
+    "reason": "No upstream fix is published. The app never calls generate(custom_generate=...) or load_custom_generate, and every Python subprocess runs with HF_HUB_OFFLINE=1, so no remote module can be fetched. Track with the Transformers 5 migration in tasks/security-ml-upgrades.md."
   }
 ]

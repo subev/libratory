@@ -507,6 +507,7 @@ export function BookList({
               book.outputs.assemblies > 0 ? `${book.outputs.assemblies} M4B` : null,
               book.outputs.pdfs > 0 ? `${book.outputs.pdfs} PDF` : null,
               book.outputs.epubs > 0 ? `${book.outputs.epubs} EPUB` : null,
+              book.outputs.bilingualEpubs > 0 ? `${book.outputs.bilingualEpubs} Bilingual EPUB` : null,
               book.outputs.syncedEpubs > 0 ? `${book.outputs.syncedEpubs} Synced EPUB` : null,
             ].filter(Boolean);
 

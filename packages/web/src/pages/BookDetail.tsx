@@ -1,8 +1,10 @@
+import { BilingualExportOptions } from "../components/book/BilingualExportOptions.tsx";
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router";
 import { trpc } from "../trpc.ts";
 import { useRunModel } from "../lib/use-llm-models.ts";
 import { ModelBundleNotice, useModelBundle } from "../components/ModelBundleNotice.tsx";
+import { BilingualSelection } from "../components/BilingualSelection.tsx";
 import { ChapterTable } from "../components/ChapterTable.tsx";
 import { SYNTH_BUSY, TEXT_BUSY, variantLabel } from "../lib/chapters.ts";
 import { SynthesizeModal, type SynthSettings } from "../components/SynthesizeModal.tsx";
@@ -184,6 +186,7 @@ export function BookDetail() {
   const [showTranslation, setShowTranslation] = useState(false);
   const [showSynthesize, setShowSynthesize] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [bilingualSelection, setBilingualSelection] = useState<{ bookId: string; chapterIds: string[]; translationKey: string } | null>(null);
   const requestedDialog = searchParams.get("dialog") ?? (searchParams.get("extract") === "1" ? "extract" : null);
   /* eslint-disable react/set-state-in-effect -- the URL is the external system here: the assistant
      panel changes it under a page that is already mounted, so the dialog cannot be initialised from
@@ -220,6 +223,8 @@ export function BookDetail() {
     }, { replace: true });
   }, [requestedDialog, setSearchParams]);
   /* eslint-enable react/set-state-in-effect */
+  const [bilingualKey, setBilingualKey] = useState("");
+  const [bilingualAudio, setBilingualAudio] = useState({ sourceAudio: true, targetAudio: true });
   const [exportFormat, setExportFormat] = useState<ExportFormatId>("epub-sync");
   const [showDetails, setShowDetails] = useState(false);
   const [showDiskUsage, setShowDiskUsage] = useState(false);
@@ -244,6 +249,16 @@ export function BookDetail() {
     { bookId: id! },
     { enabled: !!id },
   );
+  const translationLanes = variantLanes.filter((lane) => lane.kind === "translation");
+  const exportTranslation = translationLanes.find((lane) => lane.key === bilingualKey)?.key
+    ?? translationLanes.find((lane) => lane.key === activeVariant)?.key ?? translationLanes[0]?.key ?? "";
+  const bilingualExport = trpc.bilingual.exportStatus.useQuery({ bookId: id!, key: exportTranslation }, {
+    enabled: !!id && exportOpen && exportFormat === "epub-bilingual" && !!exportTranslation,
+    // Pairing started from the dialog finishes in the background; the dialog watches for it
+    refetchInterval: (query) => query.state.data?.every((row) => row.paired) ? false : 4000,
+  });
+  const readiness = trpc.bilingual.readiness.useQuery({ bookId: id! }, { enabled: !!id && translationLanes.length > 0, staleTime: 5000 });
+  const [returnToExport, setReturnToExport] = useState(false);
   const activeLane = activeVariant ? variantLanes.find((l) => l.key === activeVariant) ?? null : null;
   const activeLabel = activeLane ? variantLabel(activeLane) : activeVariant;
   const activeKind = activeLane?.kind ?? "translation";
@@ -304,6 +319,7 @@ export function BookDetail() {
   const processSelectedVariantsMutation = trpc.variants.processSelected.useMutation({ onSuccess: invalidateVariants });
   const processSelectedAudioMutation = trpc.variants.processSelectedAudio.useMutation({ onSuccess: invalidateVariants });
   const stopAudioMutation = trpc.variants.stopAudio.useMutation({ onSuccess: invalidateVariants });
+  const stopTranslationMutation = trpc.variants.stopTranslation.useMutation({ onSuccess: invalidateVariants });
   const translateTitlesMutation = trpc.variants.translateMissingTitles.useMutation({
     onSuccess: () => {
       setTitlesRequestedFor(activeVariant);
@@ -427,7 +443,7 @@ export function BookDetail() {
     ? viewChapters.filter((c) => c.selected && TEXT_BUSY.includes(c.status)).length
     : 0;
   const needsAudio = (format: ExportFormatId) => format === "m4b" || format === "epub-sync";
-  const inFlightFor = (format: ExportFormatId) => (needsAudio(format) ? selectedInFlight : selectedTextInFlight);
+  const inFlightFor = (format: ExportFormatId) => format === "epub-bilingual" ? 0 : (needsAudio(format) ? selectedInFlight : selectedTextInFlight);
   const canAssemble = (allSelectedDone || deferOutputs) && !isAssembling;
   // Language-view audio queueing is idempotent server-side, so running chapters don't block it
   const canProcess = selectedSynthesizable > 0 && !isAssembling && (!!activeVariant || !hasActiveChapters);
@@ -469,8 +485,8 @@ export function BookDetail() {
   const selectedSyncExportable = activeVariant
     ? book.chapters.filter((c) => c.selected && translationByChapter.get(c.id)?.audioStatus === "done").length
     : selectedWithAudio;
-  const viewPendingExports = pendingExports.filter((e) => (e.language ?? null) === activeVariant);
-  const viewDocuments = bookDocuments.filter((d) => (d.language ?? null) === activeVariant);
+  const viewPendingExports = pendingExports.filter((e) => e.format === "epub-bilingual" || (e.language ?? null) === activeVariant);
+  const viewDocuments = bookDocuments.filter((d) => d.format === "epub-bilingual" || (d.language ?? null) === activeVariant);
   // Cleanup takes no model pick, so the button is the only place to say what will run it
   const cleanupModelNote = !runModel.label
     ? ""
@@ -560,7 +576,7 @@ export function BookDetail() {
   ].filter(Boolean).join(" · ");
   const chaptersWithAudio = viewChapters.filter((c) => c.audioPath).length;
   const outputCount = bookAssemblies.filter((a) => (a.language ?? null) === activeVariant).length +
-    bookDocuments.filter((d) => (d.language ?? null) === activeVariant).length;
+    viewDocuments.length;
 
   const deleteAudioAction = {
     count: audioDataCount,
@@ -593,16 +609,24 @@ export function BookDetail() {
   const selectedInFlightNow = book.chapters.some((c) => c.selected && (c.status === "pending" || c.status === "normalizing" || c.status === "synthesizing"));
   // A book with no PDF has no structure to review: its chapters arrived as they are
   const stage: "review" | "narrate" | "export" = !structureConfirmed && !isSynthetic ? "review" : audioReady > 0 && !selectedInFlightNow ? "export" : "narrate";
+  // Pairing needs a translation lane: the open one, or the only one when the page shows the original
+  const pairingLane = activeVariant && activeKind === "translation" ? activeVariant : translationLanes.length === 1 ? translationLanes[0]!.key : null;
+  const pairingLeft = pairingLane ? readiness.data?.find((lane) => lane.key === pairingLane)?.unpaired.length ?? 0 : 0;
   const trayActions: TrayAction[] = [
-    ...(hasActiveChapters || translationAudioQueued
+    ...(hasActiveChapters || translationAudioQueued || translationsRunning
       ? [{
           id: "cancel-processing",
-          label: "Cancel processing",
+          label: translationsRunning ? "Stop translation" : "Cancel processing",
           pinned: true,
-          onClick: () =>
-            activeVariant ? stopAudioMutation.mutate({ bookId: book.id, key: activeVariant }) : cancelMutation.mutate({ id: book.id }),
-          disabled: cancelMutation.isPending || stopAudioMutation.isPending,
-          title: "Stop the running synthesis — finished chapters keep their audio, the rest resume later",
+          onClick: () => {
+            if (!activeVariant) { cancelMutation.mutate({ id: book.id }); return; }
+            if (translationsRunning) stopTranslationMutation.mutate({ bookId: book.id, key: activeVariant });
+            if (translationAudioQueued) stopAudioMutation.mutate({ bookId: book.id, key: activeVariant });
+          },
+          disabled: cancelMutation.isPending || stopAudioMutation.isPending || stopTranslationMutation.isPending,
+          title: translationsRunning
+            ? "Stop the running translation and any queued narration — finished chapters keep their text, a chapter already at the model finishes"
+            : "Stop the running synthesis — finished chapters keep their audio, the rest resume later",
         }]
       : []),
     {
@@ -622,7 +646,13 @@ export function BookDetail() {
     {
       id: "translate",
       label: `${activeKind === "translation" ? "Translate" : "Rewrite"} (${selectedTranslatable})`,
-      onClick: () => processSelectedVariantsMutation.mutate({ bookId: book.id, key: activeVariant! }),
+      onClick: () => {
+        // Every chapter goes through the AI model, so a click on the wrong selection is money
+        const verb = activeKind === "translation" ? "Translate" : "Rewrite";
+        if (confirm(`${verb} ${selectedTranslatable} selected chapter${selectedTranslatable === 1 ? "" : "s"} to ${activeLabel}? Each chapter goes to the AI model; a cloud model charges per chapter.`)) {
+          processSelectedVariantsMutation.mutate({ bookId: book.id, key: activeVariant! });
+        }
+      },
       disabled: !activeVariant || selectedTranslatable === 0 || processSelectedVariantsMutation.isPending,
       title: !activeVariant
         ? "Open a variant view to run it on the selected chapters"
@@ -631,6 +661,17 @@ export function BookDetail() {
           : activeKind === "translation"
             ? `Translate the selected chapters to ${activeLabel} (finished ones are skipped, stopped ones resume)`
             : `Rewrite the selected chapters as ${activeLabel} (finished ones are skipped, stopped ones resume)`,
+    },
+    {
+      id: "bilingual",
+      label: pairingLeft > 0 ? `Bilingual reading (${pairingLeft} to pair)` : "Bilingual reading",
+      pinned: !!pairingLane,
+      onClick: () => { if (pairingLane) setBilingualSelection({ bookId: book.id, chapterIds: book.chapters.filter((chapter) => chapter.selected).map((chapter) => chapter.id), translationKey: pairingLane }); },
+      disabled: !pairingLane || selectedCount === 0,
+      title: !translationLanes.length ? "Translate chapters first — two-language reading needs a translation"
+        : !pairingLane ? "Open one of the translation views to choose which language to pair"
+        : selectedCount === 0 ? "Select chapters to prepare"
+        : `Pair the selected chapters' sentences with ${pairingLane} and optionally link their words — the step before a Bilingual EPUB`,
     },
     {
       id: "cleanup",
@@ -676,11 +717,25 @@ export function BookDetail() {
     },
   ];
 
+  const bilingualRows = bilingualExport.data ?? [];
+  const bilingualReady = bilingualRows.length === selectedCount && bilingualRows.every((row) => row.paired);
+  const bilingualReason = bilingualExport.error?.message
+    ?? (bilingualExport.isFetching || !bilingualExport.data ? "Checking selected chapters…"
+      : !bilingualReady ? `Pair sentences first: ${namedRows(bilingualRows.filter((row) => !row.paired))}` : undefined);
+  const openPairing = (key: string) => {
+    setBilingualSelection({ bookId: book.id, chapterIds: book.chapters.filter((chapter) => chapter.selected).map((chapter) => chapter.id), translationKey: key });
+  };
   const exportFormats: ExportFormat[] = [
+    {
+      id: "epub-bilingual", label: "Bilingual EPUB", subtitle: "Original + a translation · choose recordings below",
+      count: selectedCount,
+      disabled: !rendererReady || selectedCount === 0 || !translationLanes.length || isAssembling || exportDocumentMutation.isPending,
+      reason: !translationLanes.length ? "Translate chapters first" : !rendererReady ? "Install the page renderer first" : selectedCount === 0 ? "Select chapters first" : "Wait for the current export to finish",
+    },
     {
       id: "epub-sync",
       label: "synced EPUB",
-      subtitle: "Text and audio locked together — read-along narration",
+      subtitle: "Single-language text and audio — read-along narration",
       count: deferOutputs ? selectedCount : selectedSyncExportable,
       disabled: !canExportSync || !!pendingExportFor("epub-sync")?.running,
       reason: syncExportTooltip,
@@ -706,7 +761,7 @@ export function BookDetail() {
     {
       id: "epub",
       label: "EPUB",
-      subtitle: "Text only · any e-reader",
+      subtitle: "Single-language text · any e-reader",
       count: selectedExportable,
       disabled: !canExportDocument || !!pendingExportFor("epub")?.running,
       reason: exportTooltip("epub"),
@@ -739,7 +794,7 @@ export function BookDetail() {
   // changes as chapters finish — so the pick falls back rather than being pinned at first render.
   const pickedExport =
     exportFormats.find((f) => f.id === exportFormat && !f.disabled)?.id ??
-    exportFormats.find((f) => !f.disabled)?.id ??
+    exportFormats.find((f) => !f.disabled && f.id !== "epub-bilingual")?.id ??
     exportFormat;
 
   const runExport = () => {
@@ -749,7 +804,8 @@ export function BookDetail() {
     } else {
       exportDocumentMutation.mutate({
         id: book.id,
-        language: activeVariant ?? undefined,
+        language: pickedExport === "epub-bilingual" ? exportTranslation : activeVariant ?? undefined,
+        bilingual: pickedExport === "epub-bilingual" ? bilingualAudio : undefined,
         format: pickedExport,
         waitForAll: waitForAll && inFlightFor(pickedExport) > 0,
       });
@@ -1205,6 +1261,9 @@ export function BookDetail() {
             onDelete={(did) => deleteDocumentMutation.mutate({ id: did })}
             isDeleting={deleteDocumentMutation.isPending}
           />
+          <DocumentOutputsSection kind="bilingual" documents={viewDocuments} pending={viewPendingExports}
+            read={{ bookId: book.id, can: canRead, title: readTitle }}
+            onDelete={(did) => deleteDocumentMutation.mutate({ id: did })} isDeleting={deleteDocumentMutation.isPending} />
           <AudioOutputsSection
             assemblies={bookAssemblies.filter((a) => (a.language ?? null) === activeVariant)}
             latestOutputPath={activeVariant ? null : book.outputPath}
@@ -1230,9 +1289,23 @@ export function BookDetail() {
         </TabPanel>
       )}
 
+      {bilingualSelection && <BilingualSelection {...bilingualSelection} onClose={() => {
+        setBilingualSelection(null);
+        void utils.bilingual.readiness.invalidate();
+        void utils.bilingual.exportStatus.invalidate();
+        // Pairing was opened from the export dialog: the dialog comes back where it was left
+        if (returnToExport) { setReturnToExport(false); setExportOpen(true); }
+      }} />}
       {exportOpen && (
         <ExportModal
           formats={exportFormats}
+          confirmReason={pickedExport === "epub-bilingual" ? bilingualReason : undefined}
+          options={pickedExport === "epub-bilingual" ? <BilingualExportOptions
+            originalLanguage={book.language} translationLanes={translationLanes.map((lane) => ({ key: lane.key, label: variantLabel(lane) }))}
+            exportTranslation={exportTranslation} onTranslation={setBilingualKey}
+            bilingualAudio={bilingualAudio} onAudio={setBilingualAudio} bilingualRows={bilingualRows}
+            selectedCount={selectedCount} bilingualReason={bilingualReason} pages={hasChapterPages}
+            onPrepare={() => { setReturnToExport(true); setExportOpen(false); openPairing(exportTranslation); }} /> : undefined}
           value={pickedExport}
           onChange={setExportFormat}
           scopeSummary={
@@ -1323,4 +1396,10 @@ export function BookDetail() {
       )}
     </BookShell>
   );
+}
+
+// The first few chapters by number and title, the way the tray and the export dialog name them
+function namedRows(rows: { index: number; title: string }[]): string {
+  const names = rows.slice(0, 3).map((row) => `${row.index + 1}. ${row.title}`);
+  return rows.length > 3 ? `${names.join(", ")} and ${rows.length - 3} more` : names.join(", ");
 }

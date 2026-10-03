@@ -28,6 +28,7 @@ const GROUPS = {
     title: "Audio + text",
     description: "Both formats in one file — the narration and the text locked together, so the words highlight as they are read.",
   },
+  bilingual: { title: "Bilingual EPUBs", description: "Original and translation, with the recordings chosen at export." },
   text: {
     title: "Text only",
     description: "No audio — small, and opens anywhere: EPUB in Apple Books, Kobo, Kindle or Calibre, PDF in anything.",
@@ -37,6 +38,7 @@ const GROUPS = {
 // A Record rather than a predicate: a format added later fails to compile until it is filed
 const GROUP_OF: Record<DocumentFormat, keyof typeof GROUPS> = {
   "epub-sync": "synced",
+  "epub-bilingual": "bilingual",
   epub: "text",
   pdf: "text",
 };
@@ -78,7 +80,7 @@ export function DocumentOutputsSection({
     >
       {mine.map((doc) => {
         const filename = doc.outputPath.split("/").pop();
-        const readAlong = doc.format === "epub-sync";
+        const readAlong = doc.format === "epub-sync" || doc.format === "epub-bilingual";
         return (
           <ResourceRow
             key={doc.id}

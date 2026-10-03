@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router";
 
 import { Button } from "../components/Button.tsx";
 import { IconArrowLeft } from "../components/icons.tsx";
@@ -10,6 +10,7 @@ import { containerSource, type DocumentSource } from "../lib/reader-source.ts";
 // uses, handed a different source — which is the whole point: nothing that draws a page knows
 // whether the bytes came from a route or a file someone was sent.
 export function ReaderOpen() {
+  const [, setSearchParams] = useSearchParams();
   const [source, setSource] = useState<DocumentSource | null>(null);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -24,11 +25,13 @@ export function ReaderOpen() {
     return () => { mounted.current = false; };
   }, []);
 
+  const openLaunchFile = useEffectEvent((bytes: Uint8Array, name: string) => open(new Blob([bytes as BlobPart]), name));
+
   // Double-clicked in Finder: the shell queued it and this is where it is claimed. Only the
   // desktop app has a shell, and only a launch that came from a file has anything waiting.
   useEffect(() => {
     void window.setup?.takeOpenFile?.()
-      .then((opened) => (opened ? open(new Blob([opened.bytes as BlobPart]), opened.name) : undefined))
+      .then((opened) => (opened ? openLaunchFile(opened.bytes, opened.name) : undefined))
       .catch((err: Error) => setError(err.message));
   }, []);
 
@@ -41,6 +44,11 @@ export function ReaderOpen() {
         opened.close();
         return;
       }
+      setSearchParams((old) => {
+        const next = new URLSearchParams(old);
+        for (const key of ["chapter", "with", "t"]) next.delete(key);
+        return next;
+      }, { replace: true });
       setSource(opened);
       setName(fileName);
     } catch (err) {

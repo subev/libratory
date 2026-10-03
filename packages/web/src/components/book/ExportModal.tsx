@@ -1,7 +1,7 @@
 import { Modal, ModalHeader } from "../Modal.tsx";
 import { Button } from "../Button.tsx";
 
-export type ExportFormatId = "epub-sync" | "m4b" | "epub" | "pdf";
+export type ExportFormatId = "epub-sync" | "epub-bilingual" | "m4b" | "epub" | "pdf";
 
 export type ExportFormat = {
   id: ExportFormatId;
@@ -28,6 +28,8 @@ export function ExportModal({
   busy,
   onConfirm,
   onClose,
+  options,
+  confirmReason,
 }: {
   formats: ExportFormat[];
   value: ExportFormatId;
@@ -44,6 +46,8 @@ export function ExportModal({
   busy: boolean;
   onConfirm: () => void;
   onClose: () => void;
+  options?: React.ReactNode;
+  confirmReason?: string;
 }) {
   const active = formats.find((f) => f.id === value);
   const label = "text-[10px] font-bold uppercase tracking-wider text-(--text-faint)";
@@ -109,6 +113,8 @@ export function ExportModal({
           </div>
         </div>
 
+        {options}
+
         {/* Above the format group on purpose: deferring is not a preference, it decides whether the
             two audio formats can be picked at all. */}
         {timing && timing.inFlight > 0 && (
@@ -134,8 +140,8 @@ export function ExportModal({
         <Button
           variant="primary"
           onClick={onConfirm}
-          disabled={!active || active.disabled || busy}
-          title={active?.disabled ? active.reason : undefined}
+          disabled={!active || active.disabled || busy || !!confirmReason}
+          title={confirmReason ?? (active?.disabled ? active.reason : undefined)}
           data-testid="export-confirm"
         >
           Export {active?.label ?? ""}

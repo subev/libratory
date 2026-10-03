@@ -1,3 +1,4 @@
+import { BilingualPreparation } from "./BilingualPreparation.tsx";
 import { StructuredText } from "./reader/StructuredText.tsx";
 import type { ReaderText } from "../lib/reader-doc.ts";
 import { useState, useRef, useEffect, useCallback, useMemo, memo, Fragment, type ReactNode } from "react";
@@ -112,7 +113,7 @@ function ChapterModalBody({
   const [speed, setSpeed] = useState(loadSpeed);
   useEffect(() => subscribeSpeed(setSpeed), []);
   const [manifest, setManifest] = useState<ReaderManifest | null>(null);
-  const playerRef = useRef<{ seek: (ms: number) => void; toggle: () => boolean } | null>(null);
+  const playerRef = useRef<{ seek: (ms: number) => void; toggle: () => boolean; pause: () => void; position: () => number } | null>(null);
   const [editText, setEditText] = useState("");
 
   const lang = readingLang(language, variant);
@@ -159,13 +160,38 @@ function ChapterModalBody({
   // Where a chapter sits in the book survives an edit or a translation; marking the audio on it does not
   const hasPages = readerChapter?.pageStart != null;
 
-  // The manifest states where a chapter's narration lives; nothing here builds that URL itself
-  const cueUrl = isVariant ? null : readerChapter?.audio ? readerChapter.cues : null;
+  const { data: originalChapter, isLoading: originalLoading } = trpc.chapters.get.useQuery(
+    { id: chapter.id },
+    { enabled: !isVariant, refetchInterval: chapter.status === "synthesizing" ? 1000 : false },
+  );
+  const { data: variantDetail, isLoading: variantLoading } = trpc.variants.detail.useQuery(
+    { chapterId: chapter.id, key: variant?.key ?? "" },
+    {
+      enabled: isVariant,
+      retry: false,
+      // A variant's audio run only moves audioStatus — chapters.status and the variant's own
+      // text status both stay "done" — so polling has to watch that field or it never runs.
+      refetchInterval: (query) => {
+        const d = query.state.data;
+        const busy =
+          d?.status === "pending" ||
+          d?.status === "translating" ||
+          d?.audioStatus === "pending" ||
+          d?.audioStatus === "synthesizing" ||
+          chapter.status === "synthesizing";
+        return busy ? 1000 : false;
+      },
+    },
+  );
+  // The manifest states where the original's narration lives; a lane's recording is its own,
+  // timed against its own text, so its cues come from the variant rather than the manifest
+  const variantAudio = isVariant && variantDetail?.audioStatus === "done" && variantDetail.audioPath ? variantDetail : null;
+  const cueUrl = isVariant ? (variantAudio ? `/read/variant/${variantAudio.id}/cues.json` : null) : readerChapter?.audio ? readerChapter.cues : null;
 
   // A re-synthesis leaves the cue URL untouched and its contents replaced, so the URL alone is not
   // enough to know the timings are the ones on disk. The timings and the playhead carry the version
   // they belong to, so a re-synthesis or an edit reads as unmarked until the new ones arrive.
-  const cueKey = cueUrl ? `${cueUrl}:${revision}` : null;
+  const cueKey = cueUrl ? `${cueUrl}:${isVariant ? `${variantAudio?.audioPath ?? ""}:${String(variantAudio?.updatedAt ?? "")}` : revision}` : null;
   const [loadedCues, setLoadedCues] = useState<{ key: string; cues: ReaderCues | null } | null>(null);
   const cues = loadedCues?.key === cueKey ? loadedCues.cues : null;
   const [playhead, setPlayhead] = useState<{ key: string | null; ms: number }>({ key: null, ms: 0 });
@@ -210,29 +236,6 @@ function ChapterModalBody({
     : !readerChapter?.audio
       ? "Synthesize this chapter to follow the narration on these pages."
       : `${UNMAPPED[readerChapter.why ?? "unmapped"]} These are the chapter's pages in the original.`;
-  const { data: originalChapter, isLoading: originalLoading } = trpc.chapters.get.useQuery(
-    { id: chapter.id },
-    { enabled: !isVariant, refetchInterval: chapter.status === "synthesizing" ? 1000 : false },
-  );
-  const { data: variantDetail, isLoading: variantLoading } = trpc.variants.detail.useQuery(
-    { chapterId: chapter.id, key: variant?.key ?? "" },
-    {
-      enabled: isVariant,
-      retry: false,
-      // A variant's audio run only moves audioStatus — chapters.status and the variant's own
-      // text status both stay "done" — so polling has to watch that field or it never runs.
-      refetchInterval: (query) => {
-        const d = query.state.data;
-        const busy =
-          d?.status === "pending" ||
-          d?.status === "translating" ||
-          d?.audioStatus === "pending" ||
-          d?.audioStatus === "synthesizing" ||
-          chapter.status === "synthesizing";
-        return busy ? 1000 : false;
-      },
-    },
-  );
   const fullChapter = isVariant
     ? variantDetail && {
         rawText: variantDetail.text,
@@ -755,6 +758,12 @@ function ChapterModalBody({
           )}
         </div>
 
+        {isTranslationKind && variant ? <BilingualPreparation
+          key={`${chapter.id}:${variant.key}`} bookId={bookId} chapterId={chapter.id} chapterIndex={chapter.index}
+          translationKey={variant.key} position={() => playerRef.current?.position() ?? 0}
+          onOpen={() => { playerRef.current?.pause(); onClose(); }}
+        /> : null}
+
         {chapterAudio || fullChapter?.chunkPreviews.length ? (
           <ChunkPreviewPanel
             chunkPreviews={fullChapter?.chunkPreviews ?? NO_PREVIEWS}
@@ -906,7 +915,7 @@ const ChunkPreviewPanel = memo(function ChunkPreviewPanel({
   onHover: (url: string | null) => void;
   isSynthesizing: boolean;
   onTime: (ms: number) => void;
-  playerRef: React.RefObject<{ seek: (ms: number) => void; toggle: () => boolean } | null>;
+  playerRef: React.RefObject<{ seek: (ms: number) => void; toggle: () => boolean; pause: () => void; position: () => number } | null>;
   // Whether the open view marks the words, and so needs a position finer than timeupdate's
   follows: boolean;
   playbackRate: number;
@@ -982,6 +991,8 @@ const ChunkPreviewPanel = memo(function ChunkPreviewPanel({
 
   useEffect(() => {
     playerRef.current = {
+      pause: () => audioRef.current?.pause(),
+      position: () => syncMode || chunkPreviews.length === 0 ? (audioRef.current?.currentTime ?? 0) * 1000 : 0,
       seek: (ms: number) => {
         const audio = audioRef.current;
         if (!audio) return;
@@ -998,7 +1009,7 @@ const ChunkPreviewPanel = memo(function ChunkPreviewPanel({
       },
     };
     return () => { playerRef.current = null; };
-  }, [playerRef, onTime, audioSrc]);
+  }, [playerRef, onTime, audioSrc, syncMode, chunkPreviews.length]);
 
   function handleTimeUpdate() {
     const audio = audioRef.current;

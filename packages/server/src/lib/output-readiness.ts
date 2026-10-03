@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import type { WorkerUtils } from "graphile-worker";
 import { db } from "../db.ts";
@@ -11,8 +12,17 @@ const OUTPUT_WAIT_MAX_MS = 24 * 60 * 60 * 1000;
 
 export const assembleJobKey = (bookId: string, language?: string | null) =>
   `assemble:${bookId}:${language ?? "original"}`;
-export const documentJobKey = (bookId: string, format: string, language?: string | null) =>
-  `assembleDocument:${bookId}:${format}:${language ?? "original"}`;
+// Named chapters are part of the key: two exports of different chapters are two documents, and
+// under one key the second replaced the first while it waited for narration.
+export const documentJobKey = (bookId: string, format: string, language?: string | null, chapterIds?: readonly string[] | null) =>
+  `assembleDocument:${bookId}:${format}:${language ?? "original"}${chapterIds?.length ? `:${createHash("sha1").update([...chapterIds].sort().join(",")).digest("hex").slice(0, 16)}` : ""}`;
+
+// The chapters an output is made from: the ones a caller named, else the selection the book page
+// keeps. An agent exporting one chapter used to deselect the other thirteen, one call each, in the
+// person's own book.
+export function outputChapters(bookId: string, chapterIds?: readonly string[] | null) {
+  return and(eq(chapters.bookId, bookId), chapterIds?.length ? inArray(chapters.id, [...chapterIds]) : eq(chapters.selected, true));
+}
 
 // Inputs still moving. Failed and suspended count as settled — waiting for them to reach
 // "done" would strand a deferred output on the first chapter that dies.
@@ -20,6 +30,7 @@ export async function inFlightInputs(
   bookId: string,
   language: string | null | undefined,
   needs: OutputNeeds,
+  chapterIds?: readonly string[] | null,
 ): Promise<number> {
   if (!language) {
     if (needs === "text") return 0;
@@ -27,8 +38,7 @@ export async function inFlightInputs(
       .select({ id: chapters.id })
       .from(chapters)
       .where(and(
-        eq(chapters.bookId, bookId),
-        eq(chapters.selected, true),
+        outputChapters(bookId, chapterIds),
         inArray(chapters.status, ["pending", "normalizing", "synthesizing"]),
       ));
     return rows.length;
@@ -42,8 +52,7 @@ export async function inFlightInputs(
     .from(chapterVariants)
     .innerJoin(chapters, eq(chapterVariants.chapterId, chapters.id))
     .where(and(
-      eq(chapters.bookId, bookId),
-      eq(chapters.selected, true),
+      outputChapters(bookId, chapterIds),
       eq(chapterVariants.key, language),
       variantFilter,
     ));
@@ -55,14 +64,14 @@ export async function inFlightInputs(
 // jobKey against repeat clicks, and the UI reads run_at to show "waiting".
 export async function deferUntilInputsSettle(opts: {
   identifier: "assemble" | "assembleDocument";
-  payload: Record<string, unknown> & { bookId: string; waitingSince?: string };
+  payload: Record<string, unknown> & { bookId: string; waitingSince?: string; chapterIds?: string[] };
   jobKey: string;
   language: string | null | undefined;
   needs: OutputNeeds;
   addJob: WorkerUtils["addJob"];
   log: (msg: string) => Promise<void>;
 }): Promise<boolean> {
-  const pending = await inFlightInputs(opts.payload.bookId, opts.language, opts.needs);
+  const pending = await inFlightInputs(opts.payload.bookId, opts.language, opts.needs, opts.payload.chapterIds);
   if (pending === 0) return false;
 
   const waitingSince = opts.payload.waitingSince ?? new Date().toISOString();

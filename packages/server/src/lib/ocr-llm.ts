@@ -1,5 +1,5 @@
 import { createRepairBudget, validatedStage, StageValidationError, type RepairBudget } from "./ocr-repair.ts";
-import { pdfFingerprint } from "./ocr-line-cache.ts";
+import { fileSha256 } from "./file-sha256.ts";
 import { orderingCheckpoint, stageCheckpoint } from "./ocr-stage-cache.ts";
 import { routePage, proseSettings, type PageRoute } from "./ocr-routing.ts";
 import { cleanText, joinTextBlocks, formatExtractedText, TEXT_KINDS, type TextKind } from "./extracted-text.ts";
@@ -579,7 +579,7 @@ export function makeLlmOcrRunner(deps: { transcribe: Transcriber; transcribePros
     const repairBudget = input.repairBudget ?? createRepairBudget(0);
     const omitVerseCounters = Boolean(settings.lineOrdering && settings.omitVerseCounters);
     const earlier = await readSavedPages(outDir);
-    const sourceHash = await pdfFingerprint(pdfPath);
+    const sourceHash = await fileSha256(pdfPath);
     if (earlier && (earlier.pages.length !== total || (earlier.sourceHash && earlier.sourceHash !== sourceHash))) {
       throw new Error("Saved AI pages belong to a different source PDF. They were kept; resolve the source mismatch before extracting.");
     }

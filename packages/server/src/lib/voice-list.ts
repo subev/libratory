@@ -1,3 +1,4 @@
+import { voiceHasWordTiming } from "./voice-catalog.ts";
 import {
   cartesiaVoiceToEntry,
   elevenlabsVoiceToEntry,
@@ -27,6 +28,8 @@ export type ListedVoice = {
   cloud: boolean;
   supportsSpeed: boolean;
   requiresMlx: boolean;
+  // A time for every word in the recording, or chunk boundaries only (sentence level)
+  wordTiming: boolean;
   note: string | null;
 };
 
@@ -42,6 +45,7 @@ function listed(voice: Voice, engine: VoiceEngine): ListedVoice {
     cloud: CLOUD_ENGINES.has(engine),
     supportsSpeed: voice.supportsSpeed ?? true,
     requiresMlx: voice.requiresMlx === true,
+    wordTiming: voiceHasWordTiming(voice.id, voice.language ?? languageOfStaticVoice(voice.id)),
     note: voice.note ?? null,
   };
 }

@@ -21,6 +21,7 @@ export {
   kokoroVoiceGroups,
   narratorVoices,
   engineForVoiceId,
+  voiceHasWordTiming,
   normalizeVoiceId,
   sayVoiceToEntry,
   cartesiaVoiceToEntry,
@@ -77,6 +78,7 @@ export function languageCodeFromName(name: string): string | null {
 }
 
 export function languageLabel(code: string): string {
+  if (code === "und") return "Unknown language";
   if (LANGUAGE_LABELS[code]) return LANGUAGE_LABELS[code];
   try {
     return new Intl.DisplayNames(["en"], { type: "language" }).of(code) ?? code;

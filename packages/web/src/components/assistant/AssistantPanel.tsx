@@ -284,9 +284,9 @@ function OpenPanel({ profileId, screen, onCollapse }: { profileId: string; scree
         <h2 className="font-(family-name:--stack-display) text-[17px] font-semibold tracking-tight text-(--text-primary)">Assistant</h2>
         <div className="flex-1" />
         {connected && (
-          <Button size="sm" onClick={() => setPicking(true)} title={index && followingScreen ? `What this thread searches · ${index.hint}` : "What this thread searches"} data-testid="assistant-sources">
-            <IconBooks className="h-3.5 w-3.5" />
-            <span className="max-w-44 truncate" data-testid="assistant-sources-label">{sourcesLabel}</span>
+          <Button size="sm" className="min-w-0" onClick={() => setPicking(true)} title={index && followingScreen ? `What this thread searches · ${index.hint}` : "What this thread searches"} data-testid="assistant-sources">
+            <IconBooks className="h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0 max-w-44 truncate" data-testid="assistant-sources-label">{sourcesLabel}</span>
             {index && followingScreen && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${index.dot} ${index.pulse ? "animate-pulse" : ""}`} data-testid="assistant-index-dot" />}
           </Button>
         )}

@@ -14,6 +14,10 @@ import { useAudioTime } from "../lib/use-audio-time.ts";
 import { usePlayPauseKey } from "../lib/play-pause-key.ts";
 import { useElementWidth } from "../lib/use-element-width.ts";
 import { SPEEDS, loadSpeed, saveSpeed, subscribeSpeed } from "../lib/playback-speed.ts";
+import { BilingualReader } from "../components/reader/BilingualReader.tsx";
+import { bilingualReferences } from "../../../server/src/lib/bilingual-format.ts";
+import { sharesPrimaryRecording } from "../lib/bilingual-reading.ts";
+import { languageLabel } from "../lib/voices.ts";
 
 // The band a cue may start in without the page moving: clear of the sticky bar, clear of the fold
 const READER_BAND: FollowBand = { top: 120, bottom: 140, landing: 0.3 };
@@ -36,20 +40,20 @@ type View = (typeof VIEWS)[number]["id"];
 // One document per URL, remembered by the URL it came from: a chapter change reads as empty during
 // render rather than through an effect, and coming back to a view whose document is already in hand
 // refetches nothing.
-function useReaderDoc<T>(url: string | null, load: (url: string) => Promise<T>) {
-  const [loaded, setLoaded] = useState<{ url: string; data: T | null; error: string | null } | null>(null);
+function useReaderDoc<T>(url: string | null, load: (url: string) => Promise<T>, attempt = 0) {
+  const [loaded, setLoaded] = useState<{ url: string; load: (url: string) => Promise<T>; attempt: number; data: T | null; error: string | null } | null>(null);
 
   useEffect(() => {
-    if (!url || loaded?.url === url) return;
+    if (!url || (loaded?.url === url && loaded.load === load && loaded.attempt === attempt)) return;
     let live = true;
     load(url)
-      .then((data) => { if (live) setLoaded({ url, data, error: null }); })
+      .then((data) => { if (live) setLoaded({ url, load, attempt, data, error: null }); })
       // A chapter's own failure, not the reader's — the picker has to stay usable
-      .catch((err: Error) => { if (live) setLoaded({ url, data: null, error: err.message }); });
+      .catch((err: Error) => { if (live) setLoaded({ url, load, attempt, data: null, error: err.message }); });
     return () => { live = false; };
-  }, [url, load, loaded?.url]);
+  }, [url, load, attempt, loaded?.url, loaded?.load, loaded?.attempt]);
 
-  return loaded?.url === url ? { data: loaded.data, error: loaded.error } : { data: null, error: null };
+  return loaded?.url === url && loaded.load === load && loaded.attempt === attempt ? { data: loaded.data, error: loaded.error } : { data: null, error: null };
 }
 
 // What the reader is showing, which is not always what the engine timed: a page with no text layer
@@ -81,11 +85,71 @@ export function Reader() {
   return <ReaderFor source={source} bookId={id} live />;
 }
 
-export function ReaderFor({ source, bookId, live = false }: { source: DocumentSource; bookId?: string; live?: boolean }) {
+type ReaderProps = { source: DocumentSource; bookId?: string; live?: boolean };
+
+export function ReaderFor(props: ReaderProps) {
+  const { source, bookId } = props;
+  const [loaded, setLoaded] = useState<{ source: DocumentSource; manifest: ReaderManifest | null; error: string | null } | null>(null);
+  const [params, setParams] = useSearchParams();
+  const [bilingualAttempt, setBilingualAttempt] = useState(0);
+  const position = useRef(0);
+  const rememberPosition = useCallback((ms: number) => { position.current = ms; }, []);
+  useEffect(() => {
+    let live = true;
+    source.manifest()
+      .then((manifest) => { if (live) setLoaded({ source, manifest, error: null }); })
+      .catch((e: unknown) => { if (live) setLoaded({ source, manifest: null, error: e instanceof Error ? e.message : "Cannot open book" }); });
+    return () => { live = false; };
+  }, [source]);
+  const manifest = loaded?.source === source ? loaded.manifest : null;
+  const error = loaded?.source === source ? loaded.error : null;
+  const chapter = manifest?.chapters.find((c) => params.has("chapter") && c.i === Number(params.get("chapter"))) ?? manifest?.chapters.find((c) => c.audio) ?? manifest?.chapters[0];
+  const refs = bilingualReferences(chapter?.bilingual);
+  const key = params.get("with") ?? refs[0]?.key ?? "";
+  const ref = refs.find((r) => r.key === key);
+  const result = useReaderDoc(ref?.url ?? null, source.bilingual, bilingualAttempt);
+  const setLanguage = (key: string) => setParams((old) => {
+    const next = new URLSearchParams(old);
+    next.set("with", key);
+    next.set("t", String(Math.round(position.current)));
+    return next;
+  });
+  const controls = refs.length > 0 ? (
+    <label className="flex items-center gap-2 text-sm">
+      Read with
+      <select aria-label="Read with" value={key ?? ""} onChange={(e) => setLanguage(e.target.value)} className="max-w-48 rounded border border-(--border) bg-(--bg-input) px-2 py-1 text-sm">
+        <option value="">Single language</option>
+        {refs.map((r) => <option key={r.key} value={r.key}>{languageLabel(r.language)}</option>)}
+      </select>
+    </label>
+  ) : null;
+  if (error) return <ReaderShell bookId={bookId}><p role="alert">{error}</p></ReaderShell>;
+  if (!manifest || !chapter) return <ReaderShell bookId={bookId}>Loading…</ReaderShell>;
+  const doc = result.data;
+  const requestedTime = Number(params.get("t"));
+  const initialMs = Number.isFinite(requestedTime) && requestedTime > 0 ? requestedTime : 0;
+  if (key && ref && doc && doc.chapterId === chapter.id && doc.key === key) return (
+    <BilingualReader
+      key={ref.url} source={source} manifest={manifest} chapter={chapter} doc={doc} bookId={bookId}
+      controls={controls} initialMs={sharesPrimaryRecording(doc, chapter.audio) ? initialMs : 0} onPosition={rememberPosition} onExit={() => setLanguage("")}
+      onChapter={(index) => { position.current = 0; setParams({ chapter: String(index), with: key }); }}
+    />
+  );
+  if (key && ref && !doc && !result.error) return <ReaderShell bookId={bookId} title={manifest.book.title}>
+    <p className="mb-3 text-sm" role="status">Loading bilingual text…</p>
+    {controls}<Button size="sm" onClick={() => setLanguage("")}>Continue in single language</Button>
+  </ReaderShell>;
+  const notice = key ? <div className={NOTE_BANNER}>
+    <p role="status">{!ref ? "Bilingual pairing is not available for this chapter." : result.error ? `Bilingual reading unavailable: ${result.error}` : "The bilingual document belongs to a different chapter or translation."} Showing the original reader.</p>
+    {ref && <Button size="sm" onClick={() => { setLanguage(key); setBilingualAttempt((attempt) => attempt + 1); }}>Try bilingual again</Button>}
+  </div> : null;
+  return <SingleReader key={manifest.book.id} {...props} initialManifest={manifest} bilingualControls={controls} bilingualNotice={notice} onPosition={rememberPosition} />;
+}
+
+function SingleReader({ source, bookId, live = false, initialManifest, bilingualControls, bilingualNotice, onPosition }: ReaderProps & { initialManifest: ReaderManifest; bilingualControls: React.ReactNode; bilingualNotice: React.ReactNode; onPosition: (ms: number) => void }) {
   const id = bookId;
   const [searchParams, setSearchParams] = useSearchParams();
-  const [manifest, setManifest] = useState<ReaderManifest | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [manifest, setManifest] = useState<ReaderManifest>(initialManifest);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(loadSpeed);
   useEffect(() => subscribeSpeed(setSpeed), []);
@@ -95,9 +159,6 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
 
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  useEffect(() => {
-    source.manifest().then(setManifest).catch((err: Error) => setError(err.message));
-  }, [source]);
 
   const requested = searchParams.get("chapter");
   const list = manifest?.chapters ?? [];
@@ -135,7 +196,7 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
   const startParam = Number(searchParams.get("t"));
   const startAt = Number.isFinite(startParam) && startParam > 0 ? startParam : 0;
   const ms = played.chapterId === chapterId ? played.ms : startAt;
-  const setMs = useCallback((at: number) => setPlayed({ chapterId, ms: at }), [chapterId]);
+  const setMs = useCallback((at: number) => { setPlayed({ chapterId, ms: at }); onPosition(at); }, [chapterId, onPosition]);
 
   // A chapter nobody has narrated has no cues to reflow; its text is its own small document,
   // fetched only when text view is what will show it.
@@ -186,7 +247,12 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
 
   const goToChapter = (to: number, play: boolean) => {
     autoPlay.current = play;
-    setSearchParams({ chapter: String(to) });
+    setSearchParams((old) => {
+      const next = new URLSearchParams(old);
+      next.set("chapter", String(to));
+      next.delete("t");
+      return next;
+    });
   };
 
   // Picking a sentence is a request to hear it, so a paused reader starts speaking
@@ -219,7 +285,6 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
     return bodyFit(manifest?.book.medianBodyPt ?? null, cropWidth, rendered);
   }, [pages, view, width, pagesWidth, manifest?.book.medianBodyPt]);
 
-  if (error) return <ReaderShell bookId={id}><p className="text-sm text-(--danger-text)">{error}</p></ReaderShell>;
   if (!manifest || !chapter) return <ReaderShell bookId={id}><p className="text-sm text-(--text-muted)">Loading…</p></ReaderShell>;
 
   const maxWidth = WIDTHS.find((w) => w.id === width)!.px;
@@ -232,8 +297,10 @@ export function ReaderFor({ source, bookId, live = false }: { source: DocumentSo
 
   return (
     <ReaderShell bookId={id} title={manifest.book.title} pinnedBack>
+      {bilingualNotice}
       <div className="sticky top-0 z-10 -mx-4 mb-4 border-b border-(--border) bg-(--bg-page)/95 px-4 py-2 backdrop-blur">
         <div className="flex flex-wrap items-center gap-3">
+          {bilingualControls}
           {/* In the pinned bar, not above it: a chapter is thousands of pixels of pages, and the way
               out scrolled away with the first of them */}
           <Button variant="icon" size="sm" to={backTo(id, chapter.id)} aria-label={id ? "Back to the book" : "Back to the library"} title={id ? "Back to the book" : "Back to the library"} data-testid="reader-back">

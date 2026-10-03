@@ -407,6 +407,18 @@ describe("booksRouter.get derived status", () => {
     await insertJob(db, "assemble", { bookId });
     expect((await caller.get({ id: bookId })).assembleQueued).toBe(true);
   });
+
+  it("does not report a failed assembly or a document export as queued", async () => {
+    const db = getDb();
+    await ensureGraphileTables(db);
+    const bookId = crypto.randomUUID();
+    await db.insert(books).values({ id: bookId, title: "Book", status: "done" });
+    // A failed job keeps its row with the one attempt spent
+    await insertJob(db, "assemble", { bookId }, { attempts: 1, maxAttempts: 1 });
+    await insertJob(db, "assembleDocument", { bookId, format: "epub" });
+
+    expect((await booksRouter.createCaller({}).get({ id: bookId })).assembleQueued).toBe(false);
+  });
 });
 
 describe("booksRouter.rawTextStats", () => {

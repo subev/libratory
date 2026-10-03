@@ -1,0 +1,300 @@
+import { readingDirection } from "../../lib/reading-lang.ts";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  linkedTokens, pairAtTime, switchNarration, tokenAtTime,
+  type BilingualDocument, type BilingualPair, type BilingualSide,
+} from "../../../../server/src/lib/bilingual-format.ts";
+import type { DocumentSource } from "../../lib/reader-source.ts";
+import type { ReaderChapter, ReaderManifest } from "../../lib/reader-doc.ts";
+import { useAudioTime } from "../../lib/use-audio-time.ts";
+import { usePlayPauseKey } from "../../lib/play-pause-key.ts";
+import { SPEEDS, loadSpeed, saveSpeed, subscribeSpeed } from "../../lib/playback-speed.ts";
+import { formatDuration } from "../../lib/format.ts";
+import { followCue } from "../../lib/cue-follow.ts";
+import { languageLabel as language } from "../../lib/voices.ts";
+import { paragraphGroups, pairPresentation, listenPosition, linkedText, sharesPrimaryRecording, sentenceSequence, sentenceStartIndex, nextSentenceIndex } from "../../lib/bilingual-reading.ts";
+import { WordMeaning, useWordMeaning } from "./WordMeaning.tsx";
+import { BilingualPassage } from "./BilingualPassage.tsx";
+import { useWordNavigation } from "../../lib/reader-word-navigation.ts";
+import { Button } from "../Button.tsx";
+import { IconPause, IconPlay } from "../icons.tsx";
+
+const BAND = { top: 160, bottom: 100, landing: 0.3 };
+const SIDES = ["source", "target"] as const;
+const NO_TOKENS: readonly number[] = [];
+
+type Props = {
+  doc: BilingualDocument;
+  source: DocumentSource;
+  manifest: ReaderManifest;
+  chapter: ReaderChapter;
+  controls: ReactNode;
+  onChapter: (index: number) => void;
+  onExit: () => void;
+  initialMs: number;
+  onPosition: (ms: number) => void;
+  bookId?: string;
+};
+
+export function BilingualReader({ doc, source, manifest, chapter, controls, onChapter, onExit, bookId, initialMs, onPosition }: Props) {
+  const [side, setSide] = useState<BilingualSide>("source");
+  const [ms, setMs] = useState(Math.max(0, initialMs));
+  const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState(loadSpeed);
+  useEffect(() => subscribeSpeed(setSpeed), []);
+  const [message, setMessage] = useState<string | null>(null);
+  const [following, setFollowing] = useState(true);
+  const [inspectMode, setInspectMode] = useState(false);
+  const [alternate, setAlternate] = useState<{ first: BilingualSide; index: number } | null>(null);
+  const completed = useRef<typeof alternate>(null);
+  const sequences = useMemo(() => ({ source: sentenceSequence(doc, "source"), target: sentenceSequence(doc, "target") }), [doc]);
+  const sentence = alternate ? sequences[alternate.first][alternate.index] : null;
+  const meaning = useWordMeaning();
+  const navigation = useWordNavigation(doc);
+  const { dismiss: dismissMeaning, show: showMeaning, consumeHold } = meaning;
+  const selection = meaning.selection;
+  const directions = useMemo(() => ({ source: readingDirection(doc.source.language), target: readingDirection(doc.target.language) }), [doc.source.language, doc.target.language]);
+  const groups = useMemo(() => paragraphGroups(doc), [doc]);
+  const presentation = useMemo(() => ({ source: pairPresentation(doc, "source"), target: pairPresentation(doc, "target") }), [doc]);
+  const firstPair = doc.pairs[0];
+  const heading = firstPair?.source && doc.source.text.slice(...firstPair.source).trim() === chapter.title.trim() ? firstPair.id : null;
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const content = useRef<HTMLDivElement>(null);
+  const toolbar = useRef<HTMLDivElement>(null);
+  const landing = useRef({ ms: Math.max(0, initialMs), play: false });
+  const lane = doc[side];
+  const activePair = pairAtTime(doc, side, ms);
+  const activeToken = tokenAtTime(lane, ms);
+  const speakingPair = activeToken ? doc.pairs.find((pair) => {
+    const range = pair[side];
+    return range && activeToken.range[0] >= range[0] && activeToken.range[1] <= range[1];
+  }) : null;
+  const counterpart = useMemo(() => activePair && activeToken ? linkedTokens(activePair, side, activeToken.id) : null, [activePair, activeToken, side]);
+  useAudioTime(audioRef, playing, setMs);
+
+  const togglePlay = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio?.getAttribute("src")) return false;
+    if (landing.current.play) {
+      landing.current.play = false;
+      audio.pause();
+      return true;
+    }
+    if (alternate && !sentence) {
+      setMessage("No timed sentence pair here. Click another sentence or turn off alternating playback.");
+      return true;
+    }
+    if (audio.paused) void audio.play().catch(() => setMessage("Playback could not start. Try Play again."));
+    else audio.pause();
+    return true;
+  }, [alternate, sentence]);
+  usePlayPauseKey(togglePlay);
+
+  useEffect(() => {
+    if (following && !selection && content.current) followCue({ ...BAND, top: (toolbar.current?.offsetHeight ?? BAND.top) + 12 }, { root: content.current });
+    // The marks move when these IDs change; the effect follows the resulting DOM geometry.
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies
+  }, [activePair?.id, activeToken?.id, side, following, selection]);
+  useEffect(() => {
+    const sourceMs = side === "source" ? ms : switchNarration(doc, side, ms)?.ms;
+    if (sourceMs !== undefined) onPosition(sharesPrimaryRecording(doc, chapter.audio) ? sourceMs : 0);
+  }, [doc, chapter.audio, side, ms, onPosition]);
+
+  const listen = useCallback((nextSide: BilingualSide, at: number, play: boolean, continuing = false) => {
+    setMessage(null);
+    if (!continuing) completed.current = null;
+    if (alternate && !continuing) {
+      const index = nextSentenceIndex(sequences[nextSide], sentenceStartIndex(doc, nextSide, at));
+      setAlternate({ first: nextSide, index });
+      if (index < 0) {
+        landing.current.play = false;
+        audioRef.current?.pause();
+        setMessage("Nothing timed remains from here. Click an earlier sentence, or turn off alternating playback.");
+        return;
+      }
+    }
+    if (!continuing) { dismissMeaning(); setFollowing(true); }
+    landing.current = { ms: at, play };
+    if (nextSide === side) {
+      const audio = audioRef.current;
+      if (audio) {
+        audio.currentTime = at / 1000;
+        landing.current.play = false;
+        if (play) void audio.play().catch(() => setMessage("Playback could not start. Try Play again."));
+      }
+    } else {
+      audioRef.current?.pause();
+      setPlaying(false);
+      setSide(nextSide);
+    }
+    setMs(at);
+  }, [alternate, doc, dismissMeaning, sequences, side]);
+
+  function finishSentence() {
+    if (!alternate || completed.current === alternate) return;
+    completed.current = alternate;
+    const audio = audioRef.current;
+    audio?.pause();
+    if (audio && sentence) { audio.currentTime = sentence.endMs / 1000; setMs(sentence.endMs); }
+    // An untimed side is skipped, not a stop; only the end of the chapter ends the run.
+    const index = nextSentenceIndex(sequences[alternate.first], alternate.index + 1);
+    const next = index < 0 ? undefined : sequences[alternate.first][index];
+    setAlternate({ first: alternate.first, index });
+    if (!next) {
+      landing.current.play = false;
+      setPlaying(false);
+      setMessage("End of chapter. Click a sentence to listen again.");
+      return;
+    }
+    listen(next.side, next.startMs, true, true);
+  }
+
+  const advanceSentence = useEffectEvent(finishSentence);
+  useEffect(() => {
+    if (!playing || !sentence) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const check = () => {
+      const audio = audioRef.current;
+      if (!audio || audio.paused) return;
+      const remaining = sentence.endMs - audio.currentTime * 1000;
+      if (remaining <= 0) { advanceSentence(); return; }
+      timer = setTimeout(check, Math.max(1, Math.min(50, remaining / audio.playbackRate)));
+    };
+    timer = setTimeout(check, 0);
+    return () => clearTimeout(timer);
+  }, [playing, sentence]);
+
+  function enableAlternation(enabled: boolean) {
+    if (!enabled) { setAlternate(null); setMessage(null); return; }
+    const at = audioRef.current?.currentTime ? audioRef.current.currentTime * 1000 : ms;
+    const index = nextSentenceIndex(sequences[side], sentenceStartIndex(doc, side, at));
+    const start = index < 0 ? undefined : sequences[side][index];
+    setAlternate({ first: side, index });
+    if (!start) {
+      audioRef.current?.pause();
+      landing.current.play = false;
+      setMessage("Nothing timed remains from here. Click an earlier sentence, or turn off alternating playback.");
+      return;
+    }
+    listen(side, start.startMs, playing, true);
+  }
+
+  function changeVoice(nextSide: BilingualSide) {
+    if (nextSide === side) return;
+    const landing = switchNarration(doc, side, ms);
+    if (!lane.narration) { listen(nextSide, 0, false); return; }
+    if (!landing) { setMessage("No timed counterpart here. Click a word in the other language to listen there."); return; }
+    listen(landing.side, landing.ms, playing);
+  }
+
+  const selectedPair = doc.pairs.find((pair) => pair.id === selection?.pair);
+  const selected = useMemo(() => selectedPair && selection ? linkedTokens(selectedPair, selection.side, selection.token) : null, [selectedPair, selection]);
+  const activateWord = useCallback((pair: BilingualPair, textSide: BilingualSide, token: number, anchor: HTMLButtonElement) => {
+    if (consumeHold() || window.getSelection()?.toString()) return;
+    if (inspectMode) { showMeaning({ pair: pair.id, side: textSide, token }, anchor); return; }
+    const textLane = doc[textSide];
+    const at = listenPosition(textLane, pair, textSide, token);
+    if (!at) { setMessage(`No narration timing here in ${language(textLane.language)}.`); return; }
+    listen(textSide, at.ms, true);
+    if (!at.word) setMessage("Word timing is unavailable here; playing from the sentence start.");
+  }, [doc, inspectMode, listen, consumeHold, showMeaning]);
+
+  return (
+    <div className="min-h-screen bg-(--bg-reading) px-4 py-3" data-testid="bilingual-reader">
+      <div className="mx-auto max-w-5xl">
+        <div ref={toolbar} data-testid="bilingual-toolbar" className="sticky top-0 z-10 -mx-4 mb-4 space-y-2 border-b border-(--border) bg-(--bg-page)/95 px-4 py-3 backdrop-blur">
+          <div className="flex flex-wrap items-center gap-3">
+            <Button size="sm" to={bookId ? `/books/${bookId}?chapter=${chapter.id}` : "/"}>Back</Button>
+
+            <select aria-label="Chapter" value={chapter.i} onChange={(e) => onChapter(Number(e.target.value))} className="max-w-64 rounded border border-(--border) bg-(--bg-input) px-2 py-1 text-sm">
+              {manifest.chapters.map((c) => <option key={c.id} value={c.i}>{c.i + 1}. {c.title}</option>)}
+            </select>
+            {controls}
+            <Button size="sm" onClick={onExit}>Single language</Button>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="icon" size="sm" aria-label={playing ? "Pause" : "Play"} title={!lane.narration ? "No narration in this language" : playing ? "Pause (Space)" : "Play (Space)"} disabled={!lane.narration} onClick={togglePlay}>
+              {playing ? <IconPause weight="fill" className="h-4 w-4" /> : <IconPlay className="h-4 w-4" />}
+            </Button>
+            <span className="text-xs text-(--text-muted)">Speak</span>
+            {SIDES.map((voice) => <Button key={voice} size="sm" variant={side === voice ? "primary" : "secondary"} aria-pressed={side === voice} disabled={!doc[voice].narration} title={doc[voice].narration ? undefined : "No narration in this language"} onClick={() => changeVoice(voice)}>{language(doc[voice].language)}</Button>)}
+            <select aria-label="Playback speed" value={speed} className="rounded border border-(--border) bg-(--bg-input) px-2 py-1 text-sm" onChange={(e) => {
+              const rate = Number(e.target.value); setSpeed(rate); saveSpeed(rate);
+              if (audioRef.current) { audioRef.current.defaultPlaybackRate = rate; audioRef.current.playbackRate = rate; }
+            }}>{SPEEDS.map((rate) => <option key={rate} value={rate}>{rate}x</option>)}</select>
+            <span className="text-xs tabular-nums text-(--text-muted)">{formatDuration(ms)} / {formatDuration(lane.narration?.totalMs ?? 0)}</span>
+            <Button size="sm" variant="ghost" onClick={() => {
+              setFollowing(true);
+              if (content.current) followCue({ ...BAND, top: (toolbar.current?.offsetHeight ?? BAND.top) + 12 }, { root: content.current, jump: true });
+            }}>{following ? playing ? "Following the voice" : "Paused" : "Back to the voice"}</Button>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-(--text-muted)">
+            <span>{inspectMode ? "Tap a word for its meaning · Space to play/pause" : "Click to listen · Space to play/pause · Hover or hold for meaning"}</span>
+            <Button variant={inspectMode ? "primary" : "ghost"} size="sm" aria-pressed={inspectMode} onClick={() => { setInspectMode(!inspectMode); meaning.dismiss(); }}>Meanings on tap</Button>
+            <label className="flex items-center gap-2" title="Play each paired passage in both languages, starting with the selected voice">
+              <input type="checkbox" className="accent-(--accent)" checked={alternate !== null}
+                disabled={!doc.source.narration || !doc.target.narration}
+                onChange={(event) => enableAlternation(event.target.checked)} />
+              Alternate languages by sentence
+            </label>
+            <details>
+              <summary className="cursor-pointer hover:text-(--text-primary)">Timing details</summary>
+              <div className="max-w-prose space-y-2 py-2">{lane.narration?.qualityNotes.map((note) => <p key={note}>{note}</p>)}</div>
+            </details>
+          </div>
+          {message && <p role="status" className="text-sm text-(--warning-text)">{message}</p>}
+        </div>
+
+        <audio key={side} ref={audioRef} src={source.resolve(lane.narration?.audio)} preload="metadata"
+          onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { if (alternate) finishSentence(); else setPlaying(false); }}
+          onError={() => { setPlaying(false); setMessage("This narration could not be loaded. Both texts remain available."); }}
+          onLoadedMetadata={() => {
+            const audio = audioRef.current;
+            if (!audio) return;
+            audio.defaultPlaybackRate = speed; audio.playbackRate = speed;
+            audio.currentTime = landing.current.ms / 1000;
+            if (landing.current.play) void audio.play().catch(() => setMessage("Press Play to continue this narration."));
+            landing.current.play = false;
+          }}
+          onTimeUpdate={() => { if (audioRef.current && !playing) setMs(audioRef.current.currentTime * 1000); }} />
+        <h1 className="sr-only">{chapter.title}</h1>
+        <div className="mb-6 flex justify-between gap-8 px-3 text-sm font-medium text-(--text-muted) md:grid md:grid-cols-2 md:gap-12">
+          {SIDES.map((s) => <span key={s}>{language(doc[s].language)}{s === side && lane.narration ? " · Audio" : ""}</span>)}
+        </div>
+        <p id="word-navigation" className="sr-only">Left and Right move between words in this language's reading direction. Home and End go to its first and last word. Enter listens from the word; Space pauses or plays.</p>
+        <div ref={content} className="space-y-6 pb-16" onWheel={() => setFollowing(false)} onTouchMove={() => setFollowing(false)}
+          onFocusCapture={navigation.onFocusCapture} onKeyDown={navigation.onKeyDown}>
+          {groups.map((pairs) => (
+            <div key={pairs[0]?.id} className="grid gap-3 md:grid-cols-2 md:gap-12" data-testid="bilingual-paragraph">
+              {SIDES.map((textSide) => (
+                <div key={textSide} className="min-w-0 max-w-prose px-3">
+                  <p dir={directions[textSide]} lang={doc[textSide].language} className={`whitespace-normal font-reading leading-relaxed ${pairs.length === 1 && pairs[0]?.id === heading ? "text-2xl font-medium" : "text-lg"}`}>
+                    {pairs.some((pair) => pair[textSide]) ? pairs.map((pair) => (
+                      <BilingualPassage key={pair.id} pair={pair} lane={doc[textSide]} side={textSide} layout={presentation[textSide].get(pair.id)}
+                        active={activePair === pair && (textSide === side || pair.status === "matched")}
+                        current={activePair === pair && textSide === side}
+                        speakingToken={speakingPair === pair && textSide === side ? activeToken?.id ?? null : null}
+                        linked={activePair === pair && textSide !== side ? counterpart?.[textSide] ?? NO_TOKENS : NO_TOKENS}
+                        inspected={selectedPair === pair ? selected?.[textSide] ?? NO_TOKENS : NO_TOKENS}
+                        meaningToken={selectedPair === pair && selection?.side === textSide ? selection.token : null}
+                        tabStop={navigation.stops[textSide].pair === pair ? navigation.stops[textSide].token : null}
+                        handlers={meaning.handlers} onActivate={activateWord} />
+                    )) : <span className="font-sans text-sm text-(--text-muted)">No counterpart for this passage.</span>}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+        {selection && selectedPair && <WordMeaning meaning={meaning}>
+          <p dir={directions[selection.side]} lang={doc[selection.side].language} className="text-xs text-(--text-muted)">{linkedText(doc[selection.side], selected?.[selection.side].length ? selected[selection.side] : [selection.token])}</p>
+          <p dir={directions[selection.side === "source" ? "target" : "source"]} lang={doc[selection.side === "source" ? "target" : "source"].language} className="font-reading text-lg">
+            {selected?.source.length && selected.target.length ? linkedText(doc[selection.side === "source" ? "target" : "source"], selected[selection.side === "source" ? "target" : "source"]) : selectedPair.status === "uncertain" ? "Pairing uncertain" : selectedPair.linksStatus === "unavailable" ? "Word meanings are not available" : "No equivalent recorded"}
+          </p>
+          {selectedPair.linksStatus === "partial" && <p className="text-xs text-(--text-muted)">Some word links are missing.</p>}
+        </WordMeaning>}
+
+      </div>
+    </div>
+  );
+}

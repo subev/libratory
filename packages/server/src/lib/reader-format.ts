@@ -24,8 +24,8 @@ export type ReaderChapter = {
   audio: string | null;
   // null when the chapter has no narration: a container cannot carry a path to a missing file
   cues: string | null;
-  // The chapter's own text, for reading a chapter no narration has been made for yet. Only a
-  // served manifest carries one: a container's text is the EPUB layer beside it, not a copy here.
+  // The chapter's own text, served over HTTP or carried in a text-only container. Narrated
+  // containers can instead carry the text inside their cue document.
   text: string | null;
   durationMs: number | null;
   pageStart: number | null;
@@ -34,6 +34,7 @@ export type ReaderChapter = {
   why?: ReaderUnmapped;
   // Where a chapter written from something on the web came from. Absolute, unlike every other URL here
   link?: { url: string };
+  bilingual?: { key: string; language: string; url: string }[];
 };
 
 export type ReaderManifest = {

@@ -6,3 +6,14 @@ export function readingLang(bookLanguage: string | null | undefined, variant?: V
   if (variant?.kind === "translation") return variant.key;
   return bookLanguage || undefined;
 }
+
+export function readingDirection(language: string): "rtl" | "ltr" | "auto" {
+  try {
+    const locale = new Intl.Locale(language);
+    if (!locale.language || locale.language === "und") return "auto";
+    const info: unknown = "getTextInfo" in locale && typeof locale.getTextInfo === "function"
+      ? locale.getTextInfo() : "textInfo" in locale ? locale.textInfo : null;
+    if (info && typeof info === "object" && "direction" in info && (info.direction === "rtl" || info.direction === "ltr")) return info.direction;
+  } catch { /* Unknown tags retain the browser's content-based fallback. */ }
+  return "auto";
+}

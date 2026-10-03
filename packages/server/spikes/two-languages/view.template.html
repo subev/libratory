@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Two Languages spike</title>
+<style>
+  :root { --bg:#f6f1e7; --card:#fffaf0; --ink:#2a2420; --muted:#7a6f63; --accent:#e8742a; --accent-soft:rgba(232,116,42,.22); --accent-strong:rgba(232,116,42,.42); --neutral:rgba(42,36,32,.08); --line:#e3d8c6; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1d1a17; --card:#26221e; --ink:#eee5d8; --muted:#a3978a; --line:#3a332c; --neutral:rgba(238,229,216,.09); } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 -apple-system, system-ui, sans-serif; }
+  header { position:sticky; top:0; z-index:2; background:var(--bg); border-bottom:1px solid var(--line); padding:12px 16px; display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; }
+  header h1 { font-size:15px; margin:0 8px 0 0; }
+  .seg { display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .seg button { border:0; background:transparent; color:var(--ink); padding:5px 10px; font:inherit; cursor:pointer; }
+  .seg button[aria-pressed=true] { background:var(--accent); color:#1b120b; }
+  .btn { border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:8px; padding:5px 12px; font:inherit; cursor:pointer; }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:#1b120b; font-weight:600; }
+  label.chk { display:inline-flex; gap:6px; align-items:center; color:var(--muted); }
+  .clock { color:var(--muted); font-variant-numeric:tabular-nums; min-width:90px; }
+  main { padding:16px; max-width:1400px; margin:0 auto; }
+  .stats { color:var(--muted); font-size:13px; margin:0 0 12px; }
+  .cols { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:760px) { .cols { grid-template-columns:1fr; } }
+  .pane { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px 24px; max-height:62vh; overflow:auto; }
+  .pane h2 { font:600 12px/1 system-ui; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:0 0 12px; display:flex; justify-content:space-between; }
+  .text { font:17px/1.65 "Iowan Old Style", "Source Serif 4", Georgia, serif; white-space:pre-wrap; max-width:65ch; }
+  .pair { cursor:pointer; border-radius:3px; transition:background .15s; }
+  .pair:hover { background:var(--neutral); }
+  .pair.on.speaking { background:var(--accent-soft); }
+  .pair.on.other { background:var(--neutral); text-decoration:underline; text-decoration-color:var(--accent); text-decoration-thickness:2px; text-underline-offset:4px; }
+  .pair.est.on.speaking { background:repeating-linear-gradient(90deg, var(--accent-soft) 0 6px, rgba(232,116,42,.14) 6px 12px); }
+  .tok.on { background:var(--accent-strong); border-radius:2px; }
+  .tok.peer { background:var(--accent-strong); border-radius:2px; box-shadow:0 2px 0 var(--accent); }
+  .tok[data-l]:hover, .tok.hov { background:var(--accent-strong); border-radius:2px; outline:1px solid var(--accent); }
+  .veil .pair:not(.on) , .veil .pair.on.other { filter:blur(5px); }
+  .veil .pair:active { filter:none; }
+  .pair.uncertain { outline:1px dashed var(--muted); outline-offset:2px; }
+  .pair.source-only, .pair.target-only { opacity:.55; }
+  .legend { font-size:12px; color:var(--muted); margin-top:10px; }
+  section.a { margin-top:24px; }
+  table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  td, th { padding:6px 10px; border-top:1px solid var(--line); vertical-align:top; text-align:left; font-size:13px; }
+  th { color:var(--muted); font-weight:600; }
+  td.k { color:var(--muted); white-space:nowrap; }
+  .merged td { background:var(--neutral); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Two Languages — spike</h1>
+  <div class="seg" id="chapters"></div>
+  <label class="chk">Bulgarian audio <select id="lane"></select></label>
+  <span class="clock" id="clock">0:00</span>
+  <button class="btn primary" id="play">Play</button>
+  <div class="seg" id="voice"><button data-v="s">English voice</button><button data-v="t">Bulgarian voice</button></div>
+  <button class="btn" id="switch" title="Jump to the start of the same pair in the other voice">Switch voice</button>
+  <div class="seg" id="rhythm"><button data-r="one">One voice</button><button data-r="both">Sentence, then translation</button></div>
+  <label class="chk"><input type="checkbox" id="veil"> Veil the side not being read</label>
+</header>
+<main>
+  <p class="stats" id="stats"></p>
+  <div class="cols">
+    <div class="pane" id="paneS"><h2><span>English · Kokoro</span><span id="gs"></span></h2><div class="text" id="textS"></div></div>
+    <div class="pane" id="paneT"><h2><span id="laneLabel">Bulgarian</span><span id="gt"></span></h2><div class="text" id="textT"></div></div>
+  </div>
+  <p class="legend">Orange fill: the sentence being spoken. Underline: its pair on the other side. Striped fill: at least one edge of the sentence is not a provider word time (hover a sentence for each edge's method). Dashed outline: an uncertain pair; faded: a sentence with no counterpart. Word highlight wherever the voice reported word times (Kokoro, Cartesia); the spoken word also lights its linked counterpart on the other side. Hover any word to see its link. Click any sentence to play it. Pairs come from BGE-M3 alignment of the translation already in the library (approach B); word links from one LLM pass over numbered tokens (token-ID prompt).</p>
+  <section class="a">
+    <h2 style="font-size:15px">Approach A, for comparison: the same chapter translated with pair markers (new text, not narrated)</h2>
+    <p class="stats" id="astats"></p>
+    <table><thead><tr><th>Pair</th><th>English</th><th>Bulgarian (marker-paired translation)</th></tr></thead><tbody id="atable"></tbody></table>
+  </section>
+</main>
+<audio id="audS" preload="auto"></audio>
+<audio id="audT" preload="auto"></audio>
+<script>
+const DATA = __DATA__;
+const $ = (id) => document.getElementById(id);
+const state = { ch: 0, voice: "s", rhythm: "one", playing: false, pair: -1, stopAt: null };
+const aud = { s: $("audS"), t: $("audT") };
+
+function fmt(ms) { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
+function esc(s) { return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]); }
+
+// Tokens come from the stored token table, never re-derived here; a token may belong to several links
+function renderSide(d, side) {
+  const text = side === "s" ? d.srcText : d.tgtText;
+  const words = side === "s" ? d.srcWords : d.tgtWords;
+  const wordAt = new Int32Array(text.length).fill(-1);
+  words.forEach((w, wi) => { for (let c = w.start; c < w.end; c++) wordAt[c] = wi; });
+  const linksOf = new Map();
+  d.links.forEach((l, li) => { for (const id of l[side]) { const k = `${l.pairId}:${id}`; linksOf.set(k, [...(linksOf.get(k) ?? []), li]); } });
+
+  const spans = d.pairs.map((p, i) => ({ i, p, r: side === "s" ? p.s : p.t })).filter((x) => x.r).sort((a, b) => a.r.start - b.r.start);
+  let html = "", at = 0;
+  for (const { i, p, r } of spans) {
+    html += esc(text.slice(at, r.start));
+    const tokens = d.tokens[p.id]?.[side] ?? [];
+    let inner = "", c = r.start;
+    for (const tok of tokens) {
+      inner += esc(text.slice(c, tok.start));
+      const l = linksOf.get(`${p.id}:${tok.id}`), w = wordAt[tok.start];
+      inner += `<span class="tok"${l ? ` data-l=" ${l.join(" ")} "` : ""}${w >= 0 ? ` data-w="${side}${w}"` : ""}>${esc(text.slice(tok.start, tok.end))}</span>`;
+      c = tok.end;
+    }
+    inner += esc(text.slice(c, r.end));
+    const timing = side === "s" ? p.sTiming : p.tTiming;
+    const est = !timing || timing.start.method !== "provider-word" || timing.end.method !== "provider-word";
+    const title = timing ? `start: ${timing.start.method}, end: ${timing.end.method}` : "";
+    html += `<span class="pair ${p.status}${est ? " est" : ""}" data-i="${i}" data-side="${side}" title="${p.status} · similarity ${p.score} · ${title}">${inner}</span>`;
+    at = r.end;
+  }
+  return html + esc(text.slice(at));
+}
+
+const edgesMs = (t) => (t && t.start.ms !== null && t.end.ms !== null ? [t.start.ms, t.end.ms] : null);
+
+function load(ch) {
+  stop();
+  state.ch = ch; state.pair = -1;
+  const d = DATA[ch];
+  const titles = [...new Set(DATA.map((x) => x.title))];
+  document.querySelectorAll("#chapters button").forEach((b, i) => b.setAttribute("aria-pressed", String(titles[i] === d.title)));
+  $("lane").innerHTML = DATA.map((x, i) => x.title === d.title ? `<option value="${i}"${i === ch ? " selected" : ""}>${esc(x.lane)}</option>` : "").join("");
+  for (const p of d.pairs) { p.sMs = edgesMs(p.sTiming); p.tMs = edgesMs(p.tTiming); }
+  $("textS").innerHTML = renderSide(d, "s");
+  $("textT").innerHTML = renderSide(d, "t");
+  $("laneLabel").textContent = "Bulgarian · " + d.lane;
+  $("gs").textContent = d.srcWords.length ? `word timings · ${d.srcWords.length} words` : "chunk timings only";
+  $("gt").textContent = d.tgtWords.length ? `word timings · ${d.tgtWords.length} words` : "chunk timings only";
+  const st = d.stats;
+  const statuses = Object.entries(st.statuses).map(([k, v]) => `${v} ${k}`).join(", ");
+  const methods = Object.entries(d.tgtEdgeMethods).map(([k, v]) => `${v} ${k}`).join(", ");
+  const linkNote = st.links ? ` ${st.links.links} word links by ${st.links.method}; ${st.links.missing.length} pairs unanswered, ${st.links.invalid} invalid lines.` : " Word links not run (--links=ids).";
+  $("stats").textContent = `${d.title}: ${st.sentences.en} English and ${st.sentences.bg} Bulgarian sentences became ${st.pairs} pairs (${statuses}) in ${(st.alignMs / 1000).toFixed(1)} s, all local. Bulgarian pair edges: ${methods}.${linkNote}`;
+  setSrc(aud.s, d.srcAudio);
+  setSrc(aud.t, d.tgtAudio);
+  const c = d.paired;
+  if (c) {
+    $("astats").textContent = `${c.validFirstTry}/${c.blocks} blocks came back with valid markers on the first try; ${c.tokensOut} output tokens.${c.problems.length ? " Problems: " + c.problems.join("; ") : ""}`;
+    $("atable").innerHTML = c.groups.map((g, i) => `<tr class="${g.kind === "1" ? "" : "merged"}"><td class="k">${i + 1}</td><td>${esc(g.src)}</td><td lang="bg">${esc(g.tgt)}</td></tr>`).join("");
+  } else { $("astats").textContent = "Not run (--paired)."; $("atable").innerHTML = ""; }
+}
+
+function setSrc(el, file) {
+  el.src = "file://" + file;
+}
+
+function pairAt(side, ms) {
+  const pairs = DATA[state.ch].pairs;
+  const key = side === "s" ? "sMs" : "tMs";
+  let found = -1;
+  for (const [i, p] of pairs.entries()) if (p[key] && p[key][0] <= ms + 30) found = i;
+  return found;
+}
+
+function paint() {
+  const d = DATA[state.ch];
+  const ms = aud[state.voice].currentTime * 1000;
+  $("clock").textContent = fmt(ms);
+  const i = pairAt(state.voice, ms);
+  if (i !== state.pair) {
+    document.querySelectorAll(".pair.on").forEach((el) => el.classList.remove("on", "speaking", "other"));
+    document.querySelectorAll(`.pair[data-i="${i}"]`).forEach((el) => {
+      el.classList.add("on", el.dataset.side === state.voice ? "speaking" : "other");
+      if (el.dataset.side === state.voice) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+    // the other side follows the pair, which lives in a different scroller
+    document.querySelector(`.pair[data-i="${i}"][data-side="${state.voice === "s" ? "t" : "s"}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    state.pair = i;
+  }
+  const words = state.voice === "s" ? d.srcWords : d.tgtWords;
+  const wi = words.findIndex((w) => w.startMs <= ms && ms < w.endMs);
+  if (wi !== state.word) {
+    state.word = wi;
+    document.querySelectorAll(".tok.on, .tok.peer").forEach((el) => el.classList.remove("on", "peer"));
+    const other = state.voice === "s" ? "#textT" : "#textS";
+    for (const el of document.querySelectorAll(`.tok[data-w="${state.voice}${wi}"]`)) {
+      el.classList.add("on");
+      for (const l of (el.dataset.l ?? "").trim().split(" ").filter(Boolean)) document.querySelectorAll(`${other} .tok[data-l~="${l}"]`).forEach((p) => p.classList.add("peer"));
+    }
+  }
+}
+
+function tick() {
+  if (!state.playing) return;
+  const a = aud[state.voice];
+  const ms = a.currentTime * 1000;
+  if (state.stopAt !== null && ms >= state.stopAt) return advanceRhythm();
+  paint();
+  requestAnimationFrame(tick);
+}
+
+function playFrom(side, ms, stopAt = null) {
+  aud.s.pause(); aud.t.pause();
+  state.voice = side; state.stopAt = stopAt;
+  document.querySelectorAll("#voice button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === side)));
+  const a = aud[side];
+  a.currentTime = ms / 1000;
+  state.playing = true; $("play").textContent = "Pause";
+  a.play(); state.pair = -2; requestAnimationFrame(tick);
+}
+
+function stop() { aud.s.pause(); aud.t.pause(); state.playing = false; $("play").textContent = "Play"; }
+
+// Sentence, then translation: each pair plays in the lead voice, then in the other, then the next pair
+function playPairRhythm(i, side) {
+  const pairs = DATA[state.ch].pairs;
+  while (i < pairs.length && !(pairs[i].sMs && pairs[i].tMs)) i++;
+  if (i >= pairs.length) return stop();
+  const r = side === "s" ? pairs[i].sMs : pairs[i].tMs;
+  state.rhythmPos = { i, side };
+  playFrom(side, r[0], r[1]);
+}
+
+function advanceRhythm() {
+  const { i, side } = state.rhythmPos;
+  const lead = document.querySelector("#voice").dataset.lead ?? "s";
+  if (side === lead) playPairRhythm(i, lead === "s" ? "t" : "s");
+  else playPairRhythm(i + 1, lead);
+}
+
+$("play").onclick = () => {
+  if (state.playing) return stop();
+  if (state.rhythm === "both") {
+    $("voice").dataset.lead = state.voice;
+    return playPairRhythm(Math.max(0, state.pair), state.voice);
+  }
+  playFrom(state.voice, aud[state.voice].currentTime * 1000);
+};
+$("voice").onclick = (e) => {
+  const v = e.target.dataset?.v; if (!v) return;
+  const was = state.playing;
+  const p = DATA[state.ch].pairs[state.pair];
+  stop(); state.voice = v; $("voice").dataset.lead = v;
+  document.querySelectorAll("#voice button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === v)));
+  const r = p && (v === "s" ? p.sMs : p.tMs);
+  if (r) aud[v].currentTime = r[0] / 1000;
+  if (was) $("play").click(); else paint();
+};
+$("switch").onclick = () => $("voice").querySelector(`[data-v="${state.voice === "s" ? "t" : "s"}"]`).click();
+$("rhythm").onclick = (e) => {
+  const r = e.target.dataset?.r; if (!r) return;
+  state.rhythm = r; state.stopAt = null;
+  document.querySelectorAll("#rhythm button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.r === r)));
+  if (state.playing) { stop(); $("play").click(); }
+};
+$("veil").onchange = (e) => { $("paneS").classList.toggle("veil", false); $("paneT").classList.toggle("veil", false); if (e.target.checked) applyVeil(); };
+function applyVeil() { if (!$("veil").checked) return; $("paneS").classList.toggle("veil", state.voice !== "s"); $("paneT").classList.toggle("veil", state.voice !== "t"); }
+document.addEventListener("click", (e) => {
+  const el = e.target.closest?.(".pair"); if (!el) return;
+  const i = Number(el.dataset.i), side = el.dataset.side, p = DATA[state.ch].pairs[i];
+  const r = side === "s" ? p.sMs : p.tMs; if (!r) return;
+  if (state.rhythm === "both") { $("voice").dataset.lead = side; return playPairRhythm(i, side); }
+  playFrom(side, r[0]);
+});
+setInterval(applyVeil, 250);
+// Hovering a linked word lights its counterpart on the other side
+document.addEventListener("mouseover", (e) => {
+  document.querySelectorAll(".tok.hov").forEach((el) => el.classList.remove("hov"));
+  const ids = (e.target.closest?.(".tok[data-l]")?.dataset.l ?? "").trim().split(" ").filter(Boolean);
+  for (const l of ids) document.querySelectorAll(`.tok[data-l~="${l}"]`).forEach((el) => el.classList.add("hov"));
+});
+
+const TITLES = [...new Set(DATA.map((x) => x.title))];
+$("chapters").innerHTML = TITLES.map((t) => `<button>${esc(t.replace(/^\d+\s+/, ""))}</button>`).join("");
+document.querySelectorAll("#chapters button").forEach((b, i) => (b.onclick = () => load(DATA.findIndex((x) => x.title === TITLES[i]))));
+$("lane").onchange = (e) => load(Number(e.target.value));
+document.querySelector('#voice [data-v="s"]').setAttribute("aria-pressed", "true");
+document.querySelector('#rhythm [data-r="one"]').setAttribute("aria-pressed", "true");
+load(0);
+</script>
+</body>
+</html>

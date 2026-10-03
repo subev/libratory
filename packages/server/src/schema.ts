@@ -1,3 +1,4 @@
+import type { PairArtifact, LinkArtifact, BilingualJob } from "./lib/bilingual-preparation.ts";
 import type { ExtractionSettings } from "./lib/extraction-presets.ts";
 import { sql } from "drizzle-orm";
 import { fromStoredPath, toStoredPath } from "./lib/paths.ts";
@@ -250,6 +251,15 @@ export const chapterVariants = pgTable("chapter_translations", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [unique("chapter_translations_chapter_language").on(t.chapterId, t.key)]);
 
+export const bilingualPreparations = pgTable("bilingual_preparations", {
+  variantId: uuid("variant_id").primaryKey().references(() => chapterVariants.id, { onDelete: "cascade" }),
+  pairs: jsonb("pairs").$type<PairArtifact>(),
+  links: jsonb("links").$type<LinkArtifact>(),
+  pairJob: jsonb("pair_job").$type<BilingualJob>(),
+  linkJob: jsonb("link_job").$type<BilingualJob>(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const bookLogs = pgTable("book_logs", {
   id: uuid("id").primaryKey().defaultRandom(),
   bookId: uuid("book_id").notNull().references(() => books.id, { onDelete: "cascade" }),
@@ -299,7 +309,7 @@ export const documents = pgTable("documents", {
   id: uuid("id").primaryKey().defaultRandom(),
   bookId: uuid("book_id").notNull().references(() => books.id, { onDelete: "cascade" }),
   language: text("language"),
-  format: text("format", { enum: ["pdf", "epub", "epub-sync"] }).notNull(),
+  format: text("format", { enum: ["pdf", "epub", "epub-sync", "epub-bilingual"] }).notNull(),
   outputPath: dataPath("output_path").notNull(),
   chapterCount: integer("chapter_count").notNull(),
   chapterSummary: text("chapter_summary").notNull(),

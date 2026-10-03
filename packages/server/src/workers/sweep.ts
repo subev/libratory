@@ -23,7 +23,7 @@ export async function sweepStrandedWork() {
     DELETE FROM graphile_worker._private_jobs j
     USING graphile_worker._private_tasks t
     WHERE t.id = j.task_id
-      AND t.identifier IN ('normalize', 'synthesize', 'translate', 'translateTitles', 'synthesizeTranslation', 'assemble', 'assembleDocument', 'cleanup', 'extract', 'indexBook', 'embedChunks', 'digest', 'propose', 'redetect', 'bookNote')
+      AND t.identifier IN ('normalize', 'synthesize', 'translate', 'translateTitles', 'synthesizeTranslation', 'assemble', 'assembleDocument', 'cleanup', 'extract', 'indexBook', 'embedChunks', 'digest', 'propose', 'redetect', 'bookNote', 'alignBilingual', 'linkBilingual')
       AND (j.locked_at IS NOT NULL OR j.attempts >= j.max_attempts)
     RETURNING t.identifier, j.payload, j.locked_at
   `)) as unknown as Array<{ identifier: string; payload: Record<string, unknown>; locked_at: string | null }>;
@@ -107,6 +107,20 @@ export async function sweepStrandedWork() {
         JOIN graphile_worker._private_tasks t ON t.id = j.task_id
         WHERE t.identifier = 'bookNote' AND j.payload->>'bookId' IS NOT NULL)
   `);
+
+  for (const [field, task] of [["pair_job", "alignBilingual"], ["link_job", "linkBilingual"]] as const) {
+    const column = sql.identifier(field);
+    await db.execute(sql`
+      UPDATE bilingual_preparations SET ${column} = ${column} || jsonb_build_object(
+        'status', 'failed', 'error', 'Interrupted by server restart — retry explicitly to continue',
+        'updatedAt', to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
+      WHERE ${column}->>'status' IN ('queued', 'running')
+        AND NOT EXISTS (
+          SELECT 1 FROM graphile_worker._private_jobs j
+          JOIN graphile_worker._private_tasks t ON t.id = j.task_id
+          WHERE t.identifier = ${task} AND j.payload->>'runId' = ${column}->>'runId')
+    `);
+  }
 
   const strandedFilesByBook = new Map<string, number>();
   for (const f of strandedFiles) {

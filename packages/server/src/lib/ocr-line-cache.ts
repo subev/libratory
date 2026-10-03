@@ -1,8 +1,7 @@
-import { createHash } from "node:crypto";
-import { createReadStream } from "node:fs";
 import { readFile, rename, stat, writeFile } from "node:fs/promises";
 import { z } from "zod";
 import type { OcrLine } from "./ocr-line-order.ts";
+import { fileSha256 } from "./file-sha256.ts";
 
 const lineSchema = z.object({
   id: z.number().int().positive(), text: z.string(),
@@ -27,14 +26,8 @@ export type CachedOcrPage = z.infer<typeof pageSchema>;
 
 export const suryaCachePath = (pdfPath: string) => `${pdfPath}.surya-lines.json`;
 
-export async function pdfFingerprint(pdfPath: string): Promise<string> {
-  const hash = createHash("sha256");
-  for await (const chunk of createReadStream(pdfPath)) hash.update(chunk);
-  return hash.digest("hex");
-}
-
 export async function openLineCache(pdfPath: string, pageCount: number) {
-  const sha256 = await pdfFingerprint(pdfPath);
+  const sha256 = await fileSha256(pdfPath);
   const target = suryaCachePath(pdfPath);
   const raw = await readFile(target, "utf8").catch((err: unknown) => {
     if (err instanceof Error && "code" in err && err.code === "ENOENT") return null;

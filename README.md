@@ -18,7 +18,7 @@
 
 The name is *library* plus *laboratory*, and that is what it is: a workbench for the PDFs you already own.
 
-Take a book apart, clean up the OCR, translate or rewrite a chapter, pick a voice, and put it back together as an M4B audiobook — the format that carries real chapter markers, so players show the chapters — or as a read-along book where the narration is highlighted on the page it was printed on.
+Take a book apart, clean up the OCR, translate or rewrite a chapter, pick a voice, and put it back together as an M4B audiobook — the format that carries real chapter markers, so players show the chapters — as a read-along book where the narration is highlighted on the page it was printed on, or as a bilingual edition that pairs each sentence with its translation.
 
 It runs on your own machine: an Apple Silicon Mac, a Linux box (x86_64 or arm64, CPU is enough), or a single Docker container on a headless server.
 
@@ -31,10 +31,11 @@ It runs on your own machine: an Apple Silicon Mac, a Linux box (x86_64 or arm64,
 - **Per-chapter control** — edit, re-narrate, exclude or queue a chapter, have AI tidy up the mistakes scanning left behind, redraw where chapters start and end.
 - **Translate & rewrite** — a chapter at a time, in whichever AI model you have set up, each version with its own audio. The original is never overwritten.
 - **Ask AI & notes** — answers save as notes, and any note can become a chapter of the book.
-- **Library chat** — search the *content* of every book and get answers with citations you can click into the PDF.
+- **Assistant** — a panel beside every page that searches the *content* of every book with citations you can click into, and runs the library for you: upload, extract, translate, narrate, export, each costly step behind a yes.
 - **Digest books** — pick a few books, get one new book with an AI summary chapter per source.
 - **Read along** — narration over the original PDF page, each sentence highlighted where it is printed.
-- **Export** — selected chapters as PDF, EPUB, or a synced EPUB: one file holding the text *and* the narration, so a reader that supports it can highlight along as it plays.
+- **Read in two languages** — each sentence paired with its translation, words linked to their counterparts, and playback that can alternate a sentence in one voice with the same sentence in the other.
+- **Export** — selected chapters as PDF, EPUB, a synced EPUB (one file holding the text *and* the narration, so a reader that supports it can highlight along as it plays), or a bilingual EPUB that carries the translation, the pairs and both narrations beside it.
 - **Library organization** — nested folders, drag & drop, cross-folder search, separate profiles per person.
 - **JSON API and MCP** — plain endpoints so scripts can create books straight to audio, and an MCP server so an AI agent can run the whole library: hand it a PDF path, get an audiobook back.
 
@@ -43,6 +44,10 @@ It runs on your own machine: an Apple Silicon Mac, a Linux box (x86_64 or arm64,
 ![A book's chapters: page ranges, word counts, per-chapter durations and status, with synthesize, translate, cleanup and export across the selection](docs/images/chapters.png)
 
 Every book is a row you can open, and every chapter inside it is a row you can edit, re-synthesize, translate or exclude on its own.
+
+![Frankenstein in English and Bulgarian side by side: hovering "forebodings" shows "предчувствия" and marks it in the Bulgarian text](docs/images/bilingual-reader.png)
+
+<p align="center"><i>The same chapter in two languages, sentence beside sentence. Hover a word and its counterpart lights up on the other side.</i></p>
 
 <details>
 <summary><b>Turning a book into audio, in detail</b></summary>
@@ -65,20 +70,26 @@ Every book is a row you can open, and every chapter inside it is a row you can e
 </details>
 
 <details>
-<summary><b>Library chat and search, in detail</b></summary>
+<summary><b>The assistant and library search, in detail</b></summary>
 
-`/chat` is an agentic assistant that searches the *content* of every book — hybrid full-text + semantic search over local BGE-M3 embeddings. It is cross-language: ask in English and it searches a Bulgarian book in Bulgarian. Answers stream with verified citations; a source opens the reader at the sentence where the chapter is narrated, and otherwise the PDF at that page, the chapter, or the translation view. Conversations are kept: a history sidebar lists them, filterable by book and searchable by any question asked, and each one remembers what it searched — one book, several, a folder or the whole library. An answer goes on being written if the tab is closed, and only Stop ends it early. Any answer can be saved as a note. See [docs/library-search.md](docs/library-search.md).
+![The assistant beside a book's chapters, answering where the creature first opens its eyes with a quotation and two cited passages that open the reader or the PDF](docs/images/assistant.png)
+
+The assistant is a panel docked beside every page. It searches the *content* of every book — hybrid full-text + semantic search over local BGE-M3 embeddings. It is cross-language: ask in English and it searches a Bulgarian book in Bulgarian. Answers stream with verified citations; a source opens the reader at the sentence where the chapter is narrated, and otherwise the PDF at that page, the chapter, or the translation view. Conversations are kept: History lists them, filterable by book and searchable by any question asked, and each one remembers what it searched — one book, several, a folder or the whole library. An answer goes on being written if the tab is closed, and only Stop ends it early. Any answer can be saved as a note. See [docs/library-search.md](docs/library-search.md).
+
+It also acts. The panel has the same tools as the MCP server below, and it knows which page you are on: drop a PDF on it and it makes a book; ask for a German version and it translates. Anything that changes a book, or spends money or hours, arrives as a card to run or cancel; a rename or a move happens at once and carries an Undo. It can open the place it is talking about — a chapter, a dialog, the reader at a moment. Ask AI's presets live here too, as chips on a book page that read the whole book or the chapters you pinned and save the answer as a note.
 
 Library organization around it: nested folders with drag & drop, cross-folder search, and lightweight profiles (workspaces) so different people keep separate libraries.
 
 </details>
 
 <details>
-<summary><b>Read-along and document export, in detail</b></summary>
+<summary><b>Read-along, two languages and document export, in detail</b></summary>
 
 **On the page**: open a book's narration over its own PDF page — the sentence being spoken is highlighted where it is printed, and tapping a sentence seeks the audio to it. Column view crops pages to their text columns, Text view reflows at your own size, and phone-width presets say whether the book's type is actually readable on a phone. Format in [docs/read-along.md](docs/read-along.md); what each kind of chapter and each TTS engine actually gets is in [docs/read-along-variations.md](docs/read-along-variations.md).
 
-**Export** selected chapters as PDF or EPUB (Vivliostyle), or as a **synced EPUB** — EPUB 3 with Media Overlays: embedded audio plus sentence-level highlighted text, valid per epubcheck.
+**In two languages**: once chapters are translated, *Bilingual reading* in the chapter tray pairs each sentence with its translation, locally with the BGE-M3 search model, then optionally asks an AI model to link the words inside each pair. In the reader, hovering a word shows its equivalent and marks the words it links to without moving playback, clicking a word starts that language's narration there, and on a touch screen holding a word previews it. With both languages narrated, alternating playback reads a sentence in one voice, then the same sentence in the other. Each stage keeps what it finished: a cancelled or failed run loses nothing, and running it again does only what is missing. Format in [docs/bilingual-format.md](docs/bilingual-format.md).
+
+**Export** selected chapters as PDF or EPUB (Vivliostyle), as a **synced EPUB** — EPUB 3 with Media Overlays: embedded audio plus sentence-level highlighted text, valid per epubcheck — or as a **bilingual EPUB**: the original-language book, with the translation, its pairs and links and either narration carried as a reading layer. A reader that does not know that layer opens it as an ordinary EPUB.
 
 </details>
 
@@ -91,7 +102,7 @@ The server speaks [MCP](https://modelcontextprotocol.io) at `/mcp`, so any agent
 claude mcp add --transport http libratory http://localhost:3034/mcp
 ```
 
-Then "turn ~/Downloads/dune.pdf into an audiobook" is a tool call: `upload_book` copies the file in and runs extraction, chapter detection, narration and assembly unattended, `wait_for_book` blocks until the M4B exists, and the rest of the tools cover what is installed, voices, chapters, text repair, re-narration, exports and library search. The tool list and the workflow are in [docs/mcp.md](docs/mcp.md).
+Then "turn ~/Downloads/dune.pdf into an audiobook" is a tool call: `upload_book` copies the file in and runs extraction and chapter detection (narration and assembly too, unattended, with `skipSynthesis: false`), `wait_for_book` blocks until a stage is reached, and the rest of the tools cover what is installed, voices, chapters, text repair, re-narration, translation, bilingual preparation, exports and library search. The tool list and the workflow are in [docs/mcp.md](docs/mcp.md).
 
 Plain JSON endpoints (`POST /api/books`, see [docs/synthetic-books-api.md](docs/synthetic-books-api.md)) let scripts and other projects create synthetic books and chapters, with optional straight-to-audio synthesis.
 
@@ -237,7 +248,8 @@ Upload → rawExtract (pdftotext, seconds, always)
        → ocrTextLayer (Tesseract, Surya or a cloud vision model — only for a scan with no text of its own)
        → extract (Marker layout, opt-in) → normalize → synthesize (TTS) → assemble → M4B
        → translate/transform → synthesizeTranslation → per-variant assembly
-       → assembleDocument → PDF / EPUB / synced EPUB
+       → alignBilingual (sentence pairs, local) → linkBilingual (word links, AI)
+       → assembleDocument → PDF / EPUB / synced EPUB / bilingual EPUB
 ```
 
 Jobs run through [Graphile Worker](https://github.com/graphile/worker) in seven pools (TTS, raw text, extraction, prep, assembly, AI/translation, search indexing) with `maxAttempts: 1` — nothing retries silently; the user reviews failures and decides. Settings sets how many jobs each pool runs at once, within limits that keep a shared GPU usable.
@@ -266,7 +278,7 @@ pnpm monorepo: `packages/server` (Fastify + tRPC + Graphile Worker + Drizzle/Pos
 
 ### Database
 
-PostgreSQL 17 with pgvector in Docker (`pgvector/pgvector:pg17`, host port **5433**, to avoid conflicts with other Postgres instances on 5432), schema via Drizzle ORM: `profiles`, `folders`, `books`, `book_files`, `chapters`, `chapter_translations`, `assemblies`, `documents`, `notes`, `book_logs`, `book_chunks` (search index: FTS + embeddings). See AGENTS.md for column-level docs. Migrations: `pnpm db:generate` + `pnpm db:migrate`.
+PostgreSQL 17 with pgvector in Docker (`pgvector/pgvector:pg17`, host port **5433**, to avoid conflicts with other Postgres instances on 5432), schema via Drizzle ORM: `profiles`, `folders`, `books`, `book_files`, `chapters`, `chapter_translations`, `assemblies`, `documents`, `notes`, `book_logs`, `book_chunks` (search index: FTS + embeddings), `bilingual_preparations` (sentence pairs and word links per translation), `chat_conversations`, `chat_messages`, `staged_files`. See AGENTS.md for column-level docs. Migrations: `pnpm db:generate` + `pnpm db:migrate`.
 
 The server applies pending migrations at boot, so a fresh database needs nothing by hand — the app depends on that, having no `drizzle-kit` in the bundle. To index an existing library for search, run `pnpm backfill:index` (FTS is available within minutes; BGE-M3 embeddings fill in as a background pass).
 

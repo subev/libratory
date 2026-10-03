@@ -5,7 +5,7 @@ vi.mock("../env.ts", () => ({
   env: { CARTESIA_API_KEY: "sk_car_test", DATA_DIR: "/tmp/libratory-test" },
 }));
 
-import { listCartesiaVoices } from "./cartesia.ts";
+import { cartesiaErrorMessage, listCartesiaVoices } from "./cartesia.ts";
 import { pcm16WavHeader } from "./wav.ts";
 
 const mockFetch = vi.fn();
@@ -20,6 +20,24 @@ describe("pcm16WavHeader", () => {
     expect(header.readUInt32LE(24)).toBe(44100);
     expect(header.readUInt16LE(22)).toBe(1);
     expect(header.readUInt32LE(40)).toBe(1000);
+  });
+});
+
+describe("cartesiaErrorMessage", () => {
+  it("states the credits a refused chunk needed and the account had, without the raw JSON", () => {
+    const body = JSON.stringify({
+      error_code: "quota_exceeded",
+      message: "This request requires approximately 349 credits but you have 125 remaining. Please upgrade your subscription or enable overages at https://play.cartesia.ai/subscription.",
+      title: "Insufficient credits",
+    });
+    const message = cartesiaErrorMessage(402, body);
+    expect(message).toMatch(/^Cartesia is out of credits: the next chunk needs about 349 credits and 125 are left/);
+    expect(message).not.toContain("error_code");
+  });
+
+  it("keeps the status and message of any other failure", () => {
+    expect(cartesiaErrorMessage(500, JSON.stringify({ message: "boom" }))).toBe("Cartesia TTS error 500: boom");
+    expect(cartesiaErrorMessage(502, "Bad gateway")).toBe("Cartesia TTS error 502: Bad gateway");
   });
 });
 

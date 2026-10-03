@@ -1,3 +1,4 @@
+import { bilingualRouter } from "./routes/bilingual.ts";
 import { extractionPresetsRouter } from "./routes/extraction-presets.ts";
 import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 import { router } from "./trpc.ts";
@@ -30,6 +31,7 @@ export const appRouter = router({
   chapters: chaptersRouter,
   bookFiles: bookFilesRouter,
   variants: variantsRouter,
+  bilingual: bilingualRouter,
   notes: notesRouter,
   chats: chatsRouter,
   search: searchRouter,
