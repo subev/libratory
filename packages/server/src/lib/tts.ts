@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { createInterface } from "node:readline";
 import { writeFile } from "node:fs/promises";
@@ -13,12 +14,23 @@ import { cartesiaSynthesize, CartesiaAbortedError, findCartesiaVoice } from "./c
 import { elevenlabsSynthesize, ElevenLabsAbortedError, findElevenLabsVoice } from "./elevenlabs.ts";
 import { POCKET_SCRIPT, parsePocketVoice, pocketLanguageArgs, pocketPython, resolvePocketVoiceArg } from "./pocket.ts";
 import { scriptPath } from "./paths.ts";
+import type { LocalEngine } from "./voice-catalog.ts";
 
 const CONDA_BIN = env.CONDA_ENV_PATH;
 const BG_MLX_SCRIPT = scriptPath("synthesize_bg_tts_mlx.py");
 const BG_MMS_SCRIPT = scriptPath("synthesize_mms_tts.py");
 const KUGEL_SCRIPT = scriptPath("synthesize_kugel_tts.py");
 const SAY_SCRIPT = scriptPath("synthesize_say_tts.py");
+const BGTTS_SCRIPT = scriptPath("synthesize_bgtts.py");
+const PIPER_SCRIPT = scriptPath("synthesize_piper_tts.py");
+
+// Read on every call, not cached: building a venv with setup must show up without a restart.
+export function installedLocalEngines(): Record<LocalEngine, boolean> {
+  return {
+    piper: existsSync(path.join(env.PIPER_ENV_PATH, "python")),
+    bgtts: existsSync(path.join(env.BGTTS_ENV_PATH, "python")),
+  };
+}
 
 type LogFn = (message: string) => Promise<void>;
 type ProgressFn = (chunk: number, totalChunks: number) => Promise<void>;
@@ -36,7 +48,7 @@ type SynthesizeOptions = {
 };
 
 type ParsedTtsVoice = {
-  engine: "kokoro" | "bg-mlx" | "bg-mms" | "kugel" | "say" | "cartesia" | "elevenlabs" | "pocket";
+  engine: "kokoro" | "bg-mlx" | "bg-mms" | "bg-bgtts" | "bg-piper" | "kugel" | "say" | "cartesia" | "elevenlabs" | "pocket";
   voice: string;
   raw: string;
 };
@@ -75,8 +87,15 @@ export const PREVIEW_TEXT_VERSION = createHash("sha1")
   .digest("hex")
   .slice(0, 8);
 
-export function previewFileBase(voice: string): string {
-  return `${encodeURIComponent(voice)}-${PREVIEW_TEXT_VERSION}`;
+export function previewFileBase(voice: string, language: string | null = null): string {
+  return `${encodeURIComponent(voice)}${language ? `.${language}` : ""}-${PREVIEW_TEXT_VERSION}`;
+}
+
+// A preview in a language other than the voice's own is only asked for where the voice reads it
+// without being made for it — today, ElevenLabs. Every other engine reads one language per voice.
+export function previewLanguageFor(voice: string, requested: string | undefined): string | null {
+  if (!requested || !(requested in PREVIEW_TEXT_BY_LANGUAGE)) return null;
+  return parseTtsVoice(voice).engine === "elevenlabs" ? requested : null;
 }
 
 function previewTextFor(languageCode: string): string {
@@ -90,6 +109,8 @@ function firstSentence(text: string): string {
 }
 const BG_MLX_VOICES = new Set(["narrator"]);
 const BG_MMS_VOICES = new Set(["bul"]);
+const BG_BGTTS_VOICES = new Set(["female", "male", "male2"]);
+const BG_PIPER_VOICES = new Set(["dimitar"]);
 const KUGEL_VOICES = new Set(["default"]);
 // Installed system voices are discovered at synthesis time; ids only need to be safe slugs
 const SAY_VOICE_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
@@ -131,6 +152,22 @@ export function parseTtsVoice(rawVoice: string): ParsedTtsVoice {
       throw new Error(`Unsupported voice ID: ${rawVoice}`);
     }
     return { engine: "bg-mms", voice, raw: rawVoice };
+  }
+
+  if (rawVoice.startsWith("bg-bgtts:")) {
+    const voice = rawVoice.slice("bg-bgtts:".length);
+    if (!BG_BGTTS_VOICES.has(voice)) {
+      throw new Error(`Unsupported voice ID: ${rawVoice}`);
+    }
+    return { engine: "bg-bgtts", voice, raw: rawVoice };
+  }
+
+  if (rawVoice.startsWith("bg-piper:")) {
+    const voice = rawVoice.slice("bg-piper:".length);
+    if (!BG_PIPER_VOICES.has(voice)) {
+      throw new Error(`Unsupported voice ID: ${rawVoice}`);
+    }
+    return { engine: "bg-piper", voice, raw: rawVoice };
   }
 
   if (rawVoice.startsWith("kugel:")) {
@@ -184,8 +221,12 @@ export function parseTtsVoice(rawVoice: string): ParsedTtsVoice {
   return { engine: "kokoro", voice: rawVoice, raw: rawVoice };
 }
 
-export async function getPreviewTextForVoice(voice: string): Promise<string> {
+export async function getPreviewTextForVoice(voice: string, language: string | null = null): Promise<string> {
   const resolved = parseTtsVoice(voice);
+  if (language) {
+    const text = previewTextFor(language);
+    return resolved.engine === "elevenlabs" ? firstSentence(text) : text;
+  }
   if (resolved.engine === "kokoro") {
     return previewTextFor(KOKORO_LANGUAGE_BY_PREFIX[resolved.voice[0] ?? ""] ?? "en");
   }
@@ -210,7 +251,7 @@ export async function getPreviewTextForVoice(voice: string): Promise<string> {
 
 export function voiceSupportsSpeed(voice: string): boolean {
   const engine = parseTtsVoice(voice).engine;
-  return engine === "kokoro" || engine === "say" || engine === "cartesia" || engine === "elevenlabs";
+  return engine === "kokoro" || engine === "bg-piper" || engine === "say" || engine === "cartesia" || engine === "elevenlabs";
 }
 
 export async function synthesize({ inputText, outputPath, voice, speed, chunkPreviewDir = null, chunkPreviewUrlBase = null, log = noopLog, onProgress = noopProgress, signal }: SynthesizeOptions): Promise<void> {
@@ -315,6 +356,49 @@ export async function synthesize({ inputText, outputPath, voice, speed, chunkPre
     return;
   }
 
+  // Both run on the CPU in venvs of their own, so neither takes the MLX lock
+  if (resolved.engine === "bg-bgtts") {
+    await synthesizeChunkedBackend({
+      backendName: "BgTTS-38M",
+      scriptPath: BGTTS_SCRIPT,
+      pythonBin: path.join(env.BGTTS_ENV_PATH, "python"),
+      missingHint: "BgTTS-38M is not installed — run `pnpm run setup --bgtts`",
+      inputText,
+      outputPath,
+      voice: resolved.voice,
+      speed,
+      chunkLimits: SENTENCE_CHUNKS,
+      chunkPreviewDir,
+      chunkPreviewUrlBase,
+      log,
+      onProgress,
+      signal,
+    });
+    return;
+  }
+
+  if (resolved.engine === "bg-piper") {
+    await synthesizeChunkedBackend({
+      backendName: "Piper",
+      scriptPath: PIPER_SCRIPT,
+      pythonBin: path.join(env.PIPER_ENV_PATH, "python"),
+      missingHint: "Piper is not installed — run `pnpm run setup`",
+      inputText,
+      outputPath,
+      voice: resolved.voice,
+      speed,
+      extraArgs: ["--speed", String(speed)],
+      speedLabel: `speed ${speed}x`,
+      chunkLimits: SENTENCE_CHUNKS,
+      chunkPreviewDir,
+      chunkPreviewUrlBase,
+      log,
+      onProgress,
+      signal,
+    });
+    return;
+  }
+
   if (resolved.engine === "bg-mlx" || resolved.engine === "kugel") {
     await runExclusiveMlxSynthesis(() => synthesizeChunkedBackend({
       backendName: resolved.engine === "kugel" ? "KugelAudio" : "Bulgarian MLX",
@@ -368,6 +452,7 @@ async function synthesizeChunkedBackend({
   backendName,
   scriptPath,
   pythonBin: pythonBinOverride,
+  missingHint,
   inputText,
   outputPath,
   voice,
@@ -383,6 +468,8 @@ async function synthesizeChunkedBackend({
   backendName: string;
   scriptPath: string;
   pythonBin?: string;
+  /** Said instead of a bare ENOENT when the engine's own venv was never built. */
+  missingHint?: string;
   extraArgs?: string[];
   speedLabel?: string;
   chunkLimits?: ChunkLimits;
@@ -499,7 +586,7 @@ async function synthesizeChunkedBackend({
         return;
       }
 
-      reject(error);
+      reject(missingHint && "code" in error && error.code === "ENOENT" ? new Error(missingHint) : error);
     });
   });
 }

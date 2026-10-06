@@ -18,17 +18,38 @@ const QUOTA_CACHE_TTL_MS = 60_000;
 // Measured against a free key on 2026-08-25 by billing 44 characters through each and reading the
 // balance back. All three return timestamps, v3 included — the docs' model table says otherwise by
 // omission, and it is wrong.
-const MODELS: Record<string, { creditsPerChar: number }> = {
-  eleven_multilingual_v2: { creditsPerChar: 1 },
-  eleven_v3: { creditsPerChar: 1 },
-  eleven_flash_v2_5: { creditsPerChar: 0.5 },
-  eleven_turbo_v2_5: { creditsPerChar: 0.5 },
+// Languages from elevenlabs.io/docs/overview/models, read 2026-10-06; v3's ISO 639-3 list mapped to
+// the 639-1 codes the picker uses (Cebuano and Filipino have none and keep theirs). The API would say
+// this itself, but /v1/models needs a `models_read` permission a voice-only key need not carry.
+const V2_LANGUAGES = [
+  "en", "ja", "zh", "de", "hi", "fr", "ko", "pt", "it", "es", "id", "nl", "tr", "fil", "pl", "sv", "bg", "ro",
+  "ar", "cs", "el", "fi", "hr", "ms", "sk", "da", "ta", "uk", "ru",
+];
+const V2_5_LANGUAGES = [...V2_LANGUAGES, "hu", "no", "vi"];
+const V3_LANGUAGES = [
+  "af", "ar", "hy", "as", "az", "be", "bn", "bs", "bg", "ca", "ceb", "ny", "hr", "cs", "da", "nl", "en", "et",
+  "fil", "fi", "fr", "gl", "ka", "de", "el", "gu", "ha", "he", "hi", "hu", "is", "id", "ga", "it", "ja", "jv",
+  "kn", "kk", "ky", "ko", "lv", "ln", "lt", "lb", "mk", "ms", "ml", "zh", "mr", "ne", "no", "ps", "fa", "pl",
+  "pt", "pa", "ro", "ru", "sr", "sd", "sk", "sl", "so", "es", "sw", "sv", "ta", "te", "th", "tr", "uk", "ur",
+  "vi", "cy",
+];
+
+const MODELS: Record<string, { creditsPerChar: number; languages: string[] }> = {
+  eleven_multilingual_v2: { creditsPerChar: 1, languages: V2_LANGUAGES },
+  eleven_v3: { creditsPerChar: 1, languages: V3_LANGUAGES },
+  eleven_flash_v2_5: { creditsPerChar: 0.5, languages: V2_5_LANGUAGES },
+  eleven_turbo_v2_5: { creditsPerChar: 0.5, languages: V2_5_LANGUAGES },
 };
 
 export type ElevenLabsVoice = {
   id: string;
   name: string;
+  /** The first language ElevenLabs verified the voice in — where it sounds most at home. */
   language: string;
+  /** Every language it is verified in, `language` first. */
+  languages: string[];
+  /** Every language the configured model reads, in this voice or any other. */
+  reads: string[];
   gender: string | null;
   tagline: string;
 };
@@ -58,10 +79,19 @@ function model(): { id: string; creditsPerChar: number } {
   return { id, creditsPerChar: entry.creditsPerChar };
 }
 
-let voiceCache: { at: number; voices: ElevenLabsVoice[] } | null = null;
-let voiceFetch: Promise<ElevenLabsVoice[]> | null = null;
+type CachedVoice = Omit<ElevenLabsVoice, "reads">;
 
+let voiceCache: { at: number; voices: CachedVoice[] } | null = null;
+let voiceFetch: Promise<CachedVoice[]> | null = null;
+
+// The model is a setting that changes without a restart, so what it reads is joined at answer time
+// rather than cached with the voices.
 export async function listElevenLabsVoices(): Promise<ElevenLabsVoice[]> {
+  const reads = MODELS[env.ELEVENLABS_MODEL]?.languages ?? [];
+  return (await cachedElevenLabsVoices()).map((voice) => ({ ...voice, reads }));
+}
+
+async function cachedElevenLabsVoices(): Promise<CachedVoice[]> {
   if (!env.ELEVENLABS_API_KEY) return [];
   if (voiceCache && Date.now() - voiceCache.at < VOICE_CACHE_TTL_MS) return voiceCache.voices;
 
@@ -91,8 +121,8 @@ type RawVoice = {
   fine_tuning?: { language?: string | null } | null;
 };
 
-async function fetchAllElevenLabsVoices(): Promise<ElevenLabsVoice[]> {
-  const voices: ElevenLabsVoice[] = [];
+async function fetchAllElevenLabsVoices(): Promise<CachedVoice[]> {
+  const voices: CachedVoice[] = [];
   let pageToken: string | null = null;
   for (let page = 0; page < 20; page++) {
     const params = new URLSearchParams({ page_size: "100" });
@@ -110,19 +140,25 @@ async function fetchAllElevenLabsVoices(): Promise<ElevenLabsVoice[]> {
   return voices;
 }
 
-// A voice reads whatever the multilingual model reads; what it actually *carries* is an accent,
-// and listing every voice under all 29 languages would bury the ones that sound native.
-function toVoice(raw: RawVoice): ElevenLabsVoice {
+// A voice reads whatever the model reads; what it actually *carries* is an accent. The verified
+// languages are where it sounds native, and the picker lists the rest of what the model reads after
+// them, marked as not native — so a language with no native voice still has ElevenLabs in it.
+function toVoice(raw: RawVoice): CachedVoice {
   const labels = raw.labels ?? {};
   const verified = raw.verified_languages?.[0];
-  const language = verified?.language ?? raw.fine_tuning?.language ?? labels.language ?? "en";
+  const code = (value: string) => value.toLowerCase().split(/[_-]/)[0] ?? value;
+  const language = code(verified?.language ?? raw.fine_tuning?.language ?? labels.language ?? "en");
+  const languages = [
+    ...new Set([language, ...(raw.verified_languages ?? []).flatMap((v) => (v.language ? [code(v.language)] : []))]),
+  ];
   const tagline = [labels.accent ?? verified?.accent, labels.age, labels.use_case, raw.description]
     .filter((part): part is string => Boolean(part && part.trim()))
     .join(" · ");
   return {
     id: raw.voice_id,
     name: raw.name?.trim() || raw.voice_id,
-    language: language.toLowerCase(),
+    language,
+    languages,
     gender: labels.gender ?? null,
     tagline: tagline.slice(0, 120),
   };

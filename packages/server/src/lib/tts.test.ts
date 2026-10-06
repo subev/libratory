@@ -8,7 +8,7 @@ vi.mock("./cartesia.ts", () => ({
   ),
 }));
 
-import { getPreviewTextForVoice, parseTtsVoice, voiceSupportsSpeed } from "./tts.ts";
+import { getPreviewTextForVoice, parseTtsVoice, previewFileBase, previewLanguageFor, voiceSupportsSpeed } from "./tts.ts";
 
 describe("parseTtsVoice", () => {
   it("treats legacy Kokoro voice ids as Kokoro", () => {
@@ -41,6 +41,11 @@ describe("parseTtsVoice", () => {
       voice: "bul",
       raw: "bg-mms:bul",
     });
+  });
+
+  it("parses the BgTTS-38M and Piper Bulgarian voices", () => {
+    expect(parseTtsVoice("bg-bgtts:male2")).toEqual({ engine: "bg-bgtts", voice: "male2", raw: "bg-bgtts:male2" });
+    expect(parseTtsVoice("bg-piper:dimitar")).toEqual({ engine: "bg-piper", voice: "dimitar", raw: "bg-piper:dimitar" });
   });
 
   it("parses the KugelAudio voice", () => {
@@ -114,6 +119,8 @@ describe("parseTtsVoice", () => {
     expect(() => parseTtsVoice("bg-mlx:other")).toThrow(/unsupported voice/i);
     expect(() => parseTtsVoice("bg-mms:")).toThrow(/unsupported voice/i);
     expect(() => parseTtsVoice("bg-mms:other")).toThrow(/unsupported voice/i);
+    expect(() => parseTtsVoice("bg-bgtts:../ref")).toThrow(/unsupported voice/i);
+    expect(() => parseTtsVoice("bg-piper:")).toThrow(/unsupported voice/i);
     expect(() => parseTtsVoice("kugel:")).toThrow(/unsupported voice/i);
     expect(() => parseTtsVoice("kugel:other")).toThrow(/unsupported voice/i);
     expect(() => parseTtsVoice("say:")).toThrow(/unsupported voice/i);
@@ -170,6 +177,11 @@ describe("voiceSupportsSpeed", () => {
     expect(voiceSupportsSpeed("bg-mlx:narrator")).toBe(false);
   });
 
+  it("offers speed control on Piper, whose length scale works, and not on BgTTS-38M", () => {
+    expect(voiceSupportsSpeed("bg-piper:dimitar")).toBe(true);
+    expect(voiceSupportsSpeed("bg-bgtts:female")).toBe(false);
+  });
+
   it("disables speed control for the Meta MMS Bulgarian voice", () => {
     expect(voiceSupportsSpeed("bg-mms:bul")).toBe(false);
   });
@@ -192,5 +204,20 @@ describe("voiceSupportsSpeed", () => {
 
   it("enables speed control for Cartesia voices", () => {
     expect(voiceSupportsSpeed("cartesia:a0e99841")).toBe(true);
+  });
+});
+
+describe("previewLanguageFor", () => {
+  it("previews an ElevenLabs voice in the language it is listed under, and nothing else in another", () => {
+    expect(previewLanguageFor("elevenlabs:JBFqnCBsd6RMkjVDRZzb", "bg")).toBe("bg");
+    expect(previewLanguageFor("elevenlabs:JBFqnCBsd6RMkjVDRZzb", "xx")).toBeNull();
+    expect(previewLanguageFor("kokoro:af_heart", "bg")).toBeNull();
+    expect(previewFileBase("elevenlabs:abc", "bg")).not.toBe(previewFileBase("elevenlabs:abc"));
+  });
+
+  it("says one Bulgarian sentence for a foreign ElevenLabs preview", async () => {
+    const text = await getPreviewTextForVoice("elevenlabs:JBFqnCBsd6RMkjVDRZzb", "bg");
+    expect(text).toMatch(/пролетна/);
+    expect(text.match(/[.!?]/g)).toHaveLength(1);
   });
 });

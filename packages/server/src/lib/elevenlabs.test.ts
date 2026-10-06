@@ -99,7 +99,7 @@ describe("listElevenLabsVoices", () => {
             voice_id: "v1",
             name: "Charlotte",
             labels: { accent: "swedish", gender: "female", use_case: "narration" },
-            verified_languages: [{ language: "EN" }],
+            verified_languages: [{ language: "EN" }, { language: "de-DE" }, { language: "en" }],
           }],
           has_more: true,
           next_page_token: "page2",
@@ -115,10 +115,13 @@ describe("listElevenLabsVoices", () => {
 
     const voices = await listElevenLabsVoices();
 
-    expect(voices).toEqual([
-      { id: "v1", name: "Charlotte", language: "en", gender: "female", tagline: "swedish · narration" },
-      { id: "v2", name: "Boris", language: "bg", gender: null, tagline: "" },
+    expect(voices.map(({ reads: _reads, ...voice }) => voice)).toEqual([
+      { id: "v1", name: "Charlotte", language: "en", languages: ["en", "de"], gender: "female", tagline: "swedish · narration" },
+      { id: "v2", name: "Boris", language: "bg", languages: ["bg"], gender: null, tagline: "" },
     ]);
+    // What the configured model reads, per its documentation — Bulgarian among them
+    expect(voices[0]?.reads).toContain("bg");
+    expect(voices[0]?.reads).not.toContain("vi");
     expect(String(mockFetch.mock.calls[1]?.[0])).toContain("next_page_token=page2");
   });
 });

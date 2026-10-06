@@ -66,6 +66,13 @@ product, the upside is two extra voices out of 26.
   choice (`ELEVENLABS_MODEL`) doubles or halves what a free month buys. At list overage rates a
   ten-hour book is $25–50, which is why this engine exists for demos and samples rather
   than for a library.
+- **Piper** (`bg-piper:`) — the engine (`piper-tts`) is GPL-3.0 and runs as a subprocess, so it
+  does not reach Libratory's own licence. The `dimitar` voice is CC0 on a CC0 dataset, finetuned from
+  the English `lessac` voice.
+- **BgTTS-38M V2** (`bg-bgtts:`) — weights and code Apache-2.0; MioCodec MIT; WavLM base+ (pulled by
+  MioCodec through torchaudio) MIT. The training data is the author's own Bulgarian set, whose
+  sources the card does not state — check that before commercial use. The three voices are the
+  reference clips the authors ship with the model.
 - **Bulgarian MLX / MMS / KugelAudio** — never examined. MMS is Meta-derived; check its
   license before commercial use.
 

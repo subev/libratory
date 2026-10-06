@@ -8,7 +8,7 @@ type VoicePickerContextValue = {
     pendingId: string | null;
     failedId: string | null;
   };
-  actions: { select: (voiceId: string) => void; play: (voiceId: string) => void };
+  actions: { select: (voiceId: string) => void; play: (voiceId: string, language?: string | null) => void };
 };
 
 const VoicePickerContext = createContext<VoicePickerContextValue | null>(null);
@@ -50,7 +50,7 @@ export function VoicePickerProvider({
   // Closing the picker mid-request would otherwise leave an orphaned element loading and playing.
   useEffect(() => teardown, [teardown]);
 
-  const play = useCallback((voiceId: string) => {
+  const play = useCallback((voiceId: string, language: string | null = null) => {
     // Generation is already under way; further clicks would only restart the wait.
     if (pendingId === voiceId) return;
 
@@ -61,7 +61,7 @@ export function VoicePickerProvider({
     // A cold preview is synthesized on demand, so the server holds the response open for seconds
     // and play() stays pending for exactly that long — which is the signal the spinner needs.
     // Attached to the document so the app-wide exclusive-audio listener can see and pause it.
-    const audio = new Audio(`/preview/${encodeURIComponent(voiceId)}`);
+    const audio = new Audio(`/preview/${encodeURIComponent(voiceId)}${language ? `?lang=${encodeURIComponent(language)}` : ""}`);
     audio.hidden = true;
     document.body.append(audio);
     audioRef.current = audio;

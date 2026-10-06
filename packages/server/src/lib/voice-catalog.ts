@@ -9,11 +9,19 @@ export type Voice = {
   note?: string;
   /** ISO-639-1 code the voice actually reads; MULTILINGUAL for models that cover many. */
   language?: string;
+  /** Further languages the voice is native in, beyond `language`. */
+  nativeLanguages?: string[];
+  /** Languages the voice can read but was not made for — listed there, after the native voices. */
+  alsoReads?: string[];
   /** Which engine provides it — the secondary grouping in the picker. */
   engine?: VoiceEngine;
   /** Set when the voice cannot run without Apple's MLX, so a non-Metal machine can say why. */
   requiresMlx?: boolean;
+  /** Set when the voice runs in a Python env of its own that setup may not have built. */
+  requiresEngine?: LocalEngine;
 };
+
+export type LocalEngine = "piper" | "bgtts";
 
 export const MULTILINGUAL = "multi";
 
@@ -26,9 +34,19 @@ const MULTILINGUAL_LANGUAGES = new Set([
 
 // The one predicate behind both the sidebar counts and the list itself; when they disagreed, the
 // rail said 48 and the provider chips added up to 49.
-export function voiceCoversLanguage(voice: Pick<Voice, "language">, code: string): boolean {
+export function voiceCoversLanguage(voice: Pick<Voice, "language" | "nativeLanguages" | "alsoReads">, code: string): boolean {
   const language = voice.language ?? "en";
-  return language === code || (language === MULTILINGUAL && MULTILINGUAL_LANGUAGES.has(code));
+  return (
+    language === code ||
+    (language === MULTILINGUAL && MULTILINGUAL_LANGUAGES.has(code)) ||
+    voice.nativeLanguages?.includes(code) === true ||
+    voice.alsoReads?.includes(code) === true
+  );
+}
+
+// Listed under a language it was not made for: it reads the words, in someone else's accent.
+export function voiceIsForeignIn(voice: Pick<Voice, "language" | "nativeLanguages" | "alsoReads">, code: string): boolean {
+  return voice.alsoReads?.includes(code) === true && voice.language !== code && voice.nativeLanguages?.includes(code) !== true;
 }
 
 export const KOKORO_LANGUAGE_BY_PREFIX: Record<string, string> = {
@@ -139,6 +157,10 @@ export const kokoroVoiceGroups: VoiceGroup[] = [
 export const narratorVoices: Voice[] = [
   { id: "bg-mlx:narrator", label: "BG-TTS V5 (Radi Totev MLX port)", gender: null, grade: "MLX", supportsSpeed: false, note: "Apple Silicon narrator", requiresMlx: true },
   { id: "bg-mms:bul", label: "MMS Bulgarian (Meta)", gender: null, grade: "VITS", supportsSpeed: false, note: "Meta MMS" },
+  { id: "bg-piper:dimitar", label: "Dimitar (Piper)", gender: "M", grade: "VITS", supportsSpeed: true, note: "Piper, CPU", requiresEngine: "piper" },
+  { id: "bg-bgtts:female", label: "BgTTS-38M female", gender: "F", grade: "38M", supportsSpeed: false, note: "BgTTS-38M V2, CPU", requiresEngine: "bgtts" },
+  { id: "bg-bgtts:male", label: "BgTTS-38M male", gender: "M", grade: "38M", supportsSpeed: false, note: "BgTTS-38M V2, CPU", requiresEngine: "bgtts" },
+  { id: "bg-bgtts:male2", label: "BgTTS-38M male 2", gender: "M", grade: "38M", supportsSpeed: false, note: "BgTTS-38M V2, CPU", requiresEngine: "bgtts" },
   { id: "kugel:default", label: "KugelAudio (7B, 24 EU languages)", gender: null, grade: "MLX", supportsSpeed: false, note: "Multilingual narrator", requiresMlx: true },
 ];
 
@@ -149,6 +171,7 @@ export const ENGINE_PREFIXES: { prefix: string; engine: VoiceEngine; supportsSpe
   { prefix: "cartesia:", engine: "cartesia", supportsSpeed: true },
   { prefix: "elevenlabs:", engine: "elevenlabs", supportsSpeed: true },
   { prefix: "pocket:", engine: "pocket", supportsSpeed: false },
+  { prefix: "bg-piper:", engine: "narrators", supportsSpeed: true },
   { prefix: "bg-", engine: "narrators", supportsSpeed: false },
   { prefix: "kugel:", engine: "narrators", supportsSpeed: false },
 ];
@@ -200,7 +223,15 @@ export function cartesiaVoiceToEntry(voice: { id: string; name: string; language
   };
 }
 
-export function elevenlabsVoiceToEntry(voice: { id: string; name: string; language: string; gender: string | null; tagline: string }): Voice {
+export function elevenlabsVoiceToEntry(voice: {
+  id: string;
+  name: string;
+  language: string;
+  languages: string[];
+  reads: string[];
+  gender: string | null;
+  tagline: string;
+}): Voice {
   return {
     id: `elevenlabs:${voice.id}`,
     label: voice.name,
@@ -209,6 +240,8 @@ export function elevenlabsVoiceToEntry(voice: { id: string; name: string; langua
     supportsSpeed: true,
     note: voice.tagline || voice.language,
     language: voice.language.split(/[_-]/)[0]?.toLowerCase() ?? "",
+    nativeLanguages: voice.languages.filter((code) => code !== voice.language),
+    alsoReads: voice.reads.filter((code) => !voice.languages.includes(code)),
     engine: "elevenlabs",
   };
 }

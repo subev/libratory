@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+"""Piper (piper-tts, GPL-3.0, run as a subprocess) with the Bulgarian `dimitar` voice (CC0).
+
+Runs in its own venv (.venv-piper): onnxruntime and numpy 2 must not touch the main env's pins.
+ONNX on the CPU, ~20x realtime, and the one local Bulgarian engine with working speed control
+(`length_scale` = 1 / speed). espeak-ng, bundled in the wheel, expands digits in any language;
+bg_speech still runs first for dates, currency and abbreviations, which espeak reads letter by letter.
+"""
+
+import argparse
+import json
+import os
+import sys
+import wave
+from pathlib import Path
+
+import numpy as np
+import soundfile as sf
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from bg_speech import speakable  # noqa: E402
+
+VOICE_REPO = "rhasspy/piper-voices"
+VOICE_REVISION = "6249c8a9178e606f0de19227d5426e5dfaf9fc9e"
+VOICES = {"dimitar": "bg/bg_BG/dimitar/medium/bg_BG-dimitar-medium"}
+CHUNK_SEPARATOR = "\f"
+PAUSE_MS = 250
+
+
+def voice_files(voice: str, local_only: bool) -> Path:
+    from huggingface_hub import hf_hub_download
+    stem = VOICES[voice]
+    hf_hub_download(VOICE_REPO, f"{stem}.onnx.json", revision=VOICE_REVISION, local_files_only=local_only)
+    return Path(hf_hub_download(VOICE_REPO, f"{stem}.onnx", revision=VOICE_REVISION, local_files_only=local_only))
+
+
+def read_chunks(input_path: str) -> list[str]:
+    text = Path(input_path).read_text(encoding="utf-8").strip()
+    if not text:
+        raise RuntimeError("input text is empty")
+    return [chunk.strip() for chunk in text.split(CHUNK_SEPARATOR) if chunk.strip()]
+
+
+def write_chunk_manifest(chunks_dir: str, chunks: list[str]) -> None:
+    os.makedirs(chunks_dir, exist_ok=True)
+    manifest = [{"index": index, "text": chunk} for index, chunk in enumerate(chunks, start=1)]
+    with open(os.path.join(chunks_dir, "chunks.json"), "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False)
+
+
+def load_existing_chunk(chunks_dir, index: int):
+    if not chunks_dir:
+        return None
+    path = os.path.join(chunks_dir, f"chunk-{index:03d}.wav")
+    if not os.path.exists(path):
+        return None
+    try:
+        data, _ = sf.read(path, dtype="float32")
+        return data if len(data) else None
+    except Exception:
+        return None
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Synthesize Bulgarian text to WAV using Piper")
+    parser.add_argument("--input")
+    parser.add_argument("--output")
+    parser.add_argument("--voice")
+    parser.add_argument("--speed", type=float, default=1.0)
+    parser.add_argument("--chunks-dir", default=None)
+    parser.add_argument("--cache-only", action="store_true", help="Download every catalog voice, then exit")
+    args = parser.parse_args()
+
+    if args.cache_only:
+        for voice in VOICES:
+            voice_files(voice, local_only=False)
+        print(json.dumps({"type": "cached"}), flush=True)
+        return
+    if not (args.input and args.output and args.voice):
+        parser.error("--input, --output and --voice are required")
+    if args.voice not in VOICES:
+        raise RuntimeError(f"Unsupported Piper voice: {args.voice}")
+    if not 0.25 <= args.speed <= 4:
+        raise RuntimeError(f"Speed out of range: {args.speed}")
+
+    from piper import PiperVoice, SynthesisConfig
+
+    local_only = os.environ.get("HF_HUB_OFFLINE") == "1"
+    try:
+        model_path = voice_files(args.voice, local_only)
+    except Exception as exc:
+        raise RuntimeError("The Piper Bulgarian voice is not downloaded — run `pnpm run setup`") from exc
+    voice = PiperVoice.load(str(model_path))
+    sample_rate = voice.config.sample_rate
+    config = SynthesisConfig(length_scale=1 / args.speed)
+
+    chunks = read_chunks(args.input)
+    if args.chunks_dir:
+        write_chunk_manifest(args.chunks_dir, chunks)
+    print(json.dumps({"type": "chunks", "total": len(chunks)}), flush=True)
+
+    audio_parts: list[np.ndarray] = []
+    for index, chunk in enumerate(chunks, start=1):
+        waveform = load_existing_chunk(args.chunks_dir, index)
+        if waveform is None:
+            pieces = [part.audio_float_array for part in voice.synthesize(speakable(chunk), syn_config=config)]
+            if not pieces:
+                raise RuntimeError(f"No audio generated for chunk {index}")
+            waveform = np.concatenate(pieces).astype(np.float32)
+            if args.chunks_dir:
+                os.makedirs(args.chunks_dir, exist_ok=True)
+                sf.write(os.path.join(args.chunks_dir, f"chunk-{index:03d}.wav"), waveform, sample_rate)
+
+        audio_parts.append(waveform)
+        if index < len(chunks):
+            audio_parts.append(np.zeros(int(sample_rate * PAUSE_MS / 1000), dtype=np.float32))
+
+        total_seconds = round(sum(len(part) for part in audio_parts) / sample_rate, 1)
+        print(json.dumps({"type": "progress", "chunk": index, "totalChunks": len(chunks), "audioSeconds": total_seconds}), flush=True)
+
+    full_audio = np.concatenate(audio_parts).astype(np.float32)
+    sf.write(args.output, full_audio, sample_rate)
+    print(json.dumps({"type": "done", "audioSeconds": round(len(full_audio) / sample_rate, 1), "chunks": len(chunks)}), flush=True)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)

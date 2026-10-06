@@ -7,6 +7,9 @@ import os
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from bg_speech import speakable  # noqa: E402
+
 
 MODEL_ID = "raditotev/bg-tts-v5-mlx"
 SPEAKER_IDS = {
@@ -148,7 +151,7 @@ def main() -> None:
         for index, chunk in enumerate(chunks, start=1):
             chunk_audio = load_existing_chunk(args.chunks_dir, index)
             if chunk_audio is None:
-                chunk_audio = synthesize_chunk_audio(mlx_inference, model, tokenizer, codec, chunk, speaker_id)
+                chunk_audio = synthesize_chunk_audio(mlx_inference, model, tokenizer, codec, speakable(chunk), speaker_id)
                 if args.chunks_dir:
                     os.makedirs(args.chunks_dir, exist_ok=True)
                     sf.write(os.path.join(args.chunks_dir, f"chunk-{index:03d}.wav"), chunk_audio, SAMPLE_RATE)

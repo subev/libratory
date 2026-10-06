@@ -6,6 +6,7 @@ import {
   languageLabel,
   MULTILINGUAL,
   voiceCoversLanguage,
+  voiceIsForeignIn,
   pocketCustomVoiceToEntry,
   pocketVoiceToEntry,
   providerOfVoice,
@@ -169,7 +170,10 @@ export function VoiceLibraryModal({
         ? clonedVoices
         // A multilingual model reads any language, so it belongs in every list.
         : allVoices.filter((v) => voiceCoversLanguage(v, language));
-    return pool.filter((v) => matches(v.label, v.note, providerOfVoice(v)));
+    // A voice made for this language before one that only reads it (stable, so each half keeps its order)
+    return pool
+      .filter((v) => matches(v.label, v.note, providerOfVoice(v)))
+      .sort((a, b) => Number(voiceIsForeignIn(a, language)) - Number(voiceIsForeignIn(b, language)));
   }, [allVoices, clonedVoices, language, matches]);
 
   const byProvider = useMemo(() => {
@@ -363,7 +367,7 @@ export function VoiceLibraryModal({
                         const rows = capped ? voices.slice(0, PREVIEW_PER_PROVIDER) : voices;
                         return (
                           <Section key={name} label={sectionLabel(name, voices.length, elevenlabsQuota)}>
-                            {rows.map((voice) => <VoiceRow key={voice.id} voice={voice} />)}
+                            {rows.map((voice) => <VoiceRow key={voice.id} voice={voice} language={language} />)}
                             {capped && (
                               <button
                                 type="button"

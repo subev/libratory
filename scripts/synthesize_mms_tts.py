@@ -11,6 +11,9 @@ import soundfile as sf
 import torch
 from transformers import AutoTokenizer, VitsModel
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from bg_speech import speakable  # noqa: E402
+
 
 MODEL_ID = "facebook/mms-tts-bul"
 VOICE_IDS = {"bul"}
@@ -86,7 +89,7 @@ def main() -> None:
     for index, chunk in enumerate(chunks, start=1):
         waveform = load_existing_chunk(args.chunks_dir, index)
         if waveform is None:
-            inputs = tokenizer(chunk, return_tensors="pt")
+            inputs = tokenizer(speakable(chunk), return_tensors="pt")
             inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
 
             with torch.no_grad():

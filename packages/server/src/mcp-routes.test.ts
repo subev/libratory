@@ -41,7 +41,15 @@ vi.mock("./lib/model-bundles.ts", () => ({
 }));
 
 vi.mock("./lib/cartesia.ts", () => ({ listCartesiaVoices: async () => [{ id: "abc123", name: "Sofia", language: "bg", gender: "feminine", tagline: "warm" }] }));
-vi.mock("./lib/elevenlabs.ts", () => ({ listElevenLabsVoices: async () => [] }));
+vi.mock("./lib/elevenlabs.ts", () => ({
+  listElevenLabsVoices: async () => [
+    { id: "el1", name: "George", language: "en", languages: ["en"], reads: ["en", "bg"], gender: "male", tagline: "" },
+  ],
+}));
+vi.mock("./lib/tts.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./lib/tts.ts")>()),
+  installedLocalEngines: () => ({ piper: true, bgtts: false }),
+}));
 vi.mock("./lib/say-voices.ts", () => ({ listSayVoices: async () => [{ slug: "daria", name: "Daria", locale: "bg_BG", sample: "" }] }));
 
 import { registerMcpRoutes } from "./mcp-routes.ts";
@@ -214,7 +222,13 @@ describe("/mcp", () => {
     const bgIds = bulgarian.map((v: { id: string }) => v.id);
     expect(bgIds).toEqual(expect.arrayContaining(["bg-mlx:narrator", "bg-mms:bul", "kugel:default", "say:daria", "cartesia:abc123"]));
     expect(bgIds).not.toContain("kokoro:af_heart");
-    expect(bulgarian.find((v: { id: string }) => v.id === "cartesia:abc123")).toMatchObject({ cloud: true, gender: "F", engine: "cartesia" });
+    expect(bulgarian.find((v: { id: string }) => v.id === "cartesia:abc123")).toMatchObject({ cloud: true, gender: "F", engine: "cartesia", native: true });
+    // Listed because the model reads Bulgarian, flagged because the voice was made for English
+    expect(bulgarian.find((v: { id: string }) => v.id === "elevenlabs:el1")).toMatchObject({ language: "en", native: false });
+    // An engine whose env setup never built is not offered
+    expect(bgIds).toContain("bg-piper:dimitar");
+    expect(bgIds).not.toContain("bg-bgtts:female");
+    expect(all.find((v: { id: string }) => v.id === "kokoro:af_heart")).toMatchObject({ native: null });
   });
 
   it("reports capabilities an agent can act on", async () => {

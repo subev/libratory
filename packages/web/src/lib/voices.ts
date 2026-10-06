@@ -17,6 +17,7 @@ export {
   type VoiceGroup,
   MULTILINGUAL,
   voiceCoversLanguage,
+  voiceIsForeignIn,
   languageOfStaticVoice,
   kokoroVoiceGroups,
   narratorVoices,
@@ -135,6 +136,17 @@ function humanizeSayVoiceId(voiceId: string): string {
 // out two voices on every page load and then ungrey them.
 export function voiceBlockedByMissingMlx(voice: Voice, mlxAvailable: boolean | undefined): boolean {
   return voice.requiresMlx === true && mlxAvailable === false;
+}
+
+// Same rule for the engines that live in a venv of their own: unknown means "assume it is there".
+const ENGINE_SETUP: Record<NonNullable<Voice["requiresEngine"]>, string> = {
+  piper: "pnpm run setup",
+  bgtts: "pnpm run setup --bgtts",
+};
+
+export function voiceMissingEngine(voice: Voice, installed: Partial<Record<string, boolean>> | undefined): string | null {
+  if (!voice.requiresEngine || installed?.[voice.requiresEngine] !== false) return null;
+  return `Not installed — run ${ENGINE_SETUP[voice.requiresEngine]}`;
 }
 
 // Runtime-discovered voices have no static entry, so the engine prefix is the fallback authority —

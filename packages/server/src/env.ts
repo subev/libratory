@@ -33,6 +33,8 @@ const envSchema = z.object({
   WEB_DIR: z.string().default(path.join(repoRoot, "packages", "web", "dist")),
   MIGRATIONS_DIR: z.string().default(path.join(repoRoot, "packages", "server", "drizzle")),
   POCKET_ENV_PATH: z.string().default(path.join(repoRoot, ".venv-pocket", "bin")),
+  PIPER_ENV_PATH: z.string().default(path.join(repoRoot, ".venv-piper", "bin")),
+  BGTTS_ENV_PATH: z.string().default(path.join(repoRoot, ".venv-bgtts", "bin")),
   // Where the vivliostyle CLI is installed when the server has no node_modules of its own.
   VIVLIOSTYLE_DIR: z.string().default(path.join(repoRoot, "vivliostyle")),
   // One directory holding the traineddata files *and* configs/ + pdf.ttf, or `tesseract … pdf` fails
