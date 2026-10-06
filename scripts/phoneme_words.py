@@ -1,8 +1,8 @@
-"""Word timings from Piper's own phoneme durations — no aligner, no second model.
+"""Word timings from a voice's own phoneme durations — no aligner, no second model.
 
-Piper (VITS) decides how many audio samples every phoneme lasts while it speaks, and
-`include_alignments=True` hands those counts back. What it does not say is which phoneme belongs
-to which word: espeak runs short words into their neighbours ("на хората" comes back as one
+Piper and Kokoro both decide how long every phoneme lasts while they speak, and hand those
+durations back (Piper's `include_alignments`, Kokoro's `pred_dur`). What they do not say is which
+phoneme belongs to which word: espeak runs short words into their neighbours ("на хората" comes back as one
 phoneme word, `nˌɐxorˈatɐ`), so splitting the phonemes at spaces matched the text's words in about
 a third of the chunks measured. Instead each word is phonemized on its own and that sequence is
 aligned to the sentence's phonemes symbol by symbol; a word's time is the span of the phonemes it
@@ -23,6 +23,10 @@ _HAS_LETTER = re.compile(r"[^\W\d_]")
 # A written number is a word on the page even though the voice says it as several
 _IS_WORD = re.compile(r"[^\W_]")
 
+# Writing without spaces between words (Chinese, Japanese, Thai, Lao, Khmer, Burmese) has no
+# whitespace token to time; a "word" there would be a whole clause, so such text gets none.
+_UNSPACED_SCRIPT = re.compile(r"[\u0e00-\u0eff\u1000-\u109f\u1780-\u17ff\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
+
 # Below this share of the chunk's words placed, the timings are not worth trusting: the chunk falls
 # back to sentence highlighting, as an engine with no timings does.
 MIN_PLACED = 0.85
@@ -30,6 +34,10 @@ MIN_PLACED = 0.85
 # matched exactly, the guesses are the timings, so there are none. 120 Bulgarian chunks of prose
 # and verse measured 0.86 at worst, 0.985 median (2026-10-06).
 MIN_MATCHED = 0.7
+
+
+def has_word_spaces(text):
+    return not _UNSPACED_SCRIPT.search(text)
 
 
 def _sounds(phonemes):
@@ -112,7 +120,7 @@ def chunk_words(written_text, spoken_text, phonemize_word, timed, sample_rate):
     """
     written = written_text.split()
     spoken = spoken_text.split()
-    if not written or not timed:
+    if not written or not timed or not has_word_spaces(written_text):
         return []
 
     word_phonemes = [phonemize_word(t) if _HAS_LETTER.search(t) else None for t in spoken]

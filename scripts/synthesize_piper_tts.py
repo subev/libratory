@@ -6,7 +6,7 @@ ONNX on the CPU, ~20x realtime, and the one local Bulgarian engine with working 
 (`length_scale` = 1 / speed). espeak-ng, bundled in the wheel, expands digits in any language;
 bg_speech still runs first for dates, currency and abbreviations, which espeak reads letter by letter.
 
-Every chunk also gets word timings from Piper's own phoneme durations (piper_words.py), written
+Every chunk also gets word timings from Piper's own phoneme durations (phoneme_words.py), written
 beside the chunk WAV as Kokoro's are, so the read-along lights words, not just sentences.
 """
 
@@ -22,7 +22,7 @@ import soundfile as sf
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bg_speech import speakable  # noqa: E402
-from piper_words import chunk_words  # noqa: E402
+from phoneme_words import chunk_words  # noqa: E402
 
 VOICE_REPO = "rhasspy/piper-voices"
 VOICE_REVISION = "6249c8a9178e606f0de19227d5426e5dfaf9fc9e"

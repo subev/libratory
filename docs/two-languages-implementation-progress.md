@@ -189,4 +189,6 @@ carries the flag. The facts, from the engines: Cartesia and ElevenLabs return wo
 the audio; Kokoro's come from its English tokenizer, so only its English voices have them, and its
 espeak-backed languages (French, Spanish, Italian, Portuguese, Hindi) do not; Pocket, KugelAudio,
 the two Bulgarian narrators and the macOS voices give chunk boundaries only. A Bulgarian lane meant
-for word-level reading therefore needs a cloud voice today.
+for word-level reading therefore needs a cloud voice today. (Update 2026-10-06: no longer — Piper's
+Bulgarian voice and Kokoro's espeak languages time words from their own phoneme durations,
+`scripts/phoneme_words.py`.)

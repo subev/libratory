@@ -182,15 +182,17 @@ export function engineForVoiceId(voiceId: string): VoiceEngine {
 // Whether a recording made with this voice carries a time for every word — what word
 // highlighting and word-level two-language reading need; without it a chapter reads at sentence
 // level. Cartesia and ElevenLabs return word timestamps with the audio. Kokoro's come from its
-// English tokenizer, so only its English voices have them; its espeak-backed languages return
-// phonemes with no token structure. Piper's come from its own phoneme durations
-// (scripts/piper_words.py). Pocket, the other Bulgarian narrators and the macOS voices give chunk
-// boundaries only.
+// English tokenizer, and in its espeak languages from its phoneme durations aligned to the words
+// (scripts/phoneme_words.py) — which needs spaces between words, so not Mandarin. Piper's come from
+// its durations the same way. Pocket, BgTTS, MMS and the macOS voices give chunk boundaries only.
+// Written without spaces between words, so there is no word to put a time on
+const UNSPACED_LANGUAGES = new Set(["zh", "ja"]);
+
 export function voiceHasWordTiming(voiceId: string, language?: string | null): boolean {
   if (voiceId.startsWith("bg-piper:")) return true;
   const engine = engineForVoiceId(voiceId);
   if (engine === "cartesia" || engine === "elevenlabs") return true;
-  if (engine === "kokoro") return (language ?? languageOfStaticVoice(voiceId)) === "en";
+  if (engine === "kokoro") return !UNSPACED_LANGUAGES.has(language ?? languageOfStaticVoice(voiceId));
   return false;
 }
 

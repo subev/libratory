@@ -5,13 +5,13 @@ import { scriptPath } from "./paths.ts";
 
 type ChunkWord = { text: string; after: string; startMs: number; endMs: number };
 
-// piper_words.py is standard library only, so any python3 runs it; the phonemizer is faked as
+// phoneme_words.py is standard library only, so any python3 runs it; the phonemizer is faked as
 // "the word's letters", and the sentence's phonemes glue words together the way espeak does.
 function chunkWords(written: string, spoken: string, sentence: string): ChunkWord[] {
   const program = `
 import json, sys
 sys.path.insert(0, ${JSON.stringify(scriptPath(""))})
-from piper_words import chunk_words
+from phoneme_words import chunk_words
 written, spoken, sentence = json.load(sys.stdin)
 letters = lambda t: "".join(c for c in t.lower() if c.isalpha())
 timed = [(c, i * 100, (i + 1) * 100) for i, c in enumerate(sentence)]
@@ -22,7 +22,7 @@ print(json.dumps(chunk_words(written, spoken, letters, timed, 1000)))
   return JSON.parse(run.stdout) as ChunkWord[];
 }
 
-describe("piper_words.chunk_words", () => {
+describe("phoneme_words.chunk_words", () => {
   it("splits words espeak glued together, and gives a normalized number the time it was spoken in", () => {
     const words = chunkWords("Струва 25 лв. на хората.", "Струва двадесет и пет лева на хората.", "струва двадесетипет лева. нахората.");
 

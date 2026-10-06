@@ -6,6 +6,13 @@ import json
 import os
 import re
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from phoneme_words import chunk_words, has_word_spaces  # noqa: E402
+
+# Kokoro predicts durations in frames of 600 samples at 24 kHz (40 frames a second)
+SAMPLES_PER_FRAME = 600
 
 
 def write_chunk_manifest(chunks_dir, chunk_texts):
@@ -89,6 +96,33 @@ def write_chunk_words(chunks_dir, index, tokens):
         json.dump(words, f, ensure_ascii=False)
 
 
+def espeak_chunk_words(pipeline, text, phonemes, pred_dur):
+    """Word timings for a chunk read through espeak, which returns phonemes but no tokens.
+
+    pred_dur runs BOS, one entry per phoneme the vocabulary knows, EOS — the same filter infer
+    applies — so each phoneme gets its own sample span and phoneme_words aligns them to words.
+    """
+    vocab = pipeline.model.vocab
+    kept = [p for p in phonemes if vocab.get(p) is not None]
+    frames = pred_dur.tolist()
+    if len(frames) != len(kept) + 2:
+        return []
+    timed = []
+    cursor = frames[0] * SAMPLES_PER_FRAME
+    for phoneme, count in zip(kept, frames[1:-1]):
+        timed.append((phoneme, cursor, cursor + count * SAMPLES_PER_FRAME))
+        cursor += count * SAMPLES_PER_FRAME
+    return chunk_words(text, text, lambda word: pipeline.g2p(word)[0] or "", timed, 24000)
+
+
+def write_words_json(chunks_dir, index, words):
+    if not chunks_dir or not words:
+        return
+    os.makedirs(chunks_dir, exist_ok=True)
+    with open(os.path.join(chunks_dir, chunk_words_file(index)), "w", encoding="utf-8") as f:
+        json.dump(words, f, ensure_ascii=False)
+
+
 def load_existing_chunk(chunks_dir, index, needs_words):
     """Return a previously-synthesized chunk's audio so resume can skip regenerating it."""
     if not chunks_dir:
@@ -140,6 +174,8 @@ def main():
     phoneme_chunks = []
     chunk_texts = []
     chunk_tokens = []
+    # An espeak chunk's words are timed by alignment instead of tokens (espeak_chunk_words)
+    chunk_espeak = []
     for segment in re.split(r'\n+', text):
         segment = segment.strip()
         if not segment:
@@ -154,12 +190,14 @@ def main():
                     phoneme_chunks.append(ps)
                     chunk_texts.append(segment)
                     chunk_tokens.append(None)
+                    chunk_espeak.append(has_word_spaces(segment))
             else:
                 for gs, chunk_ps, tks in pipeline.en_tokenize(tokens):
                     if chunk_ps.strip():
                         phoneme_chunks.append(chunk_ps)
                         chunk_texts.append(gs.strip())
                         chunk_tokens.append(tks)
+                        chunk_espeak.append(False)
         except Exception as e:
             print(f"G2P error on segment: {e}", file=sys.stderr)
             continue
@@ -168,7 +206,8 @@ def main():
     safe_chunks = []
     safe_texts = []
     safe_tokens = []
-    for ps, gs, tks in zip(phoneme_chunks, chunk_texts, chunk_tokens):
+    safe_espeak = []
+    for ps, gs, tks, espeak in zip(phoneme_chunks, chunk_texts, chunk_tokens, chunk_espeak):
         # Cutting the phoneme string desynchronizes it from the tokens, so no timings at all
         was_split = len(ps) > MAX_PHONEMES
         while len(ps) > MAX_PHONEMES:
@@ -178,14 +217,17 @@ def main():
             safe_chunks.append(ps[:split_at])
             safe_texts.append(gs)
             safe_tokens.append(None)
+            safe_espeak.append(False)
             ps = ps[split_at:].lstrip()
         if ps.strip():
             safe_chunks.append(ps)
             safe_texts.append(gs)
             safe_tokens.append(None if was_split else tks)
+            safe_espeak.append(espeak and not was_split)
     phoneme_chunks = safe_chunks
     chunk_texts = safe_texts
     chunk_tokens = safe_tokens
+    chunk_espeak = safe_espeak
 
     total_chunks = len(phoneme_chunks)
     if total_chunks == 0:
@@ -203,13 +245,15 @@ def main():
     voice_pack = pipeline.load_voice(args.voice)
     audio_chunks = []
     for i, ps in enumerate(phoneme_chunks):
-        chunk_audio = load_existing_chunk(args.chunks_dir, i + 1, chunk_tokens[i] is not None)
+        chunk_audio = load_existing_chunk(args.chunks_dir, i + 1, chunk_tokens[i] is not None or chunk_espeak[i])
         if chunk_audio is None:
             output = KPipeline.infer(pipeline.model, ps, voice_pack, args.speed)
             chunk_audio = output.audio.numpy()
             if chunk_tokens[i] is not None and output.pred_dur is not None:
                 join_timestamps(chunk_tokens[i], output.pred_dur, pipeline.model.vocab)
                 write_chunk_words(args.chunks_dir, i + 1, chunk_tokens[i])
+            elif chunk_espeak[i] and output.pred_dur is not None:
+                write_words_json(args.chunks_dir, i + 1, espeak_chunk_words(pipeline, chunk_texts[i], ps, output.pred_dur))
             if args.chunks_dir:
                 os.makedirs(args.chunks_dir, exist_ok=True)
                 sf.write(os.path.join(args.chunks_dir, f"chunk-{i + 1:03d}.wav"), chunk_audio, 24000)

@@ -166,5 +166,5 @@ unbuilt. Two findings change the gotchas list:
 - **piper-tts 1.8.0 fixed the broken espeak-ng data path** — no `ESPEAK_DATA_PATH` needed, the
   wheel's bundled data is found on its own.
 - **1.8.0 can return phoneme alignments** (`include_alignments=True`; patches the ONNX graph in
-  memory, needs the `onnx` package). Wired 2026-10-06 (`scripts/piper_words.py`): word timings for
+  memory, needs the `onnx` package). Wired 2026-10-06 (`scripts/phoneme_words.py`): word timings for
   every Piper voice, and the general engine inherits them.
