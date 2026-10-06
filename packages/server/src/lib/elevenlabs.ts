@@ -157,6 +157,8 @@ function toVoice(raw: RawVoice): CachedVoice {
   ];
   const tagline = [labels.accent ?? verified?.accent, labels.age, labels.use_case, raw.description]
     .filter((part): part is string => Boolean(part && part.trim()))
+    // Labels arrive as identifiers ("middle_aged"); the row reads them as words
+    .map((part) => part.replaceAll("_", " "))
     .join(" · ");
   return {
     id: raw.voice_id,

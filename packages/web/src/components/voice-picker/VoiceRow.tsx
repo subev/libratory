@@ -40,6 +40,7 @@ export const VoiceRow = memo(function VoiceRow({ voice, language, action }: { vo
   const needsMlx = voiceBlockedByMissingMlx(voice, capabilities?.mlx);
   const missingEngine = voiceMissingEngine(voice, engines);
   const unavailable = needsMlx || missingEngine !== null;
+  const description = describe(voice, foreignIn);
 
   const status = needsMlx
     ? "Needs Apple Silicon — this narrator runs on Metal"
@@ -84,9 +85,12 @@ export const VoiceRow = memo(function VoiceRow({ voice, language, action }: { vo
         className="flex-1 min-w-0 text-left rounded disabled:opacity-50 disabled:cursor-not-allowed"
         data-testid={`voice-option-${voice.id}`}
       >
-        <div className="text-sm text-(--text-primary) truncate">{voice.label}</div>
-        <div className={`text-xs truncate ${hasFailed ? "text-(--danger-text)" : isPending ? "text-(--accent-text)" : "text-(--text-faint)"}`}>
-          {status ?? describe(voice, foreignIn)}
+        <div className="text-sm text-(--text-primary) truncate" title={voice.label}>{voice.label}</div>
+        <div
+          title={status ?? description}
+          className={`text-xs truncate ${hasFailed ? "text-(--danger-text)" : isPending ? "text-(--accent-text)" : "text-(--text-faint)"}`}
+        >
+          {status ?? description}
         </div>
       </button>
 
