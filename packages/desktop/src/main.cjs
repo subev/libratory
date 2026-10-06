@@ -234,8 +234,9 @@ const STEPS = [
     label: "Audio and PDF tools",
     async run() {
       const missing = setup.missingTools(RESOURCES);
+      if (missing.length && process.platform === "linux") throw new Error(`Missing ${missing.join(", ")} — ${setup.installHint(missing)}`);
       if (missing.length) throw new Error(`Missing ${missing.join(", ")} from the app bundle — this build is incomplete.`);
-      return "bundled";
+      return process.platform === "linux" ? "from the system" : "bundled";
     },
   },
   {
@@ -294,7 +295,10 @@ const STEPS = [
       // reader looking for a crash rather than for the other server that is about to be adopted.
       if (state === "foreign") throw new Error(`Something else is already serving ${ctx.url} — most likely a \`pnpm dev\` server from a checkout. Quit it, or launch with LIBRATORY_PORT set to a free port.`);
       if (died) throw new Error(died);
-      if (state !== "ours") throw new Error("The server did not start — check Console.app for Libratory.");
+      if (state !== "ours") {
+        const where = process.platform === "darwin" ? "check Console.app for Libratory" : "start Libratory from a terminal to see its output";
+        throw new Error(`The server did not start — ${where}.`);
+      }
     },
   },
 ];

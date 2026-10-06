@@ -1,6 +1,7 @@
 // Everything scripts/setup.sh does, minus the terminal. Each function reports progress through a
 // callback and is safe to run again — a first run that dies halfway resumes rather than restarts.
 const { spawn } = require("node:child_process");
+const { createHash } = require("node:crypto");
 const { existsSync, mkdirSync, copyFileSync, cpSync, rmSync, readFileSync } = require("node:fs");
 const path = require("node:path");
 
@@ -30,6 +31,26 @@ function pins(dir) {
 
 function toolDirs(resources) {
   return [...(resources ? [path.join(resources, "bin")] : []), "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"];
+}
+
+// Linux has no bundle of them: the package manager installs the same tools, and a first run that
+// is missing one names the command rather than calling the build incomplete.
+const LINUX_PACKAGES = {
+  apt: { ffmpeg: ["ffmpeg"], pdftotext: ["poppler-utils"], pdfinfo: ["poppler-utils"], pdftoppm: ["poppler-utils"], tesseract: ["tesseract-ocr", "tesseract-ocr-eng", "tesseract-ocr-osd"] },
+  dnf: { ffmpeg: ["ffmpeg-free"], pdftotext: ["poppler-utils"], pdfinfo: ["poppler-utils"], pdftoppm: ["poppler-utils"], tesseract: ["tesseract", "tesseract-langpack-eng", "tesseract-osd"] },
+  pacman: { ffmpeg: ["ffmpeg"], pdftotext: ["poppler"], pdfinfo: ["poppler"], pdftoppm: ["poppler"], tesseract: ["tesseract", "tesseract-data-eng", "tesseract-data-osd"] },
+};
+const INSTALL = { apt: "sudo apt install", dnf: "sudo dnf install", pacman: "sudo pacman -S" };
+
+/**
+ * @param {string[]} missing
+ * @param {(file: string) => boolean} [exists]
+ */
+function installHint(missing, exists = existsSync) {
+  const manager = ["apt", "dnf", "pacman"].find((m) => exists(`/usr/bin/${m === "apt" ? "apt-get" : m}`));
+  if (!manager) return `Install ${missing.join(", ")} with your package manager.`;
+  const packages = [...new Set(missing.flatMap((tool) => LINUX_PACKAGES[manager][tool] ?? [tool]))];
+  return `${INSTALL[manager]} ${packages.join(" ")}`;
 }
 
 function missingTools(resources) {
@@ -72,8 +93,10 @@ function sh(cmd, args, opts = {}) {
 function stageRuntime(resources, home) {
   mkdirSync(home, { recursive: true });
   cpSync(path.join(resources, "scripts"), path.join(home, "scripts"), { recursive: true });
-  // Copied over, never replaced: an update must not take a downloaded language pack with it.
-  cpSync(path.join(resources, "tessdata"), path.join(home, "tessdata"), { recursive: true, force: true });
+  // Copied over, never replaced: an update must not take a downloaded language pack with it. A
+  // Linux build ships none — the server stages eng and osd from the system tesseract on first use.
+  const tessdata = path.join(resources, "tessdata");
+  if (existsSync(tessdata)) cpSync(tessdata, path.join(home, "tessdata"), { recursive: true, force: true });
   for (const f of ["pyproject.toml", "uv.lock", "docker-compose.yml"]) {
     copyFileSync(path.join(resources, f), path.join(home, f));
   }
@@ -85,8 +108,9 @@ async function ensureUv(home, onOutput) {
   if (existsSync(uv)) return uv;
 
   const { uv: pinned } = pins(home);
-  const build = pinned[process.arch];
-  if (!build) throw new Error(`No uv build for ${process.arch}`);
+  const key = process.platform === "linux" ? `linux-${process.arch}` : process.arch;
+  const build = pinned[key];
+  if (!build) throw new Error(`No uv build for ${key}`);
   mkdirSync(dir, { recursive: true });
 
   // Downloaded by the app rather than a browser, so it carries no quarantine flag and needs no
@@ -96,7 +120,8 @@ async function ensureUv(home, onOutput) {
   onOutput?.(`Downloading uv ${pinned.version}`);
   await sh("/usr/bin/curl", ["-fsSL", "--retry", "3", "-o", tarball, url]);
 
-  const got = (await sh("/usr/bin/shasum", ["-a", "256", tarball])).trim().split(/\s+/)[0];
+  // In-process: /usr/bin/shasum is a macOS (perl) tool most Linux systems do not have
+  const got = createHash("sha256").update(readFileSync(tarball)).digest("hex");
   if (got !== build.sha256) {
     rmSync(tarball, { force: true });
     throw new Error(`uv checksum mismatch — expected ${build.sha256.slice(0, 12)}…, got ${got.slice(0, 12)}…`);
@@ -137,4 +162,4 @@ async function fetchEssentialModels(python, home, onOutput) {
   });
 }
 
-module.exports = { missingTools, toolPath, stageRuntime, pythonBin, uvEnv, syncPython, fetchEssentialModels, failureMessage };
+module.exports = { missingTools, installHint, toolPath, stageRuntime, pythonBin, uvEnv, syncPython, fetchEssentialModels, failureMessage };

@@ -26,6 +26,9 @@ const SOCKET_CANDIDATES = [
   path.join(homedir(), ".orbstack/run/docker.sock"),
   path.join(homedir(), ".colima/default/docker.sock"),
   path.join(homedir(), ".rd/docker.sock"),
+  // Linux: Docker Desktop, then a rootless daemon, which lives under the user's runtime directory
+  path.join(homedir(), ".docker/desktop/docker.sock"),
+  ...(process.env.XDG_RUNTIME_DIR ? [path.join(process.env.XDG_RUNTIME_DIR, "docker.sock")] : []),
 ];
 
 async function firstExisting(paths) {
@@ -92,8 +95,22 @@ function dockerAdvice(state) {
   return DOCKER_HELP[state.kind].detail;
 }
 
-function dockerHelp(state) {
-  return state.kind === "ready" ? null : DOCKER_HELP[state.kind];
+// On Linux Docker is a package and a service, not an app in a folder
+const LINUX_DOCKER_HELP = {
+  missing: {
+    ...DOCKER_HELP.missing,
+    body: "Your library lives in a database, and Docker is the free program that runs it. Install Docker Engine from your distribution (for example `sudo apt install docker.io`), add yourself to the docker group with `sudo usermod -aG docker $USER`, then log out and back in.",
+    links: [{ label: "Install Docker Engine", url: "https://docs.docker.com/engine/install/" }],
+  },
+  "installed-not-running": {
+    ...DOCKER_HELP["installed-not-running"],
+    body: "Start it with `sudo systemctl start docker` — `sudo systemctl enable docker` starts it at every boot — then press Check again. If it is running and this still shows, your user is not in the docker group yet.",
+  },
+};
+
+function dockerHelp(state, platform = process.platform) {
+  if (state.kind === "ready") return null;
+  return (platform === "linux" ? LINUX_DOCKER_HELP : DOCKER_HELP)[state.kind];
 }
 
 module.exports = { CLI_CANDIDATES, SOCKET_CANDIDATES, firstExisting, detectDocker, dockerEnv, dockerAdvice, dockerHelp };

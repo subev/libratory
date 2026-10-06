@@ -816,6 +816,7 @@ the state.
   `eng`/`osd`/`pdf.ttf`/`configs`/`tessconfigs` into `resources/tessdata`, which `stageRuntime`
   copies (never replaces) into `HOME/tessdata` — an update must not take a downloaded pack with it. `scripts/make-icon.sh` builds the `.icns`.
 - **`scripts/vm-verify.sh`** — run inside a fresh macOS VM (tart), asserts the absences first.
+- **Linux** — `scripts/desktop-build.sh --linux` builds an AppImage (`bun-linux-*` server, no tools tarball: a first run names the apt/dnf/pacman command for missing ffmpeg/poppler/tesseract via `setup.installHint`, and Docker help speaks Linux). Written but not yet run on Linux; the open steps and the Windows list are in `tasks/desktop-linux-windows.md`.
 - Updating the runtime, not just the shell, is planned in `tasks/desktop-updates.md` and not built.
 
 ## Library Chat & Search Index

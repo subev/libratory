@@ -92,7 +92,16 @@
         "repo": "libratory",
         "releaseType": "draft"
       }
-    ]
+    ],
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "AudioVideo",
+      "icon": "build/icon.png",
+      "executableName": "libratory",
+      "synopsis": "PDF books to audiobooks with chapters and read-along"
+    }
   },
   "dependencies": {
     "electron-updater": "^6.8.9"
