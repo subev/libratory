@@ -38,6 +38,42 @@ Not done:
    button in the picker.
 5. CUDA: the lock routes Linux torch to the CPU index; a GPU build would need its own lock.
 
+### Test bed: Omarchy on this Mac
+
+Try Omarchy (github.com/omacom/try-omarchy, v0.5.0) is the Omarchy desktop on Arch Linux ARM in a
+Hypervisor.framework VM, with a shared Mac folder and loopback port forwarding — so the arm64
+AppImage (`LINUX_ARCH=arm64`) is the one to run there. Arch does not restrict user namespaces the
+way Ubuntu 24.04 does, so the sandbox question above does not arise on it.
+
+The AppImage uses electron-builder's legacy FUSE 2 runtime: a system without `libfuse.so.2`
+(Arch: the `fuse2` package) cannot mount it, and `--appimage-extract-and-run` is the fallback.
+Say so on the download page, or move to the static runtime when electron-builder offers it.
+
+## Flatpak — fits as our own repository, not (yet) as Flathub
+
+What fits: Electron apps have a base (`org.electronjs.Electron2.BaseApp`); ffmpeg, poppler and
+tesseract become manifest modules, which removes the "install these from your distribution" step
+the AppImage has; one package for every distribution, sandboxed, with updates through
+`flatpak update`.
+
+What does not, today:
+
+- **Docker.** The sandbox cannot reach the host's Docker unless given its socket
+  (`--filesystem=/run/docker.sock` or `xdg-run/docker.sock`), a static permission Flathub reviewers
+  push back on. The clean answer is Postgres 17 + pgvector as manifest modules, run by the app as a
+  child process — the bundled-Postgres path this project tried once (`tasks/desktop-app.md`) and
+  dropped only because the Mac app needed Docker anyway. It would also remove Docker from the Linux
+  install, which is the biggest hurdle there.
+- **Flathub's build rules.** A submission must be built from source in the manifest; the
+  bun-compiled server and the Python environment (torch and friends arrive as wheels, and the app
+  syncs its environment with uv on first run) do not fit that. A self-hosted Flatpak repository or
+  a `.flatpak` bundle has no such rule.
+- **GPU**: CUDA inside a Flatpak is its own project; CPU-only is the realistic first version.
+
+Order: AppImage first (done, needs the Linux run), then a self-hosted Flatpak with bundled
+Postgres, then Flathub only if bundled Postgres has landed and the build-from-source question has
+an answer.
+
 ## Windows — a note, bigger than Linux
 
 Everything Linux needs, plus code that assumes a POSIX layout:
