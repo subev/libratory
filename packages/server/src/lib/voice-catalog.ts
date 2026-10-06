@@ -166,15 +166,30 @@ export const narratorVoices: Voice[] = [
 
 export type VoiceEngine = "kokoro" | "narrators" | "say" | "cartesia" | "elevenlabs" | "pocket";
 
-export const ENGINE_PREFIXES: { prefix: string; engine: VoiceEngine; supportsSpeed: boolean }[] = [
+export type SpeedRange = { min: number; max: number };
+
+// What the stored speed may be. An engine whose API accepts less says so in `speedRange`; the
+// server clamps to it, so the slider stops at the same place rather than offering unused speeds.
+export const BOOK_SPEED_RANGE: SpeedRange = { min: 0.5, max: 2 };
+
+export const ENGINE_PREFIXES: { prefix: string; engine: VoiceEngine; supportsSpeed: boolean; speedRange?: SpeedRange }[] = [
   { prefix: "say:", engine: "say", supportsSpeed: true },
-  { prefix: "cartesia:", engine: "cartesia", supportsSpeed: true },
-  { prefix: "elevenlabs:", engine: "elevenlabs", supportsSpeed: true },
+  { prefix: "cartesia:", engine: "cartesia", supportsSpeed: true, speedRange: { min: 0.6, max: 1.5 } },
+  { prefix: "elevenlabs:", engine: "elevenlabs", supportsSpeed: true, speedRange: { min: 0.7, max: 1.2 } },
   { prefix: "pocket:", engine: "pocket", supportsSpeed: false },
   { prefix: "bg-piper:", engine: "narrators", supportsSpeed: true },
   { prefix: "bg-", engine: "narrators", supportsSpeed: false },
   { prefix: "kugel:", engine: "narrators", supportsSpeed: false },
 ];
+
+export function speedRangeFor(voiceId: string): SpeedRange {
+  return ENGINE_PREFIXES.find((entry) => voiceId.startsWith(entry.prefix))?.speedRange ?? BOOK_SPEED_RANGE;
+}
+
+export function clampSpeed(voiceId: string, speed: number): number {
+  const { min, max } = speedRangeFor(voiceId);
+  return Math.min(max, Math.max(min, speed));
+}
 
 export function engineForVoiceId(voiceId: string): VoiceEngine {
   return ENGINE_PREFIXES.find((entry) => voiceId.startsWith(entry.prefix))?.engine ?? "kokoro";

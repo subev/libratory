@@ -40,7 +40,7 @@ const NONE_EXPANDED: ReadonlySet<string> = new Set();
 function sectionLabel(provider: string, count: number, quota: { remaining: number; limit: number } | null | undefined): string {
   const base = `${provider} \u00b7 ${count}`;
   if (provider !== "ElevenLabs" || !quota?.limit) return base;
-  return `${base} \u00b7 ${quota.remaining.toLocaleString()} of ${quota.limit.toLocaleString()} characters left`;
+  return `${base} \u00b7 ${quota.remaining.toLocaleString()} of ${quota.limit.toLocaleString()} credits left`;
 }
 
 // What this book is being translated into comes first — that's what you're here to synthesize —

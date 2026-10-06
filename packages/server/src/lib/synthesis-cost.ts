@@ -2,6 +2,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 
 import { db } from "../db.ts";
 import { chapters, chapterVariants, type Chapter, type ChapterVariant } from "../schema.ts";
+import { chapterText } from "./chapter-text.ts";
 import { elevenLabsCreditsPerChar, elevenLabsQuota } from "./elevenlabs.ts";
 import { parseTtsVoice } from "./tts.ts";
 
@@ -43,10 +44,12 @@ export async function estimateSynthesisCost(input: {
   }
   if (engine !== "elevenlabs" && engine !== "cartesia") return null;
 
-  const texts = input.key === null ? await originalTexts(input.bookId, input.chapterId) : await variantTexts(input.bookId, input.key, input.chapterId);
+  const [texts, quota] = await Promise.all([
+    input.key === null ? originalTexts(input.bookId, input.chapterId) : variantTexts(input.bookId, input.key, input.chapterId),
+    engine === "elevenlabs" ? elevenLabsQuota().catch(() => null) : null,
+  ]);
   const characters = texts.reduce((n, t) => n + t.text.length, 0);
   const rate = engine === "elevenlabs" ? elevenLabsCreditsPerChar() : CARTESIA_CREDITS_PER_CHAR;
-  const quota = engine === "elevenlabs" ? await elevenLabsQuota().catch(() => null) : null;
   return {
     chapters: texts.length,
     characters,
@@ -67,7 +70,7 @@ async function originalTexts(bookId: string, chapterId?: string): Promise<{ text
         : and(eq(chapters.bookId, bookId), eq(chapters.selected, true), inArray(chapters.status, ORIGINAL_SYNTHESIZABLE)),
     )
     .orderBy(asc(chapters.index));
-  return rows.map((r) => ({ text: r.customText ?? r.cleanText ?? r.rawText, partial: false }));
+  return rows.map((r) => ({ text: chapterText(r), partial: false }));
 }
 
 async function variantTexts(bookId: string, key: string, chapterId?: string): Promise<{ text: string; partial: boolean }[]> {

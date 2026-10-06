@@ -5,6 +5,7 @@ import { env } from "../env.ts";
 import { chunkTextForTts } from "./tts-chunks.ts";
 import { dropStaleChunks, writeChunkWords, type ChunkWord } from "./chunk-previews.ts";
 import { pcm16WavHeader, readWavPcm } from "./wav.ts";
+import { clampSpeed } from "./voice-catalog.ts";
 
 const ELEVENLABS_URL = "https://api.elevenlabs.io";
 // pcm_44100 needs the Pro plan; 24 kHz mono is available on every tier including free, and the
@@ -266,7 +267,7 @@ async function synthesizeChunkPcm(voiceId: string, modelId: string, text: string
       model_id: modelId,
       // No language_code: the book's language is not the voice's, and forcing the voice's would
       // read a Bulgarian chapter as though it were English.
-      ...(speed !== 1 ? { voice_settings: { speed: Math.min(1.2, Math.max(0.7, speed)) } } : {}),
+      ...(speed !== 1 ? { voice_settings: { speed: clampSpeed(`elevenlabs:${voiceId}`, speed) } } : {}),
     }),
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]) : AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });

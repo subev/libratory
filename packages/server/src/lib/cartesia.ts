@@ -5,6 +5,7 @@ import { env } from "../env.ts";
 import { chunkTextForTts } from "./tts-chunks.ts";
 import { dropStaleChunks, writeChunkWords, type ChunkWord } from "./chunk-previews.ts";
 import { pcm16WavHeader, readWavPcm } from "./wav.ts";
+import { clampSpeed } from "./voice-catalog.ts";
 
 const CARTESIA_URL = "https://api.cartesia.ai";
 const CARTESIA_VERSION = "2026-08-14";
@@ -136,7 +137,7 @@ async function synthesizeChunkPcm(voiceId: string, language: string | null, text
       add_timestamps: true,
       ...(language ? { language } : {}),
       // Cartesia accepts 0.6-1.5; the app-wide slider allows 0.5-2.0
-      ...(speed !== 1 ? { generation_config: { speed: Math.min(1.5, Math.max(0.6, speed)) } } : {}),
+      ...(speed !== 1 ? { generation_config: { speed: clampSpeed(`cartesia:${voiceId}`, speed) } } : {}),
     }),
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]) : AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });

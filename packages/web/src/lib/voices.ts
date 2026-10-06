@@ -18,6 +18,8 @@ export {
   MULTILINGUAL,
   voiceCoversLanguage,
   voiceIsForeignIn,
+  speedRangeFor,
+  type SpeedRange,
   languageOfStaticVoice,
   kokoroVoiceGroups,
   narratorVoices,

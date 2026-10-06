@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { engineForVoiceId, languageCodeFromName, normalizeVoiceId, voiceSupportsSpeedControl } from "../lib/voices.ts";
+import { engineForVoiceId, languageCodeFromName, normalizeVoiceId, speedRangeFor, voiceSupportsSpeedControl } from "../lib/voices.ts";
 import { trpc } from "../trpc.ts";
 import { VoicePickerProvider } from "./voice-picker/context.tsx";
 import { VoiceLibraryModal } from "./voice-picker/VoiceLibraryModal.tsx";
@@ -57,10 +57,16 @@ export function SynthesizeModal({
         priorityLanguages={priorityLanguages}
         footer={
           <div className="px-4 py-3 space-y-3" data-testid="synthesize-modal">
-            <SpeedSlider value={speed} onChange={onChangeSpeed} disabled={!voiceSupportsSpeedControl(voice)} />
+            <SpeedSlider
+              value={speed}
+              onChange={onChangeSpeed}
+              range={speedRangeFor(normalizeVoiceId(voice))}
+              rangeOwner={meteredProvider(voice)}
+              disabled={!voiceSupportsSpeedControl(voice)}
+            />
             <div className="flex items-end justify-between gap-4">
               <div className="flex-1 space-y-1">
-              <CostLine voice={voice} scope={costScope} />
+              <CostMeter voice={voice} scope={costScope} />
               <p className="text-xs text-(--text-muted)">
                 {language
                   ? `Voice and speed are saved for the ${language} variant only — the original and other variants keep their own.`
@@ -90,24 +96,67 @@ export function SynthesizeModal({
 
 const PROVIDER_NAME = { elevenlabs: "ElevenLabs", cartesia: "Cartesia" } as const;
 
-// Metered voices only: a local engine costs nothing per character, so it gets no line at all.
-function CostLine({ voice, scope }: { voice: string; scope: { bookId: string; key: string | null; chapterId?: string } }) {
+function meteredProvider(voice: string): string | null {
   const engine = engineForVoiceId(voice);
-  const metered = engine === "elevenlabs" || engine === "cartesia";
-  const { data: cost } = trpc.chapters.synthesisCost.useQuery({ ...scope, voice }, { enabled: metered, staleTime: 30_000 });
-  if (!metered || !cost) return null;
+  return engine === "elevenlabs" || engine === "cartesia" ? PROVIDER_NAME[engine] : null;
+}
 
-  const credits = `${cost.partial ? "at least " : "≈ "}${cost.credits.toLocaleString()} ${PROVIDER_NAME[cost.provider]} credits`;
-  const over = cost.remaining !== null && cost.credits > cost.remaining;
-  const balance =
-    cost.remaining === null
-      ? "Cartesia does not report the balance to an API key — check play.cartesia.ai"
-      : over
-        ? `more than the ${cost.remaining.toLocaleString()} left — a chapter that would not fit fails before spending anything`
-        : `${cost.remaining.toLocaleString()} left`;
+// Full class names, so Tailwind sees each one
+const TONE = {
+  success: { bar: "bg-(--success)", text: "text-(--success-text)" },
+  warning: { bar: "bg-(--warning)", text: "text-(--warning-text)" },
+  danger: { bar: "bg-(--danger)", text: "text-(--danger-text)" },
+} as const;
+
+// Metered voices only: a local engine costs nothing per character, so it gets no meter at all.
+// The bar is this run against what the account has left — green under half, amber up to all of
+// it, red past it.
+function CostMeter({ voice, scope }: { voice: string; scope: { bookId: string; key: string | null; chapterId?: string } }) {
+  const provider = meteredProvider(voice);
+  const { data: cost } = trpc.chapters.synthesisCost.useQuery({ ...scope, voice }, { enabled: provider !== null, staleTime: 30_000 });
+  if (!provider || !cost) return null;
+
+  const estimate = `${cost.partial ? "at least " : "≈ "}${cost.credits.toLocaleString()} credits`;
+  const characters = `${cost.characters.toLocaleString()} characters`;
+
+  if (cost.remaining === null) {
+    return (
+      <div className="text-xs space-y-0.5" data-testid="synthesize-cost">
+        <p className="text-(--text-secondary)">
+          {provider} · this run {estimate} <span className="text-(--text-faint)">({characters})</span>
+        </p>
+        <p className="text-(--text-faint)">Cartesia does not report the balance to an API key — check play.cartesia.ai</p>
+      </div>
+    );
+  }
+
+  const share = cost.remaining === 0 ? Number.POSITIVE_INFINITY : cost.credits / cost.remaining;
+  const tone = TONE[share > 1 ? "danger" : share > 0.5 ? "warning" : "success"];
+  const percent = Number.isFinite(share) ? `${Math.round(share * 100)}% of what is left` : "nothing is left";
+  const verdict =
+    share > 1
+      ? `Needs ${percent} — ${(cost.credits - cost.remaining).toLocaleString()} credits short. A chapter that would not fit fails before spending anything.`
+      : percent;
+
   return (
-    <p className={`text-xs ${over ? "text-(--warning-text)" : "text-(--text-secondary)"}`} data-testid="synthesize-cost">
-      {credits} for {cost.characters.toLocaleString()} characters · {balance}
-    </p>
+    <div className="text-xs space-y-1 max-w-md" data-testid="synthesize-cost">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-(--text-secondary)">
+          {provider} · this run {estimate} <span className="text-(--text-faint)">({characters})</span>
+        </span>
+        <span className="text-(--text-muted) tabular-nums shrink-0">{cost.remaining.toLocaleString()} left</span>
+      </div>
+      <div
+        className="h-1.5 overflow-hidden rounded-full bg-(--bg-subtle)"
+        role="meter"
+        aria-label={`${provider} credits this run would use`}
+        aria-valuemin={0}
+        aria-valuemax={cost.remaining}
+        aria-valuenow={Math.min(cost.credits, cost.remaining)}
+      >
+        <div className={`h-full rounded-full ${tone.bar}`} style={{ width: `${Math.min(1, share) * 100}%` }} />
+      </div>
+      <p className={tone.text}>{verdict}</p>
+    </div>
   );
 }
