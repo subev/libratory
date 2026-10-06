@@ -34,6 +34,17 @@ export function listSayVoices(): Promise<SayVoice[]> {
 }
 
 export async function resolveSayVoice(slug: string): Promise<SayVoice | null> {
-  const voices = await listSayVoices();
-  return voices.find((v) => v.slug === slug) ?? null;
+  return matchSayVoice(await listSayVoices(), slug);
+}
+
+// macOS 27 lists "Samantha (English (US))" where earlier releases said "Samantha", so a voice id
+// stored before the update no longer matches its slug. Falling back to the name without its
+// parenthetical keeps such a book narrating; `say -v` accepts either spelling. An exact slug —
+// "daria-enhanced" — still wins, and the first variant listed stands in for a bare name.
+export function matchSayVoice(voices: SayVoice[], slug: string): SayVoice | null {
+  return (
+    voices.find((v) => v.slug === slug) ??
+    voices.find((v) => sayVoiceSlug(v.name.replace(/\s*\(.*$/, "")) === slug) ??
+    null
+  );
 }
