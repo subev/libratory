@@ -108,7 +108,17 @@ $PACKAGE || { echo "    resources staged; packaging left to the caller"; exit 0;
 echo "==> packaging"
 cd "$DESKTOP"
 if $LINUX; then
-  quietly npx electron-builder --linux AppImage "--$LINUX_ARCH"
+  if [ "$(uname -s)" = Darwin ]; then
+    # The AppImage step runs a Linux-only tool (its macOS build is x86_64, which needs Rosetta), so on
+    # a Mac the app is laid out here and wrapped inside a Linux container of the same architecture
+    quietly npx electron-builder --linux dir "--$LINUX_ARCH"
+    PLATFORM="linux/$([ "$LINUX_ARCH" = x64 ] && echo amd64 || echo arm64)"
+    quietly docker run --rm --platform "$PLATFORM" -v "$REPO":/repo -w /repo/packages/desktop \
+      -e ELECTRON_BUILDER_CACHE=/repo/packages/desktop/release/.eb-cache node:22-bookworm \
+      npx --no-install electron-builder --linux AppImage "--$LINUX_ARCH" --prepackaged "release/linux-$([ "$LINUX_ARCH" = x64 ] && echo unpacked || echo arm64-unpacked)"
+  else
+    quietly npx electron-builder --linux AppImage "--$LINUX_ARCH"
+  fi
   ls -lh "$DESKTOP"/release/*.AppImage | awk '{print "    " $9 "  " $5}'
   exit 0
 fi
