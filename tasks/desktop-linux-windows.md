@@ -1,5 +1,8 @@
 # Desktop app on Linux, then Windows
 
+**Paused 2026-10-06** to focus on the release: the Linux code below is committed and unit-tested,
+the arm64 AppImage builds, and nothing has run on Linux yet. Pick up at "Not done" step 1.
+
 Since BG-TTS V5 and KugelAudio were removed (2026-10-06) no engine needs a Mac: Kokoro, Piper,
 BgTTS, MMS, Pocket, Marker/Surya, Tesseract, BGE-M3 and the cloud voices all run on Linux and
 Windows. Two features stay Mac-only and already degrade: macOS `say` voices (the picker lists
