@@ -206,15 +206,15 @@ Every engine covers a different set, so the answer to "does it do language X" de
 | Mandarin Chinese | 8 | Kokoro |
 | Most others | many | [Cartesia](https://cartesia.ai) and [ElevenLabs](https://elevenlabs.io) (cloud, need an API key), plus any macOS system voice you have installed |
 
-![Scrolling the voice picker's Italian list: 49 voices grouped under Kokoro, Pocket TTS, KugelAudio, macOS system voices and Cartesia](docs/images/voice-picker-languages.gif)
+![Scrolling the voice picker's Italian list: 73 voices grouped under Kokoro, Pocket TTS, macOS system voices, Cartesia and ElevenLabs, the ElevenLabs voices not made for Italian marked as such](docs/images/voice-picker-languages.gif)
 
-The picker leads with the language, not the engine: pick Italian and you get every voice that can read it — 49 here, grouped by engine, with a preview button on each one.
+The picker leads with the language, not the engine: pick Italian and you get every voice that can read it — 73 here, grouped by engine, with a preview button on each one. Each row says whether the voice times every word (words light up as they are read) or only sentences. ElevenLabs voices appear under every language their model reads; the ones not made for it are marked and preview in that language.
 
 <details>
 <summary><b>Notes on the edges</b></summary>
 
 - **Japanese is not supported**, even though Kokoro ships Japanese voices. They need a MeCab/`fugashi` native stack plus a ~700 MB dictionary, and the extra downgrades a package the Marker/spaCy side depends on. Not worth it for five voices — so they aren't listed in the picker.
-- **Pocket TTS ships one checkpoint per language**, and only English is installed by `pnpm run setup`. The others download on demand: open the picker's Pocket TTS tab, pick a language, and press Download — it shows the size first (~370 MB each, **~800 MB for French**, which has no distilled build yet and runs ~2.5x slower). Downloads land in the shared HuggingFace cache and go live immediately; no server restart.
+- **Pocket TTS ships one checkpoint per language**, and only English is installed by `pnpm run setup`. The others download on demand: pick the language in the voice picker and press Download on the Pocket TTS notice — it shows the size first (~370 MB each, **~800 MB for French**, which has no distilled build yet and runs ~2.5x slower). Downloads land in the shared HuggingFace cache and go live immediately; no server restart.
 - **Pick the matching language.** The English model will happily read French or Italian text and produce something that sounds plausible, because the voices include non-English *speakers* (Giovanni, Lola, Juergen, Rafael, Estelle). It mispronounces silent letters and liaisons — the same French sentence runs 25% longer on the English model than the French one. Selecting the language is what makes it correct, not selecting a native-sounding voice.
 - Mandarin needs the `misaki[zh]` G2P chain, which `pyproject.toml` pins and `pnpm run setup` installs.
 
@@ -223,7 +223,7 @@ The picker leads with the language, not the engine: pick Italian and you get eve
 <details>
 <summary><b>Book language</b></summary>
 
-Books carry an optional language, set from **Extract... → About this book**. It's a plain field you pick yourself — nothing infers it — and it decides which voices the picker offers first, so a Russian PDF opens on Russian voices instead of English ones. Leave it unset and the picker falls back to the language of whatever voice is currently selected.
+Books carry an optional language, set from **Extract... → About this book**. When it is empty it is filled in from the text by a local detector, never overwriting one you set, and it decides which voices the picker offers first, so a Russian PDF opens on Russian voices instead of English ones. Leave it unset and the picker falls back to the language of whatever voice is currently selected.
 
 </details>
 
