@@ -124,8 +124,9 @@ Says what a highlight actually means, so a reader can be honest about it:
 | `sentence` | some chunks carried word timings and became sentences; the rest are whole chunks |
 | `chunk` | no word timings — one highlight is a whole synthesis chunk, often a paragraph |
 
-Kokoro reports word timings during synthesis. Engines chunked a sentence at a time (macOS
-`say`, MMS, Piper, BgTTS, Pocket) land on sentence-sized chunks without them, and audio synthesized
+Kokoro reports word timings during synthesis. Piper reports them too, from its phoneme durations
+(`scripts/piper_words.py`). Engines chunked a sentence at a time (macOS `say`, MMS, BgTTS, Pocket)
+land on sentence-sized chunks without them, and audio synthesized
 before word timings existed stays at `chunk`.
 
 ### `marks`

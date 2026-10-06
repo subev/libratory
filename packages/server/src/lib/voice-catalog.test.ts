@@ -10,6 +10,7 @@ describe("voiceHasWordTiming", () => {
     expect(voiceHasWordTiming("elevenlabs:JBFqnCBsd6RMkjVDRZzb", "en")).toBe(true);
     expect(voiceHasWordTiming("bg-mlx:narrator", "bg")).toBe(false);
     expect(voiceHasWordTiming("bg-mms:bul", "bg")).toBe(false);
+    expect(voiceHasWordTiming("bg-piper:dimitar", "bg")).toBe(true);
     expect(voiceHasWordTiming("say:daria", "bg")).toBe(false);
     expect(voiceHasWordTiming("pocket:en_female", "en")).toBe(false);
   });

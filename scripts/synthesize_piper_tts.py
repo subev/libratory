@@ -5,6 +5,9 @@ Runs in its own venv (.venv-piper): onnxruntime and numpy 2 must not touch the m
 ONNX on the CPU, ~20x realtime, and the one local Bulgarian engine with working speed control
 (`length_scale` = 1 / speed). espeak-ng, bundled in the wheel, expands digits in any language;
 bg_speech still runs first for dates, currency and abbreviations, which espeak reads letter by letter.
+
+Every chunk also gets word timings from Piper's own phoneme durations (piper_words.py), written
+beside the chunk WAV as Kokoro's are, so the read-along lights words, not just sentences.
 """
 
 import argparse
@@ -19,6 +22,7 @@ import soundfile as sf
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bg_speech import speakable  # noqa: E402
+from piper_words import chunk_words  # noqa: E402
 
 VOICE_REPO = "rhasspy/piper-voices"
 VOICE_REVISION = "6249c8a9178e606f0de19227d5426e5dfaf9fc9e"
@@ -48,11 +52,16 @@ def write_chunk_manifest(chunks_dir: str, chunks: list[str]) -> None:
         json.dump(manifest, f, ensure_ascii=False)
 
 
+def chunk_words_file(chunks_dir: str, index: int) -> str:
+    return os.path.join(chunks_dir, f"chunk-{index:03d}.words.json")
+
+
 def load_existing_chunk(chunks_dir, index: int):
     if not chunks_dir:
         return None
     path = os.path.join(chunks_dir, f"chunk-{index:03d}.wav")
-    if not os.path.exists(path):
+    # A chunk spoken before word timings existed is spoken again; Piper does it in a fraction of a second
+    if not os.path.exists(path) or not os.path.exists(chunk_words_file(chunks_dir, index)):
         return None
     try:
         data, _ = sf.read(path, dtype="float32")
@@ -90,7 +99,12 @@ def main() -> None:
         model_path = voice_files(args.voice, local_only)
     except Exception as exc:
         raise RuntimeError("The Piper Bulgarian voice is not downloaded — run `pnpm run setup`") from exc
-    voice = PiperVoice.load(str(model_path))
+    # Patches the graph in memory to return per-phoneme sample counts; without the onnx package it
+    # loads unpatched and every chunk simply has no word timings
+    voice = PiperVoice.load(str(model_path), include_alignments=True)
+
+    def phonemize_word(token: str) -> str:
+        return "".join("".join(sentence) for sentence in voice.phonemize(token))
     sample_rate = voice.config.sample_rate
     config = SynthesisConfig(length_scale=1 / args.speed)
 
@@ -103,13 +117,26 @@ def main() -> None:
     for index, chunk in enumerate(chunks, start=1):
         waveform = load_existing_chunk(args.chunks_dir, index)
         if waveform is None:
-            pieces = [part.audio_float_array for part in voice.synthesize(speakable(chunk), syn_config=config)]
+            spoken = speakable(chunk)
+            pieces, timed = [], []
+            offset = 0
+            for part in voice.synthesize(spoken, syn_config=config, include_alignments=True):
+                for alignment in part.phoneme_alignments or []:
+                    timed.append((alignment.phoneme, offset, offset + int(alignment.num_samples)))
+                    offset += int(alignment.num_samples)
+                # The sentence's own length is the truth; its phoneme counts must not drift past it
+                offset = sum(len(p) for p in pieces) + len(part.audio_float_array)
+                pieces.append(part.audio_float_array)
             if not pieces:
                 raise RuntimeError(f"No audio generated for chunk {index}")
             waveform = np.concatenate(pieces).astype(np.float32)
             if args.chunks_dir:
                 os.makedirs(args.chunks_dir, exist_ok=True)
                 sf.write(os.path.join(args.chunks_dir, f"chunk-{index:03d}.wav"), waveform, sample_rate)
+                words = chunk_words(chunk, spoken, phonemize_word, timed, sample_rate)
+                if words:
+                    with open(chunk_words_file(args.chunks_dir, index), "w", encoding="utf-8") as f:
+                        json.dump(words, f, ensure_ascii=False)
 
         audio_parts.append(waveform)
         if index < len(chunks):
