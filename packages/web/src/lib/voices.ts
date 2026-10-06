@@ -33,7 +33,7 @@ export {
 } from "../../../server/src/lib/voice-catalog.ts";
 
 // Display grouping in the picker. Finer than `engine`, which lumps the Bulgarian narrators together.
-export function providerOfVoice(voice: Voice): string {
+export function providerOfVoice(voice: Pick<Voice, "id">): string {
   if (voice.id.startsWith("bg-")) return "Bulgarian narrators";
   if (voice.id.startsWith("pocket:")) return "Pocket TTS";
   if (voice.id.startsWith("say:")) return "macOS system";
@@ -108,9 +108,17 @@ export function getVoiceById(voiceId: string): Voice | null {
   return voicesById.get(voiceId) ?? voicesById.get(normalizeVoiceId(voiceId)) ?? null;
 }
 
+// Removed engines still name the chapters they narrated
+const RETIRED_VOICE_LABELS: Record<string, string> = {
+  "bg-mlx:narrator": "BG-TTS V5 (retired)",
+  "kugel:default": "KugelAudio (retired)",
+};
+
 export function getVoiceLabel(voiceId: string): string {
   const voice = getVoiceById(voiceId);
   if (!voice) {
+    const retired = RETIRED_VOICE_LABELS[voiceId];
+    if (retired) return retired;
     if (voiceId.startsWith("say:")) return humanizeSayVoiceId(voiceId);
     if (voiceId.startsWith("cartesia:")) return `Cartesia ${voiceId.slice("cartesia:".length, "cartesia:".length + 8)}`;
     if (voiceId.startsWith("elevenlabs:")) return `ElevenLabs ${voiceId.slice("elevenlabs:".length, "elevenlabs:".length + 8)}`;

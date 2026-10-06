@@ -119,6 +119,7 @@ export const variantsRouter = router({
           audioError: chapterVariants.audioError,
           audioDurationMs: chapterVariants.audioDurationMs,
           hasAudio: sql<boolean>`${chapterVariants.audioPath} is not null`,
+          synthesizedWith: chapterVariants.synthesizedWith,
           updatedAt: chapterVariants.updatedAt,
         })
         .from(chapterVariants)

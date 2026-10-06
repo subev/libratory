@@ -23,8 +23,9 @@ type VoicePickerProps = {
   priorityLanguages?: string[];
 };
 
-// Only the engine owning the current selection is queried — the modal loads the rest on demand.
-function useSelectedVoiceLabel(selectedId: string): string {
+// Only the engine owning the voice is queried — the modal loads the rest on demand, and a table of
+// chapters shares the one cached list per engine.
+export function useVoiceLabel(selectedId: string): string {
   const engine = engineForVoiceId(selectedId);
   const { data: sayVoices = [] } = trpc.sayVoices.list.useQuery(undefined, { staleTime: Infinity, enabled: engine === "say" });
   const { data: cartesiaVoices = [] } = trpc.cartesiaVoices.list.useQuery(undefined, { staleTime: Infinity, enabled: engine === "cartesia" });
@@ -58,7 +59,7 @@ function useVoiceLibrary(value: string, onChange: (voice: string) => void, prior
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const selectedId = normalizeVoiceId(value);
-  const label = useSelectedVoiceLabel(selectedId);
+  const label = useVoiceLabel(selectedId);
 
   const close = useCallback(() => {
     setIsOpen(false);
