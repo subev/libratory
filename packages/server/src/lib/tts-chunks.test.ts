@@ -84,4 +84,14 @@ describe("chunkTextForTts with sentence limits", () => {
     expect(sentences.every((chunk) => chunk.length <= SENTENCE_CHUNKS.maxChars)).toBe(true);
     expect(normalize(sentences.join(" "))).toBe(normalize(text));
   });
+
+  // Two passages BgTTS read with no pause after the title, 2026-10-06
+  it("never merges a chunk across a blank line, so a title gets its own pause", () => {
+    expect(
+      chunkTextForTts("39 Дяволът и неговата баба\n\nИмало едно време една голяма война и кралят плащал оскъдно.", SENTENCE_CHUNKS),
+    ).toEqual(["39 Дяволът и неговата баба", "Имало едно време една голяма война и кралят плащал оскъдно."]);
+    expect(
+      chunkTextForTts("СВЕКЪРВА И СНАХА\r\n\r\n1055. ГЛЕДАМ ТЕ, ГЛЕДАМ, СТОЯНЕ\n \nМари, Калинко-Малинко,\nщо ме, Калинко, не гледаш?", SENTENCE_CHUNKS),
+    ).toEqual(["СВЕКЪРВА И СНАХА", "1055. ГЛЕДАМ ТЕ, ГЛЕДАМ, СТОЯНЕ", "Мари, Калинко-Малинко, що ме, Калинко, не гледаш?"]);
+  });
 });

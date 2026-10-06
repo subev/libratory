@@ -12,14 +12,22 @@ export const NARRATOR_CHUNKS: ChunkLimits = { mode: "pack", maxChars: 320, ideal
 export const SENTENCE_CHUNKS: ChunkLimits = { mode: "sentence", maxChars: 240, minChars: 40 };
 
 export function chunkTextForTts(text: string, limits: ChunkLimits = NARRATOR_CHUNKS): string[] {
-  // Collapse all whitespace (including paragraph breaks) so packing can merge across them.
-  const normalized = text.replace(/\r\n?/g, "\n").replace(/\s+/g, " ").trim();
-  if (!normalized) return [];
+  if (limits.mode === "pack") {
+    // Collapse all whitespace (including paragraph breaks) so packing can merge across them.
+    const collapsed = collapse(text);
+    return collapsed ? balancePartition(toUnits(collapsed, limits.maxChars), limits) : [];
+  }
+  // A blank line ends a chunk: a title without a full stop would otherwise run straight into the
+  // sentence after it, with no pause, because nothing in the text tells the voice it has ended.
+  return text
+    .split(/\n\s*\n/)
+    .map(collapse)
+    .filter(Boolean)
+    .flatMap((paragraph) => mergeShortUnits(toUnits(paragraph, limits.maxChars), limits));
+}
 
-  const units = toUnits(normalized, limits.maxChars);
-  if (units.length === 0) return [];
-
-  return limits.mode === "pack" ? balancePartition(units, limits) : mergeShortUnits(units, limits);
+function collapse(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
 }
 
 function mergeShortUnits(units: string[], limits: { maxChars: number; minChars: number }): string[] {
