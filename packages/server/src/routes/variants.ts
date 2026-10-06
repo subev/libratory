@@ -17,6 +17,7 @@ import { assembleJobKey, inFlightInputs } from "../lib/output-readiness.ts";
 import { stat, unlink, rm } from "node:fs/promises";
 import type { SourceBlock } from "../lib/marker.ts";
 import { synthesisJobSpec } from "../lib/synthesis-jobs.ts";
+import { VARIANT_TEXT_FOR_AUDIO, variantAudioQueueable } from "../lib/synthesis-cost.ts";
 import { NO_NARRATION, removeVariantNarration } from "../lib/variant-narration.ts";
 
 const connectionString = env.DATABASE_URL;
@@ -512,11 +513,11 @@ export const variantsRouter = router({
           eq(chapters.bookId, input.bookId),
           eq(chapters.selected, true),
           eq(chapterVariants.key, input.key),
-          inArray(chapterVariants.status, ["done", "pending", "translating"]),
+          inArray(chapterVariants.status, VARIANT_TEXT_FOR_AUDIO),
         ))
         .orderBy(asc(chapters.index));
 
-      const queueable = rows.filter((r) => r.audioStatus !== "synthesizing" && r.audioStatus !== "pending");
+      const queueable = rows.filter((r) => variantAudioQueueable(r.audioStatus));
       if (queueable.length === 0) throw new Error(`No selected chapters with finished or in-progress "${input.key}" text to synthesize`);
 
       await db

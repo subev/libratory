@@ -726,7 +726,7 @@ fixed zinc.
 
 **books** (synthetic + exports): `createDigest` / `resumeDigest` · `exportDocument` (pdf | epub | epub-sync) · `pendingDocumentExports` · `documents` / `deleteDocument`
 
-**chapters**: `get` · `queue` / `suspend` · `setSelected` / `setSelectedBatch` / `setAllSelected` · `rename` · `reorder` · `updateText` / `resetText` · `queueCleanup` / `stopCleanup` / `cleanupSelected` · `textStats` · `selectedAudioSize` / `deleteAudioSelected` · `deleteSelected`
+**chapters**: `get` · `synthesisCost` (credits a metered voice would charge for what Start sends — `lib/synthesis-cost.ts` owns which chapters that is, shared with `books.processSelected` and `variants.processSelectedAudio` — plus the ElevenLabs balance; Cartesia reports none to an API key) · `queue` / `suspend` · `setSelected` / `setSelectedBatch` / `setAllSelected` · `rename` · `reorder` · `updateText` / `resetText` · `queueCleanup` / `stopCleanup` / `cleanupSelected` · `textStats` · `selectedAudioSize` / `deleteAudioSelected` · `deleteSelected`
 
 **bookFiles**: `setSelected` / `setSelectedBatch` / `setAllSelected` · `setSkipSynthesis` · `remove` · `reExtract` / `reExtractSelected` · `cancel`
 

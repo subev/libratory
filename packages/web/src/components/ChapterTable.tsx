@@ -847,6 +847,7 @@ export function ChapterTable({
         <SynthesizeModal
           {...synth}
           count={1}
+          costScope={{ bookId, key: variant?.key ?? null, chapterId: synthesizeChapterId }}
           language={variant ? variantLabel(variant) : null}
           bookLanguage={language}
           canStart={!SYNTH_BUSY.includes(chapters.find((c) => c.id === synthesizeChapterId)?.status ?? "")}

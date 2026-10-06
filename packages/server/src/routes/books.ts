@@ -34,6 +34,7 @@ import { mkdir, unlink, rm } from "node:fs/promises";
 import { quickAddJob } from "graphile-worker";
 import { env } from "../env.ts";
 import { synthesisJobSpec } from "../lib/synthesis-jobs.ts";
+import { ORIGINAL_SYNTHESIZABLE } from "../lib/synthesis-cost.ts";
 
 const connectionString = env.DATABASE_URL;
 
@@ -968,9 +969,7 @@ export const booksRouter = router({
         .where(and(eq(chapters.bookId, input.id), eq(chapters.selected, true)))
         .orderBy(asc(chapters.index));
 
-      const processable = selectedChapters.filter(
-        (ch) => ch.status === "failed" || ch.status === "suspended" || ch.status === "pending" || ch.status === "done"
-      );
+      const processable = selectedChapters.filter((ch) => ORIGINAL_SYNTHESIZABLE.includes(ch.status));
 
       if (processable.length === 0) {
         throw new Error("No selected chapters are ready for synthesis");

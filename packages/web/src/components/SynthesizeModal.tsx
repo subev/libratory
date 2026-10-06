@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
-import { languageCodeFromName, normalizeVoiceId, voiceSupportsSpeedControl } from "../lib/voices.ts";
+import { engineForVoiceId, languageCodeFromName, normalizeVoiceId, voiceSupportsSpeedControl } from "../lib/voices.ts";
+import { trpc } from "../trpc.ts";
 import { VoicePickerProvider } from "./voice-picker/context.tsx";
 import { VoiceLibraryModal } from "./voice-picker/VoiceLibraryModal.tsx";
 import { SpeedSlider } from "./SpeedSlider.tsx";
@@ -24,12 +25,15 @@ export function SynthesizeModal({
   speed,
   onChangeVoice,
   onChangeSpeed,
+  costScope,
   canStart,
   disabledReason,
   onStart,
   onClose,
 }: SynthSettings & {
   count: number;
+  /** What Start would send: the selection (or one chapter) of the original or one variant. */
+  costScope: { bookId: string; key: string | null; chapterId?: string };
   /** Variant being synthesized, by display name ("Russian"); null for the original. */
   language: string | null;
   /** The book's own language code, so an original book opens on its language, not English. */
@@ -55,12 +59,15 @@ export function SynthesizeModal({
           <div className="px-4 py-3 space-y-3" data-testid="synthesize-modal">
             <SpeedSlider value={speed} onChange={onChangeSpeed} disabled={!voiceSupportsSpeedControl(voice)} />
             <div className="flex items-end justify-between gap-4">
-              <p className="text-xs text-(--text-muted) flex-1">
+              <div className="flex-1 space-y-1">
+              <CostLine voice={voice} scope={costScope} />
+              <p className="text-xs text-(--text-muted)">
                 {language
                   ? `Voice and speed are saved for the ${language} variant only — the original and other variants keep their own.`
                   : "Voice and speed are saved on the book and apply to the original audio; variants without a voice of their own follow it."}{" "}
                 Chapters that already have audio keep it until re-synthesized.
               </p>
+              </div>
               <div className="flex items-center gap-2 shrink-0">
                 <Button onClick={onClose}>Cancel</Button>
                 <Button
@@ -78,5 +85,29 @@ export function SynthesizeModal({
         }
       />
     </VoicePickerProvider>
+  );
+}
+
+const PROVIDER_NAME = { elevenlabs: "ElevenLabs", cartesia: "Cartesia" } as const;
+
+// Metered voices only: a local engine costs nothing per character, so it gets no line at all.
+function CostLine({ voice, scope }: { voice: string; scope: { bookId: string; key: string | null; chapterId?: string } }) {
+  const engine = engineForVoiceId(voice);
+  const metered = engine === "elevenlabs" || engine === "cartesia";
+  const { data: cost } = trpc.chapters.synthesisCost.useQuery({ ...scope, voice }, { enabled: metered, staleTime: 30_000 });
+  if (!metered || !cost) return null;
+
+  const credits = `${cost.partial ? "at least " : "≈ "}${cost.credits.toLocaleString()} ${PROVIDER_NAME[cost.provider]} credits`;
+  const over = cost.remaining !== null && cost.credits > cost.remaining;
+  const balance =
+    cost.remaining === null
+      ? "Cartesia does not report the balance to an API key — check play.cartesia.ai"
+      : over
+        ? `more than the ${cost.remaining.toLocaleString()} left — a chapter that would not fit fails before spending anything`
+        : `${cost.remaining.toLocaleString()} left`;
+  return (
+    <p className={`text-xs ${over ? "text-(--warning-text)" : "text-(--text-secondary)"}`} data-testid="synthesize-cost">
+      {credits} for {cost.characters.toLocaleString()} characters · {balance}
+    </p>
   );
 }

@@ -72,6 +72,10 @@ function headers(): Record<string, string> {
   return { "xi-api-key": apiKey(), "Content-Type": "application/json" };
 }
 
+export function elevenLabsCreditsPerChar(): number {
+  return model().creditsPerChar;
+}
+
 function model(): { id: string; creditsPerChar: number } {
   const id = env.ELEVENLABS_MODEL;
   const entry = MODELS[id];

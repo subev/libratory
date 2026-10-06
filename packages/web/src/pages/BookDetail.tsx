@@ -1357,6 +1357,7 @@ export function BookDetail() {
         <SynthesizeModal
           bookLanguage={book.language ?? null}
           count={selectedSynthesizable}
+          costScope={{ bookId: book.id, key: activeVariant }}
           language={activeLabel}
           {...synth}
           canStart={canProcess && !processSelectedMutation.isPending && !processSelectedAudioMutation.isPending}
