@@ -34,6 +34,7 @@ import { mkdir, unlink, rm } from "node:fs/promises";
 import { quickAddJob } from "graphile-worker";
 import { env } from "../env.ts";
 import { ORIGINAL_SYNTHESIZABLE } from "../lib/synthesis-cost.ts";
+import { assertLaneVoiceUsable } from "../lib/lane-voice.ts";
 
 const connectionString = env.DATABASE_URL;
 
@@ -961,6 +962,7 @@ export const booksRouter = router({
     .mutation(async ({ input }) => {
       const [book] = await db.select().from(books).where(eq(books.id, input.id));
       if (!book) throw new Error("Book not found");
+      await assertLaneVoiceUsable(input.id);
 
       const selectedChapters = await db
         .select()

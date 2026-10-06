@@ -56,4 +56,8 @@ describe("chunkTextForTts", () => {
       chunkTextForTts("СВЕКЪРВА И СНАХА\r\n\r\n1055. ГЛЕДАМ ТЕ, ГЛЕДАМ, СТОЯНЕ\n \nМари, Калинко-Малинко,\nщо ме, Калинко, не гледаш?", SENTENCE_CHUNKS),
     ).toEqual(["СВЕКЪРВА И СНАХА", "1055. ГЛЕДАМ ТЕ, ГЛЕДАМ, СТОЯНЕ", "Мари, Калинко-Малинко, що ме, Калинко, не гледаш?"]);
   });
+
+  it("drops a paragraph with nothing to say, such as a scene break", () => {
+    expect(chunkTextForTts("Край на главата.\n\n* * *\n\n—\n\nНова сцена.", SENTENCE_CHUNKS)).toEqual(["Край на главата.", "Нова сцена."]);
+  });
 });

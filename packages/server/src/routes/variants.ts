@@ -17,6 +17,7 @@ import { assembleJobKey, inFlightInputs } from "../lib/output-readiness.ts";
 import { stat, unlink, rm } from "node:fs/promises";
 import type { SourceBlock } from "../lib/marker.ts";
 import { VARIANT_TEXT_FOR_AUDIO, variantAudioQueueable } from "../lib/synthesis-cost.ts";
+import { assertLaneVoiceUsable } from "../lib/lane-voice.ts";
 import { NO_NARRATION, removeVariantNarration } from "../lib/variant-narration.ts";
 
 const connectionString = env.DATABASE_URL;
@@ -473,6 +474,7 @@ export const variantsRouter = router({
       if (row.audioStatus === "synthesizing" || row.audioStatus === "pending") {
         throw new Error("Chapter audio is already being processed");
       }
+      await assertLaneVoiceUsable(chapter.bookId, input.key);
 
       await db
         .update(chapterVariants)
@@ -499,6 +501,7 @@ export const variantsRouter = router({
   processSelectedAudio: publicProcedure
     .input(z.object({ bookId: z.string().uuid(), key: z.string().min(1) }))
     .mutation(async ({ input }) => {
+      await assertLaneVoiceUsable(input.bookId, input.key);
       const rows = await db
         .select({
           id: chapterVariants.id,

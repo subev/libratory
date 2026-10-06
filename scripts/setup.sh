@@ -149,14 +149,14 @@ echo "Caching the models a first run needs (~350 MB)..."
 "$PY" "$REPO_DIR/scripts/models.py" --essential
 
 echo ""
-# Everything else — Marker 5.1 GB, BGE-M3 4.3 GB, the Bulgarian narrators 1.2 GB — is fetched by
+# Everything else — Marker 5.1 GB, BGE-M3 4.3 GB, the MMS Bulgarian voice 290 MB — is fetched by
 # scripts/models.py the first time someone asks for the feature it powers. Downloading all of it
 # here meant ~15 GB and an hour before the app could open a single page.
 if [ "${WITH_ALL_MODELS:-}" = "1" ]; then
   echo "WITH_ALL_MODELS=1 — fetching every optional bundle up front..."
   "$PY" "$REPO_DIR/scripts/models.py" --download-all
 else
-  echo "Optional models (Marker/OCR, library search, Bulgarian narrators) download on first use."
+  echo "Optional models (Marker/OCR, library search, MMS Bulgarian) download on first use."
   "$PY" "$REPO_DIR/scripts/models.py" --status >/dev/null && echo "  model registry: OK"
 fi
 

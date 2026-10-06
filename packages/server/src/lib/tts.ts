@@ -14,7 +14,7 @@ import { cartesiaSynthesize, CartesiaAbortedError, findCartesiaVoice } from "./c
 import { elevenlabsSynthesize, ElevenLabsAbortedError, findElevenLabsVoice } from "./elevenlabs.ts";
 import { POCKET_SCRIPT, parsePocketVoice, pocketLanguageArgs, pocketPython, resolvePocketVoiceArg } from "./pocket.ts";
 import { scriptPath } from "./paths.ts";
-import type { LocalEngine } from "./voice-catalog.ts";
+import { ENGINE_PREFIXES, type LocalEngine } from "./voice-catalog.ts";
 
 const CONDA_BIN = env.CONDA_ENV_PATH;
 const BG_MMS_SCRIPT = scriptPath("synthesize_mms_tts.py");
@@ -238,9 +238,9 @@ export async function getPreviewTextForVoice(voice: string, language: string | n
   return BULGARIAN_PREVIEW_TEXT;
 }
 
+// One table says which engines take a speed, shared with the picker
 export function voiceSupportsSpeed(voice: string): boolean {
-  const engine = parseTtsVoice(voice).engine;
-  return engine === "kokoro" || engine === "bg-piper" || engine === "say" || engine === "cartesia" || engine === "elevenlabs";
+  return ENGINE_PREFIXES.find((entry) => voice.startsWith(entry.prefix))?.supportsSpeed ?? true;
 }
 
 export async function synthesize({ inputText, outputPath, voice, speed, chunkPreviewDir = null, chunkPreviewUrlBase = null, log = noopLog, onProgress = noopProgress, signal }: SynthesizeOptions): Promise<void> {

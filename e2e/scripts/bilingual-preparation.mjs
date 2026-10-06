@@ -38,7 +38,6 @@ try {
     switch (procedure) {
       case "bilingual.status": data = status; break;
       case "models.list": data = [{ id: "search", label: "Search", installed: true }]; break;
-      case "models.capabilities": data = { cuda: false }; break;
       case "llmModels.list": data = [{ key: "test-model", label: "Test model", recommended: true, source: "test", contextTokens: 32000 }]; break;
       case "llmModels.getDefault": data = { resolved: "test-model" }; break;
       case "bilingual.prepare": {

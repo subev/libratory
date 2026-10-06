@@ -22,6 +22,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bg_speech import speakable  # noqa: E402
+from chunk_io import load_existing_chunk, read_chunks, write_chunk_manifest  # noqa: E402
 
 MODEL_REPO = "beleata74/BgTTS-38M-V2"
 MODEL_REVISION = "3f6ca06b3ca78352eb00d8e96349c0bedaa3d2f1"
@@ -32,7 +33,6 @@ VOICES = {
     "male2": "samples/sample_male2_bg1.wav",
 }
 SNAPSHOT_PATTERNS = ["*.py", "checkpoint_inference.pt", *VOICES.values()]
-CHUNK_SEPARATOR = "\f"
 PAUSE_MS = 250
 SEED = 555
 # The model card's recommendation: 0.3 is stable, 0.5-0.7 more expressive and less predictable
@@ -58,31 +58,10 @@ def cache_only() -> None:
     print(json.dumps({"type": "cached", "path": str(model_dir)}), flush=True)
 
 
-def read_chunks(input_path: str) -> list[str]:
-    text = Path(input_path).read_text(encoding="utf-8").strip()
-    if not text:
-        raise RuntimeError("input text is empty")
-    return [chunk.strip() for chunk in text.split(CHUNK_SEPARATOR) if chunk.strip()]
 
 
-def write_chunk_manifest(chunks_dir: str, chunks: list[str]) -> None:
-    os.makedirs(chunks_dir, exist_ok=True)
-    manifest = [{"index": index, "text": chunk} for index, chunk in enumerate(chunks, start=1)]
-    with open(os.path.join(chunks_dir, "chunks.json"), "w", encoding="utf-8") as f:
-        json.dump(manifest, f, ensure_ascii=False)
 
 
-def load_existing_chunk(chunks_dir, index: int):
-    if not chunks_dir:
-        return None
-    path = os.path.join(chunks_dir, f"chunk-{index:03d}.wav")
-    if not os.path.exists(path):
-        return None
-    try:
-        data, _ = sf.read(path, dtype="float32")
-        return data if len(data) else None
-    except Exception:
-        return None
 
 
 def main() -> None:

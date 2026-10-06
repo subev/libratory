@@ -14,6 +14,7 @@ import type { SourceBlock } from "../lib/marker.ts";
 import { removeChapterArtifacts } from "../lib/chapter-artifacts.ts";
 import { queueIndexBook } from "../lib/search-index.ts";
 import { estimateSynthesisCost } from "../lib/synthesis-cost.ts";
+import { assertLaneVoiceUsable } from "../lib/lane-voice.ts";
 
 const connectionString = env.DATABASE_URL;
 
@@ -105,6 +106,7 @@ export const chaptersRouter = router({
       if (chapter.status === "synthesizing" || chapter.status === "normalizing") {
         throw new Error("Chapter is already being processed");
       }
+      await assertLaneVoiceUsable(chapter.bookId);
 
       // Resume reuses already-synthesized chunk previews; keep `progress` so the count survives.
       await db

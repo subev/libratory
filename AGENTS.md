@@ -435,7 +435,7 @@ Chapters can be individually queued (creates Graphile job) or suspended (no job,
 
 ## Database
 
-**Optional model bundles** (`scripts/models.py`, `lib/model-bundles.ts`, tRPC `models.list`/`models.download`): setup caches only Kokoro; Marker/Surya (5.1 GB), BGE-M3 (4.3 GB) and the Bulgarian narrators (1.2 GB) download at the one doorway each unlocks — the extract button, the chat page, the Bulgarian voice pane — via `<ModelBundleNotice>`. Status is read from Python because surya's cache is a per-OS platformdirs path; that path is computed with `platformdirs` directly rather than importing `surya.settings`, which drags in torch and made the check 6x slower. `.models-missing` at the repo root forces the absent state and bypasses the status cache.
+**Optional model bundles** (`scripts/models.py`, `lib/model-bundles.ts`, tRPC `models.list`/`models.download`): setup caches only Kokoro; Marker/Surya (5.1 GB), BGE-M3 (4.3 GB) and the MMS Bulgarian voice (290 MB) download at the one doorway each unlocks — the extract button, the chat page, the Bulgarian voice pane — via `<ModelBundleNotice>`. Status is read from Python because surya's cache is a per-OS platformdirs path; that path is computed with `platformdirs` directly rather than importing `surya.settings`, which drags in torch and made the check 6x slower. `.models-missing` at the repo root forces the absent state and bypasses the status cache.
 
 PostgreSQL 17 in Docker. Schema in `packages/server/src/schema.ts`. Migrations in `packages/server/drizzle/`.
 

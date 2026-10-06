@@ -23,12 +23,14 @@ const parseSpeed = (text: string) => parseFloat(text.replace(",", "."));
 // The stored speed lives on the book, so every change is a save and a refetch. Saving per input
 // event made the thumb trail the pointer by a round trip; a drag is held here and saved once.
 export function SpeedSlider({ value, onChange, range, rangeOwner = null, disabled = false }: SpeedSliderProps) {
-  // `base` is the stored value the draft was made against: once the save lands the prop moves off
-  // it and the draft is dropped, with no effect needed to notice.
+  // `base` is the stored value the draft was made against. Once the save lands the prop moves off
+  // it and the draft is dropped for good — adjusted during render, so a later return to `base`
+  // (another save, a refetch) cannot bring the old draft back.
   const [draft, setDraft] = useState<{ speed: number; base: number } | null>(null);
   const [typed, setTyped] = useState<string | null>(null);
+  if (draft !== null && draft.base !== value) setDraft(null);
   const clamped = Math.min(range.max, Math.max(range.min, value));
-  const shown = draft && draft.base === value ? draft.speed : clamped;
+  const shown = draft !== null && draft.base === value ? draft.speed : clamped;
 
   const commit = (speed: number) => {
     const next = Math.min(range.max, Math.max(range.min, roundToStep(speed)));
@@ -42,7 +44,7 @@ export function SpeedSlider({ value, onChange, range, rangeOwner = null, disable
   };
 
   const finishDrag = () => {
-    if (draft && draft.base === value) commit(draft.speed);
+    if (draft !== null) commit(draft.speed);
   };
 
   if (disabled) {

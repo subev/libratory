@@ -14,7 +14,6 @@ import argparse
 import json
 import os
 import sys
-import wave
 from pathlib import Path
 
 import numpy as np
@@ -23,11 +22,11 @@ import soundfile as sf
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bg_speech import speakable  # noqa: E402
 from phoneme_words import chunk_words  # noqa: E402
+from chunk_io import load_existing_chunk, read_chunks, write_chunk_manifest, write_chunk_words  # noqa: E402
 
 VOICE_REPO = "rhasspy/piper-voices"
 VOICE_REVISION = "6249c8a9178e606f0de19227d5426e5dfaf9fc9e"
 VOICES = {"dimitar": "bg/bg_BG/dimitar/medium/bg_BG-dimitar-medium"}
-CHUNK_SEPARATOR = "\f"
 PAUSE_MS = 250
 
 
@@ -38,36 +37,12 @@ def voice_files(voice: str, local_only: bool) -> Path:
     return Path(hf_hub_download(VOICE_REPO, f"{stem}.onnx", revision=VOICE_REVISION, local_files_only=local_only))
 
 
-def read_chunks(input_path: str) -> list[str]:
-    text = Path(input_path).read_text(encoding="utf-8").strip()
-    if not text:
-        raise RuntimeError("input text is empty")
-    return [chunk.strip() for chunk in text.split(CHUNK_SEPARATOR) if chunk.strip()]
 
 
-def write_chunk_manifest(chunks_dir: str, chunks: list[str]) -> None:
-    os.makedirs(chunks_dir, exist_ok=True)
-    manifest = [{"index": index, "text": chunk} for index, chunk in enumerate(chunks, start=1)]
-    with open(os.path.join(chunks_dir, "chunks.json"), "w", encoding="utf-8") as f:
-        json.dump(manifest, f, ensure_ascii=False)
 
 
-def chunk_words_file(chunks_dir: str, index: int) -> str:
-    return os.path.join(chunks_dir, f"chunk-{index:03d}.words.json")
 
 
-def load_existing_chunk(chunks_dir, index: int):
-    if not chunks_dir:
-        return None
-    path = os.path.join(chunks_dir, f"chunk-{index:03d}.wav")
-    # A chunk spoken before word timings existed is spoken again; Piper does it in a fraction of a second
-    if not os.path.exists(path) or not os.path.exists(chunk_words_file(chunks_dir, index)):
-        return None
-    try:
-        data, _ = sf.read(path, dtype="float32")
-        return data if len(data) else None
-    except Exception:
-        return None
 
 
 def main() -> None:
@@ -115,7 +90,8 @@ def main() -> None:
 
     audio_parts: list[np.ndarray] = []
     for index, chunk in enumerate(chunks, start=1):
-        waveform = load_existing_chunk(args.chunks_dir, index)
+        # A chunk spoken before word timings existed is spoken again; Piper does it in a fraction of a second
+        waveform = load_existing_chunk(args.chunks_dir, index, needs_words=True)
         if waveform is None:
             spoken = speakable(chunk)
             pieces, timed = [], []
@@ -133,10 +109,12 @@ def main() -> None:
             if args.chunks_dir:
                 os.makedirs(args.chunks_dir, exist_ok=True)
                 sf.write(os.path.join(args.chunks_dir, f"chunk-{index:03d}.wav"), waveform, sample_rate)
-                words = chunk_words(chunk, spoken, phonemize_word, timed, sample_rate)
-                if words:
-                    with open(chunk_words_file(args.chunks_dir, index), "w", encoding="utf-8") as f:
-                        json.dump(words, f, ensure_ascii=False)
+                try:
+                    words = chunk_words(chunk, spoken, phonemize_word, timed, sample_rate)
+                except Exception as exc:  # timings are a bonus; a failure costs them, not the chapter
+                    print(f"word timings failed for chunk {index}: {exc}", file=sys.stderr)
+                    words = []
+                write_chunk_words(args.chunks_dir, index, words)
 
         audio_parts.append(waveform)
         if index < len(chunks):

@@ -116,7 +116,8 @@ def espeak_chunk_words(pipeline, text, phonemes, pred_dur):
 
 
 def write_words_json(chunks_dir, index, words):
-    if not chunks_dir or not words:
+    # An empty list is written too: it records that timings were tried, so a resume keeps the chunk
+    if not chunks_dir:
         return
     os.makedirs(chunks_dir, exist_ok=True)
     with open(os.path.join(chunks_dir, chunk_words_file(index)), "w", encoding="utf-8") as f:
@@ -253,7 +254,12 @@ def main():
                 join_timestamps(chunk_tokens[i], output.pred_dur, pipeline.model.vocab)
                 write_chunk_words(args.chunks_dir, i + 1, chunk_tokens[i])
             elif chunk_espeak[i] and output.pred_dur is not None:
-                write_words_json(args.chunks_dir, i + 1, espeak_chunk_words(pipeline, chunk_texts[i], ps, output.pred_dur))
+                try:
+                    words = espeak_chunk_words(pipeline, chunk_texts[i], ps, output.pred_dur)
+                except Exception as exc:  # timings are a bonus; a failure costs them, not the chapter
+                    print(f"word timings failed for chunk {i + 1}: {exc}", file=sys.stderr)
+                    words = []
+                write_words_json(args.chunks_dir, i + 1, words)
             if args.chunks_dir:
                 os.makedirs(args.chunks_dir, exist_ok=True)
                 sf.write(os.path.join(args.chunks_dir, f"chunk-{i + 1:03d}.wav"), chunk_audio, 24000)

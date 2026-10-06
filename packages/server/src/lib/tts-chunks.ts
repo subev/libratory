@@ -17,7 +17,9 @@ export function chunkTextForTts(text: string, limits: ChunkLimits): string[] {
   return text
     .split(/\n\s*\n/)
     .map((paragraph) => paragraph.replace(/\s+/g, " ").trim())
-    .filter(Boolean)
+    // A scene break ("* * *", "—") has nothing to say, and a chunk with nothing to say fails the
+    // engines that refuse to return silence
+    .filter((paragraph) => /[\p{L}\p{N}]/u.test(paragraph))
     .flatMap((paragraph) => mergeShortUnits(toUnits(paragraph, limits.maxChars), limits));
 }
 

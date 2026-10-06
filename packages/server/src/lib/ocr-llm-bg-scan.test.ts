@@ -76,7 +76,8 @@ describe.skipIf(!present)("the Bulgarian scan", () => {
         }
       }
     }
-  });
+    // Both readers over every page: the same work as the test above, which already has 30 s
+  }, 30_000);
 
   it("leaves the clipped beginning of a line unlocated instead of borrowing another line", async () => {
     const f = await load();
