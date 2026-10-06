@@ -64,9 +64,9 @@ that Libratory's reader shows, and another EPUB reader shows the original alone.
 
 | Tool | What it does |
 | --- | --- |
-| `get_capabilities` | Hardware (MLX/CUDA), model bundles with installed/downloading state, OCR engines (`llm` is marked `cloud` and `available` only when an AI provider key is set), the language packs installed or downloading (plus how many more exist), Pocket TTS languages, which cloud keys are configured. |
+| `get_capabilities` | Hardware (CUDA), model bundles with installed/downloading state, OCR engines (`llm` is marked `cloud` and `available` only when an AI provider key is set), the language packs installed or downloading (plus how many more exist), Pocket TTS languages, which cloud keys are configured. |
 | `start_download` | Fetch a missing bundle, a Tesseract language pack by pack or ISO code, or a Pocket language; watch `get_capabilities`. |
-| `list_voices` | Every usable narrator voice with its language: Kokoro, Pocket TTS, the MLX narrators, installed macOS voices, and Cartesia/ElevenLabs when a key is set. Filter by `language` or `engine`. |
+| `list_voices` | Every usable narrator voice with its language: Kokoro, Pocket TTS, the Bulgarian narrators (BgTTS-38M and Piper when their envs are built, MMS), installed macOS voices, and Cartesia/ElevenLabs when a key is set. Filter by `language` or `engine`. |
 | `inspect_pdf` | Page count, text layer or scan, language guess, word count and author of a PDF before uploading it. |
 | `list_books` | The profiles (`current` marks the one listed), this profile's folders as paths with book counts, and the books newest first with status, chapter counts and whether the M4B exists. `profile`, `folder`, `query` (title words), `limit` (default 100; `truncated` says when it cut). A `query` leaves the folder list out and names matches in the other profiles under `elsewhere`. |
 | `upload_book` | Create a book from absolute PDF paths on the machine running Libratory (copied in). Options: `title`, `voice`, `speed`, `language`, `profile`, `folder`, `fullExtract` (default true), `skipSynthesis` (default true; false narrates and assembles unattended), `llmChapterDetection` + `chapterModel`, `ocrEngine` (`tesseract`, `surya`, or `llm` for a cloud vision model) + `ocrModel`. Refuses full extraction while the models are not installed. |

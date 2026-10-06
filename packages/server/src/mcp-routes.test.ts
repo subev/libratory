@@ -36,7 +36,7 @@ vi.mock("./lib/paths.ts", async (importOriginal) => {
 vi.mock("./lib/model-bundles.ts", () => ({
   listModelBundles: async () => [{ id: "extraction", label: "Marker/Surya", unlocks: "full extraction", approxMb: 5100, appleSiliconOnly: false, installed: true, downloading: false, progress: null, error: null }],
   bundleInstalled: async () => true,
-  readCapabilities: async () => ({ mlx: true, cuda: false }),
+  readCapabilities: async () => ({ cuda: false }),
   startBundleDownload: () => ({ started: true }),
 }));
 
@@ -214,13 +214,13 @@ describe("/mcp", () => {
     const all = parse(await client.callTool({ name: "list_voices", arguments: {} }));
     const ids = all.map((v: { id: string }) => v.id);
     expect(ids).toContain("kokoro:af_heart");
-    expect(ids).toContain("bg-mlx:narrator");
+    expect(ids).toContain("bg-mms:bul");
     expect(ids).toContain("say:daria");
     expect(ids).toContain("cartesia:abc123");
 
     const bulgarian = parse(await client.callTool({ name: "list_voices", arguments: { language: "bg" } }));
     const bgIds = bulgarian.map((v: { id: string }) => v.id);
-    expect(bgIds).toEqual(expect.arrayContaining(["bg-mlx:narrator", "bg-mms:bul", "kugel:default", "say:daria", "cartesia:abc123"]));
+    expect(bgIds).toEqual(expect.arrayContaining(["bg-mms:bul", "bg-piper:dimitar", "say:daria", "cartesia:abc123"]));
     expect(bgIds).not.toContain("kokoro:af_heart");
     expect(bulgarian.find((v: { id: string }) => v.id === "cartesia:abc123")).toMatchObject({ cloud: true, gender: "F", engine: "cartesia", native: true });
     // Listed because the model reads Bulgarian, flagged because the voice was made for English
@@ -239,7 +239,7 @@ describe("/mcp", () => {
     ]);
     const caps = parse(await client.callTool({ name: "get_capabilities", arguments: {} }));
     languages.mockRestore();
-    expect(caps.hardware).toEqual({ mlx: true, cuda: false });
+    expect(caps.hardware).toEqual({ cuda: false });
     expect(caps.bundles[0]).toMatchObject({ id: "extraction", installed: true });
     expect(caps.ocrEngines).toEqual([
       { id: "tesseract", default: true, needsBundle: null, cloud: false, available: true },

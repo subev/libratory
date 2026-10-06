@@ -2,7 +2,7 @@ import { open, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 
 import { env } from "../env.ts";
-import { chunkTextForTts } from "./tts-chunks.ts";
+import { chunkTextForTts, PARAGRAPH_CHUNKS } from "./tts-chunks.ts";
 import { dropStaleChunks, writeChunkWords, type ChunkWord } from "./chunk-previews.ts";
 import { pcm16WavHeader, readWavPcm } from "./wav.ts";
 import { clampSpeed } from "./voice-catalog.ts";
@@ -222,7 +222,7 @@ export async function cartesiaSynthesize({
   onProgress = async () => {},
   signal,
 }: CartesiaSynthesizeOptions): Promise<void> {
-  const chunks = chunkTextForTts(inputText);
+  const chunks = chunkTextForTts(inputText, PARAGRAPH_CHUNKS);
   if (chunks.length === 0) throw new Error("Narrator input is empty after chunking");
 
   const voice = await findCartesiaVoice(voiceId);

@@ -113,7 +113,7 @@ Ships with `scripts/hn-top10.mjs`, which turns any day's top Hacker News stories
 <details>
 <summary><b>How is this different from Ebook2Audiobook?</b></summary>
 
-[Ebook2Audiobook](https://github.com/DrewThomasson/ebook2audiobook) is a one-shot converter: file in, audiobook out, with voice cloning (XTTSv2) and huge language coverage. Libratory is a **library you live in**: books persist in a database with per-chapter editing, re-synthesis, AI cleanup, translations and rewrites, notes, digests, read-along export, and chat over the content of every book. PDFs are the first-class input (raw text instantly, OCR opt-in) rather than routed through an EPUB conversion, and the TTS stack is newer local models (Kokoro, KugelAudio) plus macOS and Cartesia voices instead of the Coqui-era engines.
+[Ebook2Audiobook](https://github.com/DrewThomasson/ebook2audiobook) is a one-shot converter: file in, audiobook out, with voice cloning (XTTSv2) and huge language coverage. Libratory is a **library you live in**: books persist in a database with per-chapter editing, re-synthesis, AI cleanup, translations and rewrites, notes, digests, read-along export, and chat over the content of every book. PDFs are the first-class input (raw text instantly, OCR opt-in) rather than routed through an EPUB conversion, and the TTS stack is newer local models (Kokoro, Pocket TTS, BgTTS-38M) plus macOS and Cartesia voices instead of the Coqui-era engines.
 
 If you want "this EPUB in a cloned voice", use Ebook2Audiobook. If you want to clean up, restructure, transform, and actually work with a messy PDF collection, that's this.
 
@@ -152,7 +152,7 @@ Signed and notarised; installs its own runtime on first launch, so nothing else 
 <details>
 <summary><b>Prerequisites in full</b></summary>
 
-An Apple Silicon Mac, or a Linux machine (x86_64 or arm64, CPU is enough), or Windows through Docker Desktop and WSL2. The two MLX narrators (KugelAudio, BG-TTS V5) need Metal and stay Mac-only — the UI greys them out with the reason; Kokoro, Pocket, Meta MMS and the cloud voices run everywhere.
+An Apple Silicon Mac, or a Linux machine (x86_64 or arm64, CPU is enough), or Windows through Docker Desktop and WSL2. Every engine runs on all of them; Kokoro uses the GPU where there is one, the rest are CPU or cloud.
 
 - **Mac**: [Homebrew](https://brew.sh), then: `brew install ffmpeg poppler tesseract espeak-ng python@3.12 node pnpm` — for running from source, which spawns `ffmpeg`, `pdftotext` and `tesseract` off your `PATH`. The packaged app carries its own copies and needs none of this.
 - **Linux (from source)**: `ffmpeg espeak-ng poppler-utils tesseract-ocr tesseract-ocr-eng tesseract-ocr-osd zip unzip python3.12 node pnpm` from your package manager — `pnpm run setup` names whatever is missing. Or skip all of it and run the Docker image.
@@ -166,10 +166,10 @@ An Apple Silicon Mac, or a Linux machine (x86_64 or arm64, CPU is enough), or Wi
 <details>
 <summary><b>What <code>pnpm run setup</code> actually does</b></summary>
 
-It is idempotent — rerun it after failures. It works the same on Linux, minus the KugelAudio prompt (Metal-only). It must be `pnpm run setup`; bare `pnpm setup` triggers pnpm's unrelated builtin.
+It is idempotent — rerun it after failures. It works the same on Linux. It must be `pnpm run setup`; bare `pnpm setup` triggers pnpm's unrelated builtin.
 
 - Creates `.env` with working defaults.
-- Skips the ~17 GB KugelAudio narrator download unless you answer yes (or run `pnpm run setup --kugel`).
+- Skips the ~1.5 GB BgTTS-38M Bulgarian narrator unless you answer yes (or run `pnpm run setup --bgtts`).
 - Installs Python packages into a repo-local `.venv` from `pyproject.toml` + `uv.lock` (`uv sync --frozen`, whole graph pinned). Point `CONDA_ENV_PATH` in `.env` at another env's `bin` dir if you manage your own.
 
 **For the AI features you need at least one model.**
@@ -200,11 +200,10 @@ Every engine covers a different set, so the answer to "does it do language X" de
 | --- | --- | --- |
 | English | 27 + 26 | Kokoro, Pocket TTS |
 | Spanish, Italian, German, Portuguese, French | 26 each | Pocket TTS (downloadable from the picker) |
-| Bulgarian | 3 + system | BG-TTS V5 MLX, MMS Bulgarian, KugelAudio, macOS `Daria` |
+| Bulgarian | 5 + system | BgTTS-38M (3 voices, opt-in), Piper Dimitar, MMS Bulgarian, macOS `Daria` |
 | French, Spanish, Italian, Brazilian Portuguese | 2 each | Kokoro |
 | Hindi | 4 | Kokoro |
 | Mandarin Chinese | 8 | Kokoro |
-| 24 EU languages | 1 multilingual narrator | KugelAudio (opt-in ~5 GB download) |
 | Most others | many | [Cartesia](https://cartesia.ai) and [ElevenLabs](https://elevenlabs.io) (cloud, need an API key), plus any macOS system voice you have installed |
 
 ![Scrolling the voice picker's Italian list: 49 voices grouped under Kokoro, Pocket TTS, KugelAudio, macOS system voices and Cartesia](docs/images/voice-picker-languages.gif)
@@ -257,7 +256,7 @@ Jobs run through [Graphile Worker](https://github.com/graphile/worker) in seven 
 <details>
 <summary><b>TTS engines and sync maps</b></summary>
 
-**Local, GPU-accelerated via MPS/Metal:** [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) (English, French, Spanish, Italian, Brazilian Portuguese, Hindi, Mandarin), KugelAudio (24 EU languages incl. Bulgarian, local 4-bit MLX quant), BG-TTS V5 MLX, and Meta MMS Bulgarian.
+**Local, GPU-accelerated via MPS/Metal:** [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) (English, French, Spanish, Italian, Brazilian Portuguese, Hindi, Mandarin), and Meta MMS Bulgarian. **Local, CPU:** BgTTS-38M V2 and Piper for Bulgarian, Pocket TTS.
 
 **Local, CPU:** [Pocket TTS](https://github.com/kyutai-labs/pocket-tts) from Kyutai (100M params, ~12x realtime, 26 built-in voices, optional voice cloning from a ~20s sample), and every installed macOS system voice (via `say`, free and ~25x realtime).
 
@@ -303,12 +302,12 @@ data/previews/                    Voice preview M4As
 <summary><b>Models: what downloads when</b></summary>
 
 - Every TTS/extraction subprocess runs with `HF_HUB_OFFLINE=1`, so models never download at synthesis time. `pnpm run setup` caches only what the core path needs — **Kokoro-82M, ~350 MB**. The heavy optional bundles arrive at the doorway of the feature that needs them, with a size and a button: **Marker/Surya 5.1 GB** (full extraction), **BGE-M3 4.3 GB** (library search and chat), **Bulgarian narrators 1.2 GB**. `WITH_ALL_MODELS=1 pnpm run setup` fetches everything up front instead — setup used to do that unconditionally, which meant ~15 GB and an hour before the app could open a page.
-- `scripts/models.py --status` lists the bundles and what is cached; `--download <id>` fetches one; `--capabilities` reports whether MLX is usable, which is what greys out the two Metal-only narrators (BG-TTS V5 and KugelAudio) instead of letting them fail at synthesis. Everything else falls back to the CPU. A `.models-missing` file at the repo root (one bundle id per line) makes the app pretend those are absent — the only sane way to work on a download gate without deleting gigabytes.
+- `scripts/models.py --status` lists the bundles and what is cached; `--download <id>` fetches one; `--capabilities` reports whether CUDA is usable, which decides marker's device on Linux. A `.models-missing` file at the repo root (one bundle id per line) makes the app pretend those are absent — the only sane way to work on a download gate without deleting gigabytes.
 - The first PDF/EPUB export downloads a rendering browser (~350 MB) into the Vivliostyle cache. In the packaged app the Vivliostyle CLI itself (~230 MB of npm packages) is installed at that same moment, into `VIVLIOSTYLE_DIR` — a compiled binary has no `node_modules` to resolve it from.
-- Python dependencies are a **uv project**: `pyproject.toml` + `uv.lock` at the repo root, installed with `uv sync --frozen` (setup fetches `uv` into `.uv/` if it is missing). 189 packages resolve in under two seconds and install in about thirteen. Four pins deliberately contradict what `mlx-audio` and `nanocodec-mlx` declare — transformers 5.x breaks marker, huggingface_hub 1.x is untested here, nanocodec wants an older mlx, and numpy must stay on 1.x — and those are `[tool.uv] override-dependencies` rather than the `--no-deps` installs they used to be.
-- **Pocket TTS** runs in its own Python env (`.venv-pocket`) because it needs numpy 2.x while the marker/kokoro stack is pinned to 1.26. `pnpm run setup` builds both. It is CPU-only by design — it leaves the GPU free for the MLX engines — and has no speed parameter, so the UI disables the slider.
-- KugelAudio (`kugelaudio/kugelaudio-0-open`, Apache-2.0) runs from a local 4-bit MLX quantization (~5 GB) at `~/.cache/libratory-models/kugelaudio-0-open-4bit` (override with `KUGEL_TTS_MODEL_PATH`); `pnpm run setup --kugel` downloads and converts it. ~1.5x realtime on an M4 Pro.
-- The Bulgarian-capable narrators are `BG-TTS V5 (Radi Totev MLX port)`, `MMS Bulgarian (Meta)`, `KugelAudio (7B, 24 EU languages)`, the macOS `Daria` system voice, and the Bulgarian voices from Cartesia and ElevenLabs. The local model narrators run at fixed speed (UI disables the slider); macOS and the cloud engines support the speed control.
+- Python dependencies are a **uv project**: `pyproject.toml` + `uv.lock` at the repo root, installed with `uv sync --frozen` (setup fetches `uv` into `.uv/` if it is missing). 166 packages resolve in under two seconds and install in about thirteen. The one `[tool.uv] override-dependencies` entry is Pillow, which marker and surya still cap below what closes its advisories.
+- **Pocket TTS** runs in its own Python env (`.venv-pocket`) because it needs numpy 2.x while the marker/kokoro stack is pinned to 1.26. `pnpm run setup` builds both. It is CPU-only by design — it leaves the GPU free for Kokoro and search — and has no speed parameter, so the UI disables the slider.
+- Piper and BgTTS-38M run in envs of their own too (`.venv-piper`, `.venv-bgtts`): Piper needs onnxruntime and numpy 2, BgTTS's codec needs a torchaudio older than the main env's torch.
+- The Bulgarian-capable narrators are BgTTS-38M V2 (three voices), Piper `Dimitar`, `MMS Bulgarian (Meta)`, the macOS `Daria` system voice, and the Bulgarian voices from Cartesia and ElevenLabs. The local model narrators run at fixed speed (UI disables the slider) except Piper; macOS and the cloud engines support the speed control.
 - Best Kokoro voices: `af_heart` (A tier), `af_bella` (A- tier), `bf_emma` (B- tier).
 
 **Voice licensing.** `facebook/mms-tts-bul` is licensed `CC-BY-NC-4.0`. Pocket TTS built-in voices are embeddings of real recordings under mixed licenses: most are CC0 or CC BY 4.0, but `cosette` and `jean` are **CC BY-NC 4.0 (non-commercial only)** and `estelle`'s provenance is unverified. Each voice shows its license in the picker. This is irrelevant while Libratory is noncommercial (see [LICENSE.md](LICENSE.md)) — it matters if you ever sell audio made with it. Details in [docs/tts-licensing.md](docs/tts-licensing.md).

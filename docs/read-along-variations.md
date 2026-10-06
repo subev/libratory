@@ -54,12 +54,10 @@ The highlight can only be as fine as the timings the engine gives back.
 | Kokoro chunk over 510 phonemes | re-split | none for the split pieces — the phonemes no longer line up with the tokens | `sentence` |
 | Kokoro chunk holding a dash or quote its aligner cannot place | as usual | **per word** — the untimed mark folds into the word before it rather than costing the chunk its timings | `word` |
 | macOS `say` | one sentence | none | `chunk` |
-| MMS (Bulgarian) | one sentence | none | `chunk` |
-| Pocket TTS | packed to ~285 chars | none | `chunk` |
-| KugelAudio | packed to ~285 chars | none | `chunk` |
-| Bulgarian MLX narrator | packed to ~285 chars | none — and it emits a fixed ~20–24 s per chunk by design | `chunk` |
-| Cartesia | packed to ~285 chars | **per word**, `add_timestamps` on the SSE endpoint | `word` |
-| ElevenLabs | packed to ~285 chars | **per character**, from `/with-timestamps`, grouped on whitespace into words — dropped entirely if the characters do not rejoin to the text sent, since one drift would misplace every word after it | `word` |
+| MMS, Piper, BgTTS-38M (Bulgarian) | one sentence | none | `chunk` |
+| Pocket TTS | one sentence | none | `chunk` |
+| Cartesia | a paragraph, up to 1000 chars | **per word**, `add_timestamps` on the SSE endpoint | `word` |
+| ElevenLabs | a paragraph, up to 1000 chars | **per character**, from `/with-timestamps`, grouped on whitespace into words — dropped entirely if the characters do not rejoin to the text sent, since one drift would misplace every word after it | `word` |
 
 `say` and MMS are chunked a sentence at a time, so their cues really are sentences even though
 `granularity` reports `chunk` — it is derived from the sync map, which does not record which

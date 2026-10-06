@@ -2,7 +2,6 @@ import { memo } from "react";
 
 import {
   languageLabel,
-  voiceBlockedByMissingMlx,
   voiceHasWordTiming,
   voiceIsForeignIn,
   voiceMissingEngine,
@@ -35,16 +34,12 @@ export const VoiceRow = memo(function VoiceRow({ voice, language, action }: { vo
   const isPending = voice.id === state.pendingId;
   const hasFailed = voice.id === state.failedId;
 
-  const { data: capabilities } = trpc.models.capabilities.useQuery(undefined, { staleTime: Infinity, enabled: voice.requiresMlx === true });
   const { data: engines } = trpc.models.engines.useQuery(undefined, { staleTime: 30_000, enabled: voice.requiresEngine !== undefined });
-  const needsMlx = voiceBlockedByMissingMlx(voice, capabilities?.mlx);
   const missingEngine = voiceMissingEngine(voice, engines);
-  const unavailable = needsMlx || missingEngine !== null;
+  const unavailable = missingEngine !== null;
   const description = describe(voice, foreignIn);
 
-  const status = needsMlx
-    ? "Needs Apple Silicon — this narrator runs on Metal"
-    : missingEngine
+  const status = missingEngine
     ? missingEngine
     : isPending
     ? "Generating preview — first time for this voice"
@@ -81,7 +76,7 @@ export const VoiceRow = memo(function VoiceRow({ voice, language, action }: { vo
         onClick={() => actions.select(voice.id)}
         aria-pressed={isSelected}
         disabled={unavailable}
-        title={needsMlx ? "This narrator needs Apple's MLX, which only runs on Apple Silicon" : (missingEngine ?? undefined)}
+        title={missingEngine ?? undefined}
         className="flex-1 min-w-0 text-left rounded disabled:opacity-50 disabled:cursor-not-allowed"
         data-testid={`voice-option-${voice.id}`}
       >

@@ -12,7 +12,6 @@ describe("voiceHasWordTiming", () => {
     expect(voiceHasWordTiming("bg-mms:bul", "bg")).toBe(false);
     expect(voiceHasWordTiming("say:daria", "bg")).toBe(false);
     expect(voiceHasWordTiming("pocket:en_female", "en")).toBe(false);
-    expect(voiceHasWordTiming("kugel:default", "multi")).toBe(false);
   });
 });
 

@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   macos:
-    # arm64. MLX is Metal, so an Intel runner cannot even smoke-test what it builds.
+    # arm64: the Mac build ships for Apple Silicon only.
     runs-on: macos-15
     # The Apple secrets live in this environment rather than on the repository, so they are exposed
     # only to this job and can be put behind a required reviewer. A signing key is not revocable by

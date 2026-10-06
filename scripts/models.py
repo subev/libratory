@@ -117,10 +117,6 @@ BUNDLES = [
         "download": lambda: _hf_fetch("BAAI/bge-m3"),
         "cacheDirs": lambda: [_hf_repo_dir("BAAI/bge-m3")],
     },
-    # One bundle used to hold both Bulgarian voices, flagged Apple-Silicon-only for the sake of
-    # the MLX narrator — which made the MMS voice, which runs anywhere, undownloadable on exactly
-    # the machines where it is the only Bulgarian option. A Mac that installed the old bundle has
-    # both repos cached, so each half reports installed without a migration.
     {
         "id": "bulgarian",
         "label": "Bulgarian voice",
@@ -130,16 +126,6 @@ BUNDLES = [
         "download": lambda: _hf_fetch("facebook/mms-tts-bul"),
         "cacheDirs": lambda: [_hf_repo_dir("facebook/mms-tts-bul")],
     },
-    {
-        "id": "bulgarian-narrator",
-        "label": "Bulgarian narrator",
-        "unlocks": "The BG-TTS V5 narrator voice",
-        "approxMb": 1000,
-        "appleSiliconOnly": True,
-        "installed": lambda: _hf_cached("raditotev/bg-tts-v5-mlx"),
-        "download": lambda: _hf_fetch("raditotev/bg-tts-v5-mlx"),
-        "cacheDirs": lambda: [_hf_repo_dir("raditotev/bg-tts-v5-mlx")],
-    },
 ]
 
 BY_ID = {b["id"]: b for b in BUNDLES}
@@ -147,16 +133,7 @@ BY_ID = {b["id"]: b for b in BUNDLES}
 
 # Developing a download gate otherwise means deleting several gigabytes to see it, and putting them
 # back to see the other state. A file rather than an env var because the e2e suite drives an
-# already-running dev server, whose environment it cannot reach. "mlx" is accepted here too, so the
-# Apple-Silicon-only narrators can be seen greyed out on a machine that has MLX.
-def _mlx_available() -> bool:
-    try:
-        import mlx.core  # noqa: F401
-        return True
-    except Exception:
-        return False
-
-
+# already-running dev server, whose environment it cannot reach.
 def _forced_missing() -> set:
     marker = Path(__file__).resolve().parent.parent / ".models-missing"
     if not marker.exists():
@@ -196,10 +173,6 @@ def main() -> int:
         # which silently skipped any bundle added here afterwards.
         import threading
         for bundle in BUNDLES:
-            # Fetching a gigabyte of Metal weights onto a machine with no Metal is not "all models"
-            if bundle.get("appleSiliconOnly") and not _mlx_available():
-                print(f"  {bundle['id']}: Apple Silicon only — skipped", file=sys.stderr)
-                continue
             print(f"  {bundle['id']}...", file=sys.stderr)
             stop = threading.Event()
             reporter = threading.Thread(
@@ -223,9 +196,8 @@ def main() -> int:
         return 0
 
     if args.capabilities:
-        # A Mac still never imports torch here: MPS gates nothing — the two MLX narrators are the
-        # only engines that cannot fall back. On Linux the answer decides marker's device, so the
-        # half-second import is paid, once, where it buys something.
+        # A Mac never imports torch here: MPS gates nothing. On Linux the answer decides marker's
+        # device, so the half-second import is paid, once, where it buys something.
         cuda = False
         if sys.platform == "linux":
             try:
@@ -233,8 +205,7 @@ def main() -> int:
                 cuda = torch.cuda.is_available()
             except Exception:
                 cuda = False
-        mlx = False if "mlx" in _forced_missing() else _mlx_available()
-        print(json.dumps({"mlx": mlx, "cuda": cuda}))
+        print(json.dumps({"cuda": cuda}))
         return 0
 
     if args.status:
@@ -250,7 +221,6 @@ def main() -> int:
                 "label": b["label"],
                 "unlocks": b["unlocks"],
                 "approxMb": b["approxMb"],
-                "appleSiliconOnly": b.get("appleSiliconOnly", False),
                 "installed": installed,
             })
         print(json.dumps(out))

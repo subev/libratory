@@ -7,7 +7,7 @@ export type Voice = {
   grade: string;
   supportsSpeed?: boolean;
   note?: string;
-  /** ISO-639-1 code the voice actually reads; MULTILINGUAL for models that cover many. */
+  /** ISO-639-1 code the voice actually reads. */
   language?: string;
   /** Further languages the voice is native in, beyond `language`. */
   nativeLanguages?: string[];
@@ -15,22 +15,11 @@ export type Voice = {
   alsoReads?: string[];
   /** Which engine provides it — the secondary grouping in the picker. */
   engine?: VoiceEngine;
-  /** Set when the voice cannot run without Apple's MLX, so a non-Metal machine can say why. */
-  requiresMlx?: boolean;
   /** Set when the voice runs in a Python env of its own that setup may not have built. */
   requiresEngine?: LocalEngine;
 };
 
 export type LocalEngine = "piper" | "bgtts";
-
-export const MULTILINGUAL = "multi";
-
-// KugelAudio reads many languages but not *any* language, and nothing recorded which — so it was
-// offered under Hindi and Mandarin, which it cannot speak. These are the EU's 24 official languages.
-const MULTILINGUAL_LANGUAGES = new Set([
-  "bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "ga", "hr",
-  "hu", "it", "lt", "lv", "mt", "nl", "pl", "pt", "ro", "sk", "sl", "sv",
-]);
 
 // The one predicate behind both the sidebar counts and the list itself; when they disagreed, the
 // rail said 48 and the provider chips added up to 49.
@@ -38,7 +27,6 @@ export function voiceCoversLanguage(voice: Pick<Voice, "language" | "nativeLangu
   const language = voice.language ?? "en";
   return (
     language === code ||
-    (language === MULTILINGUAL && MULTILINGUAL_LANGUAGES.has(code)) ||
     voice.nativeLanguages?.includes(code) === true ||
     voice.alsoReads?.includes(code) === true
   );
@@ -54,7 +42,6 @@ export const KOKORO_LANGUAGE_BY_PREFIX: Record<string, string> = {
 };
 
 export function languageOfStaticVoice(voiceId: string): string {
-  if (voiceId.startsWith("kugel:")) return MULTILINGUAL;
   if (voiceId.startsWith("bg-")) return "bg";
   if (voiceId.startsWith("kokoro:")) {
     return KOKORO_LANGUAGE_BY_PREFIX[voiceId.charAt("kokoro:".length)] ?? "en";
@@ -155,13 +142,11 @@ export const kokoroVoiceGroups: VoiceGroup[] = [
 ];
 
 export const narratorVoices: Voice[] = [
-  { id: "bg-mlx:narrator", label: "BG-TTS V5 (Radi Totev MLX port)", gender: null, grade: "MLX", supportsSpeed: false, note: "Apple Silicon narrator", requiresMlx: true },
   { id: "bg-mms:bul", label: "MMS Bulgarian (Meta)", gender: null, grade: "VITS", supportsSpeed: false, note: "Meta MMS" },
   { id: "bg-piper:dimitar", label: "Dimitar (Piper)", gender: "M", grade: "VITS", supportsSpeed: true, note: "Piper, CPU", requiresEngine: "piper" },
   { id: "bg-bgtts:female", label: "BgTTS-38M female", gender: "F", grade: "38M", supportsSpeed: false, note: "BgTTS-38M V2, CPU", requiresEngine: "bgtts" },
   { id: "bg-bgtts:male", label: "BgTTS-38M male", gender: "M", grade: "38M", supportsSpeed: false, note: "BgTTS-38M V2, CPU", requiresEngine: "bgtts" },
   { id: "bg-bgtts:male2", label: "BgTTS-38M male 2", gender: "M", grade: "38M", supportsSpeed: false, note: "BgTTS-38M V2, CPU", requiresEngine: "bgtts" },
-  { id: "kugel:default", label: "KugelAudio (7B, 24 EU languages)", gender: null, grade: "MLX", supportsSpeed: false, note: "Multilingual narrator", requiresMlx: true },
 ];
 
 export type VoiceEngine = "kokoro" | "narrators" | "say" | "cartesia" | "elevenlabs" | "pocket";
@@ -179,7 +164,6 @@ export const ENGINE_PREFIXES: { prefix: string; engine: VoiceEngine; supportsSpe
   { prefix: "pocket:", engine: "pocket", supportsSpeed: false },
   { prefix: "bg-piper:", engine: "narrators", supportsSpeed: true },
   { prefix: "bg-", engine: "narrators", supportsSpeed: false },
-  { prefix: "kugel:", engine: "narrators", supportsSpeed: false },
 ];
 
 export function speedRangeFor(voiceId: string): SpeedRange {
@@ -199,7 +183,7 @@ export function engineForVoiceId(voiceId: string): VoiceEngine {
 // highlighting and word-level two-language reading need; without it a chapter reads at sentence
 // level. Cartesia and ElevenLabs return word timestamps with the audio. Kokoro's come from its
 // English tokenizer, so only its English voices have them; its espeak-backed languages return
-// phonemes with no token structure. Pocket, KugelAudio, the Bulgarian narrators and the macOS
+// phonemes with no token structure. Pocket, the Bulgarian narrators and the macOS
 // voices give chunk boundaries only.
 export function voiceHasWordTiming(voiceId: string, language?: string | null): boolean {
   const engine = engineForVoiceId(voiceId);

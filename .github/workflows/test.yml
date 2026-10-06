@@ -137,7 +137,7 @@ jobs:
       - run: pnpm -r build
 
       # The model gates ask scripts/models.py whether a bundle is installed. Its status path
-      # imports huggingface_hub and platformdirs and nothing else — torch, mlx and surya are all
+      # imports huggingface_hub and platformdirs and nothing else — torch and surya are both
       # imported lazily inside the functions that need them — so CI needs a 19 MB environment
       # rather than the ~5 GB `uv sync --frozen` builds on a real machine. Deliberately not the
       # pinned env: nothing here runs a model, and the two packages it does load are the only

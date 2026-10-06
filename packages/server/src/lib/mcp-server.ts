@@ -791,8 +791,8 @@ export function createMcpServer(profileId: string, { origin }: { origin?: string
     "list_voices",
     {
       description:
-        "Every narrator voice this installation can use, with the language each reads: local engines (Kokoro, Pocket TTS, the Bulgarian and multilingual MLX narrators, installed macOS voices) " +
-        "and whether its recordings carry word timing (wordTiming: true — words light up as read, and two-language reading links words; false means sentence level: Kokoro's non-English voices, Pocket, KugelAudio, the Bulgarian narrators and macOS voices). " +
+        "Every narrator voice this installation can use, with the language each reads: local engines (Kokoro, Pocket TTS, the Bulgarian narrators — BgTTS-38M, Piper, MMS — installed macOS voices) " +
+        "and whether its recordings carry word timing (wordTiming: true — words light up as read, and two-language reading links words; false means sentence level: Kokoro's non-English voices, Pocket, the Bulgarian narrators and macOS voices). " +
         "and cloud ones behind a configured key (Cartesia, ElevenLabs — metered). Filter by language code to find a voice for a book; " +
         "with a language filter, native: false marks a voice that reads it in another language's accent (every ElevenLabs voice is listed under every language its model reads) — prefer native ones.",
       inputSchema: {
@@ -807,7 +807,7 @@ export function createMcpServer(profileId: string, { origin }: { origin?: string
     "get_capabilities",
     {
       description:
-        "What this installation can do right now: hardware (MLX/CUDA), model bundles and whether each is installed or downloading, OCR engines and the language packs installed or downloading " +
+        "What this installation can do right now: hardware (CUDA), model bundles and whether each is installed or downloading, OCR engines and the language packs installed or downloading " +
         "(any other language is fetched by ISO code with start_download), Pocket TTS languages, and which cloud keys are configured. Check before full extraction, OCR in a new language, or a cloud voice.",
       inputSchema: {},
     },
@@ -821,7 +821,7 @@ export function createMcpServer(profileId: string, { origin }: { origin?: string
       ]);
       return json({
         hardware,
-        bundles: bundles.map((b) => ({ id: b.id, label: b.label, unlocks: b.unlocks, approxMb: b.approxMb, appleSiliconOnly: b.appleSiliconOnly, installed: b.installed, downloading: b.downloading, progress: b.progress, error: b.error })),
+        bundles: bundles.map((b) => ({ id: b.id, label: b.label, unlocks: b.unlocks, approxMb: b.approxMb, installed: b.installed, downloading: b.downloading, progress: b.progress, error: b.error })),
         // llm is the cloud engine: page images go to a vision model, so it needs a provider key rather than a bundle
         ocrEngines: OCR_ENGINES.map((id) => ({ id, default: id === DEFAULT_OCR_ENGINE, needsBundle: id === "surya" ? SURYA_BUNDLE : null, cloud: id === "llm", available: id !== "llm" || LLM_SECRETS.some((s) => isConfigured(s.envVar)) })),
         ocrLanguages: ocrLanguages

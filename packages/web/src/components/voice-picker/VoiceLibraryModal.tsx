@@ -4,7 +4,6 @@ import {
   cartesiaVoiceToEntry,
   elevenlabsVoiceToEntry,
   languageLabel,
-  MULTILINGUAL,
   voiceCoversLanguage,
   voiceIsForeignIn,
   pocketCustomVoiceToEntry,
@@ -121,9 +120,7 @@ export function VoiceLibraryModal({
   );
 
   const languageCounts = useMemo(() => {
-    // A multilingual voice has no row of its own — it belongs to each language it can read.
     const codes = new Set(allVoices.map((v) => v.language ?? "en"));
-    codes.delete(MULTILINGUAL);
     // Pocket languages that aren't downloaded still get a row, so they can be requested from here.
     for (const language of pocketLanguages) codes.add(language.code);
     for (const code of priorityLanguages) codes.add(code);
@@ -139,8 +136,7 @@ export function VoiceLibraryModal({
 
   const [chosen, setChosen] = useState<string>(() => {
     const fromSelection = allVoicesLanguageOf(state.selectedId);
-    // A multilingual voice says nothing about intent, so the book's own language wins.
-    if (fromSelection && fromSelection !== MULTILINGUAL) return fromSelection;
+    if (fromSelection) return fromSelection;
     return priorityLanguages[0] ?? fromSelection ?? "en";
   });
   const [showAllLanguages, setShowAllLanguages] = useState(false);
@@ -356,7 +352,6 @@ export function VoiceLibraryModal({
                   {language === "bg" && (
                     <div className="mx-1 mb-3 space-y-2">
                       <ModelBundleNotice id="bulgarian" verb="Narrating in Bulgarian" />
-                      <ModelBundleNotice id="bulgarian-narrator" verb="Narrating with the BG-TTS V5 voice" />
                     </div>
                   )}
 

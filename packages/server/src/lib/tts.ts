@@ -6,7 +6,7 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { env } from "../env.ts";
-import { chunkTextForTts, NARRATOR_CHUNKS, SENTENCE_CHUNKS, type ChunkLimits } from "./tts-chunks.ts";
+import { chunkTextForTts, SENTENCE_CHUNKS } from "./tts-chunks.ts";
 import { dropStaleChunks } from "./chunk-previews.ts";
 import { synthesize as kokoroSynthesize, KokoroAbortedError } from "./kokoro.ts";
 import { resolveSayVoice } from "./say-voices.ts";
@@ -17,9 +17,7 @@ import { scriptPath } from "./paths.ts";
 import type { LocalEngine } from "./voice-catalog.ts";
 
 const CONDA_BIN = env.CONDA_ENV_PATH;
-const BG_MLX_SCRIPT = scriptPath("synthesize_bg_tts_mlx.py");
 const BG_MMS_SCRIPT = scriptPath("synthesize_mms_tts.py");
-const KUGEL_SCRIPT = scriptPath("synthesize_kugel_tts.py");
 const SAY_SCRIPT = scriptPath("synthesize_say_tts.py");
 const BGTTS_SCRIPT = scriptPath("synthesize_bgtts.py");
 const PIPER_SCRIPT = scriptPath("synthesize_piper_tts.py");
@@ -48,14 +46,13 @@ type SynthesizeOptions = {
 };
 
 type ParsedTtsVoice = {
-  engine: "kokoro" | "bg-mlx" | "bg-mms" | "bg-bgtts" | "bg-piper" | "kugel" | "say" | "cartesia" | "elevenlabs" | "pocket";
+  engine: "kokoro" | "bg-mms" | "bg-bgtts" | "bg-piper" | "say" | "cartesia" | "elevenlabs" | "pocket";
   voice: string;
   raw: string;
 };
 
 const noopLog: LogFn = async () => {};
 const noopProgress: ProgressFn = async () => {};
-let mlxSynthesisQueue: Promise<void> = Promise.resolve();
 
 const ENGLISH_PREVIEW_TEXT = "The quick brown fox jumps over the lazy dog. A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart.";
 const BULGARIAN_PREVIEW_TEXT = "В тиха пролетна утрин светът изглеждаше мек и ясен, а гласът на разказвача трябваше да носи спокойствие, ритъм и увереност през всяка страница.";
@@ -107,11 +104,9 @@ function previewTextFor(languageCode: string): string {
 function firstSentence(text: string): string {
   return text.match(/^[^.!?]*[.!?]/)?.[0] ?? text;
 }
-const BG_MLX_VOICES = new Set(["narrator"]);
 const BG_MMS_VOICES = new Set(["bul"]);
 const BG_BGTTS_VOICES = new Set(["female", "male", "male2"]);
 const BG_PIPER_VOICES = new Set(["dimitar"]);
-const KUGEL_VOICES = new Set(["default"]);
 // Installed system voices are discovered at synthesis time; ids only need to be safe slugs
 const SAY_VOICE_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 // Cartesia voice ids are UUIDs from the live library
@@ -129,21 +124,23 @@ export class TtsAbortedError extends Error {
   }
 }
 
+// Voices that were removed, named so a book still set to one says what to pick instead of
+// "unsupported". Their recordings stay; only new synthesis is refused.
+const RETIRED_VOICES: Record<string, string> = {
+  "bg-mlx:": "BG-TTS V5 (bg-mlx) was retired on 2026-10-06 — pick a BgTTS-38M voice for Bulgarian",
+  "kugel:": "KugelAudio was retired on 2026-10-06 — pick a voice in the book's language",
+};
+
 export function parseTtsVoice(rawVoice: string): ParsedTtsVoice {
+  const retired = Object.entries(RETIRED_VOICES).find(([prefix]) => rawVoice.startsWith(prefix));
+  if (retired) throw new Error(retired[1]);
+
   if (rawVoice.startsWith("kokoro:")) {
     const voice = rawVoice.slice("kokoro:".length);
     if (!KOKORO_VOICE_PATTERN.test(voice)) {
       throw new Error(`Unsupported voice ID: ${rawVoice}`);
     }
     return { engine: "kokoro", voice, raw: rawVoice };
-  }
-
-  if (rawVoice.startsWith("bg-mlx:")) {
-    const voice = rawVoice.slice("bg-mlx:".length);
-    if (!BG_MLX_VOICES.has(voice)) {
-      throw new Error(`Unsupported voice ID: ${rawVoice}`);
-    }
-    return { engine: "bg-mlx", voice, raw: rawVoice };
   }
 
   if (rawVoice.startsWith("bg-mms:")) {
@@ -168,14 +165,6 @@ export function parseTtsVoice(rawVoice: string): ParsedTtsVoice {
       throw new Error(`Unsupported voice ID: ${rawVoice}`);
     }
     return { engine: "bg-piper", voice, raw: rawVoice };
-  }
-
-  if (rawVoice.startsWith("kugel:")) {
-    const voice = rawVoice.slice("kugel:".length);
-    if (!KUGEL_VOICES.has(voice)) {
-      throw new Error(`Unsupported voice ID: ${rawVoice}`);
-    }
-    return { engine: "kugel", voice, raw: rawVoice };
   }
 
   if (rawVoice.startsWith("say:")) {
@@ -327,7 +316,6 @@ export async function synthesize({ inputText, outputPath, voice, speed, chunkPre
       speed,
       extraArgs: ["--rate", String(Math.round(SAY_BASE_RATE_WPM * speed))],
       speedLabel: `speed ${speed}x`,
-      chunkLimits: SENTENCE_CHUNKS,
       chunkPreviewDir,
       chunkPreviewUrlBase,
       log,
@@ -356,7 +344,6 @@ export async function synthesize({ inputText, outputPath, voice, speed, chunkPre
     return;
   }
 
-  // Both run on the CPU in venvs of their own, so neither takes the MLX lock
   if (resolved.engine === "bg-bgtts") {
     await synthesizeChunkedBackend({
       backendName: "BgTTS-38M",
@@ -367,7 +354,6 @@ export async function synthesize({ inputText, outputPath, voice, speed, chunkPre
       outputPath,
       voice: resolved.voice,
       speed,
-      chunkLimits: SENTENCE_CHUNKS,
       chunkPreviewDir,
       chunkPreviewUrlBase,
       log,
@@ -389,30 +375,12 @@ export async function synthesize({ inputText, outputPath, voice, speed, chunkPre
       speed,
       extraArgs: ["--speed", String(speed)],
       speedLabel: `speed ${speed}x`,
-      chunkLimits: SENTENCE_CHUNKS,
       chunkPreviewDir,
       chunkPreviewUrlBase,
       log,
       onProgress,
       signal,
     });
-    return;
-  }
-
-  if (resolved.engine === "bg-mlx" || resolved.engine === "kugel") {
-    await runExclusiveMlxSynthesis(() => synthesizeChunkedBackend({
-      backendName: resolved.engine === "kugel" ? "KugelAudio" : "Bulgarian MLX",
-      scriptPath: resolved.engine === "kugel" ? KUGEL_SCRIPT : BG_MLX_SCRIPT,
-      inputText,
-      outputPath,
-      voice: resolved.voice,
-      speed,
-      chunkPreviewDir,
-      chunkPreviewUrlBase,
-      log,
-      onProgress,
-      signal,
-    }));
     return;
   }
 
@@ -423,29 +391,12 @@ export async function synthesize({ inputText, outputPath, voice, speed, chunkPre
     outputPath,
     voice: resolved.voice,
     speed,
-    chunkLimits: SENTENCE_CHUNKS,
     chunkPreviewDir,
     chunkPreviewUrlBase,
     log,
     onProgress,
     signal,
   });
-}
-
-async function runExclusiveMlxSynthesis<T>(run: () => Promise<T>): Promise<T> {
-  let release = () => {};
-  const waitForTurn = mlxSynthesisQueue;
-  mlxSynthesisQueue = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-
-  await waitForTurn;
-
-  try {
-    return await run();
-  } finally {
-    release();
-  }
 }
 
 async function synthesizeChunkedBackend({
@@ -460,7 +411,6 @@ async function synthesizeChunkedBackend({
   speedLabel = "fixed speed",
   chunkPreviewDir = null,
   chunkPreviewUrlBase = null,
-  chunkLimits = NARRATOR_CHUNKS,
   log = noopLog,
   onProgress = noopProgress,
   signal,
@@ -472,9 +422,8 @@ async function synthesizeChunkedBackend({
   missingHint?: string;
   extraArgs?: string[];
   speedLabel?: string;
-  chunkLimits?: ChunkLimits;
 }): Promise<void> {
-  const chunks = chunkTextForTts(inputText, chunkLimits);
+  const chunks = chunkTextForTts(inputText, SENTENCE_CHUNKS);
   if (chunks.length === 0) {
     throw new Error("Narrator input is empty after chunking");
   }

@@ -29,7 +29,6 @@ export type ListedVoice = {
   engine: VoiceEngine;
   cloud: boolean;
   supportsSpeed: boolean;
-  requiresMlx: boolean;
   // A time for every word in the recording, or chunk boundaries only (sentence level)
   wordTiming: boolean;
   // Against the language filtered by: false when the voice reads it in another language's accent
@@ -48,7 +47,6 @@ function listed(voice: Voice, engine: VoiceEngine, language: string | undefined)
     engine,
     cloud: CLOUD_ENGINES.has(engine),
     supportsSpeed: voice.supportsSpeed ?? true,
-    requiresMlx: voice.requiresMlx === true,
     wordTiming: voiceHasWordTiming(voice.id, voice.language ?? languageOfStaticVoice(voice.id)),
     note: voice.note ?? null,
     native: language === undefined ? null : !voiceIsForeignIn(voice, language),

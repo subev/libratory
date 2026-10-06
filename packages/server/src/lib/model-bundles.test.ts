@@ -10,16 +10,9 @@ const bundle = (id: string) => source.match(new RegExp(`\\{[^{}]*"id": "${id}"[^
 
 describe("scripts/models.py bundles", () => {
   it("defines every id the app gates on", () => {
-    for (const id of ["extraction", "search", "bulgarian", "bulgarian-narrator"]) {
+    for (const id of ["extraction", "search", "bulgarian"]) {
       expect(bundle(id), `models.py has no "${id}" bundle`).not.toBeNull();
     }
   });
 
-  it("keeps the MMS Bulgarian voice downloadable off Apple Silicon", () => {
-    expect(bundle("bulgarian")![0]).not.toContain("appleSiliconOnly");
-  });
-
-  it("still gates the MLX narrator on Apple Silicon", () => {
-    expect(bundle("bulgarian-narrator")![0]).toContain('"appleSiliconOnly": True');
-  });
 });

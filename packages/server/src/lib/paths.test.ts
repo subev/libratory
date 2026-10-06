@@ -11,9 +11,9 @@ import { fromStoredPath, outputDir, scriptPath, toStoredPath, uploadsDir } from 
 // kept walking up from import.meta.url, which resolves to nothing in a compiled binary.
 const SPAWNED = [
   "synthesize.py",
-  "synthesize_bg_tts_mlx.py",
+  "synthesize_bgtts.py",
+  "synthesize_piper_tts.py",
   "synthesize_mms_tts.py",
-  "synthesize_kugel_tts.py",
   "synthesize_say_tts.py",
   "synthesize_pocket_tts.py",
   "embed_bge_m3.py",

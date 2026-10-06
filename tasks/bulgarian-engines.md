@@ -10,15 +10,13 @@ polished; decide what stays after an A/B on a real book.
   Measured ~11x realtime on this Mac (the card claims 3.3x on an i3). No published WER/MOS.
 - `bg-piper:dimitar` — Piper 1.8.0 + `bg_BG-dimitar-medium` (CC0), ~20x realtime, speed works.
 - `scripts/bg_speech.py` over the vendored `bg_text_normalizer` — applied by every Bulgarian-only
-  engine (BG-MLX, MMS, Piper, BgTTS). On a number-heavy passage BgTTS read 14.0 s raw vs 22.7 s
+  engine (MMS, Piper, BgTTS; BG-MLX until it was retired). On a number-heavy passage BgTTS read 14.0 s raw vs 22.7 s
   normalized: it was silently skipping digits.
+- BgTTS was chosen over BG-TTS V5 on 2026-10-06; V5 and KugelAudio were removed the same day,
+  and with them MLX and the narrator's fixed-length chunk packing.
 
 ## Listen for
 
-- **BG-MLX on number-heavy chunks.** Expansion roughly doubles a chunk's length, and the narrator
-  emits ~20-24 s whatever the text (see `NARRATOR_CHUNKS`). A 170-character probe came out 20.8 s —
-  at the ceiling, so its end may be clipped. If so, normalize before chunking (it would have to move
-  to TS, or the chunker learn the expanded length) or exclude BG-MLX.
 - BgTTS's 18 s per-utterance ceiling: chunks are `SENTENCE_CHUNKS` and the script re-splits at the
   model's 250 characters after expansion, then decodes the pieces as one code stream.
 - Abbreviations before a capitalised word: `bg_speech` keeps a sentence-final dot only after

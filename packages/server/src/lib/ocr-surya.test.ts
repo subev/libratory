@@ -10,7 +10,7 @@ let python = "";
 
 vi.mock("./model-bundles.ts", () => ({
   bundleInstalled: vi.fn(async () => true),
-  readCapabilities: vi.fn(async () => ({ mlx: false, cuda: false })),
+  readCapabilities: vi.fn(async () => ({ cuda: false })),
 }));
 
 import { ExtractAbortedError } from "./marker.ts";

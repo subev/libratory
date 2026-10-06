@@ -73,7 +73,7 @@ product, the upside is two extra voices out of 26.
   MioCodec through torchaudio) MIT. The training data is the author's own Bulgarian set, whose
   sources the card does not state — check that before commercial use. The three voices are the
   reference clips the authors ship with the model.
-- **Bulgarian MLX / MMS / KugelAudio** — never examined. MMS is Meta-derived; check its
+- **MMS** — never examined. MMS is Meta-derived; check its
   license before commercial use.
 
 ## Business-model note that is not about licenses

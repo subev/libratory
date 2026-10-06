@@ -11,7 +11,6 @@ export type ModelBundle = {
   label: string;
   unlocks: string;
   approxMb: number;
-  appleSiliconOnly: boolean;
   installed: boolean;
   downloading: boolean;
   progress: string | null;
@@ -86,24 +85,24 @@ async function readStatus(): Promise<PythonBundle[]> {
   return bundles;
 }
 
-// Whether MLX or CUDA works cannot change while the process runs, so this is asked once and kept.
-let capabilities: Promise<{ mlx: boolean; cuda: boolean }> | null = null;
+// Whether CUDA works cannot change while the process runs, so this is asked once and kept.
+let capabilities: Promise<{ cuda: boolean }> | null = null;
 
-export function readCapabilities(): Promise<{ mlx: boolean; cuda: boolean }> {
+export function readCapabilities(): Promise<{ cuda: boolean }> {
   // Same rule as readStatus: the dev marker skips the cache outright, because a debugging aid that
   // takes a process restart to apply is a bad debugging aid.
   if (existsSync(FORCED_MISSING_FILE)) capabilities = null;
-  capabilities ??= new Promise<{ mlx: boolean; cuda: boolean }>((resolve, reject) => {
+  capabilities ??= new Promise<{ cuda: boolean }>((resolve, reject) => {
     run(["--capabilities"], (code, out) => {
       if (code !== 0) return reject(new Error(out.trim().split("\n").at(-1) || `exit ${code ?? "?"}`));
       try {
-        resolve(JSON.parse(out) as { mlx: boolean; cuda: boolean });
+        resolve(JSON.parse(out) as { cuda: boolean });
       } catch {
         reject(new Error("models.py did not return JSON"));
       }
     });
-  // "MLX is absent" is permanent; "we could not ask" is not, and caching the second one hides
-  // every Metal voice until the process restarts, long after the user has fixed their env.
+  // "No CUDA" is permanent; "we could not ask" is not, and caching the second one would pin marker
+  // to the CPU until the process restarts, long after the user has fixed their env.
   }).catch((err) => {
     capabilities = null;
     throw err;

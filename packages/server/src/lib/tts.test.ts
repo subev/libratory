@@ -27,14 +27,6 @@ describe("parseTtsVoice", () => {
     });
   });
 
-  it("parses the Bulgarian MLX narrator voice", () => {
-    expect(parseTtsVoice("bg-mlx:narrator")).toEqual({
-      engine: "bg-mlx",
-      voice: "narrator",
-      raw: "bg-mlx:narrator",
-    });
-  });
-
   it("parses the Meta MMS Bulgarian voice", () => {
     expect(parseTtsVoice("bg-mms:bul")).toEqual({
       engine: "bg-mms",
@@ -48,12 +40,9 @@ describe("parseTtsVoice", () => {
     expect(parseTtsVoice("bg-piper:dimitar")).toEqual({ engine: "bg-piper", voice: "dimitar", raw: "bg-piper:dimitar" });
   });
 
-  it("parses the KugelAudio voice", () => {
-    expect(parseTtsVoice("kugel:default")).toEqual({
-      engine: "kugel",
-      voice: "default",
-      raw: "kugel:default",
-    });
+  it("names a retired voice instead of calling it unsupported", () => {
+    expect(() => parseTtsVoice("bg-mlx:narrator")).toThrow(/retired.*BgTTS-38M/);
+    expect(() => parseTtsVoice("kugel:default")).toThrow(/KugelAudio was retired/);
   });
 
   it("parses Cartesia voice ids", () => {
@@ -115,14 +104,10 @@ describe("parseTtsVoice", () => {
   });
 
   it("rejects unsupported or empty prefixed voice ids", () => {
-    expect(() => parseTtsVoice("bg-mlx:")).toThrow(/unsupported voice/i);
-    expect(() => parseTtsVoice("bg-mlx:other")).toThrow(/unsupported voice/i);
     expect(() => parseTtsVoice("bg-mms:")).toThrow(/unsupported voice/i);
     expect(() => parseTtsVoice("bg-mms:other")).toThrow(/unsupported voice/i);
     expect(() => parseTtsVoice("bg-bgtts:../ref")).toThrow(/unsupported voice/i);
     expect(() => parseTtsVoice("bg-piper:")).toThrow(/unsupported voice/i);
-    expect(() => parseTtsVoice("kugel:")).toThrow(/unsupported voice/i);
-    expect(() => parseTtsVoice("kugel:other")).toThrow(/unsupported voice/i);
     expect(() => parseTtsVoice("say:")).toThrow(/unsupported voice/i);
     expect(() => parseTtsVoice("say:Daria (Enhanced)")).toThrow(/unsupported voice/i);
     expect(() => parseTtsVoice("kokoro:")).toThrow(/unsupported voice/i);
@@ -137,20 +122,12 @@ describe("parseTtsVoice", () => {
 });
 
 describe("getPreviewTextForVoice", () => {
-  it("returns Bulgarian sample text for the MLX narrator", async () => {
-    expect(await getPreviewTextForVoice("bg-mlx:narrator")).toMatch(/пролетна|утрин/i);
-  });
-
   it("returns Bulgarian sample text for the MMS voice", async () => {
     expect(await getPreviewTextForVoice("bg-mms:bul")).toMatch(/пролетна|утрин/i);
   });
 
   it("returns an English sample for Kokoro voices", async () => {
     expect(await getPreviewTextForVoice("kokoro:af_heart")).toMatch(/quick brown fox/i);
-  });
-
-  it("returns Bulgarian sample text for the KugelAudio voice", async () => {
-    expect(await getPreviewTextForVoice("kugel:default")).toMatch(/пролетна|утрин/i);
   });
 
   it("falls back to English for a say voice that is not installed", async () => {
@@ -173,10 +150,6 @@ describe("getPreviewTextForVoice", () => {
 });
 
 describe("voiceSupportsSpeed", () => {
-  it("disables speed control for the Bulgarian MLX narrator", () => {
-    expect(voiceSupportsSpeed("bg-mlx:narrator")).toBe(false);
-  });
-
   it("offers speed control on Piper, whose length scale works, and not on BgTTS-38M", () => {
     expect(voiceSupportsSpeed("bg-piper:dimitar")).toBe(true);
     expect(voiceSupportsSpeed("bg-bgtts:female")).toBe(false);
@@ -184,10 +157,6 @@ describe("voiceSupportsSpeed", () => {
 
   it("disables speed control for the Meta MMS Bulgarian voice", () => {
     expect(voiceSupportsSpeed("bg-mms:bul")).toBe(false);
-  });
-
-  it("disables speed control for the KugelAudio voice", () => {
-    expect(voiceSupportsSpeed("kugel:default")).toBe(false);
   });
 
   it("disables speed control for Pocket TTS, which has no speed parameter", () => {

@@ -113,7 +113,7 @@ function pythonBin(home) {
 
 // UV_PROJECT_ENVIRONMENT puts the venv where we want it instead of beside pyproject.toml. PyPI is
 // forced because --frozen downloads from the lock but still resolves build backends for the source
-// builds in it (docopt, jieba, the mlx git dep) from the user's configured indexes — an employer's
+// builds in it (docopt, jieba) from the user's configured indexes — an employer's
 // registry answered those with 401 (#19). Both vars: UV_INDEX outranks the extra indexes a uv.toml
 // declares, UV_DEFAULT_INDEX replaces the one it marks `default`.
 function uvEnv(home) {
