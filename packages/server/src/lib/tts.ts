@@ -27,6 +27,7 @@ export function installedLocalEngines(): Record<LocalEngine, boolean> {
   return {
     piper: existsSync(path.join(env.PIPER_ENV_PATH, "python")),
     bgtts: existsSync(path.join(env.BGTTS_ENV_PATH, "python")),
+    pocket: existsSync(path.join(env.POCKET_ENV_PATH, "python")),
   };
 }
 

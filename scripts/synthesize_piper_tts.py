@@ -30,6 +30,24 @@ VOICES = {"dimitar": "bg/bg_BG/dimitar/medium/bg_BG-dimitar-medium"}
 PAUSE_MS = 250
 
 
+def espeak_data_dir() -> Path:
+    """Piper's bundled espeak-ng data, by a path espeak can hold.
+
+    espeak-ng keeps its data path in a fixed buffer: a venv under a long home (a long user name,
+    a deep install directory) truncates it to ".../piper//phontab" and every chunk fails. Measured:
+    173 characters failed, 113 worked. A short symlink in /tmp stands in for a long path.
+    """
+    from piper.phonemize_espeak import ESPEAK_DATA_DIR
+
+    if len(str(ESPEAK_DATA_DIR)) < 120:
+        return ESPEAK_DATA_DIR
+    link = Path(f"/tmp/libratory-espeak-{os.getuid()}")
+    if not (link.is_symlink() and link.resolve() == ESPEAK_DATA_DIR.resolve()):
+        link.unlink(missing_ok=True)
+        link.symlink_to(ESPEAK_DATA_DIR)
+    return link
+
+
 def voice_files(voice: str, local_only: bool) -> Path:
     from huggingface_hub import hf_hub_download
     stem = VOICES[voice]
@@ -56,8 +74,12 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.cache_only:
+        # The cache first: run at every container start, it must stay quiet and offline once warm
         for voice in VOICES:
-            voice_files(voice, local_only=False)
+            try:
+                voice_files(voice, local_only=True)
+            except Exception:
+                voice_files(voice, local_only=False)
         print(json.dumps({"type": "cached"}), flush=True)
         return
     if not (args.input and args.output and args.voice):
@@ -76,7 +98,7 @@ def main() -> None:
         raise RuntimeError("The Piper Bulgarian voice is not downloaded — run `pnpm run setup`") from exc
     # Patches the graph in memory to return per-phoneme sample counts; without the onnx package it
     # loads unpatched and every chunk simply has no word timings
-    voice = PiperVoice.load(str(model_path), include_alignments=True)
+    voice = PiperVoice.load(str(model_path), include_alignments=True, espeak_data_dir=espeak_data_dir())
 
     def phonemize_word(token: str) -> str:
         return "".join("".join(sentence) for sentence in voice.phonemize(token))

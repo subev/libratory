@@ -19,7 +19,7 @@ export type Voice = {
   requiresEngine?: LocalEngine;
 };
 
-export type LocalEngine = "piper" | "bgtts";
+export type LocalEngine = "piper" | "bgtts" | "pocket";
 
 // The one predicate behind both the sidebar counts and the list itself; when they disagreed, the
 // rail said 48 and the provider chips added up to 49.
@@ -263,6 +263,7 @@ export function pocketVoiceToEntry(
     note: `${voice.note} \u00b7 ${voice.license}`,
     language: languageCode,
     engine: "pocket",
+    requiresEngine: "pocket",
   };
 }
 
@@ -278,5 +279,6 @@ export function pocketCustomVoiceToEntry(voice: { id: string; name: string; seco
     note: `${voice.seconds}s reference`,
     language: "en",
     engine: "pocket",
+    requiresEngine: "pocket",
   };
 }

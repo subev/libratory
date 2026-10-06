@@ -35,10 +35,8 @@ Not done:
    AppArmor profile, a `.deb` (installed sandbox helper), or documenting the flag.
 3. **Release CI**: a Linux job beside the macOS one, `latest-linux.yml` for electron-updater
    (AppImage updates work; deb does not self-update).
-4. **Piper and BgTTS in the desktop app** (every platform): first run builds neither
-   `.venv-piper` nor `.venv-bgtts`, and `voiceMissingEngine`'s hint says `pnpm run setup`, which a
-   packaged app does not have. A first-run step (Piper is small; BgTTS opt-in) or a download
-   button in the picker.
+4. **BgTTS (and Pocket) in the desktop app** (every platform): Piper has a first-run step since
+   2026-10-07; BgTTS and Pocket still have no environment there and their rows say so.
 5. CUDA: the lock routes Linux torch to the CPU index; a GPU build would need its own lock.
 
 ### Test bed: Omarchy on this Mac

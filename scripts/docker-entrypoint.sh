@@ -10,4 +10,8 @@
 if ! /opt/venv/bin/python /app/scripts/models.py --essential; then
   echo "warning: could not cache the Kokoro voice (~350 MB); synthesis will fail until a restart with network access" >&2
 fi
+# Piper's Bulgarian voice, 63 MB, the same way: from the cache when it is there, else fetched once
+if ! /opt/venv-piper/bin/python /app/scripts/synthesize_piper_tts.py --cache-only >/dev/null; then
+  echo "warning: could not cache the Piper Bulgarian voice (63 MB); it will be unavailable until a restart with network access" >&2
+fi
 exec "$@"

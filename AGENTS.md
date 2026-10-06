@@ -787,8 +787,12 @@ the state.
 - **`src/main.cjs` / `src/setup.cjs`** — the window and the first run. Stages `scripts/`,
   `pyproject.toml` and `uv.lock` out of the bundle into `~/Library/Application Support/Libratory`,
   fetches a checksummed `uv`, builds the Python environment from the lockfile, fetches Kokoro,
-  brings up Postgres in Docker, applies the migrations, starts the compiled server. ~2.4 GB
-  downloaded once, then the window loads it. Steps are a list in `main.cjs` sent to `first-run.html`
+  builds Piper's own environment (`python-piper`, keyed on `requirements-piper.txt`, optional — a
+  failure costs the voice, not the app), brings up Postgres in Docker, applies the migrations,
+  starts the compiled server. ~2.6 GB downloaded once, then the window loads it. Pocket and BgTTS
+  have no environment in the packaged app; the server reports `LIBRATORY_RUNTIME` (`desktop`,
+  `docker`, `source`) and their rows say "Not in the desktop app yet" rather than naming a setup
+  command a packaged app cannot run. Steps are a list in `main.cjs` sent to `first-run.html`
   so the window draws itself; the runner blocks the step that failed and marks the rest skipped.
   A synced EPUB double-clicked in Finder arrives through `open-file` (declared as a `Viewer` at
   `Alternate` rank, so Books.app keeps the default) and is queued rather than opened: on a cold

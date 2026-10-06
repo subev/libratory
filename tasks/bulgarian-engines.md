@@ -26,8 +26,7 @@ polished; decide what stays after an A/B on a real book.
 
 ## Polish if it stays
 
-- Bundle UI: neither engine is in `scripts/models.py`. A missing venv disables the row with the
-  setup command (`requiresEngine`), not a download button. The Dockerfile and the desktop app's first
-  run build neither venv.
+- BgTTS in the desktop app and the Docker image (~1.5 GB): a download button behind its rows, which
+  say "Not in the desktop app yet" today. Piper ships in both since 2026-10-07.
 - `9 ч.` (hour without minutes) is not expanded by the normalizer.
 - Word timings for BgTTS: an autoregressive model with no durations; would need a forced aligner.

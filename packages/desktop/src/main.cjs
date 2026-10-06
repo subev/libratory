@@ -199,6 +199,9 @@ function serverEnv() {
     DATA_DIR: dataDir(),
     CONDA_ENV_PATH: path.join(HOME, "python/bin"),
     POCKET_ENV_PATH: path.join(HOME, "python-pocket/bin"),
+    PIPER_ENV_PATH: path.join(HOME, "python-piper/bin"),
+    BGTTS_ENV_PATH: path.join(HOME, "python-bgtts/bin"),
+    LIBRATORY_RUNTIME: "desktop",
     WEB_DIR: path.join(RESOURCES, "web"),
     MIGRATIONS_DIR: path.join(RESOURCES, "drizzle"),
     DATABASE_URL: process.env.DATABASE_URL || CONFIG.databaseUrl || DEFAULT_DATABASE_URL,
@@ -281,6 +284,22 @@ const STEPS = [
       detail("Downloading the Kokoro voice — 347 MB");
       await setup.fetchEssentialModels(ctx.python, HOME, () => {});
       runtime.writeState(HOME, { essentialModels: true });
+    },
+  },
+  {
+    id: "piper",
+    label: "Piper voice (Bulgarian)",
+    // Optional: a failure here costs the Piper voice, never the app, and is tried again next launch
+    async run(ctx, detail) {
+      if (!ctx.pending.piper) return "up to date";
+      detail("Installing Piper and its Bulgarian voice — about 210 MB, once");
+      try {
+        await setup.syncPiper(HOME, (line) => detail(line.trim().split("\n").at(-1)));
+      } catch (err) {
+        return `skipped — ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`;
+      }
+      runtime.writeState(HOME, { piperLock: ctx.pending.want.piperLock });
+      return "installed";
     },
   },
   {

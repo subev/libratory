@@ -155,6 +155,27 @@ async function syncPython(home, onOutput) {
   return pythonBin(home);
 }
 
+// Piper (Bulgarian, with word timings) runs in a venv of its own: onnxruntime and numpy 2 must not
+// disturb the main environment's pins. Same uv, same index pin, the requirements staged with the
+// scripts; then its voice is cached, since synthesis runs offline.
+function piperPython(home) {
+  return path.join(home, "python-piper", "bin", "python");
+}
+
+async function syncPiper(home, onOutput) {
+  const uv = await ensureUv(home, onOutput);
+  const venv = path.join(home, "python-piper");
+  await sh(uv, ["venv", "--python", "3.12", "--allow-existing", venv], { env: uvEnv(home), onOutput });
+  await sh(uv, ["pip", "install", "--python", piperPython(home), "-r", path.join(home, "scripts", "requirements-piper.txt")], {
+    env: uvEnv(home),
+    onOutput,
+  });
+  await sh(piperPython(home), [path.join(home, "scripts", "synthesize_piper_tts.py"), "--cache-only"], {
+    env: { HF_HUB_OFFLINE: "0" },
+    onOutput,
+  });
+}
+
 async function fetchEssentialModels(python, home, onOutput) {
   await sh(python, [path.join(home, "scripts", "models.py"), "--essential"], {
     env: { HF_HUB_OFFLINE: "0" },
@@ -162,4 +183,4 @@ async function fetchEssentialModels(python, home, onOutput) {
   });
 }
 
-module.exports = { missingTools, installHint, toolPath, stageRuntime, pythonBin, uvEnv, syncPython, fetchEssentialModels, failureMessage };
+module.exports = { missingTools, installHint, toolPath, syncPiper, piperPython, stageRuntime, pythonBin, uvEnv, syncPython, fetchEssentialModels, failureMessage };

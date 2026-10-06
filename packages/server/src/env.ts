@@ -35,6 +35,8 @@ const envSchema = z.object({
   POCKET_ENV_PATH: z.string().default(path.join(repoRoot, ".venv-pocket", "bin")),
   PIPER_ENV_PATH: z.string().default(path.join(repoRoot, ".venv-piper", "bin")),
   BGTTS_ENV_PATH: z.string().default(path.join(repoRoot, ".venv-bgtts", "bin")),
+  // What kind of install this is, so a voice whose env is missing names a step the person can take
+  LIBRATORY_RUNTIME: z.enum(["source", "desktop", "docker"]).default("source"),
   // Where the vivliostyle CLI is installed when the server has no node_modules of its own.
   VIVLIOSTYLE_DIR: z.string().default(path.join(repoRoot, "vivliostyle")),
   // One directory holding the traineddata files *and* configs/ + pdf.ttf, or `tesseract … pdf` fails

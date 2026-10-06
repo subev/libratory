@@ -140,10 +140,16 @@ function humanizeSayVoiceId(voiceId: string): string {
 const ENGINE_SETUP: Record<NonNullable<Voice["requiresEngine"]>, string> = {
   piper: "pnpm run setup",
   bgtts: "pnpm run setup --bgtts",
+  pocket: "pnpm run setup",
 };
 
-export function voiceMissingEngine(voice: Voice, installed: Partial<Record<string, boolean>> | undefined): string | null {
-  if (!voice.requiresEngine || installed?.[voice.requiresEngine] !== false) return null;
+export type EngineStatus = { installed: Partial<Record<string, boolean>>; runtime: "source" | "desktop" | "docker" };
+
+// A setup command means something only in a checkout; a packaged build says so instead
+export function voiceMissingEngine(voice: Voice, engines: EngineStatus | undefined): string | null {
+  if (!voice.requiresEngine || engines?.installed[voice.requiresEngine] !== false) return null;
+  if (engines.runtime === "desktop") return "Not in the desktop app yet";
+  if (engines.runtime === "docker") return "Not in the Docker image yet";
   return `Not installed — run ${ENGINE_SETUP[voice.requiresEngine]}`;
 }
 
