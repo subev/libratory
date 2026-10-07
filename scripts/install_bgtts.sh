@@ -9,6 +9,10 @@
 # Safe to run again: a venv still marked .installing is not counted as installed, so an interrupted
 # run is offered again and resumes from uv's cache.
 set -eu
+# The desktop app hands its server a PATH of bundled tools, Homebrew and /usr/bin — no /bin, which is
+# the only place macOS keeps mkdir and rm
+PATH="${PATH:+$PATH:}/usr/bin:/bin:/usr/sbin:/sbin"
+export PATH
 
 UV="$1"
 VENV="$2"
