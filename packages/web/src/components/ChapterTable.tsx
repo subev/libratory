@@ -72,6 +72,14 @@ export type FileInfo = {
   filename: string;
 };
 
+function withChapter(current: URLSearchParams, id: string | null): URLSearchParams {
+  if (current.get("chapter") === id || (id === null && !current.has("chapter"))) return current;
+  const next = new URLSearchParams(current);
+  if (id === null) next.delete("chapter");
+  else next.set("chapter", id);
+  return next;
+}
+
 export function ChapterTable({
   language,
   bookId,
@@ -111,43 +119,39 @@ export function ChapterTable({
   /** The translation pairing is shown against, when there is one to pair with. */
   bilingualLanguage?: string | null;
 }) {
-  const [pickedChapterIndex, setPickedChapterIndex] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // A deep link (?chapter=<id>, e.g. from a chat citation) opens the modal on its own; the first
-  // move away from it — another chapter, or closing — is what takes it back out of the URL.
-  const deepLinked = searchParams.get("chapter");
-  const deepLinkedIndex = deepLinked ? chapters.findIndex((c) => c.id === deepLinked) : -1;
-  const modalChapterIndex = pickedChapterIndex ?? (deepLinkedIndex >= 0 ? deepLinkedIndex : null);
+  // The open chapter lives in the URL (?chapter=<id>) and nowhere else, so a reload, a shared link
+  // and a chat citation all land on it. It used to be held in state, with the param removed on the
+  // first click — a refreshed page came back with the dialog closed.
+  const openChapterId = searchParams.get("chapter");
+  const openIndex = openChapterId ? chapters.findIndex((c) => c.id === openChapterId) : -1;
+  const modalChapterIndex = openIndex >= 0 ? openIndex : null;
+  // The updater form: ?variant= and the shell's own params are written from elsewhere, so this
+  // render's snapshot is not safe to write back
+  const openChapterModal = (index: number | null) => {
+    const id = index === null ? null : (chapters[index]?.id ?? null);
+    setSearchParams((current) => withChapter(current, id), { replace: true });
+  };
   // Inside the modal, [ and ] walk the chapters; the page's book switch stays out while a dialog is open
+  const modalOpen = modalChapterIndex !== null;
   useEffect(() => {
-    if (modalChapterIndex === null) return;
+    if (!modalOpen) return;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== "[" && e.key !== "]") return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
-      const next = (modalChapterIndex ?? 0) + (e.key === "]" ? 1 : -1);
-      if (next >= 0 && next < chapters.length) setPickedChapterIndex(next);
+      // From the URL as it is now, not this render's: the router applies a search change as a
+      // transition, so keys pressed in a row all read the same render and stopped one chapter on
+      const openId = new URLSearchParams(window.location.search).get("chapter");
+      const at = chapters.findIndex((c) => c.id === openId);
+      const next = at >= 0 ? chapters[at + (e.key === "]" ? 1 : -1)] : undefined;
+      if (next) setSearchParams((current) => withChapter(current, next.id), { replace: true });
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [modalChapterIndex, chapters.length, setPickedChapterIndex]);
-  const openChapterModal = (index: number | null) => {
-    setPickedChapterIndex(index);
-    // The updater form, and the has() check inside it: ?variant= and the shell's own param are
-    // written from elsewhere, so the render's snapshot is neither safe to write back nor to read
-    // the answer out of — a deep link that arrived since this render would survive the delete.
-    setSearchParams(
-      (current) => {
-        if (!current.has("chapter")) return current;
-        const next = new URLSearchParams(current);
-        next.delete("chapter");
-        return next;
-      },
-      { replace: true },
-    );
-  };
+  }, [modalOpen, chapters, setSearchParams]);
 
   const { pin } = useAssistant();
   const [pdfPreview, setPdfPreview] = useState<{ fileId: string; page: number; filename?: string } | null>(null);
