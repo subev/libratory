@@ -346,3 +346,16 @@ body {
   color: transparent;
   animation: thinking-sweep 1.6s linear infinite;
 }
+
+/* A table cell that stays put while its row scrolls sideways under it, so it has to be opaque —
+   and --bg-card-hover is a translucent wash in dark mode, so the row tint is layered over the card
+   colour rather than replacing it. The chapter table pins its titles left and its actions right. */
+.pinned-cell {
+  background: linear-gradient(var(--pinned-tint, transparent), var(--pinned-tint, transparent)), var(--bg-card);
+}
+/* The edge facing the scrolled columns, so a cut-off column reads as passing under the pinned one
+   (macOS hides the scrollbar until the table is scrolled; this is the hint that there is more) */
+.pinned-cell.left-0 { box-shadow: inset -1px 0 0 var(--border); }
+.pinned-cell.right-0 { box-shadow: inset 1px 0 0 var(--border); }
+thead .pinned-cell { --pinned-tint: var(--bg-subtle); }
+tr:hover > .pinned-cell { --pinned-tint: var(--bg-card-hover); }

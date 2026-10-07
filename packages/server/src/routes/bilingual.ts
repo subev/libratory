@@ -9,6 +9,7 @@ import { bilingualPreparations, chapterVariants, chapters, books } from "../sche
 import { publicProcedure, router } from "../trpc.ts";
 import { bilingualContext, currentPreparation, jobColumn, failPreparation } from "../lib/bilingual-store.ts";
 import { matchesTexts, type BilingualJob } from "../lib/bilingual-preparation.ts";
+import { bilingualChapterState } from "../lib/bilingual-chapter-state.ts";
 import { bundleInstalled } from "../lib/model-bundles.ts";
 import { textRevision, switchNarration } from "../lib/bilingual-format.ts";
 import { conversionBlocked, convertLegacyBilingualAudio, isLegacyAudio } from "../lib/bilingual-audio.ts";
@@ -76,20 +77,28 @@ async function cancelPreparation(input: z.infer<typeof choice>) {
 }
 
 const selection = z.object({ bookId: z.string().uuid(), chapterIds: z.array(z.string().uuid()).min(1).max(1000), key: z.string().min(1) });
-async function selectedPreparation(input: z.infer<typeof selection>) {
-  const ids = [...new Set(input.chapterIds)];
+
+// Every chapter of the book, or the chosen ones, with this translation and its preparation
+async function preparationRows(bookId: string, key: string, chapterIds?: string[]) {
+  const ids = chapterIds ? [...new Set(chapterIds)] : null;
   const rows = await db.select({ chapter: chapters, language: books.language, variant: chapterVariants, row: bilingualPreparations })
     .from(chapters).innerJoin(books, eq(books.id, chapters.bookId))
-    .leftJoin(chapterVariants, and(eq(chapterVariants.chapterId, chapters.id), eq(chapterVariants.key, input.key)))
+    .leftJoin(chapterVariants, and(eq(chapterVariants.chapterId, chapters.id), eq(chapterVariants.key, key)))
     .leftJoin(bilingualPreparations, eq(bilingualPreparations.variantId, chapterVariants.id))
-    .where(and(eq(chapters.bookId, input.bookId), inArray(chapters.id, ids))).orderBy(asc(chapters.index));
-  if (rows.length !== ids.length) throw new Error("Selection contains missing chapters or chapters from another book");
-  return rows.map(({ chapter, variant, row, language }) => {
-    const source = chapterText(chapter).trim(), target = variant?.text.trim() ?? "";
+    .where(and(eq(chapters.bookId, bookId), ids ? inArray(chapters.id, ids) : undefined)).orderBy(asc(chapters.index));
+  if (ids && rows.length !== ids.length) throw new Error("Selection contains missing chapters or chapters from another book");
+  return rows.map((entry) => {
+    const source = chapterText(entry.chapter).trim(), target = entry.variant?.text.trim() ?? "";
+    return { ...entry, source, target, state: bilingualChapterState({ variant: entry.variant, source, target, row: entry.row }) };
+  });
+}
+
+async function selectedPreparation(input: z.infer<typeof selection>) {
+  return (await preparationRows(input.bookId, input.key, input.chapterIds)).map(({ chapter, variant, row, language, source, target, state }) => {
     const available = variant?.kind === "translation" && variant.status === "done" && !!source && !!target;
     const status = variant?.kind === "translation"
       ? summarize({ chapter, variant, language, source, target }, row, available && matchesTexts(row?.pairs ?? null, source, target)) : null;
-    return { chapterId: chapter.id, index: chapter.index, title: chapter.title, available, status };
+    return { chapterId: chapter.id, index: chapter.index, title: chapter.title, available, status, state };
   });
 }
 
@@ -98,6 +107,9 @@ export const bilingualRouter = router({
     .query(({ input }) => bilingualExportStatus(input.bookId, input.key)),
   readiness: publicProcedure.input(z.object({ bookId: z.string().uuid() })).query(({ input }) => bilingualReadiness(input.bookId)),
   selection: publicProcedure.input(selection).query(({ input }) => selectedPreparation(input)),
+  // Light enough to poll: no token estimates, which build every link prompt
+  chapterStates: publicProcedure.input(z.object({ bookId: z.string().uuid(), key: z.string().min(1) })).query(async ({ input }) =>
+    (await preparationRows(input.bookId, input.key)).map(({ chapter, state }) => ({ chapterId: chapter.id, ...state }))),
   prepareSelection: publicProcedure.input(selection.extend({ stage: z.enum(["pairs", "links"]), model: modelKeySchema.optional() })).mutation(async ({ input }) => {
     const rows = await selectedPreparation(input);
     const results: { chapterId: string; queued: boolean; error: string | null }[] = [];

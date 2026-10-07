@@ -94,7 +94,7 @@ describe("synthesize worker", () => {
     expect(chapter.progress).toBeNull();
     expect(chapter.audioPath).toContain("ch000.m4a");
     expect(chapter.durationMs).toBe(12400);
-    expect(chapter.synthesizedWith).toEqual({ voice: "bg-bgtts:male", speed: null });
+    expect(chapter.synthesizedWith).toEqual({ voice: "bg-bgtts:male", speed: null, at: expect.any(String) });
   });
 
   it("never queues an assembly when the last chapter lands", async () => {
@@ -262,6 +262,6 @@ describe("synthesize worker", () => {
     }));
 
     const chapter = row(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
-    expect(chapter.synthesizedWith).toEqual({ voice: "bg-mms:bul", speed: null });
+    expect(chapter.synthesizedWith).toEqual({ voice: "bg-mms:bul", speed: null, at: expect.any(String) });
   });
 });

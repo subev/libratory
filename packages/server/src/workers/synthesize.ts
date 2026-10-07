@@ -165,6 +165,7 @@ export async function synthesize(payload: SynthesizePayload, { addJob: _addJob }
         synthesizedWith: {
           voice: book.voice,
           speed: voiceSupportsSpeed(book.voice) ? book.speed : null,
+          at: new Date().toISOString(),
         },
       })
       .where(eq(chapters.id, chapterId));

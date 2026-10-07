@@ -7,47 +7,32 @@ describe("bookLayout", () => {
       showHeadMeta: true,
       showStageHint: true,
       showPosition: true,
-      showSource: true,
-      showWords: true,
-      showDuration: true,
-      showVoice: true,
-      showPages: true,
       showLabels: true,
       trayCompact: false,
       filterColumns: 2,
     });
   });
 
-  it("drops the head meta, stage hint, book position and Voice below 1180", () => {
+  it("drops the head meta, stage hint and book position below 1180", () => {
     const layout = bookLayout(1179);
     expect(layout.showHeadMeta).toBe(false);
     expect(layout.showStageHint).toBe(false);
     expect(layout.showPosition).toBe(false);
-    expect(layout.showVoice).toBe(false);
-    expect(layout.showWords).toBe(true);
+    expect(layout.showLabels).toBe(true);
   });
 
-  it("drops Words below 1120 and keeps Length", () => {
-    expect(bookLayout(1119).showWords).toBe(false);
-    expect(bookLayout(1119).showDuration).toBe(true);
-  });
-
-  it("collapses labels, Length, pages and the tray below 1000", () => {
+  it("collapses labels, the tray and the filter grid below 1000", () => {
     expect(bookLayout(999)).toMatchObject({
-      showDuration: false,
-      showPages: false,
       showLabels: false,
       trayCompact: true,
       filterColumns: 1,
     });
   });
 
-  // Each boundary is inclusive on the roomy side — off by one here is a column that never appears.
+  // Each boundary is inclusive on the roomy side — off by one here is chrome that never appears.
   it.each([
     [1180, "showHeadMeta"],
-    [1180, "showVoice"],
-    [1120, "showWords"],
-    [1000, "showDuration"],
+    [1000, "showLabels"],
   ] as const)("turns %s on exactly at its own width", (width, key) => {
     expect(bookLayout(width)[key]).toBe(true);
     expect(bookLayout(width - 1)[key]).toBe(false);

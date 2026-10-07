@@ -12,6 +12,8 @@ import {
   PROVIDER_ORDER,
   sayVoiceToEntry,
   staticVoices,
+  voiceHasWordTiming,
+  voiceSupportsSpeedControl,
   type Voice,
 } from "../../lib/voices.ts";
 import { trpc } from "../../trpc.ts";
@@ -33,6 +35,15 @@ const ALL = "all";
 const PREVIEW_PER_PROVIDER = 6;
 const RAIL_LANGUAGE_LIMIT = 8;
 const NONE_EXPANDED: ReadonlySet<string> = new Set();
+
+// What a listener cannot hear in a preview, so the list has to be able to ask for it. Word timing
+// is judged in the language of the list, because that is what the voice will be reading.
+type Needs = { wordTiming: boolean; speed: boolean };
+const NEEDS_NOTHING: Needs = { wordTiming: false, speed: false };
+const hasWordTiming = (voice: Voice, language: string) =>
+  voiceHasWordTiming(voice.id, language === CLONED ? voice.language : language);
+const meetsNeeds = (voice: Voice, language: string, needs: Needs) =>
+  (!needs.wordTiming || hasWordTiming(voice, language)) && (!needs.speed || voiceSupportsSpeedControl(voice.id));
 
 // Every other engine here is free; this one is metered, and running out mid-chapter is the
 // normal case on a free month. What is left belongs where the voices are chosen.
@@ -71,6 +82,8 @@ export function VoiceLibraryModal({
 }) {
   const { state } = useVoicePicker();
   const [query, setQuery] = useState("");
+  // Held across languages: wanting word timing is about the reading, not about one language
+  const [needs, setNeeds] = useState<Needs>(NEEDS_NOTHING);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useBodyScrollLock();
@@ -134,6 +147,17 @@ export function VoiceLibraryModal({
 
   const languages = useMemo(() => orderLanguages(languageCounts, priorityLanguages), [languageCounts, priorityLanguages]);
 
+  // With a toggle on, the rail answers "where can I get this" — the numbers follow it, the order
+  // does not, so languages stay where the eye left them
+  const neededCounts = useMemo(() => {
+    if (!needs.wordTiming && !needs.speed) return languageCounts;
+    const counts = new Map<string, number>();
+    for (const code of languageCounts.keys()) {
+      counts.set(code, allVoices.reduce((n, v) => n + (voiceCoversLanguage(v, code) && meetsNeeds(v, code, needs) ? 1 : 0), 0));
+    }
+    return counts;
+  }, [needs, languageCounts, allVoices]);
+
   const [chosen, setChosen] = useState<string>(() => {
     const fromSelection = allVoicesLanguageOf(state.selectedId);
     if (fromSelection) return fromSelection;
@@ -160,7 +184,7 @@ export function VoiceLibraryModal({
 
   const pocketLanguage = pocketLanguages.find((l) => l.code === language) ?? null;
 
-  const visible = useMemo(() => {
+  const searched = useMemo(() => {
     const pool =
       language === CLONED
         ? clonedVoices
@@ -171,6 +195,23 @@ export function VoiceLibraryModal({
       .filter((v) => matches(v.label, v.note, providerOfVoice(v)))
       .sort((a, b) => Number(voiceIsForeignIn(a, language)) - Number(voiceIsForeignIn(b, language)));
   }, [allVoices, clonedVoices, language, matches]);
+
+  // Each counts with the other toggle as it stands, so the number is what this one would leave
+  const capabilityCounts = useMemo(
+    () => ({
+      wordTiming: searched.filter((v) => meetsNeeds(v, language, { ...needs, wordTiming: true })).length,
+      speed: searched.filter((v) => meetsNeeds(v, language, { ...needs, speed: true })).length,
+    }),
+    [searched, language, needs],
+  );
+
+  // Clones are Pocket's, which has neither, so the toggles would only ever empty that list
+  const visible = useMemo(
+    () =>
+      language === CLONED ? searched : searched.filter((v) => meetsNeeds(v, language, needs)),
+    [searched, needs, language],
+  );
+  const needsLabel = language === CLONED ? "" : [needs.wordTiming && "word timing", needs.speed && "speed control"].filter(Boolean).join(" and ");
 
   const byProvider = useMemo(() => {
     const groups = new Map<string, Voice[]>();
@@ -200,7 +241,9 @@ export function VoiceLibraryModal({
   const expanded = picked.language === language ? picked.expanded : NONE_EXPANDED;
   const setProvider = (name: string | null) => setPicked({ language, provider: name, expanded });
   const expand = (name: string) => setPicked({ language, provider, expanded: new Set(expanded).add(name) });
-  const activeProvider = query ? ALL : (provider ?? selectedProvider);
+  const chosenProvider = provider ?? selectedProvider;
+  // A toggle can empty the provider that was open; the list falls back to all rather than to nothing
+  const activeProvider = query || !byProvider.some((g) => g.provider === chosenProvider) ? ALL : chosenProvider;
 
   const shown = activeProvider === ALL ? byProvider : byProvider.filter((g) => g.provider === activeProvider);
 
@@ -260,7 +303,7 @@ export function VoiceLibraryModal({
               >
                 <span className="truncate">{languageLabel(code)}</span>
                 <span className="text-xs text-(--text-faint) tabular-nums" title={languageCounts.get(code) ? undefined : "Not downloaded yet"}>
-                  {languageCounts.get(code) || <IconDownload className="h-3 w-3" />}
+                  {languageCounts.get(code) ? neededCounts.get(code) : <IconDownload className="h-3 w-3" />}
                 </span>
               </button>
             ))}
@@ -280,7 +323,7 @@ export function VoiceLibraryModal({
           </nav>
 
           <div className="flex-1 min-w-0 flex flex-col">
-            <div className="p-2 border-b border-(--border) shrink-0">
+            <div className="p-2 border-b border-(--border) shrink-0 flex items-center gap-2">
               <input
                 ref={searchRef}
                 type="search"
@@ -289,9 +332,29 @@ export function VoiceLibraryModal({
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={language === CLONED ? "Search your voices…" : `Search ${languageLabel(language)} voices…`}
                 aria-label="Search voices"
-                className="w-full rounded-md border border-(--border-input) bg-(--bg-input) px-3 py-1.5 text-sm"
+                className="flex-1 min-w-0 rounded-md border border-(--border-input) bg-(--bg-input) px-3 py-1.5 text-sm"
                 data-testid="voice-search"
               />
+              {language !== CLONED && (
+              <div className="flex gap-1 shrink-0" role="group" aria-label="Only voices with">
+                <PillToggle
+                  selected={needs.wordTiming}
+                  onClick={() => setNeeds((n) => ({ ...n, wordTiming: !n.wordTiming }))}
+                  title="Only voices that time every word, so read-along and two-language reading follow word by word"
+                  testId="voice-need-word-timing"
+                >
+                  Word timing <span className="tabular-nums opacity-70">{capabilityCounts.wordTiming}</span>
+                </PillToggle>
+                <PillToggle
+                  selected={needs.speed}
+                  onClick={() => setNeeds((n) => ({ ...n, speed: !n.speed }))}
+                  title="Only voices whose speed can be set"
+                  testId="voice-need-speed"
+                >
+                  Speed control <span className="tabular-nums opacity-70">{capabilityCounts.speed}</span>
+                </PillToggle>
+              </div>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto overscroll-contain p-2" data-testid="voice-list">
@@ -376,9 +439,16 @@ export function VoiceLibraryModal({
                           </Section>
                         );
                       })
-                    : !pocketLanguage && (
+                    : (needsLabel || !pocketLanguage) && (
                         <Empty>
-                          {query ? (
+                          {needsLabel && searched.length > 0 ? (
+                            <>
+                              No {languageLabel(language)} voices {query ? `matching “${query}” ` : ""}have {needsLabel}.{" "}
+                              <Button variant="ghost" size="sm" onClick={() => setNeeds(NEEDS_NOTHING)}>
+                                Show them all
+                              </Button>
+                            </>
+                          ) : query ? (
                             `No ${languageLabel(language)} voices match “${query}”.`
                           ) : (
                             <>
@@ -438,7 +508,8 @@ function ProviderChip({
 }) {
   return (
     <PillToggle selected={active} onClick={onClick} testId={`voice-provider-${label}`}>
-      {label} <span className="tabular-nums text-(--text-faint)">{count}</span>
+      {/* Dimmed, not recoloured: a faint grey vanished on the selected chip's accent fill */}
+      {label} <span className="tabular-nums opacity-70">{count}</span>
     </PillToggle>
   );
 }
