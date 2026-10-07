@@ -13,6 +13,11 @@ import { rowClick } from "../lib/row-click.ts";
 import { useVoiceLabel } from "./VoicePicker.tsx";
 import { providerOfVoice } from "../lib/voices.ts";
 import { SynthesizeModal, type SynthSettings } from "./SynthesizeModal.tsx";
+import { ChapterFilterPanel } from "./ChapterFilterPanel.tsx";
+import { NO_FILTERS, activeFilterCount as countActiveFilters, matchesFilters, type ChapterFilters } from "../lib/chapter-filters.ts";
+import type { SynthesizedWith } from "../../../server/src/schema.ts";
+import { TONE_CLASS, bilingualShort, describeBilingual, type BilingualChapterState } from "../lib/bilingual-state.ts";
+import { formatOutputDate, formatRelativeTime } from "../lib/format.ts";
 import {
   IconAi,
   IconBook,
@@ -46,7 +51,9 @@ export type ChapterRow = {
   pageEnd: number | null;
   sourceFileIndex: number | null;
   source?: { kind: "book"; bookId: string; title: string } | { kind: "url"; url: string; title?: string } | { kind: "note"; noteId: string } | { kind: "api"; client?: string } | null;
-  synthesizedWith: { voice?: string; speed?: number | null } | null;
+  synthesizedWith: SynthesizedWith | null;
+  /** Two-language reading with `bilingualLanguage`; absent when the book has no translation to pair. */
+  bilingual?: BilingualChapterState | null;
   // Translation view: rows without a finished translation can't be synthesized (but can be selected for bulk translation)
   synthesizable?: boolean;
   audioUrl?: string;
@@ -65,8 +72,6 @@ export type FileInfo = {
   filename: string;
 };
 
-const STATUSES = ["done", "failed", "pending", "suspended", "synthesizing", "normalizing"] as const;
-
 export function ChapterTable({
   language,
   bookId,
@@ -83,6 +88,7 @@ export function ChapterTable({
   onSwitchVariant,
   synth,
   layout,
+  bilingualLanguage = null,
 }: {
   language?: string | null;
   bookId: string;
@@ -102,6 +108,8 @@ export function ChapterTable({
   synth: SynthSettings;
   /** Which columns and labels fit — supplied by the page, so the table stays portable. */
   layout: BookLayout;
+  /** The translation pairing is shown against, when there is one to pair with. */
+  bilingualLanguage?: string | null;
 }) {
   const [pickedChapterIndex, setPickedChapterIndex] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -153,14 +161,9 @@ export function ChapterTable({
   // Filter state
   const [quickFilter, setQuickFilter] = useState<"all" | "noaudio" | "flight" | "attention">("all");
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [statusOperator, setStatusOperator] = useState<"is" | "is_not">("is");
-  const [wordCountMin, setWordCountMin] = useState("");
-  const [wordCountMax, setWordCountMax] = useState("");
-  const [durationMin, setDurationMin] = useState("");
-  const [durationMax, setDurationMax] = useState("");
-  const [durationUnit, setDurationUnit] = useState<"sec" | "min">("sec");
-  const [sourceFileFilter, setSourceFileFilter] = useState("");
+  const [filters, setFilters] = useState<ChapterFilters>(NO_FILTERS);
+  // "In the last 7 days" counts from when the panel opened; a render must not read the clock
+  const [ageNow, setAgeNow] = useState(() => Date.now());
   const [dragChapterId, setDragChapterId] = useState<string | null>(null);
   const [dragOverChapterId, setDragOverChapterId] = useState<string | null>(null);
 
@@ -176,37 +179,23 @@ export function ChapterTable({
     return true;
   };
 
+  // A Bilingual choice outlives a switch to a view with nothing to pair; unseen, it must not filter
+  const effectiveFilters = bilingualLanguage === null && filters.bilingual !== "" ? { ...filters, bilingual: "" as const } : filters;
+  const filterContext = { current: { voice: synth.voice, speed: synth.speed }, now: ageNow };
   const filteredChapters = chapters.filter((ch) => {
     if (!matchesQuick(ch)) return false;
     if (search && !ch.title.toLowerCase().includes(search.toLowerCase())) return false;
-    if (statusFilter) {
-      if (statusOperator === "is" && ch.status !== statusFilter) return false;
-      if (statusOperator === "is_not" && ch.status === statusFilter) return false;
-    }
-    const minW = Number(wordCountMin);
-    if (minW && ch.wordCount < minW) return false;
-    const maxW = Number(wordCountMax);
-    if (maxW && ch.wordCount > maxW) return false;
-    const durationMultiplier = durationUnit === "min" ? 60000 : 1000;
-    const minD = Number(durationMin) * durationMultiplier;
-    if (minD && (ch.durationMs ?? 0) < minD) return false;
-    const maxD = Number(durationMax) * durationMultiplier;
-    if (maxD && (ch.durationMs ?? 0) > maxD) return false;
-    if (sourceFileFilter && ch.sourceFileIndex !== Number(sourceFileFilter)) return false;
-    return true;
+    return matchesFilters(ch, effectiveFilters, filterContext);
   });
 
   const isFiltered = filteredChapters.length !== chapters.length;
   const canDrag = onReorder && !isFiltered;
-  const activeFilterCount = [
-    search,
-    statusFilter,
-    wordCountMin,
-    wordCountMax,
-    durationMin,
-    durationMax,
-    sourceFileFilter,
-    quickFilter === "all" ? "" : quickFilter,
+  // Only what the panel hides: the chips and the search box already show themselves
+  const activeFilterCount = countActiveFilters(effectiveFilters);
+  const showBilingual = bilingualLanguage !== null;
+  const columnCount = [
+    true, Boolean(canDrag), true, true, Boolean(isMultiFile), true,
+    true, true, true, true, showBilingual, true,
   ].filter(Boolean).length;
   // One pass, not four: none of these depends on the search box, and every keystroke re-renders.
   const quickCounts = { all: chapters.length, noaudio: 0, flight: 0, attention: 0 };
@@ -238,14 +227,7 @@ export function ChapterTable({
   function clearFilters() {
     setQuickFilter("all");
     setSearch("");
-    setStatusFilter("");
-    setStatusOperator("is");
-    setWordCountMin("");
-    setWordCountMax("");
-    setDurationMin("");
-    setDurationMax("");
-    setDurationUnit("sec");
-    setSourceFileFilter("");
+    setFilters(NO_FILTERS);
   }
 
   const playingChapter = playingChapterId
@@ -332,7 +314,10 @@ export function ChapterTable({
             // button-ok: a disclosure for the filter panel, skinned to sit with the pills beside it
             <button
               type="button"
-              onClick={toggle}
+              onClick={() => {
+                if (!open) setAgeNow(Date.now());
+                toggle();
+              }}
               aria-expanded={open}
               className={`flex items-center gap-1.5 h-6.5 px-2.5 rounded-md border text-xs font-semibold ${
                 activeFilterCount > 0
@@ -349,114 +334,18 @@ export function ChapterTable({
           )}
         >
           {(close) => (
-            <div className="p-2">
-              <div className={`grid gap-x-6 gap-y-3 ${layout.filterColumns === 2 ? "grid-cols-2" : "grid-cols-1"}`}>
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) w-16 shrink-0">Status</span>
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <select
-                      value={statusOperator}
-                      onChange={(e) => setStatusOperator(e.target.value as "is" | "is_not")}
-                      className="px-1.5 py-1 text-xs border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary)"
-                    >
-                      <option value="is">is</option>
-                      <option value="is_not">is not</option>
-                    </select>
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className="flex-1 min-w-0 px-1.5 py-1 text-xs border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary)"
-                    >
-                      <option value="">All</option>
-                      {STATUSES.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                {isMultiFile && (
-                  <label className="flex items-center gap-3">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) w-16 shrink-0">Source</span>
-                    <select
-                      value={sourceFileFilter}
-                      onChange={(e) => setSourceFileFilter(e.target.value)}
-                      className="flex-1 min-w-0 px-1.5 py-1 text-xs border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary)"
-                    >
-                      <option value="">All files</option>
-                      {files!.map((f) => (
-                        <option key={f.index} value={String(f.index)}>
-                          {f.index + 1}. {f.filename}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) w-16 shrink-0">Words</span>
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <input
-                      type="number"
-                      value={wordCountMin}
-                      onChange={(e) => setWordCountMin(e.target.value)}
-                      placeholder="min"
-                      min={0}
-                      className="w-full min-w-0 px-2 py-1 text-xs border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) tabular-nums"
-                    />
-                    <span className="text-(--text-faint) text-xs">–</span>
-                    <input
-                      type="number"
-                      value={wordCountMax}
-                      onChange={(e) => setWordCountMax(e.target.value)}
-                      placeholder="max"
-                      min={0}
-                      className="w-full min-w-0 px-2 py-1 text-xs border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) tabular-nums"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) w-16 shrink-0">Length</span>
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <input
-                      type="number"
-                      value={durationMin}
-                      onChange={(e) => setDurationMin(e.target.value)}
-                      placeholder="min"
-                      min={0}
-                      className="w-full min-w-0 px-2 py-1 text-xs border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) tabular-nums"
-                    />
-                    <span className="text-(--text-faint) text-xs">–</span>
-                    <input
-                      type="number"
-                      value={durationMax}
-                      onChange={(e) => setDurationMax(e.target.value)}
-                      placeholder="max"
-                      min={0}
-                      className="w-full min-w-0 px-2 py-1 text-xs border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) tabular-nums"
-                    />
-                    <select
-                      value={durationUnit}
-                      onChange={(e) => setDurationUnit(e.target.value as "sec" | "min")}
-                      className="px-1 py-1 text-xs border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) shrink-0"
-                    >
-                      <option value="sec">sec</option>
-                      <option value="min">min</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-(--border)">
-                <span className="text-xs text-(--text-faint)">
-                  {filteredChapters.length} of {chapters.length} chapters match
-                </span>
-                <div className="flex-1" />
-                <Button variant="secondary" size="sm" onClick={clearFilters} data-testid="chapter-filters-clear">
-                  Clear all
-                </Button>
-                <Button variant="primary" size="sm" onClick={close}>
-                  Done
-                </Button>
-              </div>
-            </div>
+            <ChapterFilterPanel
+              chapters={chapters}
+              filters={filters}
+              setFilters={setFilters}
+              current={filterContext.current}
+              now={ageNow}
+              files={files}
+              bilingualLanguage={bilingualLanguage}
+              twoColumns={layout.filterColumns === 2}
+              matchCount={filteredChapters.length}
+              onClose={close}
+            />
           )}
         </Menu>
 
@@ -484,13 +373,14 @@ export function ChapterTable({
       </div>
 
 
-      {/* The table is the scroller and thead sticks to it, so the filters above stay put. No
-          overflow-x: the width contract drops columns instead of sliding them sideways. */}
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain rounded-lg border border-(--border)">
+      {/* The table is the scroller and thead sticks to it, so the filters above stay put. A narrow
+          window scrolls it sideways rather than dropping columns — a hidden column hid its data with
+          no way to reach it — with the title pinned left and the actions pinned right. */}
+      <div className="flex-1 min-h-0 overflow-auto overscroll-contain rounded-lg border border-(--border)">
         <table className="w-full divide-y divide-(--divide)">
           {/* The card colour under the tint: --bg-subtle is a 4% wash in dark mode, and rows scrolling
               under a translucent header read as a rendering fault */}
-          <thead className="bg-(--bg-card) sticky top-0 z-10">
+          <thead className="bg-(--bg-card) sticky top-0 z-10 whitespace-nowrap">
             <tr className="bg-(--bg-subtle)">
               {canDrag && <th className="w-8 px-2 py-3"></th>}
               <th className="px-3 py-3 w-10">
@@ -503,21 +393,24 @@ export function ChapterTable({
                 />
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">#</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Title</th>
-              {isMultiFile && layout.showSource && (
+              <th className="pinned-cell sticky left-0 z-1 px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Title</th>
+              {isMultiFile && (
                 <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Source</th>
               )}
               <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider w-40">Status</th>
-              {layout.showWords && (
-                <th className="px-4 py-3 text-right text-xs font-medium text-(--text-muted) uppercase tracking-wider">Words</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-(--text-muted) uppercase tracking-wider">Words</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-(--text-muted) uppercase tracking-wider">Duration</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Voice</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Made</th>
+              {showBilingual && (
+                <th
+                  className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider"
+                  title={`Two-language reading with ${bilingualLanguage}: sentences paired, then words linked`}
+                >
+                  Bilingual
+                </th>
               )}
-              {layout.showDuration && (
-                <th className="px-4 py-3 text-right text-xs font-medium text-(--text-muted) uppercase tracking-wider">Duration</th>
-              )}
-              {layout.showVoice && (
-                <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Voice</th>
-              )}
-              <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Actions</th>
+              <th className="pinned-cell sticky right-0 z-1 px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-(--bg-card) divide-y divide-(--divide)">
@@ -586,8 +479,9 @@ export function ChapterTable({
                     />
                   </td>
                   <td className="px-4 py-3 text-sm text-(--text-tertiary)">{chapter.index + 1}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
+                  <td className="pinned-cell sticky left-0 z-1 px-4 py-3">
+                    {/* A floor, or the title would be squeezed to a word once the row scrolls */}
+                    <div className="flex items-center gap-2 min-w-56">
                       <EditableChapterTitle
                         title={chapter.title}
                         onRename={onRename ? (title) => onRename(chapter.id, title) : undefined}
@@ -625,7 +519,7 @@ export function ChapterTable({
                           source <IconExternal className="h-3 w-3" />
                         </a>
                       ) : null}
-                      {chapter.pageStart && layout.showPages ? (
+                      {chapter.pageStart ? (
                         sourceFile ? (
                           <button
                             onClick={() =>
@@ -644,7 +538,7 @@ export function ChapterTable({
                       ) : null}
                     </div>
                   </td>
-                  {isMultiFile && layout.showSource && (
+                  {isMultiFile && (
                     <td className="px-4 py-3 text-xs text-(--text-muted) truncate max-w-32" title={files!.find((f) => f.index === chapter.sourceFileIndex)?.filename}>
                       {files!.find((f) => f.index === chapter.sourceFileIndex)?.filename ?? "\u2014"}
                     </td>
@@ -652,20 +546,23 @@ export function ChapterTable({
                   <td className="px-4 py-3">
                     <ChapterStatusCell chapter={chapter} cleanup={variant ? null : chapter.cleanup ?? null} />
                   </td>
-                  {layout.showWords && (
-                    <td className="px-4 py-3 text-sm text-(--text-tertiary) text-right tabular-nums">
-                      {chapter.wordCount.toLocaleString()}
-                    </td>
+                  <td className="px-4 py-3 text-sm text-(--text-tertiary) text-right tabular-nums">
+                    {chapter.wordCount.toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-(--text-tertiary) text-right tabular-nums">
+                    {chapter.durationMs ? formatDuration(chapter.durationMs) : "\u2014"}
+                  </td>
+                  <VoiceCell voice={chapter.audioPath ? chapter.synthesizedWith?.voice ?? null : null} />
+                  <td
+                    className="px-4 py-3 text-xs text-(--text-tertiary) whitespace-nowrap tabular-nums"
+                    title={chapter.audioPath && chapter.synthesizedWith?.at ? formatOutputDate(chapter.synthesizedWith.at) : undefined}
+                  >
+                    {chapter.audioPath && chapter.synthesizedWith?.at ? formatRelativeTime(chapter.synthesizedWith.at) : "\u2014"}
+                  </td>
+                  {showBilingual && (
+                    <BilingualCell state={chapter.bilingual ?? null} language={bilingualLanguage ?? ""} />
                   )}
-                  {layout.showDuration && (
-                    <td className="px-4 py-3 text-sm text-(--text-tertiary) text-right tabular-nums">
-                      {chapter.durationMs ? formatDuration(chapter.durationMs) : "\u2014"}
-                    </td>
-                  )}
-                  {layout.showVoice && (
-                    <VoiceCell voice={chapter.audioPath ? chapter.synthesizedWith?.voice ?? null : null} />
-                  )}
-                  <td className="px-4 py-3">
+                  <td className="pinned-cell sticky right-0 z-1 px-4 py-3">
                     <div className="flex items-center gap-2">
                       <Button
                         variant="icon"
@@ -779,8 +676,9 @@ export function ChapterTable({
             })}
             {filteredChapters.length === 0 && chapters.length > 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-sm text-(--text-faint)">
-                  No chapters match the current filters
+                <td colSpan={columnCount} className="px-4 py-8 text-center text-sm text-(--text-faint)">
+                  No chapters match the current filters.{" "}
+                  <Button variant="ghost" size="sm" onClick={clearFilters}>Show all</Button>
                 </td>
               </tr>
             ) : null}
@@ -1021,6 +919,16 @@ function EditableChapterTitle({
         </button>
       )}
     </span>
+  );
+}
+
+function BilingualCell({ state, language }: { state: BilingualChapterState | null; language: string }) {
+  if (!state) return <td className="px-4 py-3 text-xs text-(--text-tertiary)">{"\u2014"}</td>;
+  const { label, tone } = bilingualShort(state);
+  return (
+    <td className={`px-4 py-3 text-xs whitespace-nowrap tabular-nums ${TONE_CLASS[tone]}`} title={describeBilingual(state, language)}>
+      {label}
+    </td>
   );
 }
 

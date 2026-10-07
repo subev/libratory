@@ -182,6 +182,7 @@ export async function synthesizeTranslation(
         synthesizedWith: {
           voice,
           speed: voiceSupportsSpeed(voice) ? speed : null,
+          at: new Date().toISOString(),
         },
         updatedAt: new Date(),
       })

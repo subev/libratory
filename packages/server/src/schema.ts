@@ -108,6 +108,10 @@ export type VariantParams = {
 };
 
 // Per-lane (variant key) voice/speed overrides; absent fields fall back to books.voice/speed
+// What a chapter's audio was made with, and when — `at` is ISO, and audio made before it was
+// recorded gets its file's modified time at boot (lib/synthesized-at.ts).
+export type SynthesizedWith = { voice?: string; speed?: number | null; at?: string };
+
 export type VariantVoices = Record<string, { voice?: string; speed?: number }>;
 
 // Snapshot title so the link label survives source deletion
@@ -211,7 +215,7 @@ export const chapters = pgTable("chapters", {
   textMap: jsonb("text_map").$type<ChapterTextMap>(),
   sourceFileIndex: integer("source_file_index"),
   source: jsonb("source").$type<ChapterSource>(),
-  synthesizedWith: jsonb("synthesized_with").$type<{ voice?: string; speed?: number | null }>(),
+  synthesizedWith: jsonb("synthesized_with").$type<SynthesizedWith>(),
   cleanup: jsonb("cleanup").$type<ChapterCleanup>(),
   error: text("error"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -246,7 +250,7 @@ export const chapterVariants = pgTable("chapter_translations", {
   }),
   audioProgress: text("audio_progress"),
   audioError: text("audio_error"),
-  synthesizedWith: jsonb("synthesized_with").$type<{ voice?: string; speed?: number | null }>(),
+  synthesizedWith: jsonb("synthesized_with").$type<SynthesizedWith>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [unique("chapter_translations_chapter_language").on(t.chapterId, t.key)]);

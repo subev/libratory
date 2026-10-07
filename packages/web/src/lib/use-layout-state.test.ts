@@ -8,7 +8,8 @@ describe("sameFlags", () => {
   it("holds across widths inside one step and breaks across a boundary", () => {
     expect(sameFlags(bookLayout(1200), bookLayout(1439))).toBe(true);
     expect(sameFlags(bookLayout(1180), bookLayout(1179))).toBe(false);
-    expect(sameFlags(bookLayout(1120), bookLayout(1119))).toBe(false);
+    // 1120 used to drop the Words column; the table scrolls now, so it is no boundary
+    expect(sameFlags(bookLayout(1120), bookLayout(1119))).toBe(true);
     expect(sameFlags(bookLayout(1000), bookLayout(999))).toBe(false);
   });
 

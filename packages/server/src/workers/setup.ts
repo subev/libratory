@@ -22,6 +22,7 @@ import { synthesizeTranslation } from "./synthesize-translation.ts";
 import { indexBook } from "./index-book.ts";
 import { embedChunks } from "./embed-chunks.ts";
 import { sweepStrandedWork } from "./sweep.ts";
+import { backfillSynthesizedAt } from "../lib/synthesized-at.ts";
 import { env } from "../env.ts";
 import { POOL_META, poolByName, poolConcurrency, runningJobsByPool, setPoolConcurrency, type PoolMeta, type PoolName } from "./pools.ts";
 
@@ -152,6 +153,10 @@ export async function startWorker(): Promise<Runner[]> {
   } catch (err) {
     console.error("[worker] Startup sweep failed:", err);
   }
+  // Not awaited: a library of old audio is thousands of stats, and nothing waits on the dates
+  backfillSynthesizedAt()
+    .then((filled) => { if (filled > 0) console.log(`[worker] Dated ${filled} narrations from their audio files`); })
+    .catch((err) => console.error("[worker] Dating old narrations failed:", err));
   const started = await Promise.all(
     POOL_META.map(async (pool) => [pool.name, await runPool(pool.name, poolConcurrency(pool))] as const),
   );

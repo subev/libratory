@@ -5,6 +5,7 @@ import { trpc } from "../trpc.ts";
 import { useRunModel } from "../lib/use-llm-models.ts";
 import { ModelBundleNotice, useModelBundle } from "../components/ModelBundleNotice.tsx";
 import { BilingualSelection } from "../components/BilingualSelection.tsx";
+import { isReadable, needsPairing, needsTranslation, type BilingualChapterState } from "../lib/bilingual-state.ts";
 import { ChapterTable } from "../components/ChapterTable.tsx";
 import { SYNTH_BUSY, TEXT_BUSY, variantLabel } from "../lib/chapters.ts";
 import { SynthesizeModal, type SynthSettings } from "../components/SynthesizeModal.tsx";
@@ -257,11 +258,23 @@ export function BookDetail() {
     // Pairing started from the dialog finishes in the background; the dialog watches for it
     refetchInterval: (query) => query.state.data?.every((row) => row.paired) ? false : 4000,
   });
-  const readiness = trpc.bilingual.readiness.useQuery({ bookId: id! }, { enabled: !!id && translationLanes.length > 0, staleTime: 5000 });
   const [returnToExport, setReturnToExport] = useState(false);
   const activeLane = activeVariant ? variantLanes.find((l) => l.key === activeVariant) ?? null : null;
   const activeLabel = activeLane ? variantLabel(activeLane) : activeVariant;
   const activeKind = activeLane?.kind ?? "translation";
+  // Pairing needs a translation lane: the open one, or the only one when the page shows the original.
+  // Never from a rewrite view — pairing joins the original to a translation, and a rewrite is neither
+  const pairingLane = activeVariant
+    ? (activeKind === "translation" ? activeVariant : null)
+    : translationLanes.length === 1 ? (translationLanes[0]?.key ?? null) : null;
+  // One state per chapter feeds the table's column, its filter, the tray and the preparation dialog,
+  // so a selection change is reflected at once — the tray's count used to come from a cached query
+  const { data: bilingualStates } = trpc.bilingual.chapterStates.useQuery({ bookId: id!, key: pairingLane ?? "" }, {
+    enabled: !!id && !!pairingLane,
+    // A translation finishing moves its chapter on too, so it is watched like pairing and linking
+    refetchInterval: (query) => (query.state.data?.some((c) => c.step === "pairing" || c.step === "linking" || c.step === "translating") ? 2000 : false),
+  });
+  const bilingualByChapter = new Map((bilingualStates ?? []).map((c) => [c.chapterId, c]));
 
   // Prev/next navigation follows the home list's persisted sort order, scoped to the book's folder
   const { data: siblingList } = trpc.books.list.useQuery(
@@ -389,7 +402,7 @@ export function BookDetail() {
 
   // Translation view: replace every chapter row with its <activeVariant> counterpart — no fallback to the original
   const translationByChapter = new Map(translationRows.map((t) => [t.chapterId, t]));
-  const viewChapters = !activeVariant
+  const laneChapters = !activeVariant
     ? book.chapters
     : book.chapters.map((c) => {
         const t = translationByChapter.get(c.id);
@@ -416,6 +429,7 @@ export function BookDetail() {
           audioUrl: t && translated ? `/audio/translation/${t.id}?v=${new Date(t.updatedAt).getTime()}` : undefined,
         };
       });
+  const viewChapters = pairingLane ? laneChapters.map((c) => ({ ...c, bilingual: bilingualByChapter.get(c.id) ?? null })) : laneChapters;
 
   const selectedCount = viewChapters.filter((c) => c.selected).length;
   const hasActiveChapters = viewChapters.some((c) => SYNTH_BUSY.includes(c.status));
@@ -609,9 +623,8 @@ export function BookDetail() {
   const selectedInFlightNow = book.chapters.some((c) => c.selected && (c.status === "pending" || c.status === "normalizing" || c.status === "synthesizing"));
   // A book with no PDF has no structure to review: its chapters arrived as they are
   const stage: "review" | "narrate" | "export" = !structureConfirmed && !isSynthetic ? "review" : audioReady > 0 && !selectedInFlightNow ? "export" : "narrate";
-  // Pairing needs a translation lane: the open one, or the only one when the page shows the original
-  const pairingLane = activeVariant && activeKind === "translation" ? activeVariant : translationLanes.length === 1 ? translationLanes[0]!.key : null;
-  const pairingLeft = pairingLane ? readiness.data?.find((lane) => lane.key === pairingLane)?.unpaired.length ?? 0 : 0;
+  const selectedBilingual = book.chapters.filter((c) => c.selected).flatMap((c) => bilingualByChapter.get(c.id) ?? []);
+  const bilingualSummary = summarizeSelection(selectedBilingual);
   const trayActions: TrayAction[] = [
     ...(hasActiveChapters || translationAudioQueued || translationsRunning
       ? [{
@@ -664,14 +677,14 @@ export function BookDetail() {
     },
     {
       id: "bilingual",
-      label: pairingLeft > 0 ? `Bilingual reading (${pairingLeft} to pair)` : "Bilingual reading",
+      label: "Bilingual reading",
       pinned: !!pairingLane,
       onClick: () => { if (pairingLane) setBilingualSelection({ bookId: book.id, chapterIds: book.chapters.filter((chapter) => chapter.selected).map((chapter) => chapter.id), translationKey: pairingLane }); },
       disabled: !pairingLane || selectedCount === 0,
       title: !translationLanes.length ? "Translate chapters first — two-language reading needs a translation"
         : !pairingLane ? "Open one of the translation views to choose which language to pair"
         : selectedCount === 0 ? "Select chapters to prepare"
-        : `Pair the selected chapters' sentences with ${pairingLane} and optionally link their words — the step before a Bilingual EPUB`,
+        : `Of ${selectedCount} selected: ${bilingualSummary}. Opens the two steps — pair sentences, then link words — for reading side by side with ${pairingLane}`,
     },
     {
       id: "cleanup",
@@ -1235,6 +1248,7 @@ export function BookDetail() {
                 variants={variantLanes.map((l) => ({ key: l.key, label: l.label, kind: l.kind }))}
                 onSwitchVariant={setActiveVariant}
                 synth={synth}
+                bilingualLanguage={pairingLane}
               />
                 )}
               </WithShellLayout>
@@ -1291,7 +1305,7 @@ export function BookDetail() {
 
       {bilingualSelection && <BilingualSelection {...bilingualSelection} onClose={() => {
         setBilingualSelection(null);
-        void utils.bilingual.readiness.invalidate();
+        void utils.bilingual.chapterStates.invalidate();
         void utils.bilingual.exportStatus.invalidate();
         // Pairing was opened from the export dialog: the dialog comes back where it was left
         if (returnToExport) { setReturnToExport(false); setExportOpen(true); }
@@ -1403,4 +1417,18 @@ export function BookDetail() {
 function namedRows(rows: { index: number; title: string }[]): string {
   const names = rows.slice(0, 3).map((row) => `${row.index + 1}. ${row.title}`);
   return rows.length > 3 ? `${names.join(", ")} and ${rows.length - 3} more` : names.join(", ");
+}
+
+// The tray's tooltip: where the selected chapters stand, in the words the table column uses
+function summarizeSelection(states: BilingualChapterState[]): string {
+  const ready = states.filter((s) => isReadable(s.step)).length;
+  const toPair = states.filter((s) => needsPairing(s.step)).length;
+  const busy = states.filter((s) => s.step === "pairing").length;
+  const blocked = states.filter((s) => needsTranslation(s.step)).length;
+  return [
+    `${ready} ready to read`,
+    toPair > 0 && `${toPair} need sentence pairing`,
+    busy > 0 && `${busy} pairing now`,
+    blocked > 0 && `${blocked} need a translation first`,
+  ].filter(Boolean).join(", ");
 }

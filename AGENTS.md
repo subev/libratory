@@ -316,7 +316,7 @@ pane). Everything is pinned but the pane, and the pane's child owns its own scro
 tray — the tray has to sit outside the scroller it acts on.
 
 Each publishes its own contract through its own context, from a pure module: `lib/book-layout.ts`
-(four steps, ten booleans) and `lib/library-layout.ts` (four steps, five). Both are under test, and
+(three widths, six fields — the chapter table scrolls sideways instead of dropping columns) and `lib/library-layout.ts` (four steps, five). Both are under test, and
 both drive the same `lib/use-layout-state.ts`, which is the part worth sharing — it holds the
 *layout* rather than the width and bails when a resize lands inside the same step, because a context
 change walks straight past the children-identity bailout that protects the tables reading it. The
@@ -447,7 +447,7 @@ Connection string via `DATABASE_URL` env var (required, validated by Zod).
 
 **folders** — id (uuid), name, parentId (self-FK, cascade — nested folders), profileId (FK profiles), createdAt, updatedAt. Books live in at most one folder (null = home/root). Home shows only root-level folder rows + unfiled books; `/folders/:id` shows a folder's contents. Recursive aggregates (bookCount/active/size) are computed in `books.list`; subtree/ancestor walks via CTE helpers in `lib/folders.ts`. `folders.delete` collects all descendant books first and deletes each via `deleteBook` before removing the folder row. `folders.move` reparents a folder (rejects moves into the folder's own subtree).
 
-**chapters** — id (uuid), bookId (FK, cascade delete), index, title, rawText, cleanText, customText, audioPath, durationMs, progress (text, e.g. "12/48"), status (`pending` | `normalizing` | `synthesizing` | `done` | `failed` | `suspended`), error, selected (boolean, default true), pageStart/pageEnd (1-based), sourceBlocks (jsonb — block metadata with type, text, page, included, level?, polygon?), sourceFileIndex, source (jsonb `ChapterSource` — digest/note back-link; non-null marks an inserted chapter that survives rebuilds), synthesizedWith (jsonb voice/speed snapshot), cleanup (jsonb `ChapterCleanup` run state), createdAt
+**chapters** — id (uuid), bookId (FK, cascade delete), index, title, rawText, cleanText, customText, audioPath, durationMs, progress (text, e.g. "12/48"), status (`pending` | `normalizing` | `synthesizing` | `done` | `failed` | `suspended`), error, selected (boolean, default true), pageStart/pageEnd (1-based), sourceBlocks (jsonb — block metadata with type, text, page, included, level?, polygon?), sourceFileIndex, source (jsonb `ChapterSource` — digest/note back-link; non-null marks an inserted chapter that survives rebuilds), synthesizedWith (jsonb `SynthesizedWith`: voice, speed and `at`, when the audio was made — audio older than `at` is dated from its file at boot by `lib/synthesized-at.ts`), cleanup (jsonb `ChapterCleanup` run state), createdAt
 
 **book_files** — id (uuid), bookId (FK, cascade delete), index, filename, pdfPath, searchablePdfPath (the OCR'd copy written beside the original, which is never replaced), ocrEngine, ocrConfidence + ocrLowConfidenceFraction (fractions in [0,1] — Tesseract's mean word confidence and the share of words under 60, the evidence a "redo with the slower engine" offer is made from), status (`raw` | `pending` | `extracting` | `done` | `failed`), selected, skipSynthesis, rawText, rawWords, error, createdAt. One row per uploaded PDF; `raw` = pdftotext-only, marker neither queued nor planned. **Every path that reads a book's pages goes through `readablePdfPath` (`lib/pdf-raw-text.ts`)**, which prefers the searchable copy — marker, page geometry, TOC detection, raw text, the read-along EPUB, and `/pdf/:fileId` (the in-app reader). A route whose job is to hand back the original keeps `pdfPath`.
 
@@ -648,6 +648,8 @@ packages/web/src/
     ChapterTable.tsx    Chapter table — quick-filter chips, title search, the rest behind a Filters
                         popover; sticky header over its own scroller (the pinned filter bar is why the
                         table scrolls rather than the tab), range selection, floating audio player
+    ChapterFilterPanel.tsx  The Filters popover: status chips, voice (incl. "not the current voice"), when made,
+                        words and length; the predicates are pure in lib/chapter-filters.ts
     SynthesizeModal.tsx Voice/speed picker + start button — behind the toolbar's Synthesize action
                         for the selection, and behind every single-chapter re-synthesize (row icon
                         and chapter modal), which is where a chapter's voice is chosen
@@ -743,7 +745,7 @@ fixed zinc.
 
 **notes**: `list` (per book, newest first) / `delete` / `toChapter` (append the note as a suspended chapter, `source {kind:"note"}`; refuses library notes) / `saveLibraryAnswer` (persist a library-chat answer as a book-less note, profile-scoped)
 
-**bilingual**: `readiness` (per translation: selected chapters, how many are paired and how many fully linked) · `selection` / `prepareSelection` / `cancelSelection` (the tray's batch over selected chapters, `stage: "pairs" | "links"`, current work skipped) · `status` / `prepare` / `cancel` (one chapter) · `exportStatus` (paired chapters vs ones that still need it, for the export dialog and the assistant) · `position` (a time in the original narration → the matching time in the translation's) · `convertAudio` (legacy MP3 recordings → M4A, originals kept)
+**bilingual**: `chapterStates` (one translation's per-chapter step — `bilingualChapterState` in `lib/bilingual-chapter-state.ts`, from no translation through pairing to words linked — which the chapter table's Bilingual column and filter, the tray and the preparation dialog all read, so they cannot disagree) · `readiness` (per translation: selected chapters, how many are paired and how many fully linked) · `selection` / `prepareSelection` / `cancelSelection` (the tray's batch over selected chapters, `stage: "pairs" | "links"`, current work skipped) · `status` / `prepare` / `cancel` (one chapter) · `exportStatus` (paired chapters vs ones that still need it, for the export dialog and the assistant) · `position` (a time in the original narration → the matching time in the translation's) · `convertAudio` (legacy MP3 recordings → M4A, originals kept)
 
 **search**: `library` (hybrid FTS + vector search over `book_chunks`, profile-scoped, optional folder subtree scope, RRF fusion + cross-language grouping — see Library Chat below) / `indexStatus` (per-profile index coverage counts for the chat UI hint)
 
