@@ -88,9 +88,11 @@ jobs:
         run: |
           gh workflow run release.yml --ref "$TAG"
           gh workflow run docker.yml --ref "$TAG"
-          # A dispatch returns before the run exists
+          # A dispatch returns before the run exists. Found by commit, which a dispatched run carries
+          # however it names its branch.
+          sha=$(git rev-list -n 1 "$TAG")
           for _ in $(seq 1 36); do
-            id=$(gh run list --workflow release.yml --branch "$TAG" --limit 1 --json databaseId -q '.[0].databaseId')
+            id=$(gh run list --workflow release.yml --commit "$sha" --limit 1 --json databaseId -q '.[0].databaseId')
             [ -n "$id" ] && break
             sleep 5
           done

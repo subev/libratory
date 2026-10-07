@@ -65,7 +65,9 @@ function main() {
     console.log(`\n  NOTE  ${drafts.length} drafts waiting: ${drafts.join(", ")} — taking the newest.`);
   }
 
-  const build = JSON.parse(gh("run", "list", "--workflow", "release.yml", "--branch", tag, "--limit", "1",
+  // By commit, not --branch: a tag push names the run after the tag, but a run deploy.yml dispatched
+  // is not guaranteed to, and the commit is the same either way
+  const build = JSON.parse(gh("run", "list", "--workflow", "release.yml", "--commit", git("rev-list", "-n", "1", tag), "--limit", "1",
     "--json", "status,conclusion,databaseId"))[0];
   if (!build) fail(`No build found for ${tag}.`, "The tag may not have started a workflow run.");
   if (build.status !== "completed") fail(`The build for ${tag} is still ${build.status}.`, "Wait for it to finish.");
