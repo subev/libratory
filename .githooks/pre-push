@@ -1,0 +1,3 @@
+#!/bin/sh
+# A push to main must be covered by a recorded review — see scripts/review.mjs
+exec node "$(git rev-parse --show-toplevel)/scripts/review.mjs" pre-push "$1"

@@ -53,11 +53,13 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           node scripts/release.mjs --yes
 
-      - name: Verify the release tag matches the package
-        if: github.ref_type == 'tag'
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: node -e 'const p = require("./packages/desktop/package.json"); if (process.env.RELEASE_TAG !== "v" + p.version) throw new Error("Release tag does not match package version")'
+      # The version lives in the tag, never in a commit: main changes only through reviewed merges
+      # (scripts/review.mjs), so the package's version on main is not the release's
+      - name: Stamp the version from the tag
+        run: |
+          TAG=$(git describe --exact-match --tags --match 'v*' HEAD)
+          node -e 'const fs = require("fs"); const f = "packages/desktop/package.json"; const p = JSON.parse(fs.readFileSync(f, "utf8")); p.version = process.argv[1]; fs.writeFileSync(f, JSON.stringify(p, null, 2) + "\n")' "${TAG#v}"
+          echo "Building $TAG"
 
       - run: pnpm install --frozen-lockfile
 
