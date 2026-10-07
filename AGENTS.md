@@ -933,11 +933,12 @@ The UI has a LogViewer component that polls `books.logs` every second during pro
 
 Every merge to main that passes the tests is released to everyone automatically
 (`.github/workflows/deploy.yml`), so **nothing reaches main unreviewed**. Work on a branch, open a
-PR, run `/code-review` locally, fix or decline each finding, then record it on the reviewed tip with
-`pnpm review:stamp --level <level> --summary "<outcome>"` (a git note under `refs/notes/review`,
-`scripts/review.mjs`). The pre-push hook refuses a push to main with an unstamped commit, and the
+PR, run `/code-review` locally, fix or decline each finding and report them, then the **person**
+records it on the reviewed tip with `pnpm review:stamp --level <level> --summary "<outcome>"` (a
+git note under `refs/notes/review`, `scripts/review.mjs`) — an agent does not stamp its own work;
+it hands over the exact command. The pre-push hook refuses a push to main with an unstamped commit, and the
 deploy refuses to release one; a commit added after the stamp needs another review. Never stamp
-without having reviewed, never `--no-verify` a push to main, and never set `notes.rewriteRef`.
+unreviewed work, never `--no-verify` a push to main, and never set `notes.rewriteRef`.
 Releases are tag-only: no version commit lands on main. Details in `packages/desktop/README.md`
 under *Reviews*.
 
