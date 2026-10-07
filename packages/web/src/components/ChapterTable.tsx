@@ -263,6 +263,12 @@ export function ChapterTable({
     }
   }, [playingChapterId]);
 
+  // Offsets for the cells pinned left: drag handle w-8, checkbox w-10, number w-16, each the sum of
+  // the widths before it. The widths are fixed for exactly this reason.
+  const stick = canDrag
+    ? { check: "left-8", num: "left-18", title: "left-34" }
+    : { check: "left-0", num: "left-10", title: "left-26" };
+
   return (
     <div className="flex flex-col min-h-0 flex-1">
       {/* Quick filters, a title search, and the rest behind a popover — a closed disclosure hid
@@ -386,8 +392,8 @@ export function ChapterTable({
               under a translucent header read as a rendering fault */}
           <thead className="bg-(--bg-card) sticky top-0 z-10 whitespace-nowrap">
             <tr className="bg-(--bg-subtle)">
-              {canDrag && <th className="w-8 px-2 py-3"></th>}
-              <th className="px-3 py-3 w-10">
+              {canDrag && <th className="pinned-cell sticky left-0 z-1 w-8 min-w-8 px-2 py-3"></th>}
+              <th className={`pinned-cell sticky ${stick.check} z-1 w-10 min-w-10 px-3 py-3`}>
                 <input
                   ref={toggleAllRef}
                   type="checkbox"
@@ -396,8 +402,8 @@ export function ChapterTable({
                   className="rounded border-(--border-input) text-(--accent-text)"
                 />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">#</th>
-              <th className="pinned-cell sticky left-0 z-1 px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Title</th>
+              <th className={`pinned-cell sticky ${stick.num} z-1 w-16 min-w-16 px-3 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider`}>#</th>
+              <th className={`pinned-cell pinned-last sticky ${stick.title} z-1 px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider`}>Title</th>
               {isMultiFile && (
                 <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Source</th>
               )}
@@ -457,11 +463,11 @@ export function ChapterTable({
                   className={`group cursor-pointer hover:bg-(--bg-card-hover) ${!chapter.selected ? "opacity-40" : ""} ${dragChapterId === chapter.id ? "opacity-30" : ""} ${dragOverChapterId === chapter.id && dragChapterId !== chapter.id ? "border-t-2 border-(--accent)" : ""}`}
                 >
                   {canDrag && (
-                    <td className="px-2 py-3 cursor-grab text-(--text-faint)">
+                    <td className="pinned-cell sticky left-0 z-1 px-2 py-3 cursor-grab text-(--text-faint)">
                       <IconDragHandle className="h-4 w-4" />
                     </td>
                   )}
-                  <td className="px-3 py-3">
+                  <td className={`pinned-cell sticky ${stick.check} z-1 px-3 py-3`}>
                     <input
                       type="checkbox"
                       checked={chapter.selected}
@@ -482,8 +488,8 @@ export function ChapterTable({
                       className="rounded border-(--border-input) text-(--accent-text)"
                     />
                   </td>
-                  <td className="px-4 py-3 text-sm text-(--text-tertiary)">{chapter.index + 1}</td>
-                  <td className="pinned-cell sticky left-0 z-1 px-4 py-3">
+                  <td className={`pinned-cell sticky ${stick.num} z-1 px-3 py-3 text-sm text-(--text-tertiary)`}>{chapter.index + 1}</td>
+                  <td className={`pinned-cell pinned-last sticky ${stick.title} z-1 px-4 py-3`}>
                     {/* A floor, or the title would be squeezed to a word once the row scrolls */}
                     <div className="flex items-center gap-2 min-w-56">
                       <EditableChapterTitle

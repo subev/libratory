@@ -104,7 +104,7 @@ function FolderTableRow({
           className="rounded"
         />
       </td>
-      <td className="pinned-cell sticky left-0 z-1 px-4 py-3 max-w-md">
+      <td className="pinned-cell pinned-last sticky left-0 z-1 px-4 py-3 max-w-md">
         <div className="flex items-center gap-2 group min-w-48">
           {renaming ? (
             <input
@@ -193,7 +193,7 @@ function SortableTh({
   onSort: (key: SortKey) => void;
 }) {
   return (
-    <th className={`${pinned ? "pinned-cell sticky left-0 z-1 " : ""}px-4 py-3 whitespace-nowrap ${align === "right" ? "text-right" : "text-left"} text-xs font-medium text-(--text-muted) uppercase tracking-wider`}>
+    <th className={`${pinned ? "pinned-cell pinned-last sticky left-0 z-1 " : ""}px-4 py-3 whitespace-nowrap ${align === "right" ? "text-right" : "text-left"} text-xs font-medium text-(--text-muted) uppercase tracking-wider`}>
       <button
         onClick={() => onSort(sortKey)}
         className={`inline-flex items-center gap-1 uppercase tracking-wider hover:text-(--text-secondary) ${active ? "text-(--text-secondary)" : ""}`}
@@ -529,7 +529,7 @@ export function BookList({
                   />
                 </td>
                 {/* Pinned while the table scrolls sideways; the floor stops a long row squeezing it to a word */}
-                <td className="pinned-cell sticky left-0 z-1 px-4 py-3 max-w-md min-w-48">
+                <td className="pinned-cell pinned-last sticky left-0 z-1 px-4 py-3 max-w-md min-w-48">
                   <Link to={`/books/${book.id}`} className="text-(--accent-text) hover:text-(--accent-text-hover) font-medium">
                     {book.title}
                   </Link>
