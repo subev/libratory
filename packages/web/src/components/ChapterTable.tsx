@@ -72,6 +72,14 @@ export type FileInfo = {
   filename: string;
 };
 
+function withChapter(current: URLSearchParams, id: string | null): URLSearchParams {
+  if (current.get("chapter") === id || (id === null && !current.has("chapter"))) return current;
+  const next = new URLSearchParams(current);
+  if (id === null) next.delete("chapter");
+  else next.set("chapter", id);
+  return next;
+}
+
 export function ChapterTable({
   language,
   bookId,
@@ -111,43 +119,39 @@ export function ChapterTable({
   /** The translation pairing is shown against, when there is one to pair with. */
   bilingualLanguage?: string | null;
 }) {
-  const [pickedChapterIndex, setPickedChapterIndex] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // A deep link (?chapter=<id>, e.g. from a chat citation) opens the modal on its own; the first
-  // move away from it — another chapter, or closing — is what takes it back out of the URL.
-  const deepLinked = searchParams.get("chapter");
-  const deepLinkedIndex = deepLinked ? chapters.findIndex((c) => c.id === deepLinked) : -1;
-  const modalChapterIndex = pickedChapterIndex ?? (deepLinkedIndex >= 0 ? deepLinkedIndex : null);
+  // The open chapter lives in the URL (?chapter=<id>) and nowhere else, so a reload, a shared link
+  // and a chat citation all land on it. It used to be held in state, with the param removed on the
+  // first click — a refreshed page came back with the dialog closed.
+  const openChapterId = searchParams.get("chapter");
+  const openIndex = openChapterId ? chapters.findIndex((c) => c.id === openChapterId) : -1;
+  const modalChapterIndex = openIndex >= 0 ? openIndex : null;
+  // The updater form: ?variant= and the shell's own params are written from elsewhere, so this
+  // render's snapshot is not safe to write back
+  const openChapterModal = (index: number | null) => {
+    const id = index === null ? null : (chapters[index]?.id ?? null);
+    setSearchParams((current) => withChapter(current, id), { replace: true });
+  };
   // Inside the modal, [ and ] walk the chapters; the page's book switch stays out while a dialog is open
+  const modalOpen = modalChapterIndex !== null;
   useEffect(() => {
-    if (modalChapterIndex === null) return;
+    if (!modalOpen) return;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== "[" && e.key !== "]") return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
-      const next = (modalChapterIndex ?? 0) + (e.key === "]" ? 1 : -1);
-      if (next >= 0 && next < chapters.length) setPickedChapterIndex(next);
+      // From the URL as it is now, not this render's: the router applies a search change as a
+      // transition, so keys pressed in a row all read the same render and stopped one chapter on
+      const openId = new URLSearchParams(window.location.search).get("chapter");
+      const at = chapters.findIndex((c) => c.id === openId);
+      const next = at >= 0 ? chapters[at + (e.key === "]" ? 1 : -1)] : undefined;
+      if (next) setSearchParams((current) => withChapter(current, next.id), { replace: true });
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [modalChapterIndex, chapters.length, setPickedChapterIndex]);
-  const openChapterModal = (index: number | null) => {
-    setPickedChapterIndex(index);
-    // The updater form, and the has() check inside it: ?variant= and the shell's own param are
-    // written from elsewhere, so the render's snapshot is neither safe to write back nor to read
-    // the answer out of — a deep link that arrived since this render would survive the delete.
-    setSearchParams(
-      (current) => {
-        if (!current.has("chapter")) return current;
-        const next = new URLSearchParams(current);
-        next.delete("chapter");
-        return next;
-      },
-      { replace: true },
-    );
-  };
+  }, [modalOpen, chapters, setSearchParams]);
 
   const { pin } = useAssistant();
   const [pdfPreview, setPdfPreview] = useState<{ fileId: string; page: number; filename?: string } | null>(null);
@@ -258,6 +262,12 @@ export function ChapterTable({
       audioRef.current.play().catch(() => {});
     }
   }, [playingChapterId]);
+
+  // Offsets for the cells pinned left: drag handle w-8, checkbox w-10, number w-16, each the sum of
+  // the widths before it. The widths are fixed for exactly this reason.
+  const stick = canDrag
+    ? { check: "left-8", num: "left-18", title: "left-34" }
+    : { check: "left-0", num: "left-10", title: "left-26" };
 
   return (
     <div className="flex flex-col min-h-0 flex-1">
@@ -382,8 +392,8 @@ export function ChapterTable({
               under a translucent header read as a rendering fault */}
           <thead className="bg-(--bg-card) sticky top-0 z-10 whitespace-nowrap">
             <tr className="bg-(--bg-subtle)">
-              {canDrag && <th className="w-8 px-2 py-3"></th>}
-              <th className="px-3 py-3 w-10">
+              {canDrag && <th className="pinned-cell sticky left-0 z-1 w-8 min-w-8 px-2 py-3"></th>}
+              <th className={`pinned-cell sticky ${stick.check} z-1 w-10 min-w-10 px-3 py-3`}>
                 <input
                   ref={toggleAllRef}
                   type="checkbox"
@@ -392,8 +402,8 @@ export function ChapterTable({
                   className="rounded border-(--border-input) text-(--accent-text)"
                 />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">#</th>
-              <th className="pinned-cell sticky left-0 z-1 px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Title</th>
+              <th className={`pinned-cell sticky ${stick.num} z-1 w-16 min-w-16 px-3 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider`}>#</th>
+              <th className={`pinned-cell pinned-last sticky ${stick.title} z-1 px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider`}>Title</th>
               {isMultiFile && (
                 <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Source</th>
               )}
@@ -453,11 +463,11 @@ export function ChapterTable({
                   className={`group cursor-pointer hover:bg-(--bg-card-hover) ${!chapter.selected ? "opacity-40" : ""} ${dragChapterId === chapter.id ? "opacity-30" : ""} ${dragOverChapterId === chapter.id && dragChapterId !== chapter.id ? "border-t-2 border-(--accent)" : ""}`}
                 >
                   {canDrag && (
-                    <td className="px-2 py-3 cursor-grab text-(--text-faint)">
+                    <td className="pinned-cell sticky left-0 z-1 px-2 py-3 cursor-grab text-(--text-faint)">
                       <IconDragHandle className="h-4 w-4" />
                     </td>
                   )}
-                  <td className="px-3 py-3">
+                  <td className={`pinned-cell sticky ${stick.check} z-1 px-3 py-3`}>
                     <input
                       type="checkbox"
                       checked={chapter.selected}
@@ -478,8 +488,8 @@ export function ChapterTable({
                       className="rounded border-(--border-input) text-(--accent-text)"
                     />
                   </td>
-                  <td className="px-4 py-3 text-sm text-(--text-tertiary)">{chapter.index + 1}</td>
-                  <td className="pinned-cell sticky left-0 z-1 px-4 py-3">
+                  <td className={`pinned-cell sticky ${stick.num} z-1 px-3 py-3 text-sm text-(--text-tertiary)`}>{chapter.index + 1}</td>
+                  <td className={`pinned-cell pinned-last sticky ${stick.title} z-1 px-4 py-3`}>
                     {/* A floor, or the title would be squeezed to a word once the row scrolls */}
                     <div className="flex items-center gap-2 min-w-56">
                       <EditableChapterTitle

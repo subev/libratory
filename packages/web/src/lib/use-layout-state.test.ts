@@ -15,7 +15,8 @@ describe("sameFlags", () => {
 
   it("does the same job for the library's own contract", () => {
     expect(sameFlags(libraryLayout(1200), libraryLayout(1440))).toBe(true);
-    expect(sameFlags(libraryLayout(1180), libraryLayout(1179))).toBe(false);
-    expect(sameFlags(libraryLayout(1080), libraryLayout(1079))).toBe(false);
+    // 1180 and 1080 dropped Languages and Outputs; the table scrolls now, so 1000 is the one boundary
+    expect(sameFlags(libraryLayout(1180), libraryLayout(1179))).toBe(true);
+    expect(sameFlags(libraryLayout(1000), libraryLayout(999))).toBe(false);
   });
 });

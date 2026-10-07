@@ -45,7 +45,6 @@ function FolderTableRow({
 }) {
   const utils = trpc.useUtils();
   const navigate = useNavigate();
-  const layout = useLibraryLayout();
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(folder.name);
   const [dragOver, setDragOver] = useState(false);
@@ -76,7 +75,7 @@ function FolderTableRow({
 
   return (
     <tr
-      className={`cursor-pointer hover:bg-(--bg-card-hover) ${selected ? "bg-(--bg-selected)" : ""} ${dragOver ? "outline outline-2 -outline-offset-2 outline-(--accent)" : ""}`}
+      className={`cursor-pointer hover:bg-(--bg-card-hover) ${selected ? "row-selected bg-(--bg-selected)" : ""} ${dragOver ? "outline outline-2 -outline-offset-2 outline-(--accent)" : ""}`}
       data-testid="folder-row"
       draggable
       onClick={rowClick(() => navigate(`/folders/${folder.id}`))}
@@ -105,8 +104,8 @@ function FolderTableRow({
           className="rounded"
         />
       </td>
-      <td className="px-4 py-3 max-w-md">
-        <div className="flex items-center gap-2 group">
+      <td className="pinned-cell pinned-last sticky left-0 z-1 px-4 py-3 max-w-md">
+        <div className="flex items-center gap-2 group min-w-48">
           {renaming ? (
             <input
               autoFocus
@@ -163,17 +162,15 @@ function FolderTableRow({
           )}
         </div>
       </td>
-      {layout.showLangs && <td className="px-4 py-3"><span className="text-xs text-(--text-faint)">—</span></td>}
-      {layout.showOutputs && <td className="px-4 py-3"><span className="text-xs text-(--text-faint)">—</span></td>}
-      {layout.showSize && (
-        <td className="px-4 py-3 text-right text-sm tabular-nums text-(--text-tertiary)">
-          {formatBytes(folder.sizeBytes)}
-        </td>
-      )}
+      <td className="px-4 py-3"><span className="text-xs text-(--text-faint)">—</span></td>
+      <td className="px-4 py-3"><span className="text-xs text-(--text-faint)">—</span></td>
+      <td className="px-4 py-3 text-right text-sm tabular-nums text-(--text-tertiary)">
+        {formatBytes(folder.sizeBytes)}
+      </td>
       <td className="px-4 py-3 text-right text-sm text-(--text-tertiary)" title={folder.lastActivityAt ? new Date(folder.lastActivityAt).toLocaleString() : undefined}>
         {folder.lastActivityAt ? formatRelativeTime(folder.lastActivityAt) : <span className="text-xs text-(--text-faint)">—</span>}
       </td>
-      <td className="px-4 py-3" />
+      <td className="pinned-cell sticky right-0 z-1 px-4 py-3" />
     </tr>
   );
 }
@@ -182,6 +179,7 @@ function SortableTh({
   label,
   sortKey,
   align = "left",
+  pinned = false,
   active,
   dir,
   onSort,
@@ -189,12 +187,13 @@ function SortableTh({
   label: string;
   sortKey: SortKey;
   align?: "left" | "right";
+  pinned?: boolean;
   active: boolean;
   dir: SortDir;
   onSort: (key: SortKey) => void;
 }) {
   return (
-    <th className={`px-4 py-3 ${align === "right" ? "text-right" : "text-left"} text-xs font-medium text-(--text-muted) uppercase tracking-wider`}>
+    <th className={`${pinned ? "pinned-cell pinned-last sticky left-0 z-1 " : ""}px-4 py-3 whitespace-nowrap ${align === "right" ? "text-right" : "text-left"} text-xs font-medium text-(--text-muted) uppercase tracking-wider`}>
       <button
         onClick={() => onSort(sortKey)}
         className={`inline-flex items-center gap-1 uppercase tracking-wider hover:text-(--text-secondary) ${active ? "text-(--text-secondary)" : ""}`}
@@ -431,8 +430,8 @@ export function BookList({
       ? "Shift-click a checkbox to take a range"
       : `${selectedBooks.reduce((n, b) => n + b.chapterCount, 0)} chapters · ${selectedBooks.filter((b) => b.searchIndex?.status === "done").length} indexed`;
 
-  const th = (label: string, key: SortKey, align?: "left" | "right") => (
-    <SortableTh label={label} sortKey={key} align={align} active={sortKey === key} dir={sortDir} onSort={handleSort} />
+  const th = (label: string, key: SortKey, align?: "left" | "right", pinned?: boolean) => (
+    <SortableTh label={label} sortKey={key} align={align} pinned={pinned} active={sortKey === key} dir={sortDir} onSort={handleSort} />
   );
 
   return (
@@ -448,7 +447,8 @@ export function BookList({
           {folderId ? "This folder is empty." : "No books yet. Upload a PDF to get started."}
         </p>
       ) : (
-      <div className="rounded-lg border border-(--border)">
+      <div className="rounded-lg border border-(--border) overflow-x-auto">
+      {/* Scrolls sideways when the pane is narrow rather than dropping columns, as the chapter table does */}
       <table className="w-full divide-y divide-(--divide)">
         <thead className="bg-(--bg-subtle)">
           <tr>
@@ -462,14 +462,14 @@ export function BookList({
                 className="rounded"
               />
             </th>
-            {th("Title", "title")}
+            {th("Title", "title", "left", true)}
             {th("Ch.", "chapters", "right")}
             <th className="px-4 py-2 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Status</th>
-            {layout.showLangs && th("Languages", "langs")}
-            {layout.showOutputs && th("Outputs", "outputs")}
-            {layout.showSize && th("Size", "size", "right")}
+            {th("Languages", "langs")}
+            {th("Outputs", "outputs")}
+            {th("Size", "size", "right")}
             {th("Last activity", "lastActivity", "right")}
-            <th className="px-4 py-2 w-24" />
+            <th className="pinned-cell sticky right-0 z-1 px-4 py-2 w-24" />
           </tr>
         </thead>
         <tbody className="bg-(--bg-card) divide-y divide-(--divide)">
@@ -514,7 +514,7 @@ export function BookList({
             return (
               <tr
                 key={book.id}
-                className={`cursor-pointer hover:bg-(--bg-card-hover) ${selectedIds.has(book.id) ? "bg-(--bg-selected)" : ""}`}
+                className={`cursor-pointer hover:bg-(--bg-card-hover) ${selectedIds.has(book.id) ? "row-selected bg-(--bg-selected)" : ""}`}
                 draggable
                 onDragStart={(e) => setDragItems(e, dragItemsFor("book", book.id))}
                 onClick={rowClick(() => navigate(`/books/${book.id}`))}
@@ -528,7 +528,8 @@ export function BookList({
                     className="rounded"
                   />
                 </td>
-                <td className="px-4 py-3 max-w-md">
+                {/* Pinned while the table scrolls sideways; the floor stops a long row squeezing it to a word */}
+                <td className="pinned-cell pinned-last sticky left-0 z-1 px-4 py-3 max-w-md min-w-48">
                   <Link to={`/books/${book.id}`} className="text-(--accent-text) hover:text-(--accent-text-hover) font-medium">
                     {book.title}
                   </Link>
@@ -626,7 +627,6 @@ export function BookList({
                     {idle && totalFailures === 0 && !book.failed && !noText && <span className="text-xs text-(--text-faint)">—</span>}
                   </div>
                 </td>
-                {layout.showLangs && (
                 <td className="px-4 py-3">
                   {book.languages.length === 0 ? (
                     <span className="text-xs text-(--text-faint)">—</span>
@@ -644,24 +644,19 @@ export function BookList({
                     </div>
                   )}
                 </td>
-                )}
-                {layout.showOutputs && (
-                  <td className="px-4 py-3 text-sm text-(--text-tertiary)">
-                    {outputParts.length === 0 ? <span className="text-xs text-(--text-faint)">—</span> : outputParts.join(" · ")}
-                  </td>
-                )}
-                {layout.showSize && (
-                  <td className="px-4 py-3 text-right text-sm tabular-nums text-(--text-tertiary)">
-                    {formatBytes(book.sizeBytes)}
-                  </td>
-                )}
+                <td className="px-4 py-3 text-sm text-(--text-tertiary)">
+                  {outputParts.length === 0 ? <span className="text-xs text-(--text-faint)">—</span> : outputParts.join(" · ")}
+                </td>
+                <td className="px-4 py-3 text-right text-sm tabular-nums text-(--text-tertiary)">
+                  {formatBytes(book.sizeBytes)}
+                </td>
                 <td
                   className="px-4 py-3 text-right text-sm text-(--text-tertiary)"
                   title={`Created ${new Date(book.createdAt).toLocaleDateString()} · last activity ${new Date(book.lastActivityAt).toLocaleString()}`}
                 >
                   {formatRelativeTime(book.lastActivityAt)}
                 </td>
-                <td className="px-4 py-3">
+                <td className="pinned-cell sticky right-0 z-1 px-4 py-3">
                   <BookRowActions
                     book={book}
                     onMove={(id) => setMoveTarget({ bookIds: [id], folderIds: [] })}

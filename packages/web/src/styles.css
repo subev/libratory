@@ -349,13 +349,18 @@ body {
 
 /* A table cell that stays put while its row scrolls sideways under it, so it has to be opaque —
    and --bg-card-hover is a translucent wash in dark mode, so the row tint is layered over the card
-   colour rather than replacing it. The chapter table pins its titles left and its actions right. */
+   colour rather than replacing it. The chapter and book tables pin their titles left and their
+   actions right — the chapter table its checkbox and number too, at fixed widths so the offsets
+   add up; a row that marks selection with a tint carries .row-selected so its pinned cells show it
+   too. */
 .pinned-cell {
   background: linear-gradient(var(--pinned-tint, transparent), var(--pinned-tint, transparent)), var(--bg-card);
 }
 /* The edge facing the scrolled columns, so a cut-off column reads as passing under the pinned one
-   (macOS hides the scrollbar until the table is scrolled; this is the hint that there is more) */
-.pinned-cell.left-0 { box-shadow: inset -1px 0 0 var(--border); }
+   (macOS hides the scrollbar until the table is scrolled; this is the hint that there is more).
+   .pinned-last marks the last cell of the left group, since several can be pinned left. */
+.pinned-cell.pinned-last { box-shadow: inset -1px 0 0 var(--border); }
 .pinned-cell.right-0 { box-shadow: inset 1px 0 0 var(--border); }
 thead .pinned-cell { --pinned-tint: var(--bg-subtle); }
+tr.row-selected > .pinned-cell { --pinned-tint: var(--bg-selected); }
 tr:hover > .pinned-cell { --pinned-tint: var(--bg-card-hover); }
