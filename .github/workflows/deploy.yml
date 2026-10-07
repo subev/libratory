@@ -1,0 +1,109 @@
+# Continuous deployment: every push to main whose Test run passes, and whose commits were all
+# reviewed locally (scripts/review.mjs), is released to everyone — tagged, built, signed,
+# notarised, published, the Docker image pushed and the Homebrew tap bumped. Nothing waits for a
+# person; problems are fixed forward with the next merge. The other brake is ship.mjs
+# --unattended, which refuses a build that was not notarised rather than publishing it with a
+# warning nobody reads.
+#
+# The tag is pushed with the workflow token, and GitHub starts no workflow from such a push — so
+# the build and the image are dispatched on the tag explicitly, which it does allow.
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [Test]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write # the version commit, the tag, publishing the release
+  actions: write # dispatching Release and Docker image, reading their runs
+
+# One release at a time, in order; a merge landing mid-deploy waits for the next slot
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    # Holds TAP_TOKEN beside the signing secrets
+    environment: release
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      # Main may have moved on while the tests ran: the newer commit has a Test run of its own and
+      # deploys from there, and releasing it from here would ship a commit nothing has tested yet.
+      - name: Is the tested commit still main, and unreleased?
+        id: check
+        env:
+          TESTED: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          head=$(git rev-parse HEAD)
+          if [ "$head" != "$TESTED" ]; then
+            echo "main is at $head now, not the tested $TESTED — its own Test run deploys it."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          elif git describe --exact-match --tags --match 'v*' HEAD >/dev/null 2>&1; then
+            echo "$head is already released."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The backstop for the local pre-push hook, which --no-verify skips and a merge made on GitHub
+      # never runs: every commit since the last release must be covered by a recorded review
+      # (scripts/review.mjs). No model runs here — a note on the reviewed commit is the evidence.
+      - name: Was every commit reviewed?
+        if: steps.check.outputs.go == 'true'
+        run: |
+          git fetch --quiet origin refs/notes/review:refs/notes/review || echo "No review notes on the remote yet."
+          node scripts/review.mjs check "$(git describe --tags --abbrev=0 --match 'v*' HEAD)" HEAD || {
+            echo "::error::Not released: commits on main are not covered by a review. Review them locally, stamp, push the notes (any git push does), then re-run this workflow."
+            exit 1
+          }
+
+      - name: Tag
+        id: tag
+        if: steps.check.outputs.go == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          node scripts/release.mjs --yes
+          echo "tag=$(git describe --exact-match --tags --match 'v*' HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Build the app and the image
+        if: steps.check.outputs.go == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          gh workflow run release.yml --ref "$TAG"
+          gh workflow run docker.yml --ref "$TAG"
+          # A dispatch returns before the run exists. Found by commit, which a dispatched run carries
+          # however it names its branch.
+          sha=$(git rev-list -n 1 "$TAG")
+          for _ in $(seq 1 36); do
+            id=$(gh run list --workflow release.yml --commit "$sha" --limit 1 --json databaseId -q '.[0].databaseId')
+            [ -n "$id" ] && break
+            sleep 5
+          done
+          [ -n "$id" ] || { echo "::error::No Release run appeared for $TAG"; exit 1; }
+          gh run watch "$id" --exit-status --interval 60 > /dev/null
+          echo "Release run $id for $TAG passed."
+
+      - name: Publish
+        if: steps.check.outputs.go == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: node scripts/ship.mjs "$TAG" --unattended

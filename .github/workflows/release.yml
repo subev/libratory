@@ -4,10 +4,12 @@
 # the in-app updater cannot install anything until the certificate exists.
 name: Release
 
-# Two ways in, one path out. Locally: `pnpm release` works out the version, commits, tags and
-# pushes — the tag starts this. From the GitHub UI: Actions → Release → Run workflow does the same
-# thing here, so a release needs no checkout at all. Either way the version is computed by
-# scripts/release.mjs and never typed by hand.
+# Three ways in, one path out. Locally: `pnpm release` works out the version, commits, tags and
+# pushes — the tag starts this. From the GitHub UI: Actions → Release → Run workflow on main does
+# the same thing here, so a release needs no checkout at all. And deploy.yml, which tags with the
+# workflow token — a push GitHub will not start workflows from — so it dispatches this on the tag,
+# and a dispatch on a tag builds that tag rather than cutting another. Either way the version is
+# computed by scripts/release.mjs and never typed by hand.
 on:
   push:
     tags: ["v*"]
@@ -35,8 +37,8 @@ jobs:
           # release.mjs reads existing tags to pick the next number, and pushes when run from here
           fetch-depth: 0
           # A tag build must ship the tagged commit. Manual releases still cut from main.
-          ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.ref }}
-          persist-credentials: ${{ github.event_name == 'workflow_dispatch' }}
+          ref: ${{ github.ref_type == 'tag' && github.ref || 'main' }}
+          persist-credentials: ${{ github.ref_type != 'tag' }}
 
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -45,17 +47,19 @@ jobs:
           cache: pnpm
 
       - name: Work out the version and tag it
-        if: github.event_name == 'workflow_dispatch'
+        if: github.ref_type != 'tag'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           node scripts/release.mjs --yes
 
-      - name: Verify the release tag matches the package
-        if: github.event_name == 'push'
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: node -e 'const p = require("./packages/desktop/package.json"); if (process.env.RELEASE_TAG !== "v" + p.version) throw new Error("Release tag does not match package version")'
+      # The version lives in the tag, never in a commit: main changes only through reviewed merges
+      # (scripts/review.mjs), so the package's version on main is not the release's
+      - name: Stamp the version from the tag
+        run: |
+          TAG=$(git describe --exact-match --tags --match 'v*' HEAD)
+          node -e 'const fs = require("fs"); const f = "packages/desktop/package.json"; const p = JSON.parse(fs.readFileSync(f, "utf8")); p.version = process.argv[1]; fs.writeFileSync(f, JSON.stringify(p, null, 2) + "\n")' "${TAG#v}"
+          echo "Building $TAG"
 
       - run: pnpm install --frozen-lockfile
 

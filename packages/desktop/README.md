@@ -114,13 +114,26 @@ Tag it. `.github/workflows/release.yml` builds on a `v*` tag and publishes the D
 Releases, which is also where `electron-updater` looks — so the download page and the update feed
 are the same artefact, and there is nothing to keep in step by hand.
 
-Two ways to cut one, and neither involves editing a version by hand.
+**Automatically, on every merge.** `.github/workflows/deploy.yml` runs when the Test workflow
+passes on main. It first checks that every commit since the last release is covered by a recorded
+local review (see *Reviews* below) and fails the run if one is not; then `release.mjs --yes` tags
+the commit, the Release and Docker image workflows are
+dispatched on that tag (a tag pushed with the workflow token starts no workflow by itself), and
+once the build passes `ship.mjs --unattended` publishes it and bumps the tap. Nobody looks at it
+on the way out; a bad release is fixed forward. It skips a commit main has already moved past (that
+commit's own Test run deploys the newer one) and a commit that already carries a tag, and
+`--unattended` refuses — rather than warns about — a build the notary did not accept or one a
+newer release has overtaken. The tap is written with `TAP_TOKEN` in the `release` environment, a
+fine-grained token with Contents read/write on `subev/homebrew-libratory` only; without it the
+release still goes out and the run warns that the cask was left behind.
+
+By hand, two more ways, and neither involves editing a version by hand.
 
 **From your machine:**
 
 ```bash
 pnpm release          # says what it would do, changes nothing
-pnpm release --yes    # version, commit, tag, push — the push starts the build
+pnpm release --yes    # version, tag, push the tag — the push starts the build
 pnpm ship             # publish the draft that build produced
 ```
 
@@ -133,8 +146,8 @@ published with `--latest=false`, so an old one left lying around cannot take the
 the notes are still the workflow's placeholder it writes them from the commit subjects since the
 previous tag.
 
-**From GitHub:** Actions → **Release** → *Run workflow*. Same script, run on the runner, so a
-release needs no checkout at all.
+**From GitHub:** Actions → **Release** → *Run workflow* on main. Same script, run on the runner,
+so a release needs no checkout at all. Run on a tag instead, it builds that tag.
 
 `ship` also rewrites the Homebrew cask. `scripts/cask.mjs` renders it from the version and the
 sha256 GitHub reports for the zip, and one API call puts it in
@@ -143,9 +156,25 @@ the release is the newest, so an old draft published late cannot roll `brew inst
 If that call fails the release stays published and the script prints the `node scripts/cask.mjs`
 line to paste by hand. The tap's own workflow runs `brew audit` and `brew style` on every push.
 
-Either way `scripts/release.mjs` picks the version, and it refuses to run from the wrong branch,
-with a dirty tree, or behind `origin/main` — each of which is otherwise discovered *after* the tag
-is pushed, which is the one point where undoing it means deleting a tag other people may have.
+Either way `scripts/release.mjs` picks the version and commits nothing: the version lives in the
+tag, and `release.yml` stamps it into `packages/desktop/package.json` before building, so the
+version on main is not the release's. It refuses to run from the wrong branch, with a dirty tree,
+behind or ahead of `origin/main`, or on a commit already released — each of which is otherwise
+discovered *after* the tag is pushed, which is the one point where undoing it means deleting a tag
+other people may have.
+
+### Reviews
+
+Main is released to everyone automatically, so every commit reaching it must have been reviewed
+locally first — `/code-review`, with no CI and no model in the gate itself. A review is recorded
+as a git note under `refs/notes/review` on the exact commit reviewed (`pnpm review:stamp --level
+high --summary "…"`), and covers that commit and its ancestors back to where its branch left main.
+A commit added afterwards is not covered. `.githooks/pre-push` (installed by `pnpm install` through
+`core.hooksPath`) refuses a push to main with an uncovered commit and pushes the notes along with
+every push; `deploy.yml` runs the same check (`node scripts/review.mjs check <base> <tip>`) as the
+backstop for `--no-verify` and for merges made on GitHub. Leave `notes.rewriteRef` unset: a rebased
+or amended commit is not the one that was reviewed, and its stamp should not follow it. The stamp
+proves a review was recorded, not that it was good; stamping by hand is the deliberate override.
 
 Versions are **`v<YY>.<MMDD>.<n>`** — `v26.826.0` is the first release on 26 August 2026,
 `v26.826.1` the second that day. The script counts existing tags for today and takes the next

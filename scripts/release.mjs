@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-// Cuts a release. Works out the version, commits it, tags it, pushes — which is what starts the
-// build. Nothing here is clever; it exists because doing it by hand means editing a version in a
-// file, and a version edited by hand is a version that is one digit wrong on a Friday.
+// Cuts a release. Works out the version, tags main's head with it and pushes the tag — which is
+// what starts the build. Nothing is committed: the build stamps the version into
+// packages/desktop/package.json from the tag (release.yml), so main only ever changes through a
+// reviewed merge (scripts/review.mjs) and the version on main is not the release's. It exists
+// because a version worked out by hand is a version that is one digit wrong on a Friday.
 //
 //   node scripts/release.mjs            what would happen, and stop
 //   node scripts/release.mjs --yes      do it
@@ -10,12 +12,10 @@
 // second that day. Three numeric parts because electron-updater compares with semver and rejects
 // anything else; see packages/desktop/README.md for why a 4th part and a -2 suffix both fail.
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const PKG = path.join(REPO, "packages/desktop/package.json");
 const go = process.argv.includes("--yes");
 
 const git = (...args) => execFileSync("git", args, { cwd: REPO, encoding: "utf8" }).trim();
@@ -53,18 +53,23 @@ function preflight() {
   git("fetch", "origin", "main", "--tags", "--quiet");
   const behind = git("rev-list", "--count", "HEAD..origin/main");
   if (behind !== "0") fail(`${behind} commit(s) on origin/main that you do not have.`, "git pull --rebase");
+  // The tag would name a commit main does not have; it gets there through a pull request
+  const ahead = git("rev-list", "--count", "origin/main..HEAD");
+  if (ahead !== "0") fail(`${ahead} commit(s) not on origin/main.`, "Merge them through a pull request first.");
+  const tagged = git("tag", "--points-at", "HEAD", "--list", "v*");
+  if (tagged) fail(`HEAD is already released as ${tagged.split("\n").join(", ")}.`, "Nothing new to release.");
 }
 
 function main() {
   preflight();
   const tags = git("tag", "--list", "v*").split("\n").filter(Boolean);
   const version = nextVersion(tags);
-  const ahead = git("rev-list", "--count", "origin/main..HEAD");
+  const previous = git("describe", "--tags", "--abbrev=0", "--match", "v*", "HEAD");
 
   console.log(`\n  version   ${version}`);
-  console.log(`  tag       v${version}`);
-  console.log(`  pushing   ${ahead} commit(s) to origin/main`);
-  for (const subject of git("log", "origin/main..HEAD", "--format=%s").split("\n").filter(Boolean)) {
+  console.log(`  tag       v${version} on ${git("log", "-1", "--format=%h %s", "HEAD")}`);
+  console.log(`  since     ${previous}:`);
+  for (const subject of git("log", "--no-merges", `${previous}..HEAD`, "--format=%s").split("\n").filter(Boolean)) {
     console.log(`            ${subject}`);
   }
   console.log(`  then      the Release workflow builds a DMG and opens a draft release`);
@@ -74,19 +79,8 @@ function main() {
     return;
   }
 
-  const pkg = JSON.parse(readFileSync(PKG, "utf8"));
-  const alreadyRight = pkg.version === version;
-  pkg.version = version;
-  writeFileSync(PKG, `${JSON.stringify(pkg, null, 2)}\n`);
-
-  // The version can already be what we want — a release cut on the same day as the last edit, or a
-  // retry after a push that failed. Committing nothing is an error to git, not to us.
-  if (!alreadyRight) {
-    git("add", PKG);
-    git("commit", "-m", `Release ${version}`);
-  }
   git("tag", `v${version}`);
-  git("push", "origin", "main", `v${version}`);
+  git("push", "origin", `v${version}`);
 
   console.log(`\n  Pushed v${version} — a DRAFT. Nobody is offered it until it is published.`);
   console.log(`  Watch the build:  gh run watch`);
