@@ -15,11 +15,11 @@ import { useVoicePicker } from "./context.tsx";
 // Word timing is the difference between words lighting up as they are read and sentences
 // doing so, and between word-level and sentence-level two-language reading; said on every row
 // because it is the one thing a listener cannot hear in the preview.
-function describe(voice: Voice, foreignIn: string | null): string {
+function describe(voice: Voice, foreignIn: string | null, reading: string | null | undefined): string {
   const parts: string[] = [];
   if (foreignIn) parts.push(`Not a native ${languageLabel(foreignIn)} voice`);
   if (voice.gender) parts.push(voice.gender === "F" ? "Female" : "Male");
-  parts.push(voiceHasWordTiming(voice.id, voice.language) ? "Word timing" : "Sentence timing");
+  parts.push(voiceHasWordTiming(voice.id, reading) ? "Word timing" : "Sentence timing");
   if (voice.note) parts.push(voice.note);
   return parts.join(" · ");
 }
@@ -37,7 +37,8 @@ export const VoiceRow = memo(function VoiceRow({ voice, language, action }: { vo
   const { data: engines } = trpc.models.engines.useQuery(undefined, { staleTime: 30_000, enabled: voice.requiresEngine !== undefined });
   const missingEngine = voiceMissingEngine(voice, engines);
   const unavailable = missingEngine !== null;
-  const description = describe(voice, foreignIn);
+  // Timed in the language of the list it sits in, as the picker's Word timing filter judges it
+  const description = describe(voice, foreignIn, language ?? voice.language);
 
   const status = missingEngine
     ? missingEngine

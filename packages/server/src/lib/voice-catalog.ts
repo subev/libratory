@@ -179,20 +179,24 @@ export function engineForVoiceId(voiceId: string): VoiceEngine {
   return ENGINE_PREFIXES.find((entry) => voiceId.startsWith(entry.prefix))?.engine ?? "kokoro";
 }
 
+// Written without spaces between words, so there is no word to put a time on
+const UNSPACED_LANGUAGES = new Set(["zh", "ja"]);
+
 // Whether a recording made with this voice carries a time for every word — what word
 // highlighting and word-level two-language reading need; without it a chapter reads at sentence
 // level. Cartesia and ElevenLabs return word timestamps with the audio. Kokoro's come from its
 // English tokenizer, and in its espeak languages from its phoneme durations aligned to the words
 // (scripts/phoneme_words.py) — which needs spaces between words, so not Mandarin. Piper's come from
 // its durations the same way. Pocket, BgTTS, MMS and the macOS voices give chunk boundaries only.
-// Written without spaces between words, so there is no word to put a time on
-const UNSPACED_LANGUAGES = new Set(["zh", "ja"]);
-
 export function voiceHasWordTiming(voiceId: string, language?: string | null): boolean {
   if (voiceId.startsWith("bg-piper:")) return true;
   const engine = engineForVoiceId(voiceId);
-  if (engine === "cartesia" || engine === "elevenlabs") return true;
-  if (engine === "kokoro") return !UNSPACED_LANGUAGES.has(language ?? languageOfStaticVoice(voiceId));
+  if (engine === "cartesia") return true;
+  // ElevenLabs times characters, and charactersToWords groups them at spaces — a sentence of
+  // Japanese would come back as one word. Kokoro's words come from the same spaces.
+  if (engine === "elevenlabs" || engine === "kokoro") {
+    return !UNSPACED_LANGUAGES.has(language ?? languageOfStaticVoice(voiceId));
+  }
   return false;
 }
 
