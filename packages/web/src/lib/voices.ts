@@ -143,11 +143,21 @@ const ENGINE_SETUP: Record<NonNullable<Voice["requiresEngine"]>, string> = {
   pocket: "pnpm run setup",
 };
 
-export type EngineStatus = { installed: Partial<Record<string, boolean>>; runtime: "source" | "desktop" | "docker" };
+export type EngineInstall = { installable: boolean; installing: boolean };
+export type EngineStatus = {
+  installed: Partial<Record<string, boolean>>;
+  runtime: "source" | "desktop" | "docker";
+  /** Engines the app can build itself, from the voice picker (BgTTS today) */
+  install?: Partial<Record<string, EngineInstall>>;
+};
 
-// A setup command means something only in a checkout; a packaged build says so instead
+// A setup command means something only in a checkout; a packaged build says so instead. An engine
+// the app can build points at the picker's download card rather than at either.
 export function voiceMissingEngine(voice: Voice, engines: EngineStatus | undefined): string | null {
   if (!voice.requiresEngine || engines?.installed[voice.requiresEngine] !== false) return null;
+  const install = engines.install?.[voice.requiresEngine];
+  if (install?.installing) return "Setting up — available when the download finishes";
+  if (install?.installable) return "Needs a one-time download — see Download and set up";
   if (engines.runtime === "desktop") return "Not in the desktop app yet";
   if (engines.runtime === "docker") return "Not in the Docker image yet";
   return `Not installed — run ${ENGINE_SETUP[voice.requiresEngine]}`;

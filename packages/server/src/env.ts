@@ -35,6 +35,9 @@ const envSchema = z.object({
   POCKET_ENV_PATH: z.string().default(path.join(repoRoot, ".venv-pocket", "bin")),
   PIPER_ENV_PATH: z.string().default(path.join(repoRoot, ".venv-piper", "bin")),
   BGTTS_ENV_PATH: z.string().default(path.join(repoRoot, ".venv-bgtts", "bin")),
+  // The uv that builds an engine's venv from the app (lib/engine-install.ts): the desktop first run
+  // fetches it into its home as uv/uv, scripts/setup.sh into the checkout as .uv/uv
+  UV_PATH: z.string().default(path.join(repoRoot, process.env.LIBRATORY_HOME ? "uv" : ".uv", "uv")),
   // What kind of install this is, so a voice whose env is missing names a step the person can take
   LIBRATORY_RUNTIME: z.enum(["source", "desktop", "docker"]).default("source"),
   // Where the vivliostyle CLI is installed when the server has no node_modules of its own.

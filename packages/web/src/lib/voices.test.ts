@@ -18,6 +18,13 @@ describe("voiceMissingEngine", () => {
     expect(voiceMissingEngine(bgtts, { installed: { bgtts: false }, runtime: "desktop" })).toBe("Not in the desktop app yet");
     expect(voiceMissingEngine(bgtts, { installed: { bgtts: false }, runtime: "docker" })).toBe("Not in the Docker image yet");
   });
+
+  it("points at the download when the app can build the engine itself, and says so while it does", () => {
+    const install = (installing: boolean) => ({ bgtts: { installable: true, installing } });
+    expect(voiceMissingEngine(bgtts, { installed: { bgtts: false }, runtime: "desktop", install: install(false) })).toMatch(/Download and set up/);
+    expect(voiceMissingEngine(bgtts, { installed: { bgtts: false }, runtime: "desktop", install: install(true) })).toMatch(/^Setting up/);
+    expect(voiceMissingEngine(bgtts, { installed: { bgtts: true }, runtime: "desktop", install: install(false) })).toBeNull();
+  });
 });
 
 describe("getVoiceLabel", () => {
