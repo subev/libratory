@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { engineForVoiceId, languageCodeFromName, normalizeVoiceId, speedRangeFor, voiceSupportsSpeedControl } from "../lib/voices.ts";
+import { engineForVoiceId, getVoiceById, languageCodeFromName, normalizeVoiceId, speedRangeFor, voiceMissingEngine, voiceSupportsSpeedControl } from "../lib/voices.ts";
 import { trpc } from "../trpc.ts";
 import { VoicePickerProvider } from "./voice-picker/context.tsx";
 import { VoiceLibraryModal } from "./voice-picker/VoiceLibraryModal.tsx";
@@ -49,6 +49,13 @@ export function SynthesizeModal({
     return [...new Set([variantCode, bookLanguage].filter((c): c is string => !!c))];
   }, [language, bookLanguage]);
 
+  // A voice saved while its engine was there (a checkout, then the desktop app on the same library)
+  // must not queue chapters that can only fail
+  const entry = getVoiceById(normalizeVoiceId(voice));
+  const { data: engines } = trpc.models.engines.useQuery(undefined, { staleTime: 30_000, enabled: entry?.requiresEngine !== undefined });
+  const voiceUnavailable = entry ? voiceMissingEngine(entry, engines) : null;
+  const startable = canStart && voiceUnavailable === null;
+
   return (
     <VoicePickerProvider selectedId={normalizeVoiceId(voice)} onSelect={onChangeVoice}>
       <VoiceLibraryModal
@@ -79,8 +86,8 @@ export function SynthesizeModal({
                 <Button
                   variant="primary"
                   onClick={onStart}
-                  disabled={!canStart}
-                  title={canStart ? undefined : disabledReason}
+                  disabled={!startable}
+                  title={voiceUnavailable ? `${entry?.label ?? voice}: ${voiceUnavailable}` : canStart ? undefined : disabledReason}
                   data-testid="synthesize-start"
                 >
                   Start synthesis ({count})

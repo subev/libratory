@@ -6,7 +6,6 @@ VENV_DIR="$REPO_DIR/.venv"
 POCKET_VENV_DIR="$REPO_DIR/.venv-pocket"
 PIPER_VENV_DIR="$REPO_DIR/.venv-piper"
 BGTTS_VENV_DIR="$REPO_DIR/.venv-bgtts"
-MIOCODEC_REF="77473544375d57e96cbdfd5d7d257e8f280fa8e3"
 WITH_BGTTS=false
 for arg in "$@"; do
   case "$arg" in
@@ -196,22 +195,16 @@ echo "Caching the Piper Bulgarian voice (63 MB)..."
 
 echo ""
 BGTTS_PY="$BGTTS_VENV_DIR/bin/python"
-if [ -x "$BGTTS_PY" ] && "$BGTTS_PY" -c "import miocodec" 2>/dev/null; then
+if [ -x "$BGTTS_PY" ] && [ ! -e "$BGTTS_VENV_DIR/.installing" ] && "$BGTTS_PY" -c "import miocodec" 2>/dev/null; then
   WITH_BGTTS=true
 elif ! $WITH_BGTTS && [ -t 0 ]; then
   read -r -p "Add the BgTTS-38M Bulgarian narrator (CPU, voice cloning-capable)? Downloads ~1.5 GB once. [y/N] " answer
   [[ "$answer" =~ ^[Yy] ]] && WITH_BGTTS=true
 fi
 if $WITH_BGTTS; then
-  # Separate venv: MioCodec needs torchaudio, which stops at 2.9.1, while .venv pins torch 2.13.
   echo "Preparing BgTTS-38M narrator at .venv-bgtts..."
-  [ -x "$BGTTS_PY" ] || "$PYTHON" -m venv "$BGTTS_VENV_DIR"
-  BGTTS_TORCH=()
-  [ "$PLATFORM" = "linux" ] && BGTTS_TORCH=(--torch-backend=cpu)
-  "$UV" --no-config pip install --python "$BGTTS_PY" --quiet "${BGTTS_TORCH[@]}" -r "$REPO_DIR/scripts/requirements-bgtts.txt"
-  # A source build: its uv_build backend would otherwise come from the user's default index (issue #19)
-  UV_INDEX="https://pypi.org/simple" UV_DEFAULT_INDEX="https://pypi.org/simple" "$UV" --no-config pip install --python "$BGTTS_PY" --quiet --no-deps "miocodec @ git+https://github.com/Aratako/MioCodec@$MIOCODEC_REF"
-  "$BGTTS_PY" "$REPO_DIR/scripts/synthesize_bgtts.py" --cache-only >/dev/null && echo "  bgtts-38m-v2: OK"
+  # pipefail: a failed install must stop setup, not vanish into sed's exit code
+  (set -o pipefail; "$REPO_DIR/scripts/install_bgtts.sh" "$UV" "$BGTTS_VENV_DIR" "$REPO_DIR/scripts" | sed -n 's/.*"label":"\(.*\)".*/  \1/p')
 else
   echo "BgTTS-38M narrator: skipped (run 'pnpm run setup --bgtts' to add it later)"
 fi

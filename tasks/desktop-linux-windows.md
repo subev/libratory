@@ -35,8 +35,9 @@ Not done:
    AppArmor profile, a `.deb` (installed sandbox helper), or documenting the flag.
 3. **Release CI**: a Linux job beside the macOS one, `latest-linux.yml` for electron-updater
    (AppImage updates work; deb does not self-update).
-4. **BgTTS (and Pocket) in the desktop app** (every platform): Piper has a first-run step since
-   2026-10-07; BgTTS and Pocket still have no environment there and their rows say so.
+4. **Pocket in the desktop app** (every platform): Piper has a first-run step and BgTTS a
+   download card in the voice picker since 2026-10-07; Pocket still has no environment there and
+   its rows say so. `scripts/install_bgtts.sh` + `lib/engine-install.ts` is the pattern to copy.
 5. CUDA: the lock routes Linux torch to the CPU index; a GPU build would need its own lock.
 
 ### Test bed: Omarchy on this Mac

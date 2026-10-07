@@ -26,7 +26,8 @@ const PIPER_SCRIPT = scriptPath("synthesize_piper_tts.py");
 export function installedLocalEngines(): Record<LocalEngine, boolean> {
   return {
     piper: existsSync(path.join(env.PIPER_ENV_PATH, "python")),
-    bgtts: existsSync(path.join(env.BGTTS_ENV_PATH, "python")),
+    // .installing stays until scripts/install_bgtts.sh finishes, so a half-built venv is not a voice
+    bgtts: existsSync(path.join(env.BGTTS_ENV_PATH, "python")) && !existsSync(path.join(env.BGTTS_ENV_PATH, "..", ".installing")),
     pocket: existsSync(path.join(env.POCKET_ENV_PATH, "python")),
   };
 }

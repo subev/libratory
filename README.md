@@ -169,7 +169,7 @@ An Apple Silicon Mac, or a Linux machine (x86_64 or arm64, CPU is enough), or Wi
 It is idempotent — rerun it after failures. It works the same on Linux. It must be `pnpm run setup`; bare `pnpm setup` triggers pnpm's unrelated builtin.
 
 - Creates `.env` with working defaults.
-- Skips the ~1.5 GB BgTTS-38M Bulgarian narrator unless you answer yes (or run `pnpm run setup --bgtts`).
+- Skips the ~1.5 GB BgTTS-38M Bulgarian narrator unless you answer yes (or run `pnpm run setup --bgtts`, or press *Download and set up* on its voices in the app).
 - Installs Python packages into a repo-local `.venv` from `pyproject.toml` + `uv.lock` (`uv sync --frozen`, whole graph pinned). Point `CONDA_ENV_PATH` in `.env` at another env's `bin` dir if you manage your own.
 
 **For the AI features you need at least one model.**

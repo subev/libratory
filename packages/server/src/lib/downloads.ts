@@ -39,7 +39,12 @@ export class DownloadTracker {
       for (const line of String(buf).split("\n")) {
         if (!line.startsWith("{")) continue;
         try {
-          const m = JSON.parse(line) as { type?: string; mb?: number; totalMb?: number };
+          const m = JSON.parse(line) as { type?: string; mb?: number; totalMb?: number; label?: string };
+          // A multi-step install (lib/engine-install.ts) names the step it is on instead
+          if (m.type === "step" && m.label) {
+            this.progress.set(id, m.label);
+            continue;
+          }
           if (m.type !== "progress" || m.mb === undefined || !m.totalMb) continue;
           const pct = Math.min(99, Math.round((m.mb / m.totalMb) * 100));
           this.progress.set(id, `${(m.mb / 1024).toFixed(1)} / ${(m.totalMb / 1024).toFixed(1)} GB (${pct}%)`);
