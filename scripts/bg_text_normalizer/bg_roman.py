@@ -47,12 +47,3 @@ def roman_to_arabic(roman: str) -> Optional[int]:
         return None
 
     return result
-
-
-if __name__ == '__main__':
-    test_romans = ['I', 'II', 'III', 'IV', 'V', 'IX', 'X',
-                   'XIV', 'XIX', 'XX', 'XXI', 'L', 'C', 'D', 'M']
-
-    print("=== Roman Numerals ===")
-    for r in test_romans:
-        print(f"  {r} → {roman_to_arabic(r)}")

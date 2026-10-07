@@ -65,18 +65,3 @@ def normalize_phone_number(phone: str) -> str:
             i += 1
 
     return ' '.join(result_parts)
-
-
-if __name__ == '__main__':
-    test_phones = [
-        "+359 888 123 456",
-        "0888 123 456",
-        "02 1234567",
-        "0888123456",
-        "+359 2 981 5678",
-    ]
-
-    print("=== Phone Number Normalization ===")
-    for phone in test_phones:
-        result = normalize_phone_number(phone)
-        print(f"  {phone} → {result}")

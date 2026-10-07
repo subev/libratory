@@ -376,32 +376,3 @@ def float_to_words(f, gender: str = 'n') -> str:
     result += decimal_words + ' ' + denom
 
     return result.strip()
-
-
-if __name__ == '__main__':
-    # Test cardinal numbers
-    test_cardinals = [
-        (0, 'm'), (1, 'm'), (1, 'f'), (1, 'n'), (2, 'm'), (2, 'f'),
-        (10, 'm'), (11, 'm'), (15, 'm'), (20, 'm'), (21, 'm'), (21, 'f'),
-        (100, 'm'), (101, 'm'), (200, 'm'), (256, 'm'), (999, 'm'),
-        (1000, 'm'), (1001, 'm'), (1500, 'm'), (2000, 'm'), (2026, 'm'),
-        (10000, 'm'), (100000, 'm'), (1000000, 'm'), (1234567, 'm'),
-    ]
-
-    print("=== Cardinal Numbers ===")
-    for num, g in test_cardinals:
-        print(f"  {num} ({g}): {number_to_words_cardinal(num, g)}")
-
-    print("\n=== Ordinal Numbers ===")
-    test_ordinals = [
-        (1, 'm'), (1, 'f'), (2, 'm'), (3, 'm'), (5, 'f'),
-        (10, 'm'), (11, 'm'), (15, 'f'), (20, 'm'), (21, 'm'),
-        (100, 'm'), (256, 'm'),
-    ]
-    for num, g in test_ordinals:
-        print(f"  {num} ({g}): {number_to_words_ordinal(num, g)}")
-
-    print("\n=== Decimal Numbers ===")
-    test_decimals = [3.14, 1.5, 0.25, 99.99, 1500.50]
-    for num in test_decimals:
-        print(f"  {num}: {float_to_words(num)}")

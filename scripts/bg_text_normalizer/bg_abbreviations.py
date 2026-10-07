@@ -216,26 +216,3 @@ def normalize_abbreviations(text: str) -> str:
         text = re.sub(pattern, r'\1 ' + full_form, text)
 
     return text
-
-
-if __name__ == '__main__':
-    test_cases = [
-        "бул. Витоша №10, гр. София",
-        "г-н Иванов е д-р по медицина",
-        "Офис на 5 км от центъра",
-        "Площ: 120 кв.м",
-        "т.е. не може да се направи",
-        "Фирма Тест ЕООД",
-        "Скорост: 60 км/ч",
-        "Заплата: 2500 лв. (вкл. ДДС)",
-        "ж.к. Люлин, бл. 305, вх. А, ет. 5, ап. 20",
-        "проф. д-р Петров",
-        "и т.н. и т.н.",
-    ]
-
-    print("=== Abbreviation Expansion ===")
-    for test in test_cases:
-        result = normalize_abbreviations(test)
-        print(f"  Input:  {test}")
-        print(f"  Output: {result}")
-        print()

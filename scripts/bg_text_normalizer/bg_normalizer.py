@@ -44,8 +44,6 @@ class BulgarianTextNormalizer:
         if not text.strip():
             return text
 
-        original = text
-
         # Step 1: Normalize abbreviations first (before numbers eat the dots)
         if self.expand_abbrevs:
             text = normalize_abbreviations(text)
@@ -90,8 +88,6 @@ class BulgarianTextNormalizer:
         # Step 13: Clean up extra whitespace
         text = re.sub(r'\s+', ' ', text).strip()
 
-        if self.verbose and text != original:
-            print(f"[NORM] '{original}' -> '{text}'")
 
         return text
 
@@ -341,31 +337,3 @@ def normalize_text(text: str, **kwargs) -> str:
     if _default_normalizer is None:
         _default_normalizer = BulgarianTextNormalizer()
     return _default_normalizer.normalize(text)
-
-
-if __name__ == '__main__':
-    normalizer = BulgarianTextNormalizer(verbose=True)
-
-    test_cases = [
-        "На 15.02.2026 г. в 14:30 ч. цената е 1500.50 лв.",
-        "Среща на 01.03.2026 г. в 9:05 часа.",
-        "Това е 21-ви век.",
-        "Дължимата сума е $250 или €230.",
-        "Населението е 7 000 000 души.",
-        "Увеличение от 15.5%.",
-        "бул. Витоша №10, гр. София",
-        "На 3-ти март 1878 г.",
-        "Доставка на 25.12.",
-        "Цена: 99.99 лв.",
-        "Обадете се на 0888 123 456.",
-        "Роден на 01.01.2000 г.",
-        "Той е на 35 години.",
-    ]
-
-    print("=" * 60)
-    print("Bulgarian Text Normalizer - Test Cases")
-    print("=" * 60)
-    for test in test_cases:
-        result = normalizer.normalize(test)
-        print(f"\nInput:  {test}")
-        print(f"Output: {result}")

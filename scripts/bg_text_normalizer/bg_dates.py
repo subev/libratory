@@ -71,27 +71,3 @@ def normalize_year(year: int) -> str:
 
     # Use ordinal feminine since "година" is feminine
     return number_to_words_ordinal(year, gender='f')
-
-
-if __name__ == '__main__':
-    test_dates = [
-        (15, 2, 2026, True),
-        (1, 1, 2000, True),
-        (3, 3, 1878, True),
-        (25, 12, None, False),
-        (31, 12, 1999, True),
-        (1, 9, 2024, False),
-    ]
-
-    print("=== Date Normalization ===")
-    for args in test_dates:
-        day, month = args[0], args[1]
-        year = args[2]
-        suffix = args[3] if len(args) > 3 else False
-        result = normalize_date(day, month, year, include_year_suffix=suffix)
-        date_str = f"{day:02d}.{month:02d}"
-        if year:
-            date_str += f".{year}"
-        if suffix:
-            date_str += " г."
-        print(f"  {date_str} → {result}")

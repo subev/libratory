@@ -43,20 +43,3 @@ def normalize_time(hours: int, minutes: int, include_suffix: bool = False) -> st
         result += ' часа'
 
     return result
-
-
-if __name__ == '__main__':
-    test_times = [
-        (14, 30, True),
-        (9, 5, True),
-        (12, 0, True),
-        (0, 0, False),
-        (23, 59, False),
-        (8, 15, True),
-    ]
-
-    print("=== Time Normalization ===")
-    for h, m, suffix in test_times:
-        result = normalize_time(h, m, suffix)
-        time_str = f"{h:02d}:{m:02d}" + (" ч." if suffix else "")
-        print(f"  {time_str} → {result}")

@@ -102,23 +102,3 @@ def normalize_currency(amount_str: str, currency: str = 'BGN') -> str:
         return f"нула {info['main_plural']}"
 
     return ' '.join(parts)
-
-
-if __name__ == '__main__':
-    test_amounts = [
-        ("1500.50", "BGN"),
-        ("1", "BGN"),
-        ("2", "BGN"),
-        ("25", "BGN"),
-        ("99.99", "BGN"),
-        ("0.50", "BGN"),
-        ("100", "EUR"),
-        ("50.25", "USD"),
-        ("1", "EUR"),
-        ("1000000", "BGN"),
-    ]
-
-    print("=== Currency Normalization ===")
-    for amount, currency in test_amounts:
-        result = normalize_currency(amount, currency)
-        print(f"  {amount} {currency} → {result}")
