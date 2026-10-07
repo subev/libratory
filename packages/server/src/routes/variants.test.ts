@@ -490,13 +490,13 @@ describe("variants router", () => {
     const db = getDb();
     const { bookId } = await insertFixture(db);
 
-    await caller.setVoice({ bookId, key: "Bulgarian", voice: "bg-mlx:narrator" });
+    await caller.setVoice({ bookId, key: "Bulgarian", voice: "bg-bgtts:male" });
     await caller.setVoice({ bookId, key: "Bulgarian", speed: 1.2 });
     await caller.setVoice({ bookId, key: "eli5", voice: "af_bella" });
 
     const book = firstRow(await db.select().from(books).where(eq(books.id, bookId)));
     expect(book.variantVoices).toEqual({
-      Bulgarian: { voice: "bg-mlx:narrator", speed: 1.2 },
+      Bulgarian: { voice: "bg-bgtts:male", speed: 1.2 },
       eli5: { voice: "af_bella" },
     });
     expect(book.voice).toBe("af_heart");

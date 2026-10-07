@@ -107,6 +107,24 @@ describe("booksRouter.updateSettings", () => {
     expect(chapter.synthesizedWith).toBeNull();
     expect(chapter.error).toBeNull();
   });
+
+  it("refuses a retired voice before touching a chapter's audio", async () => {
+    const db = getDb();
+    const bookId = crypto.randomUUID();
+    const chapterId = crypto.randomUUID();
+    await db.insert(books).values({ id: bookId, title: "Book", filename: "book.pdf", pdfPath: "/tmp/book.pdf", voice: "bg-mlx:narrator", speed: 1.0 });
+    await db.insert(chapters).values({
+      id: chapterId, bookId, index: 0, title: "Chapter 1", rawText: "Добро утро.", cleanText: "Добро утро.",
+      status: "done", selected: true, audioPath: "/tmp/ch000.m4a", durationMs: 12345,
+      synthesizedWith: { voice: "bg-mlx:narrator", speed: null },
+    });
+
+    await expect(booksRouter.createCaller({}).processSelected({ id: bookId })).rejects.toThrow(/retired.*BgTTS-38M/);
+
+    const chapter = row(await db.select().from(chapters).where(eq(chapters.id, chapterId)));
+    expect(chapter).toMatchObject({ status: "done", audioPath: "/tmp/ch000.m4a", durationMs: 12345 });
+    expect(mockQuickAddJob).not.toHaveBeenCalled();
+  });
 });
 
 function block(type: string, text: string, page: number): FlatBlock {

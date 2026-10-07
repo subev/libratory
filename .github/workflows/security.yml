@@ -67,3 +67,7 @@ jobs:
         with:
           fail-on-severity: low
           license-check: false
+          # torch 2.9.1 in scripts/requirements-bgtts.txt (lstm_cell, jit.script, both low): BgTTS's
+          # codec needs torchaudio, whose last release requires exactly torch 2.9.1. Opt-in, source
+          # checkout only, and it neither scripts nor runs untrusted models. Drop with a torchaudio bump.
+          allow-ghsas: GHSA-qfhq-4f3w-5fph, GHSA-rrmf-rvhw-rf47

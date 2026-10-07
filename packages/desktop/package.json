@@ -3,6 +3,7 @@
   "private": true,
   "version": "26.1003.0",
   "description": "Turns PDFs and EPUBs into audiobooks you can read along with, on your own machine.",
+  "desktopName": "libratory.desktop",
   "author": "Petar Sabev",
   "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
@@ -92,7 +93,17 @@
         "repo": "libratory",
         "releaseType": "draft"
       }
-    ]
+    ],
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "AudioVideo",
+      "icon": "build/icon.png",
+      "executableName": "libratory",
+      "synopsis": "PDF books to audiobooks with chapters and read-along",
+      "syncDesktopName": true
+    }
   },
   "dependencies": {
     "electron-updater": "^6.8.9"

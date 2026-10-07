@@ -2,7 +2,6 @@ import {
   type Voice,
   type VoiceEngine,
   type VoiceGroup,
-  MULTILINGUAL,
   languageOfStaticVoice,
   kokoroVoiceGroups,
   narratorVoices,
@@ -15,8 +14,10 @@ export {
   type Voice,
   type VoiceEngine,
   type VoiceGroup,
-  MULTILINGUAL,
   voiceCoversLanguage,
+  voiceIsForeignIn,
+  speedRangeFor,
+  type SpeedRange,
   languageOfStaticVoice,
   kokoroVoiceGroups,
   narratorVoices,
@@ -31,10 +32,8 @@ export {
   pocketCustomVoiceToEntry,
 } from "../../../server/src/lib/voice-catalog.ts";
 
-// Display grouping in the picker. Finer than `engine`: the narrator bucket holds two Bulgarian
-// models and KugelAudio, which is a different beast and deserves its own name.
-export function providerOfVoice(voice: Voice): string {
-  if (voice.id.startsWith("kugel:")) return "KugelAudio";
+// Display grouping in the picker. Finer than `engine`, which lumps the Bulgarian narrators together.
+export function providerOfVoice(voice: Pick<Voice, "id">): string {
   if (voice.id.startsWith("bg-")) return "Bulgarian narrators";
   if (voice.id.startsWith("pocket:")) return "Pocket TTS";
   if (voice.id.startsWith("say:")) return "macOS system";
@@ -43,7 +42,7 @@ export function providerOfVoice(voice: Voice): string {
   return "Kokoro";
 }
 
-export const PROVIDER_ORDER = ["Kokoro", "Pocket TTS", "KugelAudio", "Bulgarian narrators", "macOS system", "Cartesia", "ElevenLabs"];
+export const PROVIDER_ORDER = ["Kokoro", "Pocket TTS", "Bulgarian narrators", "macOS system", "Cartesia", "ElevenLabs"];
 
 
 export const LANGUAGE_LABELS: Record<string, string> = {
@@ -58,7 +57,6 @@ export const LANGUAGE_LABELS: Record<string, string> = {
   zh: "Mandarin Chinese",
   ja: "Japanese",
   ru: "Russian",
-  [MULTILINGUAL]: "Multilingual",
 };
 
 // Translation variants are keyed by display name ("Russian"); the picker works in codes.
@@ -87,8 +85,7 @@ export function languageLabel(code: string): string {
   }
 }
 
-// Kokoro encodes language in the voice prefix; the narrator models are single-language except
-// KugelAudio, which covers 24 EU languages and so belongs to every list.
+// Kokoro encodes language in the voice prefix; the narrator models are Bulgarian.
 const voiceGroups: VoiceGroup[] = [
   ...kokoroVoiceGroups,
   { label: "Bulgarian", voices: narratorVoices },
@@ -111,9 +108,17 @@ export function getVoiceById(voiceId: string): Voice | null {
   return voicesById.get(voiceId) ?? voicesById.get(normalizeVoiceId(voiceId)) ?? null;
 }
 
+// Removed engines still name the chapters they narrated
+const RETIRED_VOICE_LABELS: Record<string, string> = {
+  "bg-mlx:narrator": "BG-TTS V5 (retired)",
+  "kugel:default": "KugelAudio (retired)",
+};
+
 export function getVoiceLabel(voiceId: string): string {
   const voice = getVoiceById(voiceId);
   if (!voice) {
+    const retired = RETIRED_VOICE_LABELS[voiceId];
+    if (retired) return retired;
     if (voiceId.startsWith("say:")) return humanizeSayVoiceId(voiceId);
     if (voiceId.startsWith("cartesia:")) return `Cartesia ${voiceId.slice("cartesia:".length, "cartesia:".length + 8)}`;
     if (voiceId.startsWith("elevenlabs:")) return `ElevenLabs ${voiceId.slice("elevenlabs:".length, "elevenlabs:".length + 8)}`;
@@ -130,11 +135,22 @@ function humanizeSayVoiceId(voiceId: string): string {
   return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") + " (macOS)";
 }
 
-// Every other engine degrades to the CPU off Apple Silicon; the two MLX narrators cannot run at
-// all. Undefined capabilities means the probe has not answered — assume it works rather than grey
-// out two voices on every page load and then ungrey them.
-export function voiceBlockedByMissingMlx(voice: Voice, mlxAvailable: boolean | undefined): boolean {
-  return voice.requiresMlx === true && mlxAvailable === false;
+// An engine that lives in a venv of its own may not be built. Unknown means the probe has not
+// answered — assume it is there rather than grey out voices on every page load and ungrey them.
+const ENGINE_SETUP: Record<NonNullable<Voice["requiresEngine"]>, string> = {
+  piper: "pnpm run setup",
+  bgtts: "pnpm run setup --bgtts",
+  pocket: "pnpm run setup",
+};
+
+export type EngineStatus = { installed: Partial<Record<string, boolean>>; runtime: "source" | "desktop" | "docker" };
+
+// A setup command means something only in a checkout; a packaged build says so instead
+export function voiceMissingEngine(voice: Voice, engines: EngineStatus | undefined): string | null {
+  if (!voice.requiresEngine || engines?.installed[voice.requiresEngine] !== false) return null;
+  if (engines.runtime === "desktop") return "Not in the desktop app yet";
+  if (engines.runtime === "docker") return "Not in the Docker image yet";
+  return `Not installed — run ${ENGINE_SETUP[voice.requiresEngine]}`;
 }
 
 // Runtime-discovered voices have no static entry, so the engine prefix is the fallback authority —

@@ -222,20 +222,22 @@ async function main() {
 
   registerReaderRoutes(fastify);
 
-  // Keyed by voice: a second request for a preview already being synthesized waits on the same run
+  // Keyed by voice and preview language: a second request for a preview already being synthesized waits on the same run
   // rather than being told to come back later, so the client needs no polling protocol.
   const previewGenerating = new Map<string, Promise<void>>();
 
   fastify.get("/preview/:voiceId", { config: { rateLimit: PREVIEW_RATE_LIMIT } }, async (request, reply) => {
     const { voiceId } = request.params as { voiceId: string };
+    const { lang } = request.query as { lang?: string };
 
-    const { parseTtsVoice, previewFileBase } = await import("./lib/tts.ts");
+    const { parseTtsVoice, previewFileBase, previewLanguageFor } = await import("./lib/tts.ts");
     try {
       parseTtsVoice(voiceId);
     } catch {
       return reply.code(400).send({ error: "Invalid voice ID" });
     }
-    const previewKey = previewFileBase(voiceId);
+    const language = previewLanguageFor(voiceId, lang);
+    const previewKey = previewFileBase(voiceId, language);
 
     const m4aPath = path.join(previewsDir, `${previewKey}.m4a`);
 
@@ -244,7 +246,7 @@ async function main() {
       return reply.sendFile(`${previewKey}.m4a`, previewsDir);
     } catch {}
 
-    let generating = previewGenerating.get(voiceId);
+    let generating = previewGenerating.get(previewKey);
     if (!generating) {
       generating = (async () => {
         const { synthesize, getPreviewTextForVoice } = await import("./lib/tts.ts");
@@ -252,7 +254,7 @@ async function main() {
         const wavPath = path.join(previewsDir, `${previewKey}.wav`);
 
         await synthesize({
-          inputText: await getPreviewTextForVoice(voiceId),
+          inputText: await getPreviewTextForVoice(voiceId, language),
           outputPath: wavPath,
           voice: voiceId,
           speed: 1.0,
@@ -264,10 +266,10 @@ async function main() {
           unlink(wavPath.replace(/\.wav$/, ".txt")).catch(() => {}),
         ]);
       })();
-      previewGenerating.set(voiceId, generating);
+      previewGenerating.set(previewKey, generating);
       // Settled either way, the slot must free; the catch keeps the rejection from going unhandled
       // here, since each waiting request handles it on its own await below.
-      void generating.catch(() => {}).finally(() => previewGenerating.delete(voiceId));
+      void generating.catch(() => {}).finally(() => previewGenerating.delete(previewKey));
     }
 
     try {

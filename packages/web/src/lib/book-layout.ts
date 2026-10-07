@@ -7,6 +7,7 @@ export type BookLayout = {
   showSource: boolean;
   showWords: boolean;
   showDuration: boolean;
+  showVoice: boolean;
   showPages: boolean;
   showLabels: boolean;
   trayCompact: boolean;
@@ -23,6 +24,7 @@ export function bookLayout(width: number): BookLayout {
     showSource: roomy,
     showWords: width >= 1120,
     showDuration: !tight,
+    showVoice: roomy,
     showPages: !tight,
     showLabels: !tight,
     trayCompact: tight,

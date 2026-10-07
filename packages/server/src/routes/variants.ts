@@ -16,7 +16,8 @@ import { dirSize } from "../lib/disk-usage.ts";
 import { assembleJobKey, inFlightInputs } from "../lib/output-readiness.ts";
 import { stat, unlink, rm } from "node:fs/promises";
 import type { SourceBlock } from "../lib/marker.ts";
-import { synthesisJobSpec } from "../lib/synthesis-jobs.ts";
+import { VARIANT_TEXT_FOR_AUDIO, variantAudioQueueable } from "../lib/synthesis-cost.ts";
+import { assertLaneVoiceUsable } from "../lib/lane-voice.ts";
 import { NO_NARRATION, removeVariantNarration } from "../lib/variant-narration.ts";
 
 const connectionString = env.DATABASE_URL;
@@ -118,6 +119,7 @@ export const variantsRouter = router({
           audioError: chapterVariants.audioError,
           audioDurationMs: chapterVariants.audioDurationMs,
           hasAudio: sql<boolean>`${chapterVariants.audioPath} is not null`,
+          synthesizedWith: chapterVariants.synthesizedWith,
           updatedAt: chapterVariants.updatedAt,
         })
         .from(chapterVariants)
@@ -473,6 +475,7 @@ export const variantsRouter = router({
       if (row.audioStatus === "synthesizing" || row.audioStatus === "pending") {
         throw new Error("Chapter audio is already being processed");
       }
+      await assertLaneVoiceUsable(chapter.bookId, input.key);
 
       await db
         .update(chapterVariants)
@@ -489,7 +492,7 @@ export const variantsRouter = router({
         { connectionString },
         "synthesizeTranslation",
         { translationId: row.id, bookId: chapter.bookId, resume: input.resume ?? false },
-        await synthesisJobSpec(chapter.bookId, row.key),
+        { maxAttempts: 1 },
       );
 
       const [updated] = await db.select().from(chapterVariants).where(eq(chapterVariants.id, row.id));
@@ -499,6 +502,7 @@ export const variantsRouter = router({
   processSelectedAudio: publicProcedure
     .input(z.object({ bookId: z.string().uuid(), key: z.string().min(1) }))
     .mutation(async ({ input }) => {
+      await assertLaneVoiceUsable(input.bookId, input.key);
       const rows = await db
         .select({
           id: chapterVariants.id,
@@ -512,11 +516,11 @@ export const variantsRouter = router({
           eq(chapters.bookId, input.bookId),
           eq(chapters.selected, true),
           eq(chapterVariants.key, input.key),
-          inArray(chapterVariants.status, ["done", "pending", "translating"]),
+          inArray(chapterVariants.status, VARIANT_TEXT_FOR_AUDIO),
         ))
         .orderBy(asc(chapters.index));
 
-      const queueable = rows.filter((r) => r.audioStatus !== "synthesizing" && r.audioStatus !== "pending");
+      const queueable = rows.filter((r) => variantAudioQueueable(r.audioStatus));
       if (queueable.length === 0) throw new Error(`No selected chapters with finished or in-progress "${input.key}" text to synthesize`);
 
       await db
@@ -532,13 +536,12 @@ export const variantsRouter = router({
         `Queued ${queueable.length} chapter${queueable.length === 1 ? "" : "s"} for ${input.key} synthesis` +
           (deferred > 0 ? ` (${deferred} will start when the text finishes)` : ""),
       );
-      const spec = await synthesisJobSpec(input.bookId, input.key);
       for (const r of ready) {
         await quickAddJob(
           { connectionString },
           "synthesizeTranslation",
           { translationId: r.id, bookId: input.bookId },
-          spec,
+          { maxAttempts: 1 },
         );
       }
       return { queued: queueable.length, deferred };

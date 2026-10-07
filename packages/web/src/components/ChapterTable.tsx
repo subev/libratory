@@ -10,6 +10,8 @@ import { chapterAudioDownload, chapterAudioUrl, SYNTH_BUSY, variantLabel } from 
 import { useAssistant } from "./assistant/context.tsx";
 import { PdfPreviewModal } from "./PdfPreviewModal.tsx";
 import { rowClick } from "../lib/row-click.ts";
+import { useVoiceLabel } from "./VoicePicker.tsx";
+import { providerOfVoice } from "../lib/voices.ts";
 import { SynthesizeModal, type SynthSettings } from "./SynthesizeModal.tsx";
 import {
   IconAi,
@@ -512,6 +514,9 @@ export function ChapterTable({
               {layout.showDuration && (
                 <th className="px-4 py-3 text-right text-xs font-medium text-(--text-muted) uppercase tracking-wider">Duration</th>
               )}
+              {layout.showVoice && (
+                <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Voice</th>
+              )}
               <th className="px-4 py-3 text-left text-xs font-medium text-(--text-muted) uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
@@ -656,6 +661,9 @@ export function ChapterTable({
                     <td className="px-4 py-3 text-sm text-(--text-tertiary) text-right tabular-nums">
                       {chapter.durationMs ? formatDuration(chapter.durationMs) : "\u2014"}
                     </td>
+                  )}
+                  {layout.showVoice && (
+                    <VoiceCell voice={chapter.audioPath ? chapter.synthesizedWith?.voice ?? null : null} />
                   )}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -847,6 +855,7 @@ export function ChapterTable({
         <SynthesizeModal
           {...synth}
           count={1}
+          costScope={{ bookId, key: variant?.key ?? null, chapterId: synthesizeChapterId }}
           language={variant ? variantLabel(variant) : null}
           bookLanguage={language}
           canStart={!SYNTH_BUSY.includes(chapters.find((c) => c.id === synthesizeChapterId)?.status ?? "")}
@@ -1012,5 +1021,18 @@ function EditableChapterTitle({
         </button>
       )}
     </span>
+  );
+}
+
+// What the audio was made with, so a mixed book shows which chapters a new voice has reached
+function VoiceCell({ voice }: { voice: string | null }) {
+  const label = useVoiceLabel(voice ?? "");
+  if (!voice) return <td className="px-4 py-3 text-xs text-(--text-tertiary)">{"\u2014"}</td>;
+  // The name says which voice, the provider which model made it
+  const provider = providerOfVoice({ id: voice });
+  return (
+    <td className="px-4 py-3 text-xs text-(--text-tertiary) truncate max-w-48" title={`${label} · ${provider}`}>
+      {label} <span className="text-(--text-faint)">· {provider}</span>
+    </td>
   );
 }

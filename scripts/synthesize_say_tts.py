@@ -6,45 +6,22 @@ import os
 import subprocess
 import sys
 import tempfile
-from pathlib import Path
 
 import numpy as np
 import soundfile as sf
 
+from chunk_io import load_existing_chunk, read_chunks, write_chunk_manifest
 
-CHUNK_SEPARATOR = "\f"
+
 PAUSE_MS = 250
 SAMPLE_RATE = 22050
 DATA_FORMAT = f"LEI16@{SAMPLE_RATE}"
 
 
-def read_chunks(input_path: str) -> list[str]:
-    text = Path(input_path).read_text(encoding="utf-8").strip()
-    if not text:
-        raise RuntimeError("input text is empty")
-
-    return [chunk.strip() for chunk in text.split(CHUNK_SEPARATOR) if chunk.strip()]
 
 
-def write_chunk_manifest(chunks_dir: str, chunks: list[str]) -> None:
-    os.makedirs(chunks_dir, exist_ok=True)
-    manifest = [{"index": index, "text": chunk} for index, chunk in enumerate(chunks, start=1)]
-    with open(os.path.join(chunks_dir, "chunks.json"), "w", encoding="utf-8") as f:
-        json.dump(manifest, f, ensure_ascii=False)
 
 
-def load_existing_chunk(chunks_dir, index: int):
-    """Return a previously-synthesized chunk's audio so resume can skip regenerating it."""
-    if not chunks_dir:
-        return None
-    path = os.path.join(chunks_dir, f"chunk-{index:03d}.wav")
-    if not os.path.exists(path):
-        return None
-    try:
-        data, _ = sf.read(path, dtype="float32")
-        return data if len(data) else None
-    except Exception:
-        return None
 
 
 def synthesize_chunk_audio(say_voice: str, text: str, wav_path: str, rate: int | None) -> np.ndarray:

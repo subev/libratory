@@ -412,7 +412,7 @@ export function BookDetail() {
           hasCustomText: false,
           hasCleanText: false,
           hasSourceBlocks: false,
-          synthesizedWith: null,
+          synthesizedWith: translated && t.hasAudio ? t.synthesizedWith : null,
           audioUrl: t && translated ? `/audio/translation/${t.id}?v=${new Date(t.updatedAt).getTime()}` : undefined,
         };
       });
@@ -1357,6 +1357,7 @@ export function BookDetail() {
         <SynthesizeModal
           bookLanguage={book.language ?? null}
           count={selectedSynthesizable}
+          costScope={{ bookId: book.id, key: activeVariant }}
           language={activeLabel}
           {...synth}
           canStart={canProcess && !processSelectedMutation.isPending && !processSelectedAudioMutation.isPending}

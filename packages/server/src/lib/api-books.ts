@@ -9,7 +9,6 @@ import { queueIndexBook } from "./search-index.ts";
 import { appendLog } from "./log.ts";
 import { parseTtsVoice } from "./tts.ts";
 import { env } from "../env.ts";
-import { synthesisJobSpec } from "./synthesis-jobs.ts";
 import { detectLanguage } from "./detect-language.ts";
 import { MAX_LANGUAGE_CHARS } from "./pdf-books.ts";
 
@@ -76,10 +75,9 @@ async function insertApiChapters(
     .orderBy(asc(chapters.index));
 
   if (synthesize && inserted.length > 0) {
-    const spec = await synthesisJobSpec(bookId);
     for (const ch of inserted) {
       await db.update(chapters).set({ status: "pending" }).where(eq(chapters.id, ch.id));
-      await quickAddJob({ connectionString }, "synthesize", { chapterId: ch.id, bookId }, spec);
+      await quickAddJob({ connectionString }, "synthesize", { chapterId: ch.id, bookId }, { maxAttempts: 1 });
     }
     await appendLog(bookId, `Queued ${inserted.length} chapter${inserted.length === 1 ? "" : "s"} for synthesis`);
   }

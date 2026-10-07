@@ -25,7 +25,6 @@ export function useModelBundle(id: string) {
 export function ModelBundleNotice({ id, verb }: { id: string; verb: string }) {
   const utils = trpc.useUtils();
   const { bundle, error } = useModelBundle(id);
-  const { data: capabilities } = trpc.models.capabilities.useQuery(undefined, { staleTime: Infinity });
   const download = trpc.models.download.useMutation({ onSuccess: () => void utils.models.list.invalidate() });
 
   // Buttons stay enabled when the probe itself is broken — but saying so beats letting the job
@@ -40,16 +39,6 @@ export function ModelBundleNotice({ id, verb }: { id: string; verb: string }) {
   if (!bundle || bundle.installed) return null;
 
   const gb = (bundle.approxMb / 1024).toFixed(1);
-  // Offering a 1.2 GB download for models that need Metal, on a machine without it, is worse than
-  // saying nothing — the voices it would unlock are already greyed out for the same reason.
-  if (bundle.appleSiliconOnly && capabilities?.mlx === false) {
-    return (
-      <p className="rounded-md border border-(--border) bg-(--bg-subtle) px-3 py-2 text-xs text-(--text-muted)" data-testid={`model-notice-${id}`}>
-        {verb} needs the <strong>{bundle.label}</strong> models, which run only on Apple Silicon.
-      </p>
-    );
-  }
-
   return (
     <DownloadNotice
       testIdPrefix={`model-${id}`}

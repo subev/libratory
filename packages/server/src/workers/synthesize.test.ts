@@ -62,7 +62,7 @@ describe("synthesize worker", () => {
       title: "Bulgarian Book",
       filename: "book.pdf",
       pdfPath: "/tmp/book.pdf",
-      voice: "bg-mlx:narrator",
+      voice: "bg-bgtts:male",
       speed: 1.0,
     });
 
@@ -83,7 +83,7 @@ describe("synthesize worker", () => {
     await synthesizeWorker({ bookId, chapterId }, { addJob: vi.fn() } as never);
 
     expect(mockSynthesizeAudio).toHaveBeenCalledWith(expect.objectContaining({
-      voice: "bg-mlx:narrator",
+      voice: "bg-bgtts:male",
       speed: 1.0,
       chunkPreviewDir: `/tmp/test-output-${bookId}/chunks/ch000`,
       chunkPreviewUrlBase: `/files/${bookId}/chunks/ch000`,
@@ -94,7 +94,7 @@ describe("synthesize worker", () => {
     expect(chapter.progress).toBeNull();
     expect(chapter.audioPath).toContain("ch000.m4a");
     expect(chapter.durationMs).toBe(12400);
-    expect(chapter.synthesizedWith).toEqual({ voice: "bg-mlx:narrator", speed: null });
+    expect(chapter.synthesizedWith).toEqual({ voice: "bg-bgtts:male", speed: null });
   });
 
   it("never queues an assembly when the last chapter lands", async () => {
@@ -132,7 +132,7 @@ describe("synthesize worker", () => {
       title: "Bulgarian Book",
       filename: "book.pdf",
       pdfPath: "/tmp/book.pdf",
-      voice: "bg-mlx:narrator",
+      voice: "bg-bgtts:male",
       speed: 1.0,
     });
     await db.insert(chapters).values({
@@ -172,7 +172,7 @@ describe("synthesize worker", () => {
       title: "Bulgarian Book",
       filename: "book.pdf",
       pdfPath: "/tmp/book.pdf",
-      voice: "bg-mlx:narrator",
+      voice: "bg-bgtts:male",
       speed: 1.0,
     });
     await db.insert(chapters).values({
@@ -206,7 +206,7 @@ describe("synthesize worker", () => {
       title: "Bulgarian Book",
       filename: "book.pdf",
       pdfPath: "/tmp/book.pdf",
-      voice: "bg-mlx:narrator",
+      voice: "bg-bgtts:male",
       speed: 1.0,
     });
 

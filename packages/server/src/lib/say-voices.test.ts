@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseSayVoiceList, sayVoiceSlug } from "./say-voices.ts";
+import { parseSayVoiceList, sayVoiceSlug, matchSayVoice } from "./say-voices.ts";
 
 const SAMPLE_OUTPUT = [
   "Albert              en_US    # Hello! My name is Albert.",
@@ -41,5 +41,24 @@ describe("sayVoiceSlug", () => {
   it("slugs to lowercase alphanumerics and dashes", () => {
     expect(sayVoiceSlug("Daria (Enhanced)")).toBe("daria-enhanced");
     expect(sayVoiceSlug("Bad News")).toBe("bad-news");
+  });
+});
+
+describe("matchSayVoice", () => {
+  // `say -v '?'` on macOS 27: the language now follows the name
+  const voices = parseSayVoiceList([
+    "Daria (Bulgarian (Bulgaria)) bg_BG    # Hello! My name is Daria.",
+    "Daria (Enhanced)    bg_BG    # Hello! My name is Daria.",
+    "Samantha (English (US)) en_US    # Hello! My name is Samantha.",
+  ].join("\n"));
+
+  it("still finds a voice stored before macOS named it with its language", () => {
+    expect(matchSayVoice(voices, "samantha")?.name).toBe("Samantha (English (US))");
+    expect(matchSayVoice(voices, "daria")?.name).toBe("Daria (Bulgarian (Bulgaria))");
+  });
+
+  it("prefers an exact slug, and finds nothing for a voice that is not installed", () => {
+    expect(matchSayVoice(voices, "daria-enhanced")?.name).toBe("Daria (Enhanced)");
+    expect(matchSayVoice(voices, "alex")).toBeNull();
   });
 });

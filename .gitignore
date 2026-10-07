@@ -6,6 +6,8 @@ dist/
 !.env.example
 .venv/
 .venv-pocket/
+.venv-piper/
+.venv-bgtts/
 data/
 *.tsbuildinfo
 .turbo/

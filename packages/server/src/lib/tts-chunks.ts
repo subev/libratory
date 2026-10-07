@@ -1,28 +1,29 @@
-export type ChunkLimits =
-  | { mode: "pack"; maxChars: number; idealChars: number }
-  | { mode: "sentence"; maxChars: number; minChars: number };
+// A chunk never crosses a blank line, and within a paragraph a piece shorter than `minChars` joins
+// its neighbour while the two fit in `maxChars`. Every chunk is one request and one preview file,
+// and every seam between chunks restarts the voice — so where the seams fall is a prosody choice.
+export type ChunkLimits = { maxChars: number; minChars: number };
 
-// The narrator model (raditotev/bg-tts-v5-mlx, speaker 1) emits a roughly fixed ~20–24s of audio
-// per chunk regardless of input length, so chunks shorter than its 250–320 char sweet spot come
-// out padded with mumble/repetition. We therefore pack text toward this midpoint and balance the
-// chunks so none is needlessly short — merging across paragraph/sentence boundaries as needed.
-export const NARRATOR_CHUNKS: ChunkLimits = { mode: "pack", maxChars: 320, idealChars: 285 };
+// A sentence per chunk, which is also the sync map's highlight unit for engines with no word timings
+export const SENTENCE_CHUNKS: ChunkLimits = { maxChars: 240, minChars: 40 };
 
-// Without that quirk a chunk can be a sentence — which is also the sync map's highlight unit
-export const SENTENCE_CHUNKS: ChunkLimits = { mode: "sentence", maxChars: 240, minChars: 40 };
+// The cloud voices time every word themselves, so a chunk need not be a sentence. A whole paragraph
+// up to this size is one request and reads as one breath; the cap bounds what a failed request
+// costs to redo, well under every provider's request limit.
+export const PARAGRAPH_CHUNKS: ChunkLimits = { maxChars: 1000, minChars: 1000 };
 
-export function chunkTextForTts(text: string, limits: ChunkLimits = NARRATOR_CHUNKS): string[] {
-  // Collapse all whitespace (including paragraph breaks) so packing can merge across them.
-  const normalized = text.replace(/\r\n?/g, "\n").replace(/\s+/g, " ").trim();
-  if (!normalized) return [];
-
-  const units = toUnits(normalized, limits.maxChars);
-  if (units.length === 0) return [];
-
-  return limits.mode === "pack" ? balancePartition(units, limits) : mergeShortUnits(units, limits);
+export function chunkTextForTts(text: string, limits: ChunkLimits): string[] {
+  // A blank line ends a chunk: a title without a full stop would otherwise run straight into the
+  // sentence after it, with no pause, because nothing in the text tells the voice it has ended.
+  return text
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.replace(/\s+/g, " ").trim())
+    // A scene break ("* * *", "—") has nothing to say, and a chunk with nothing to say fails the
+    // engines that refuse to return silence
+    .filter((paragraph) => /[\p{L}\p{N}]/u.test(paragraph))
+    .flatMap((paragraph) => mergeShortUnits(toUnits(paragraph, limits.maxChars), limits));
 }
 
-function mergeShortUnits(units: string[], limits: { maxChars: number; minChars: number }): string[] {
+function mergeShortUnits(units: string[], limits: ChunkLimits): string[] {
   const chunks: string[] = [];
 
   for (const unit of units) {
@@ -70,84 +71,6 @@ function splitByWords(text: string, maxChars: number): string[] {
     } else {
       if (current) chunks.push(current);
       current = word; // a single word longer than the cap is kept whole (rare)
-    }
-  }
-
-  if (current) chunks.push(current);
-  return chunks;
-}
-
-// Group consecutive units into the fewest chunks needed to stay near the ideal size, then split
-// them as evenly as possible so we never leave a tiny leftover chunk at the end.
-function balancePartition(units: string[], limits: { maxChars: number; idealChars: number }): string[] {
-  const lengths = units.map((u) => u.length);
-  const totalChars = chunkLength(lengths);
-
-  const numChunks = Math.max(
-    1,
-    Math.ceil(totalChars / limits.maxChars),
-    Math.round(totalChars / limits.idealChars),
-  );
-
-  // Can't fit more chunks than units (units are indivisible here) — emit each on its own.
-  if (numChunks >= units.length) return [...units];
-
-  const capacity = minMaxCapacity(lengths, numChunks);
-  return packToCapacity(units, capacity);
-}
-
-// Length of a chunk made of these units joined by single spaces.
-function chunkLength(lengths: number[]): number {
-  if (lengths.length === 0) return 0;
-  return lengths.reduce((sum, len) => sum + len, 0) + (lengths.length - 1);
-}
-
-// Smallest per-chunk capacity that lets the units fit in at most `numChunks` chunks (binary search
-// on the classic "split array to minimize the largest part" — yields evenly balanced chunks).
-function minMaxCapacity(lengths: number[], numChunks: number): number {
-  let lo = Math.max(...lengths); // a chunk must hold at least its largest single unit
-  let hi = chunkLength(lengths); // everything in one chunk
-
-  while (lo < hi) {
-    const mid = Math.floor((lo + hi) / 2);
-    if (chunksNeeded(lengths, mid) <= numChunks) {
-      hi = mid;
-    } else {
-      lo = mid + 1;
-    }
-  }
-
-  return lo;
-}
-
-function chunksNeeded(lengths: number[], capacity: number): number {
-  let count = 1;
-  let current = 0;
-
-  for (const len of lengths) {
-    const candidate = current === 0 ? len : current + 1 + len;
-    if (candidate <= capacity) {
-      current = candidate;
-    } else {
-      count += 1;
-      current = len;
-    }
-  }
-
-  return count;
-}
-
-function packToCapacity(units: string[], capacity: number): string[] {
-  const chunks: string[] = [];
-  let current = "";
-
-  for (const unit of units) {
-    const candidate = current ? `${current} ${unit}` : unit;
-    if (candidate.length <= capacity) {
-      current = candidate;
-    } else {
-      chunks.push(current);
-      current = unit;
     }
   }
 

@@ -61,4 +61,23 @@ describe("what a launch has to bring forward", () => {
     expect(pending(resources, home).python).toBe(false);
     expect(readState(home).essentialModels).toBeUndefined();
   });
+
+  // A Mac that installed a release before Piper existed has no piperLock at all: updating must
+  // install Piper without touching the 2.4 GB environment, and a later pin change reinstalls it
+  it("installs Piper on an update that adds it, and again when its pins change", async () => {
+    const { resources, home } = await scratch();
+    await mkdir(path.join(resources, "scripts"));
+    await writeFile(path.join(resources, "scripts", "requirements-piper.txt"), "piper-tts==1.8.0\n");
+    writeState(home, { pythonLock: pending(resources, home).want.pythonLock, essentialModels: true });
+
+    const before = pending(resources, home);
+    expect(before.piper).toBe(true);
+    expect(before.python).toBe(false);
+
+    writeState(home, { piperLock: before.want.piperLock });
+    expect(pending(resources, home).piper).toBe(false);
+
+    await writeFile(path.join(resources, "scripts", "requirements-piper.txt"), "piper-tts==1.9.0\n");
+    expect(pending(resources, home).piper).toBe(true);
+  });
 });

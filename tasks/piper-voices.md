@@ -155,3 +155,16 @@ Bulgarian A/B recorded 2026-08-22 against the three existing BG engines, same tw
 
 BG-MLX produced 34.8s of audio for text the others read in ~16s — the known over-generation,
 reproduced. Piper Bulgarian is 63 MB, **CC0**, finetuned from the English lessac medium voice.
+
+### 2026-10-05: Bulgarian landed first, as `bg-piper:dimitar`
+
+`feat/bulgarian-engines` ships the one Bulgarian voice through `.venv-piper` and
+`scripts/synthesize_piper_tts.py`, set up by `scripts/setup.sh` and fetched with `hf_hub_download`
+(pinned revision) rather than the planned TypeScript downloader — the general engine above is still
+unbuilt. Two findings change the gotchas list:
+
+- **piper-tts 1.8.0 fixed the broken espeak-ng data path** — no `ESPEAK_DATA_PATH` needed, the
+  wheel's bundled data is found on its own.
+- **1.8.0 can return phoneme alignments** (`include_alignments=True`; patches the ONNX graph in
+  memory, needs the `onnx` package). Wired 2026-10-06 (`scripts/phoneme_words.py`): word timings for
+  every Piper voice, and the general engine inherits them.

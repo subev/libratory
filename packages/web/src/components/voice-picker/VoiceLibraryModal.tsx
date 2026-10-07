@@ -4,8 +4,8 @@ import {
   cartesiaVoiceToEntry,
   elevenlabsVoiceToEntry,
   languageLabel,
-  MULTILINGUAL,
   voiceCoversLanguage,
+  voiceIsForeignIn,
   pocketCustomVoiceToEntry,
   pocketVoiceToEntry,
   providerOfVoice,
@@ -39,7 +39,7 @@ const NONE_EXPANDED: ReadonlySet<string> = new Set();
 function sectionLabel(provider: string, count: number, quota: { remaining: number; limit: number } | null | undefined): string {
   const base = `${provider} \u00b7 ${count}`;
   if (provider !== "ElevenLabs" || !quota?.limit) return base;
-  return `${base} \u00b7 ${quota.remaining.toLocaleString()} of ${quota.limit.toLocaleString()} characters left`;
+  return `${base} \u00b7 ${quota.remaining.toLocaleString()} of ${quota.limit.toLocaleString()} credits left`;
 }
 
 // What this book is being translated into comes first — that's what you're here to synthesize —
@@ -120,9 +120,7 @@ export function VoiceLibraryModal({
   );
 
   const languageCounts = useMemo(() => {
-    // A multilingual voice has no row of its own — it belongs to each language it can read.
     const codes = new Set(allVoices.map((v) => v.language ?? "en"));
-    codes.delete(MULTILINGUAL);
     // Pocket languages that aren't downloaded still get a row, so they can be requested from here.
     for (const language of pocketLanguages) codes.add(language.code);
     for (const code of priorityLanguages) codes.add(code);
@@ -138,8 +136,7 @@ export function VoiceLibraryModal({
 
   const [chosen, setChosen] = useState<string>(() => {
     const fromSelection = allVoicesLanguageOf(state.selectedId);
-    // A multilingual voice says nothing about intent, so the book's own language wins.
-    if (fromSelection && fromSelection !== MULTILINGUAL) return fromSelection;
+    if (fromSelection) return fromSelection;
     return priorityLanguages[0] ?? fromSelection ?? "en";
   });
   const [showAllLanguages, setShowAllLanguages] = useState(false);
@@ -169,7 +166,10 @@ export function VoiceLibraryModal({
         ? clonedVoices
         // A multilingual model reads any language, so it belongs in every list.
         : allVoices.filter((v) => voiceCoversLanguage(v, language));
-    return pool.filter((v) => matches(v.label, v.note, providerOfVoice(v)));
+    // A voice made for this language before one that only reads it (stable, so each half keeps its order)
+    return pool
+      .filter((v) => matches(v.label, v.note, providerOfVoice(v)))
+      .sort((a, b) => Number(voiceIsForeignIn(a, language)) - Number(voiceIsForeignIn(b, language)));
   }, [allVoices, clonedVoices, language, matches]);
 
   const byProvider = useMemo(() => {
@@ -352,7 +352,6 @@ export function VoiceLibraryModal({
                   {language === "bg" && (
                     <div className="mx-1 mb-3 space-y-2">
                       <ModelBundleNotice id="bulgarian" verb="Narrating in Bulgarian" />
-                      <ModelBundleNotice id="bulgarian-narrator" verb="Narrating with the BG-TTS V5 voice" />
                     </div>
                   )}
 
@@ -363,7 +362,7 @@ export function VoiceLibraryModal({
                         const rows = capped ? voices.slice(0, PREVIEW_PER_PROVIDER) : voices;
                         return (
                           <Section key={name} label={sectionLabel(name, voices.length, elevenlabsQuota)}>
-                            {rows.map((voice) => <VoiceRow key={voice.id} voice={voice} />)}
+                            {rows.map((voice) => <VoiceRow key={voice.id} voice={voice} language={language} />)}
                             {capped && (
                               <button
                                 type="button"

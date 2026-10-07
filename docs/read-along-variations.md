@@ -50,16 +50,16 @@ The highlight can only be as fine as the timings the engine gives back.
 | Engine | Chunk it is given | Timings it returns | `granularity` |
 | --- | --- | --- | --- |
 | Kokoro, English (`a`/`b` voices) | up to 510 phonemes | **per word**, from the model's own duration prediction | `word` |
-| Kokoro, espeak languages (es, fr, it, pt, hi, zh) | same | none — `en_tokenize` returns no tokens | `chunk` |
+| Kokoro, espeak languages (es, fr, it, pt, hi) | one paragraph | **per word**, from `pred_dur`: espeak returns phonemes but no tokens, so each word is phonemized alone and aligned to the paragraph's phonemes (`scripts/phoneme_words.py`) — none for a paragraph past 510 phonemes, which is split | `word` |
+| Kokoro, Mandarin | one paragraph | none — written without spaces, there is no word to time | `chunk` |
 | Kokoro chunk over 510 phonemes | re-split | none for the split pieces — the phonemes no longer line up with the tokens | `sentence` |
 | Kokoro chunk holding a dash or quote its aligner cannot place | as usual | **per word** — the untimed mark folds into the word before it rather than costing the chunk its timings | `word` |
 | macOS `say` | one sentence | none | `chunk` |
-| MMS (Bulgarian) | one sentence | none | `chunk` |
-| Pocket TTS | packed to ~285 chars | none | `chunk` |
-| KugelAudio | packed to ~285 chars | none | `chunk` |
-| Bulgarian MLX narrator | packed to ~285 chars | none — and it emits a fixed ~20–24 s per chunk by design | `chunk` |
-| Cartesia | packed to ~285 chars | **per word**, `add_timestamps` on the SSE endpoint | `word` |
-| ElevenLabs | packed to ~285 chars | **per character**, from `/with-timestamps`, grouped on whitespace into words — dropped entirely if the characters do not rejoin to the text sent, since one drift would misplace every word after it | `word` |
+| Piper (Bulgarian) | one sentence | **per word**, from Piper's own phoneme durations: each word phonemized alone and aligned to the sentence's phonemes (`scripts/phoneme_words.py`), then mapped back from the spoken words to the written ones — none for a chunk where under 70% of the sounds match | `word` |
+| MMS, BgTTS-38M (Bulgarian) | one sentence | none | `chunk` |
+| Pocket TTS | one sentence | none | `chunk` |
+| Cartesia | a paragraph, up to 1000 chars | **per word**, `add_timestamps` on the SSE endpoint | `word` |
+| ElevenLabs | a paragraph, up to 1000 chars | **per character**, from `/with-timestamps`, grouped on whitespace into words — dropped entirely if the characters do not rejoin to the text sent, since one drift would misplace every word after it | `word` |
 
 `say` and MMS are chunked a sentence at a time, so their cues really are sentences even though
 `granularity` reports `chunk` — it is derived from the sync map, which does not record which

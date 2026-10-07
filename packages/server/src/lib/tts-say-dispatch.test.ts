@@ -110,31 +110,4 @@ describe("tts macOS say dispatcher", () => {
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
-  it("does not wait on the MLX queue behind a KugelAudio synthesis", async () => {
-    const kugelRun = synthesize({
-      inputText: "Първи откъс.",
-      outputPath: "/tmp/first.wav",
-      voice: "kugel:default",
-      speed: 1,
-    });
-
-    await flushAsyncWork();
-
-    const sayRun = synthesize({
-      inputText: "Втори откъс.",
-      outputPath: "/tmp/second.wav",
-      voice: "say:daria-enhanced",
-      speed: 1,
-    });
-
-    await flushAsyncWork();
-
-    expect(mockSpawn).toHaveBeenCalledTimes(2);
-
-    procs[0]?.emit("close", 0);
-    procs[1]?.emit("close", 0);
-
-    await kugelRun;
-    await sayRun;
-  });
 });

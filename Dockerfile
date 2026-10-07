@@ -53,8 +53,8 @@ tar -xzf /tmp/uv.tar.gz --strip-components=1 -C /usr/local/bin
 rm /tmp/uv.tar.gz
 SH
 
-# Both Python environments live outside /app so a development bind-mount of the source cannot
-# shadow them. env.ts is told where via CONDA_ENV_PATH/POCKET_ENV_PATH below.
+# The Python environments live outside /app so a development bind-mount of the source cannot
+# shadow them. env.ts is told where via CONDA_ENV_PATH/POCKET_ENV_PATH/PIPER_ENV_PATH below.
 ENV UV_PYTHON_INSTALL_DIR=/opt/uv/python \
     UV_PROJECT_ENVIRONMENT=/opt/venv
 COPY pyproject.toml uv.lock ./
@@ -64,6 +64,11 @@ COPY scripts/requirements-pocket.txt scripts/requirements-pocket.txt
 # does the same for the native path).
 RUN --mount=type=cache,target=/root/.cache/uv uv venv --python 3.12 /opt/venv-pocket \
     && uv pip install --python /opt/venv-pocket/bin/python --torch-backend=cpu -r scripts/requirements-pocket.txt
+# Piper (Bulgarian, word timings): onnxruntime and numpy 2 kept out of the main env. BgTTS is not
+# built here — the picker says so — because its codec pulls ~1.5 GB for three voices.
+COPY scripts/requirements-piper.txt scripts/requirements-piper.txt
+RUN --mount=type=cache,target=/root/.cache/uv uv venv --python 3.12 /opt/venv-piper \
+    && uv pip install --python /opt/venv-piper/bin/python -r scripts/requirements-piper.txt
 
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -87,6 +92,8 @@ COPY --from=web-build /app/packages/web/dist packages/web/dist
 ENV NODE_ENV=production \
     CONDA_ENV_PATH=/opt/venv/bin \
     POCKET_ENV_PATH=/opt/venv-pocket/bin \
+    PIPER_ENV_PATH=/opt/venv-piper/bin \
+    LIBRATORY_RUNTIME=docker \
     DATA_DIR=/data \
     LIBRATORY_ENV_FILE=/data/.env \
     HOST=0.0.0.0 \

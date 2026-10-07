@@ -9,7 +9,6 @@ import { createHash, randomUUID } from "node:crypto";
 import type { WorkerUtils } from "graphile-worker";
 import { queueIndexBook } from "../lib/search-index.ts";
 import { beginTranslationLive, type TranslationLiveHandle } from "../lib/translate-live.ts";
-import { synthesisJobSpec } from "../lib/synthesis-jobs.ts";
 import { NO_NARRATION, removeVariantNarration } from "../lib/variant-narration.ts";
 
 export type TranslatePayload = {
@@ -141,7 +140,7 @@ export async function translate(
     // Synthesis queued while this variant was still running waits as audioStatus=pending
     if (finished.audioStatus === "pending") {
       await chLog(`Starting queued ${label} synthesis`);
-      await addJob("synthesizeTranslation", { translationId, bookId }, await synthesisJobSpec(bookId, row.key));
+      await addJob("synthesizeTranslation", { translationId, bookId }, { maxAttempts: 1 });
     }
   } catch (err) {
     const message = describeError(err);

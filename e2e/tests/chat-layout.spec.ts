@@ -13,7 +13,6 @@ for (const width of [1280, 900]) {
         "llmModels.list": [{ key: "test", label: "Test model", hint: "", source: "Local", contextTokens: 8192, supportsTools: true }],
         "llmModels.getDefault": { resolved: "test" },
         "models.list": [],
-        "models.capabilities": {},
         "notes.listLibrary": [],
         "chats.list": [],
         "chats.bookOptions": [],

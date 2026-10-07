@@ -5,6 +5,8 @@
 #   scripts/desktop-build.sh --install    …and replace /Applications/Libratory.app with it
 #   scripts/desktop-build.sh --fast       skip the DMG; a .app is enough to test
 #   scripts/desktop-build.sh --no-package  prepare resources only, for a signed build to package
+#   scripts/desktop-build.sh --linux      an AppImage instead (LINUX_ARCH=x64|arm64, default x64);
+#                                         ffmpeg, poppler and tesseract come from the distribution
 #
 # The install step exists because rebuilding proves nothing until the build is installed: it is
 # easy to spend an afternoon reading the behaviour of the copy in /Applications while editing the
@@ -25,9 +27,11 @@ quietly() {
 }
 REPO="$PWD"
 DESKTOP="$REPO/packages/desktop"
-INSTALL=false; FAST=false; PACKAGE=true
+INSTALL=false; FAST=false; PACKAGE=true; LINUX=false
+LINUX_ARCH="${LINUX_ARCH:-x64}"
 for arg in "$@"; do
   case "$arg" in
+    --linux) LINUX=true ;;
     --install) INSTALL=true ;;
     --fast) FAST=true ;;
     --no-package) PACKAGE=false ;;
@@ -54,7 +58,10 @@ fi
 # formula for them and upgrades them under you, so a machine that installs "ffmpeg" gets whatever is
 # current — which is how CI came to hold 8.1.2 against the 7.1.1 this was tested with. Pinned and
 # checksummed here for the same reason uv and bun are. scripts/bundle-tools.py rebuilds it.
-if [ ! -d "$DESKTOP/resources/bin" ] || [ ! -d "$DESKTOP/resources/tessdata" ]; then
+if $LINUX; then
+  # No tools tarball and no Vision binary: a Linux first run checks the distribution's packages
+  rm -rf "$DESKTOP/resources/bin" "$DESKTOP/resources/tessdata"
+elif [ ! -d "$DESKTOP/resources/bin" ] || [ ! -d "$DESKTOP/resources/tessdata" ]; then
   echo "==> fetching the bundled CLI tools"
   read -r TOOLS_URL TOOLS_SHA <<<"$(node -e '
     const p = require("./scripts/pins.json").bundledTools;
@@ -74,19 +81,25 @@ fi
 # Apple Vision word boxes for the AI OCR engine (scripts/vision-words.swift): compiled here rather
 # than shipped in the tools tarball, since the Swift toolchain is on every build Mac and the source
 # is the pin. Without it the engine falls back to Tesseract's boxes.
-if [ ! -x "$DESKTOP/resources/bin/vision-words" ] || [ scripts/vision-words.swift -nt "$DESKTOP/resources/bin/vision-words" ]; then
+if ! $LINUX && { [ ! -x "$DESKTOP/resources/bin/vision-words" ] || [ scripts/vision-words.swift -nt "$DESKTOP/resources/bin/vision-words" ]; }; then
   echo "==> compiling vision-words"
   bash scripts/build-vision-words.sh "$DESKTOP/resources/bin/vision-words" \
     || echo "    no Swift toolchain — the AI OCR engine will place words with Tesseract's boxes instead" >&2
 fi
-[ -f "$DESKTOP/build/icon.icns" ] || { echo "==> rendering the icon"; bash scripts/make-icon.sh; }
+if $LINUX; then
+  # Linux draws icons edge to edge; the macOS inset is make-icon.sh's business
+  [ -f "$DESKTOP/build/icon.png" ] || { echo "==> rendering the icon"; rsvg-convert -w 512 -h 512 packages/desktop/icons/app-icon/app-icon-512.svg -o "$DESKTOP/build/icon.png"; }
+else
+  [ -f "$DESKTOP/build/icon.icns" ] || { echo "==> rendering the icon"; bash scripts/make-icon.sh; }
+fi
 
 echo "==> building the web bundle"
 quietly pnpm --filter @libratory/web build
 
 echo "==> compiling the server"
 mkdir -p "$DESKTOP/resources"
-quietly "$BUN" build --compile --target=bun-darwin-arm64 packages/server/src/main.ts \
+if $LINUX; then BUN_TARGET="bun-linux-$LINUX_ARCH"; else BUN_TARGET="bun-darwin-arm64"; fi
+quietly "$BUN" build --compile --target="$BUN_TARGET" packages/server/src/main.ts \
   --outfile "$DESKTOP/resources/libratory-server"
 rm -rf "$DESKTOP/resources/web" && cp -R packages/web/dist "$DESKTOP/resources/web"
 
@@ -94,6 +107,21 @@ $PACKAGE || { echo "    resources staged; packaging left to the caller"; exit 0;
 
 echo "==> packaging"
 cd "$DESKTOP"
+if $LINUX; then
+  if [ "$(uname -s)" = Darwin ]; then
+    # The AppImage step runs a Linux-only tool (its macOS build is x86_64, which needs Rosetta), so on
+    # a Mac the app is laid out here and wrapped inside a Linux container of the same architecture
+    quietly npx electron-builder --linux dir "--$LINUX_ARCH"
+    PLATFORM="linux/$([ "$LINUX_ARCH" = x64 ] && echo amd64 || echo arm64)"
+    quietly docker run --rm --platform "$PLATFORM" -v "$REPO":/repo -w /repo/packages/desktop \
+      -e ELECTRON_BUILDER_CACHE=/repo/packages/desktop/release/.eb-cache node:22-bookworm \
+      npx --no-install electron-builder --linux AppImage "--$LINUX_ARCH" --prepackaged "release/linux-$([ "$LINUX_ARCH" = x64 ] && echo unpacked || echo arm64-unpacked)"
+  else
+    quietly npx electron-builder --linux AppImage "--$LINUX_ARCH"
+  fi
+  ls -lh "$DESKTOP"/release/*.AppImage | awk '{print "    " $9 "  " $5}'
+  exit 0
+fi
 # No Developer ID yet, but "unsigned" and "ad-hoc signed" are very different to macOS: an app with
 # only the linker's partial signature is reported as *damaged*, with Move to Bin as the only button
 # and no way back. A complete ad-hoc signature (mac.identity "-") downgrades that to the ordinary

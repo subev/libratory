@@ -17,7 +17,10 @@ function hashOf(file) {
 // Derived from the shipped lockfile rather than a hand-maintained version number, because the
 // release that forgets to bump a counter is exactly the one that ships a mismatched runtime.
 function wanted(resources) {
-  return { pythonLock: hashOf(path.join(resources, "uv.lock")) };
+  return {
+    pythonLock: hashOf(path.join(resources, "uv.lock")),
+    piperLock: hashOf(path.join(resources, "scripts", "requirements-piper.txt")),
+  };
 }
 
 function readState(home) {
@@ -42,6 +45,7 @@ function pending(resources, home) {
     want,
     // No recorded state at all is a first run, which needs the same work for a different reason
     python: want.pythonLock !== have.pythonLock,
+    piper: want.piperLock !== have.piperLock,
     models: !have.essentialModels,
     fresh: have.pythonLock === undefined,
   };

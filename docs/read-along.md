@@ -124,10 +124,10 @@ Says what a highlight actually means, so a reader can be honest about it:
 | `sentence` | some chunks carried word timings and became sentences; the rest are whole chunks |
 | `chunk` | no word timings — one highlight is a whole synthesis chunk, often a paragraph |
 
-Kokoro reports word timings during synthesis. Engines chunked a sentence at a time (macOS
-`say`, MMS) land on sentence-sized chunks without them. The Bulgarian MLX narrator emits a fixed
-~20–24 s per chunk by design and stays at `chunk`, as does any audio synthesized before word
-timings existed.
+Kokoro reports word timings during synthesis. Piper reports them too, from its phoneme durations
+(`scripts/phoneme_words.py`). Engines chunked a sentence at a time (macOS `say`, MMS, BgTTS, Pocket)
+land on sentence-sized chunks without them, and audio synthesized
+before word timings existed stays at `chunk`.
 
 ### `marks`
 
@@ -148,7 +148,7 @@ that was never OCR'd and is narrated by Kokoro is `granularity: "word"` with `ma
 the voice is measured to the word and the page cannot show it. Give the same scan a text layer
 (`ocrEngine: "tesseract"` on the book) and it becomes `word`/`word`, because everything downstream
 then reads the searchable copy Tesseract wrote. The reverse is just as common: a born-digital book
-narrated by the Bulgarian MLX narrator is `chunk` and `word`.
+narrated by a local Bulgarian narrator is `chunk` and `word`.
 
 ### `text` and `range`
 

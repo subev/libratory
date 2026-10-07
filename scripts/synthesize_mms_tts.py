@@ -11,41 +11,21 @@ import soundfile as sf
 import torch
 from transformers import AutoTokenizer, VitsModel
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from bg_speech import speakable  # noqa: E402
+from chunk_io import load_existing_chunk, read_chunks, write_chunk_manifest  # noqa: E402
+
 
 MODEL_ID = "facebook/mms-tts-bul"
 VOICE_IDS = {"bul"}
-CHUNK_SEPARATOR = "\f"
 PAUSE_MS = 250
 SEED = 555
 
 
-def read_chunks(input_path: str) -> list[str]:
-    text = Path(input_path).read_text(encoding="utf-8").strip()
-    if not text:
-        raise RuntimeError("input text is empty")
-
-    return [chunk.strip() for chunk in text.split(CHUNK_SEPARATOR) if chunk.strip()]
 
 
-def write_chunk_manifest(chunks_dir: str, chunks: list[str]) -> None:
-    os.makedirs(chunks_dir, exist_ok=True)
-    manifest = [{"index": index, "text": chunk} for index, chunk in enumerate(chunks, start=1)]
-    with open(os.path.join(chunks_dir, "chunks.json"), "w", encoding="utf-8") as f:
-        json.dump(manifest, f, ensure_ascii=False)
 
 
-def load_existing_chunk(chunks_dir, index: int):
-    """Return a previously-synthesized chunk's audio so resume can skip regenerating it."""
-    if not chunks_dir:
-        return None
-    path = os.path.join(chunks_dir, f"chunk-{index:03d}.wav")
-    if not os.path.exists(path):
-        return None
-    try:
-        data, _ = sf.read(path, dtype="float32")
-        return data if len(data) else None
-    except Exception:
-        return None
 
 
 def select_device() -> torch.device:
@@ -86,7 +66,7 @@ def main() -> None:
     for index, chunk in enumerate(chunks, start=1):
         waveform = load_existing_chunk(args.chunks_dir, index)
         if waveform is None:
-            inputs = tokenizer(chunk, return_tensors="pt")
+            inputs = tokenizer(speakable(chunk), return_tensors="pt")
             inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
 
             with torch.no_grad():

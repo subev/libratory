@@ -1,0 +1,9 @@
+# Piper runs in its own venv (.venv-piper): onnxruntime and numpy 2 must not disturb the main env.
+# piper-tts is GPL-3.0; it runs as a subprocess, like every other engine here.
+piper-tts==1.8.0
+# Piper's `alignment` extra: patches the voice in memory to return per-phoneme durations (word timings)
+onnx==1.23.2
+onnxruntime==1.30.0
+soundfile==0.14.0
+numpy==2.5.3
+huggingface-hub==2.1.1

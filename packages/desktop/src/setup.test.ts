@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { failureMessage, missingTools, stageRuntime, toolPath, uvEnv } from "./setup.cjs";
+import { failureMessage, installHint, missingTools, stageRuntime, toolPath, uvEnv } from "./setup.cjs";
 import pins from "../../../scripts/pins.json" with { type: "json" };
 
 const dirs: string[] = [];
@@ -55,6 +55,23 @@ describe("the tools the app expects to find in its bundle", () => {
 // else. These pin stageRuntime's contract against a genuinely empty directory. They would not have
 // caught the ordering bug itself — that was staging happening three steps after the database step
 // read what it writes — which is why the comment above the call in main.cjs says so out loud.
+// Linux has no tools bundle: the first run names the package manager's command for what is missing
+describe("what a Linux first run says about missing tools", () => {
+  const on = (manager: string) => (p: string) => p === `/usr/bin/${manager}`;
+
+  it("names each distribution's packages, once each", () => {
+    expect(installHint(["pdftotext", "pdfinfo", "tesseract"], on("apt-get"))).toBe(
+      "sudo apt install poppler-utils tesseract-ocr tesseract-ocr-eng tesseract-ocr-osd",
+    );
+    expect(installHint(["ffmpeg"], on("dnf"))).toBe("sudo dnf install ffmpeg-free");
+    expect(installHint(["pdftoppm"], on("pacman"))).toBe("sudo pacman -S poppler");
+  });
+
+  it("falls back to the tool names when it knows no package manager", () => {
+    expect(installHint(["ffmpeg"], () => false)).toBe("Install ffmpeg with your package manager.");
+  });
+});
+
 describe("what a first run has to put in place before any step reads it", () => {
   async function stagedInto(): Promise<{ resources: string; home: string }> {
     const d = await mkdtemp(path.join(tmpdir(), "stage-"));
@@ -153,5 +170,21 @@ describe("what a failed setup command reports", () => {
 
   it("names the exit code when the command said nothing at all", () => {
     expect(failureMessage("  \n\n", 137)).toBe("exit 137");
+  });
+});
+
+describe("a build that ships no tessdata (Linux)", () => {
+  it("stages the rest instead of failing on the missing directory", async () => {
+    const d = await mkdtemp(path.join(tmpdir(), "stage-linux-"));
+    dirs.push(d);
+    const resources = path.join(d, "resources");
+    const home = path.join(d, "home");
+    await mkdir(path.join(resources, "scripts"), { recursive: true });
+    for (const f of ["pyproject.toml", "uv.lock", "docker-compose.yml"]) await writeFile(path.join(resources, f), "");
+
+    stageRuntime(resources, home);
+
+    expect(existsSync(path.join(home, "uv.lock"))).toBe(true);
+    expect(existsSync(path.join(home, "tessdata"))).toBe(false);
   });
 });

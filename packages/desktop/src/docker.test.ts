@@ -68,14 +68,14 @@ describe("finding Docker without $PATH", () => {
 // not developers — so the two states have to be told apart in words, and "get it" needs a link.
 describe("what someone without Docker is told", () => {
   it("tells someone with Docker stopped to start it, not to install it", () => {
-    const help = dockerHelp({ kind: "installed-not-running", cli: "/usr/local/bin/docker" });
+    const help = dockerHelp({ kind: "installed-not-running", cli: "/usr/local/bin/docker" }, "darwin");
     expect(help.title).toMatch(/not running/i);
     expect(help.body).toMatch(/Applications folder/i);
     expect(help.links).toHaveLength(0);
   });
 
   it("gives someone without Docker somewhere to download it", () => {
-    const help = dockerHelp({ kind: "missing" });
+    const help = dockerHelp({ kind: "missing" }, "darwin");
     expect(help.links.map((l: { url: string }) => l.url)).toEqual([
       "https://www.docker.com/products/docker-desktop/",
       "https://orbstack.dev/download",
@@ -89,5 +89,12 @@ describe("what someone without Docker is told", () => {
   it("says nothing extra once Docker is answering", () => {
     expect(dockerHelp({ kind: "ready", cli: "/usr/local/bin/docker", version: "28.6.0" })).toBeNull();
     expect(dockerAdvice({ kind: "ready", cli: "/usr/local/bin/docker", version: "28.6.0" })).toBe("Docker 28.6.0");
+  });
+
+  it("tells Linux to install and start the Docker Engine service, not to open an app", () => {
+    const missing = dockerHelp({ kind: "missing" }, "linux");
+    expect(missing.body).toMatch(/docker group/);
+    expect(missing.links.map((l: { url: string }) => l.url)).toEqual(["https://docs.docker.com/engine/install/"]);
+    expect(dockerHelp({ kind: "installed-not-running", cli: "/usr/bin/docker" }, "linux").body).toMatch(/systemctl start docker/);
   });
 });

@@ -13,7 +13,8 @@ import { stat } from "node:fs/promises";
 import type { SourceBlock } from "../lib/marker.ts";
 import { removeChapterArtifacts } from "../lib/chapter-artifacts.ts";
 import { queueIndexBook } from "../lib/search-index.ts";
-import { synthesisJobSpec } from "../lib/synthesis-jobs.ts";
+import { estimateSynthesisCost } from "../lib/synthesis-cost.ts";
+import { assertLaneVoiceUsable } from "../lib/lane-voice.ts";
 
 const connectionString = env.DATABASE_URL;
 
@@ -105,6 +106,7 @@ export const chaptersRouter = router({
       if (chapter.status === "synthesizing" || chapter.status === "normalizing") {
         throw new Error("Chapter is already being processed");
       }
+      await assertLaneVoiceUsable(chapter.bookId);
 
       // Resume reuses already-synthesized chunk previews; keep `progress` so the count survives.
       await db
@@ -117,7 +119,7 @@ export const chaptersRouter = router({
           chapterId: input.id,
           bookId: chapter.bookId,
           resume: input.resume ?? false,
-        }, await synthesisJobSpec(chapter.bookId));
+        }, { maxAttempts: 1 });
       } else {
         await quickAddJob({ connectionString }, "normalize", {
           chapterId: input.id,
@@ -287,6 +289,16 @@ export const chaptersRouter = router({
       }
       return { success: true };
     }),
+
+  // What a metered voice would charge for what Start would send, and what the account has left
+  synthesisCost: publicProcedure
+    .input(z.object({
+      bookId: z.string().uuid(),
+      voice: z.string().min(1).max(200),
+      key: z.string().min(1).nullable(),
+      chapterId: z.string().uuid().optional(),
+    }))
+    .query(({ input }) => estimateSynthesisCost(input)),
 
   textStats: publicProcedure
     .input(z.object({ chapterIds: z.array(z.string().uuid()).min(1).max(500) }))

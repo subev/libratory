@@ -1,27 +1,29 @@
 import { describe, expect, it } from "vitest";
 
-import { getVoiceById, staticVoices, voiceBlockedByMissingMlx, type Voice } from "./voices.ts";
+import { getVoiceLabel, staticVoices, voiceMissingEngine, type Voice } from "./voices.ts";
 
-const kokoro = getVoiceById("kokoro:af_heart")!;
-const kugel = getVoiceById("kugel:default")!;
+describe("voiceMissingEngine", () => {
+  const bgtts = staticVoices.find((v) => v.id === "bg-bgtts:female") as Voice;
+  const source = (installed: Record<string, boolean>) => ({ installed, runtime: "source" as const });
 
-describe("voiceBlockedByMissingMlx", () => {
-  it("blocks an MLX narrator when the probe says there is no MLX", () => {
-    expect(voiceBlockedByMissingMlx(kugel, false)).toBe(true);
+  it("names the setup step for an engine whose env is absent, and nothing while unknown", () => {
+    expect(voiceMissingEngine(bgtts, source({ piper: true, bgtts: false }))).toMatch(/setup --bgtts/);
+    expect(voiceMissingEngine(bgtts, source({ piper: true, bgtts: true }))).toBeNull();
+    expect(voiceMissingEngine(bgtts, undefined)).toBeNull();
+    expect(voiceMissingEngine(staticVoices.find((v) => v.id === "bg-mms:bul") as Voice, source({ bgtts: false }))).toBeNull();
   });
 
-  it("leaves every other engine alone — they fall back to the CPU", () => {
-    expect(voiceBlockedByMissingMlx(kokoro, false)).toBe(false);
+  // A packaged build has no setup script to run, so it must not tell anyone to run one
+  it("says which build lacks it instead of naming a command a packaged app cannot run", () => {
+    expect(voiceMissingEngine(bgtts, { installed: { bgtts: false }, runtime: "desktop" })).toBe("Not in the desktop app yet");
+    expect(voiceMissingEngine(bgtts, { installed: { bgtts: false }, runtime: "docker" })).toBe("Not in the Docker image yet");
   });
+});
 
-  // Two voices flickering greyed-out on every page load while the probe runs is worse than the
-  // rare case of offering a voice that then fails
-  it("assumes available while the probe has not answered", () => {
-    expect(voiceBlockedByMissingMlx(kugel, undefined)).toBe(false);
-  });
-
-  it("marks exactly the two Metal-only narrators", () => {
-    const flagged = staticVoices.filter((v: Voice) => v.requiresMlx).map((v) => v.id).sort();
-    expect(flagged).toEqual(["bg-mlx:narrator", "kugel:default"]);
+describe("getVoiceLabel", () => {
+  it("names a voice, and a retired one by what it was rather than its id", () => {
+    expect(getVoiceLabel("bg-bgtts:male2")).toBe("BgTTS-38M male 2 (M)");
+    expect(getVoiceLabel("bg-mlx:narrator")).toBe("BG-TTS V5 (retired)");
+    expect(getVoiceLabel("kugel:default")).toBe("KugelAudio (retired)");
   });
 });

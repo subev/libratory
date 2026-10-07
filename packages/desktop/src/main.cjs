@@ -199,6 +199,9 @@ function serverEnv() {
     DATA_DIR: dataDir(),
     CONDA_ENV_PATH: path.join(HOME, "python/bin"),
     POCKET_ENV_PATH: path.join(HOME, "python-pocket/bin"),
+    PIPER_ENV_PATH: path.join(HOME, "python-piper/bin"),
+    BGTTS_ENV_PATH: path.join(HOME, "python-bgtts/bin"),
+    LIBRATORY_RUNTIME: "desktop",
     WEB_DIR: path.join(RESOURCES, "web"),
     MIGRATIONS_DIR: path.join(RESOURCES, "drizzle"),
     DATABASE_URL: process.env.DATABASE_URL || CONFIG.databaseUrl || DEFAULT_DATABASE_URL,
@@ -234,8 +237,9 @@ const STEPS = [
     label: "Audio and PDF tools",
     async run() {
       const missing = setup.missingTools(RESOURCES);
+      if (missing.length && process.platform === "linux") throw new Error(`Missing ${missing.join(", ")} — ${setup.installHint(missing)}`);
       if (missing.length) throw new Error(`Missing ${missing.join(", ")} from the app bundle — this build is incomplete.`);
-      return "bundled";
+      return process.platform === "linux" ? "from the system" : "bundled";
     },
   },
   {
@@ -283,6 +287,22 @@ const STEPS = [
     },
   },
   {
+    id: "piper",
+    label: "Piper voice (Bulgarian)",
+    // Optional: a failure here costs the Piper voice, never the app, and is tried again next launch
+    async run(ctx, detail) {
+      if (!ctx.pending.piper) return "up to date";
+      detail("Installing Piper and its Bulgarian voice — about 210 MB, once");
+      try {
+        await setup.syncPiper(HOME, (line) => detail(line.trim().split("\n").at(-1)));
+      } catch (err) {
+        return `skipped — ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`;
+      }
+      runtime.writeState(HOME, { piperLock: ctx.pending.want.piperLock });
+      return "installed";
+    },
+  },
+  {
     id: "server",
     label: "Starting Libratory",
     async run(ctx, detail) {
@@ -294,7 +314,10 @@ const STEPS = [
       // reader looking for a crash rather than for the other server that is about to be adopted.
       if (state === "foreign") throw new Error(`Something else is already serving ${ctx.url} — most likely a \`pnpm dev\` server from a checkout. Quit it, or launch with LIBRATORY_PORT set to a free port.`);
       if (died) throw new Error(died);
-      if (state !== "ours") throw new Error("The server did not start — check Console.app for Libratory.");
+      if (state !== "ours") {
+        const where = process.platform === "darwin" ? "check Console.app for Libratory" : "start Libratory from a terminal to see its output";
+        throw new Error(`The server did not start — ${where}.`);
+      }
     },
   },
 ];

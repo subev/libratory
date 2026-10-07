@@ -4,18 +4,25 @@ set -e
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 VENV_DIR="$REPO_DIR/.venv"
 POCKET_VENV_DIR="$REPO_DIR/.venv-pocket"
-WITH_KUGEL=false
-[ "${1:-}" = "--kugel" ] && WITH_KUGEL=true
+PIPER_VENV_DIR="$REPO_DIR/.venv-piper"
+BGTTS_VENV_DIR="$REPO_DIR/.venv-bgtts"
+MIOCODEC_REF="77473544375d57e96cbdfd5d7d257e8f280fa8e3"
+WITH_BGTTS=false
+for arg in "$@"; do
+  case "$arg" in
+    --bgtts) WITH_BGTTS=true ;;
+  esac
+done
 
 echo "=== Libratory setup ==="
 
-# Apple Silicon gets everything; Linux gets everything except the two MLX narrators, which are
-# Metal and say so in the UI. Anything else has no local TTS story, so refusing beats half-installing.
+# Apple Silicon and Linux get the same engines; anything else has no local TTS story, so refusing
+# beats half-installing.
 case "$(uname -s)-$(uname -m)" in
   Darwin-arm64) PLATFORM=mac ;;
   Linux-*) PLATFORM=linux ;;
   *)
-    echo "This setup targets Apple Silicon Macs and Linux — $(uname -s)/$(uname -m) can run neither the MLX nor the CPU engines."
+    echo "This setup targets Apple Silicon Macs and Linux — $(uname -s)/$(uname -m) has no build of the local engines."
     exit 1
     ;;
 esac
@@ -123,9 +130,7 @@ echo "  uv: $("$UV" --version)"
 
 echo ""
 echo "Creating Python environment at .venv from uv.lock..."
-# uv.lock pins the whole graph, including three conflicts that pip only survived because the
-# packages were installed with --no-deps: mlx-audio wants transformers 5.x (breaks marker) and
-# huggingface_hub 1.x, and nanocodec-mlx wants mlx 0.29.2. pyproject states those as overrides.
+# uv.lock pins the whole graph; pyproject explains the one override left (Pillow, for marker).
 # Forced index: the lock's source builds resolve their build backends from whatever indexes are
 # configured, so a private registry in the user's own uv.toml fails the install (#19).
 (cd "$REPO_DIR" && UV_INDEX="https://pypi.org/simple" UV_DEFAULT_INDEX="https://pypi.org/simple" "$UV" sync --frozen)
@@ -136,7 +141,6 @@ echo "Verifying Python runtimes..."
 "$PY" -c "import marker; print(f'  marker: {marker.__version__}')" 2>/dev/null || echo "  marker: installed (version check N/A)"
 "$PY" -c "from kokoro import KPipeline; print('  kokoro: OK')"
 "$PY" -c "from transformers import AutoTokenizer, VitsModel; print('  mms runtime: OK')"
-[ "$PLATFORM" != "mac" ] || "$PY" -c "import mlx.core; print('  mlx: OK')"
 
 # What a first run must have lives in scripts/models.py, which the desktop app calls too — spelling
 # it out again here is how the two paths drift.
@@ -145,14 +149,14 @@ echo "Caching the models a first run needs (~350 MB)..."
 "$PY" "$REPO_DIR/scripts/models.py" --essential
 
 echo ""
-# Everything else — Marker 5.1 GB, BGE-M3 4.3 GB, the Bulgarian narrators 1.2 GB — is fetched by
+# Everything else — Marker 5.1 GB, BGE-M3 4.3 GB, the MMS Bulgarian voice 290 MB — is fetched by
 # scripts/models.py the first time someone asks for the feature it powers. Downloading all of it
 # here meant ~15 GB and an hour before the app could open a single page.
 if [ "${WITH_ALL_MODELS:-}" = "1" ]; then
   echo "WITH_ALL_MODELS=1 — fetching every optional bundle up front..."
   "$PY" "$REPO_DIR/scripts/models.py" --download-all
 else
-  echo "Optional models (Marker/OCR, library search, Bulgarian narrators) download on first use."
+  echo "Optional models (Marker/OCR, library search, MMS Bulgarian) download on first use."
   "$PY" "$REPO_DIR/scripts/models.py" --status >/dev/null && echo "  model registry: OK"
 fi
 
@@ -182,24 +186,34 @@ fi
 "$POCKET_PY" "$REPO_DIR/scripts/synthesize_pocket_tts.py" --cache-only
 
 echo ""
-KUGEL_DIR="$HOME/.cache/libratory-models/kugelaudio-0-open-4bit"
-if [ "$PLATFORM" != "mac" ]; then
-  echo "KugelAudio narrator: Apple Silicon only (MLX) — skipped"
-elif [ -d "$KUGEL_DIR" ]; then
-  echo "KugelAudio narrator: already present"
-elif ! $WITH_KUGEL && [ -t 0 ]; then
-  read -r -p "Download the KugelAudio narrator (24 EU languages)? Downloads ~17 GB once, quantizes to ~5 GB, then deletes the download. [y/N] " answer
-  [[ "$answer" =~ ^[Yy] ]] && WITH_KUGEL=true
+# Separate venv: onnxruntime and numpy 2 must not disturb the main env's pins. ~150 MB plus a 63 MB voice.
+echo "Creating Piper environment at .venv-piper..."
+[ -x "$PIPER_VENV_DIR/bin/python" ] || "$PYTHON" -m venv "$PIPER_VENV_DIR"
+PIPER_PY="$PIPER_VENV_DIR/bin/python"
+"$UV" --no-config pip install --python "$PIPER_PY" --quiet -r "$REPO_DIR/scripts/requirements-piper.txt"
+echo "Caching the Piper Bulgarian voice (63 MB)..."
+"$PIPER_PY" "$REPO_DIR/scripts/synthesize_piper_tts.py" --cache-only >/dev/null && echo "  piper bg_BG-dimitar: OK"
+
+echo ""
+BGTTS_PY="$BGTTS_VENV_DIR/bin/python"
+if [ -x "$BGTTS_PY" ] && "$BGTTS_PY" -c "import miocodec" 2>/dev/null; then
+  WITH_BGTTS=true
+elif ! $WITH_BGTTS && [ -t 0 ]; then
+  read -r -p "Add the BgTTS-38M Bulgarian narrator (CPU, voice cloning-capable)? Downloads ~1.5 GB once. [y/N] " answer
+  [[ "$answer" =~ ^[Yy] ]] && WITH_BGTTS=true
 fi
-if [ ! -d "$KUGEL_DIR" ] && $WITH_KUGEL; then
-  echo "Preparing KugelAudio narrator..."
-  "$PY" -c "from huggingface_hub import snapshot_download; snapshot_download('Qwen/Qwen2.5-7B', allow_patterns=['tokenizer*', 'vocab*', 'merges*', 'config.json'])"
-  "$PY" -m mlx_audio.convert --hf-path kugelaudio/kugelaudio-0-open --mlx-path "$KUGEL_DIR" -q --q-bits 4 --model-domain tts \
-    && "$PY" -c "from huggingface_hub import scan_cache_dir; c = scan_cache_dir(); [c.delete_revisions(*[r.commit_hash for r in repo.revisions]).execute() for repo in c.repos if repo.repo_id == 'kugelaudio/kugelaudio-0-open']" \
-    && echo "  kugelaudio 4-bit: OK" \
-    || echo "  kugelaudio: conversion failed — rerun 'pnpm run setup --kugel' or synthesize with another voice"
-elif [ ! -d "$KUGEL_DIR" ]; then
-  echo "KugelAudio narrator: skipped (run 'pnpm run setup --kugel' to add it later)"
+if $WITH_BGTTS; then
+  # Separate venv: MioCodec needs torchaudio, which stops at 2.9.1, while .venv pins torch 2.13.
+  echo "Preparing BgTTS-38M narrator at .venv-bgtts..."
+  [ -x "$BGTTS_PY" ] || "$PYTHON" -m venv "$BGTTS_VENV_DIR"
+  BGTTS_TORCH=()
+  [ "$PLATFORM" = "linux" ] && BGTTS_TORCH=(--torch-backend=cpu)
+  "$UV" --no-config pip install --python "$BGTTS_PY" --quiet "${BGTTS_TORCH[@]}" -r "$REPO_DIR/scripts/requirements-bgtts.txt"
+  # A source build: its uv_build backend would otherwise come from the user's default index (issue #19)
+  UV_INDEX="https://pypi.org/simple" UV_DEFAULT_INDEX="https://pypi.org/simple" "$UV" --no-config pip install --python "$BGTTS_PY" --quiet --no-deps "miocodec @ git+https://github.com/Aratako/MioCodec@$MIOCODEC_REF"
+  "$BGTTS_PY" "$REPO_DIR/scripts/synthesize_bgtts.py" --cache-only >/dev/null && echo "  bgtts-38m-v2: OK"
+else
+  echo "BgTTS-38M narrator: skipped (run 'pnpm run setup --bgtts' to add it later)"
 fi
 
 echo ""

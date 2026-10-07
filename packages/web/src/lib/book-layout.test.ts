@@ -10,6 +10,7 @@ describe("bookLayout", () => {
       showSource: true,
       showWords: true,
       showDuration: true,
+      showVoice: true,
       showPages: true,
       showLabels: true,
       trayCompact: false,
@@ -17,11 +18,12 @@ describe("bookLayout", () => {
     });
   });
 
-  it("drops the head meta, stage hint and book position below 1180", () => {
+  it("drops the head meta, stage hint, book position and Voice below 1180", () => {
     const layout = bookLayout(1179);
     expect(layout.showHeadMeta).toBe(false);
     expect(layout.showStageHint).toBe(false);
     expect(layout.showPosition).toBe(false);
+    expect(layout.showVoice).toBe(false);
     expect(layout.showWords).toBe(true);
   });
 
@@ -43,6 +45,7 @@ describe("bookLayout", () => {
   // Each boundary is inclusive on the roomy side — off by one here is a column that never appears.
   it.each([
     [1180, "showHeadMeta"],
+    [1180, "showVoice"],
     [1120, "showWords"],
     [1000, "showDuration"],
   ] as const)("turns %s on exactly at its own width", (width, key) => {

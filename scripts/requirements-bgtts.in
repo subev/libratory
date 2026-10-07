@@ -1,0 +1,15 @@
+# BgTTS-38M-V2 runs in its own venv (.venv-bgtts): MioCodec needs torchaudio, whose last release
+# (2.9.1) predates the main env's torch 2.13. CPU-only, so the torch pin is independent.
+# MioCodec itself is installed by setup.sh with --no-deps from MIOCODEC_REF: its pyproject points
+# torch at the CUDA index, which made this lock ask for torch+cu128 on a Mac. Its dependencies:
+huggingface-hub==2.1.1
+jsonargparse[signatures]
+json5
+ruamel.yaml
+einops
+julius
+safetensors
+soundfile==0.14.0
+numpy==2.5.3
+torch==2.9.1
+torchaudio==2.9.1
