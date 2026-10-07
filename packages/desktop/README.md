@@ -114,7 +114,18 @@ Tag it. `.github/workflows/release.yml` builds on a `v*` tag and publishes the D
 Releases, which is also where `electron-updater` looks — so the download page and the update feed
 are the same artefact, and there is nothing to keep in step by hand.
 
-Two ways to cut one, and neither involves editing a version by hand.
+**Automatically, on every merge.** `.github/workflows/deploy.yml` runs when the Test workflow
+passes on main: `release.mjs --yes` tags the commit, the Release and Docker image workflows are
+dispatched on that tag (a tag pushed with the workflow token starts no workflow by itself), and
+once the build passes `ship.mjs --unattended` publishes it and bumps the tap. Nobody reviews it on
+the way out; a bad release is fixed forward. It skips a commit main has already moved past (that
+commit's own Test run deploys the newer one) and a commit that already carries a tag, and
+`--unattended` refuses — rather than warns about — a build the notary did not accept or one a
+newer release has overtaken. The tap is written with `TAP_TOKEN` in the `release` environment, a
+fine-grained token with Contents read/write on `subev/homebrew-libratory` only; without it the
+release still goes out and the run warns that the cask was left behind.
+
+By hand, two more ways, and neither involves editing a version by hand.
 
 **From your machine:**
 
@@ -133,8 +144,8 @@ published with `--latest=false`, so an old one left lying around cannot take the
 the notes are still the workflow's placeholder it writes them from the commit subjects since the
 previous tag.
 
-**From GitHub:** Actions → **Release** → *Run workflow*. Same script, run on the runner, so a
-release needs no checkout at all.
+**From GitHub:** Actions → **Release** → *Run workflow* on main. Same script, run on the runner,
+so a release needs no checkout at all. Run on a tag instead, it builds that tag.
 
 `ship` also rewrites the Homebrew cask. `scripts/cask.mjs` renders it from the version and the
 sha256 GitHub reports for the zip, and one API call puts it in

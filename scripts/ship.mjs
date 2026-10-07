@@ -6,6 +6,11 @@
 //   node scripts/ship.mjs               the newest draft, then ask
 //   node scripts/ship.mjs v26.828.4     that one
 //   node scripts/ship.mjs --yes         do not ask
+//   node scripts/ship.mjs v26.828.4 --unattended
+//                                       deploy.yml: do not ask, and refuse what --yes would only
+//                                       warn about — a build that was not notarised, or is not the
+//                                       newest. The tap is written with TAP_TOKEN, since the
+//                                       workflow's own token cannot reach another repository.
 //
 // It refuses to publish a build that is still running, that failed, or that is missing an
 // artefact — all three produce a draft that looks perfectly normal in the GitHub UI.
@@ -17,11 +22,16 @@ import { renderCask, TAP, ZIP } from "./cask.mjs";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
-const go = args.includes("--yes");
+const unattended = args.includes("--unattended");
+const go = unattended || args.includes("--yes");
 const wanted = args.find((a) => a.startsWith("v"));
 
 const run = (cmd, ...a) => execFileSync(cmd, a, { cwd: REPO, encoding: "utf8", maxBuffer: 64 << 20 }).trim();
 const gh = (...a) => run("gh", ...a);
+const tapToken = process.env.TAP_TOKEN || null;
+const ghTap = (...a) => (tapToken
+  ? execFileSync("gh", a, { cwd: REPO, encoding: "utf8", env: { ...process.env, GH_TOKEN: tapToken } }).trim()
+  : gh(...a));
 const git = (...a) => run("git", ...a);
 
 function fail(message, fix) {
@@ -132,11 +142,17 @@ const bumpTap = () => {
     console.log(`  Tap not bumped — no digest on ${ZIP}. Hash it and run:  node scripts/cask.mjs ${version} <sha256>\n`);
     return;
   }
+  // A warning, not a failure: the release is out either way, and a red run on every deploy until
+  // the secret exists would teach nobody anything
+  if (unattended && !tapToken) {
+    console.log(`::warning::Tap not bumped — no TAP_TOKEN. Run: node scripts/cask.mjs ${version} ${plan.sha256}`);
+    return;
+  }
   try {
     let existing = null;
-    try { existing = JSON.parse(gh("api", `repos/${TAP.repo}/contents/${TAP.path}`)).sha; } catch { /* first bump: nothing to replace */ }
+    try { existing = JSON.parse(ghTap("api", `repos/${TAP.repo}/contents/${TAP.path}`)).sha; } catch { /* first bump: nothing to replace */ }
     const content = Buffer.from(renderCask({ version, sha256: plan.sha256 })).toString("base64");
-    gh("api", "-X", "PUT", `repos/${TAP.repo}/contents/${TAP.path}`,
+    ghTap("api", "-X", "PUT", `repos/${TAP.repo}/contents/${TAP.path}`,
       "-f", `message=libratory ${version}`, "-f", `content=${content}`, ...(existing ? ["-f", `sha=${existing}`] : []));
     console.log(`  Tap bumped: brew install --cask ${TAP.name}/libratory now installs ${version}.\n`);
   } catch (error) {
@@ -155,7 +171,9 @@ const publish = () => {
   bumpTap();
 };
 
-if (go) {
+if (unattended && plan.risky) {
+  fail(`Not publishing ${plan.tag} unattended.`, "It is not notarised or not the newest — publish it by hand with --yes if it should go out.");
+} else if (go) {
   publish();
 } else if (!process.stdin.isTTY) {
   // No terminal to answer the prompt: readline never resolves and node dies on the pending await.
