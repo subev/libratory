@@ -316,7 +316,7 @@ pane). Everything is pinned but the pane, and the pane's child owns its own scro
 tray — the tray has to sit outside the scroller it acts on.
 
 Each publishes its own contract through its own context, from a pure module: `lib/book-layout.ts`
-(three widths, six fields — the chapter table scrolls sideways instead of dropping columns) and `lib/library-layout.ts` (four steps, five). Both are under test, and
+(three widths, six fields — the chapter table scrolls sideways instead of dropping columns) and `lib/library-layout.ts` (two widths, two fields — the book table scrolls the same way). Both are under test, and
 both drive the same `lib/use-layout-state.ts`, which is the part worth sharing — it holds the
 *layout* rather than the width and bails when a resize lands inside the same step, because a context
 change walks straight past the children-identity bailout that protects the tables reading it. The
