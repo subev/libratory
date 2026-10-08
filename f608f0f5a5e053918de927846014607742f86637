@@ -1,0 +1,4 @@
+Reviewed: low
+Outcome: Reviewed in-context by Claude: docs-only note on BgTTS early end-of-speech (reproduced with the original seed; attention-tail check measured at 39/90 false flags, so not built). Branch also carries the stamped audit deferral.
+By: Petur Subev
+At: 2026-10-08T17:50:28.026Z
