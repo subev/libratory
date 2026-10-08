@@ -86,7 +86,8 @@ function prePush(remote) {
     const [, localSha, remoteRef, remoteSha] = line.split(" ");
     if (remoteRef !== "refs/heads/main" || !localSha || ZERO.test(localSha)) continue;
     const base = remoteSha && !ZERO.test(remoteSha) ? remoteSha : null;
-    if (base && !tryGit("cat-file", "-e", `${base}^{commit}`)) {
+    // cat-file -e prints nothing either way, so only a failure (null) means the commit is missing
+    if (base && tryGit("cat-file", "-e", `${base}^{commit}`) === null) {
       console.error(`  ${remote}/main is at ${base.slice(0, 10)}, which this clone does not have — fetch first.`);
       ok = false;
       continue;
