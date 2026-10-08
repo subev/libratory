@@ -1,0 +1,4 @@
+Reviewed: medium
+Outcome: Reviewed in-context by Claude: pre-push hook read git cat-file -e's empty output as a missing commit and refused every push onto a fetched main; fixed with a null check. Review finding fixed before stamping: the new test relied on a global git email (CI has none). Hook test fails 2/3 on the old code, passes 3/3 with no global git config; lint green.
+By: Petur Subev
+At: 2026-10-08T17:26:05.009Z
