@@ -1,0 +1,4 @@
+Reviewed: medium
+Outcome: In-context review of origin/main..HEAD by Claude, stamped at the user's explicit instruction. 1 finding fixed: stale docs and MCP list_voices still called BgTTS sentence-level. Found in use and fixed: lane switching clipped the last Bulgarian word (word ends held through voiced frames; passages closing a chunk end with it), regression tests fail on the old code. Not covered by tests: real BgTTS synthesis (needs the model); checked on Frankenstein's Bulgarian lane instead. lint, typecheck, 1220 tests green.
+By: Petur Subev
+At: 2026-10-08T17:05:54.670Z
