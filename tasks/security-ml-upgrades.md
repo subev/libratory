@@ -24,6 +24,11 @@ GHSA-4j2p-28q2-5m79 has no published fix as of the audit. Monitor upstream's val
 sharded checkpoint `weight_map` paths. The app does not offer arbitrary checkpoint imports;
 that restriction is not a substitute for an upstream fix.
 
+Checked 2026-10-08: 1.15.0 (released 2026-09-09) is still unfixed. Its `load_checkpoint_in_model`
+reads `weight_map` exactly as 1.14.0 does, with no path validation added. The advisory's range stops
+at `<= 1.14.0`, so the audit would stop flagging a bump to 1.15.0, but that would hide the record,
+not fix it.
+
 Keep raw reports available; do not dismiss these GitHub alerts as fixed or turn off scanning.
 
 ## Routine ML updates deferred on September 9
