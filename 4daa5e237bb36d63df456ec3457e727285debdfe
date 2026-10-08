@@ -1,0 +1,4 @@
+Reviewed: medium
+Outcome: Reviewed in-context by Claude (two docs-only commits since the last stamp): review flow is local with no PR and the reviewing agent stamps; accelerate 1.15.0 recorded as still unfixed. One wording fix folded in (merge -> push). No code changes; lint green.
+By: Petur Subev
+At: 2026-10-08T17:24:53.495Z
