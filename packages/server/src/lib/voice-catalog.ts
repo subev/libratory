@@ -187,9 +187,10 @@ const UNSPACED_LANGUAGES = new Set(["zh", "ja"]);
 // level. Cartesia and ElevenLabs return word timestamps with the audio. Kokoro's come from its
 // English tokenizer, and in its espeak languages from its phoneme durations aligned to the words
 // (scripts/phoneme_words.py) — which needs spaces between words, so not Mandarin. Piper's come from
-// its durations the same way. Pocket, BgTTS, MMS and the macOS voices give chunk boundaries only.
+// its durations the same way, BgTTS's from its own cross-attention (scripts/attention_words.py).
+// Pocket, MMS and the macOS voices give chunk boundaries only.
 export function voiceHasWordTiming(voiceId: string, language?: string | null): boolean {
-  if (voiceId.startsWith("bg-piper:")) return true;
+  if (voiceId.startsWith("bg-piper:") || voiceId.startsWith("bg-bgtts:")) return true;
   const engine = engineForVoiceId(voiceId);
   if (engine === "cartesia") return true;
   // ElevenLabs times characters, and charactersToWords groups them at spaces — a sentence of

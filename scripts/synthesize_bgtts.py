@@ -8,6 +8,9 @@ little and stays free for Kokoro and BGE-M3.
 The model's code ships in the HF repo beside the weights, so it is imported from the pinned
 snapshot rather than vendored. The three voices are the reference clips the authors ship; the
 speaker embedding is taken from them at load.
+
+Word timings come from the model's own cross-attention over the codes it produced
+(attention_words.py), written beside each chunk WAV as Piper's and Kokoro's are.
 """
 
 import argparse
@@ -22,7 +25,8 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bg_speech import speakable  # noqa: E402
-from chunk_io import load_existing_chunk, read_chunks, write_chunk_manifest  # noqa: E402
+from attention_words import chunk_words, piece_attention, spoken_words, voiced_frames  # noqa: E402
+from chunk_io import load_existing_chunk, read_chunks, write_chunk_manifest, write_chunk_words  # noqa: E402
 
 MODEL_REPO = "beleata74/BgTTS-38M-V2"
 MODEL_REVISION = "3f6ca06b3ca78352eb00d8e96349c0bedaa3d2f1"
@@ -87,7 +91,7 @@ def main() -> None:
     except Exception as exc:
         raise RuntimeError("BgTTS-38M-V2 is not downloaded — run `pnpm run setup` and accept the BgTTS step") from exc
     sys.path.insert(0, str(model_dir))
-    from model import load_for_inference
+    from model import CrossAttention, load_for_inference
     from tokenizer import TTSTokenizer
     from codec import CodecV6
     from inference import generate, _split_text
@@ -106,20 +110,24 @@ def main() -> None:
 
     audio_parts: list[np.ndarray] = []
     for index, chunk in enumerate(chunks, start=1):
-        waveform = load_existing_chunk(args.chunks_dir, index)
+        waveform = load_existing_chunk(args.chunks_dir, index, needs_words=True)
         if waveform is None:
             torch.manual_seed(SEED + index)
             # Expanding numbers can push a sentence past the encoder's 256 characters
-            codes = []
+            codes, timed_pieces = [], []
             for piece in _split_text(speakable(chunk), tokenizer, max_len):
                 piece_codes = generate(model, tokenizer, piece, speaker, temperature=TEMPERATURE, device=device)
                 if piece_codes is None or len(piece_codes) == 0:
                     raise RuntimeError(f"No audio generated for chunk {index}: {piece[:60]!r}")
                 codes.append(piece_codes)
+                if args.chunks_dir:
+                    attention = piece_attention(model, CrossAttention, tokenizer, piece, piece_codes, speaker)
+                    timed_pieces.append((attention, *spoken_words(tokenizer, piece)))
             waveform = codec.decode(torch.cat(codes), speaker).numpy().astype(np.float32)
             if args.chunks_dir:
                 os.makedirs(args.chunks_dir, exist_ok=True)
                 sf.write(os.path.join(args.chunks_dir, f"chunk-{index:03d}.wav"), waveform, SAMPLE_RATE)
+                write_chunk_words(args.chunks_dir, index, chunk_words(chunk, timed_pieces, voiced_frames(waveform, SAMPLE_RATE)))
 
         audio_parts.append(waveform)
         if index < len(chunks):
