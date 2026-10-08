@@ -83,5 +83,10 @@ no `words.json`, so a resumed run speaks them again (`needs_words`, as Piper doe
 `attention-words.test.ts` runs `chunk_words` on hand-drawn attention through `CONDA_ENV_PATH`'s
 python, which has numpy (CI installs it beside the PDF test packages).
 
+Found in use (Frankenstein, alternating languages): attention leaves a word for the space or
+<eot> while the word is still sounding, so word ends came out early, and switching lanes after a
+sentence clipped its last word. Word ends now run on through voiced frames up to the next word
+(`hold_through_voice`), and a bilingual passage that closes its chunk ends with the chunk.
+
 Open for A: the heads are fixed to this checkpoint (`MODEL_REVISION` pins it). A new BgTTS release
 means running `score.py scan` again. The real check on BgTTS's own voice is listening in the reader.
