@@ -3,91 +3,91 @@
     "id": "GHSA-4j2p-28q2-5m79",
     "package": "accelerate",
     "version": "1.14.0",
-    "expires": "2026-10-08",
-    "reason": "No upstream fix is published. Only the application-selected model repositories are loaded; arbitrary checkpoint imports are not exposed. Track the sharded-checkpoint loader fix in tasks/security-ml-upgrades.md."
+    "expires": "2026-11-05",
+    "reason": "No upstream fix: 1.15.0 (2026-09-09) loads sharded checkpoint weight_map paths exactly as 1.14.0 does, though the advisory's range stops at 1.14.0, so a bump would only hide it. Only the application-selected model repositories are loaded; arbitrary checkpoint imports are not exposed. Track in tasks/security-ml-upgrades.md."
   },
   {
     "id": "GHSA-29pf-2h5f-8g72",
     "package": "transformers",
     "version": "4.57.6",
-    "expires": "2026-10-08",
-    "reason": "Patched only in Transformers 5, incompatible with the current Marker runtime. Model repositories are application-selected, with local-only inference. This remains a model supply-chain risk; see tasks/security-ml-upgrades.md."
+    "expires": "2026-11-05",
+    "reason": "Patched only in Transformers 5, which only Marker 2.0 + Surya 2 accept, a rewrite of the extraction runtime tracked in tasks/security-ml-upgrades.md. Model repositories are application-selected, with local-only inference. This remains a model supply-chain risk; see tasks/security-ml-upgrades.md."
   },
   {
     "id": "GHSA-69w3-r845-3855",
     "package": "transformers",
     "version": "4.57.6",
-    "expires": "2026-10-08",
+    "expires": "2026-11-05",
     "reason": "The app does not train or resume Trainer checkpoints and uses PyTorch 2.13, above the affected <2.6 condition. Remove with the Transformers 5 migration."
   },
   {
     "id": "GHSA-fgcw-684q-jj6r",
     "package": "transformers",
     "version": "4.57.6",
-    "expires": "2026-10-08",
+    "expires": "2026-11-05",
     "reason": "The app does not load LightGlue or expose arbitrary model repositories. Marker currently requires Transformers 4; remove with the Transformers 5 migration."
   },
   {
     "id": "GHSA-xrqw-3rrv-vx5w",
     "package": "transformers",
     "version": "4.57.6",
-    "expires": "2026-10-08",
+    "expires": "2026-11-05",
     "reason": "The app does not save user-provided tokenizers/processors or chat templates through save_pretrained. Marker currently requires Transformers 4; remove with its migration."
   },
   {
     "id": "PYSEC-2025-217",
     "package": "transformers",
     "version": "4.57.6",
-    "expires": "2026-10-08",
+    "expires": "2026-11-05",
     "reason": "The app does not run the X-CLIP checkpoint conversion utility. Remove with the Transformers migration when upstream supplies a fix."
   },
   {
     "id": "PYSEC-2026-2288",
     "package": "transformers",
     "version": "4.57.6",
-    "expires": "2026-10-08",
+    "expires": "2026-11-05",
     "reason": "The app does not train or resume Trainer checkpoints and uses PyTorch 2.13, above the affected <2.6 condition. Remove with the Transformers 5 migration."
   },
   {
     "id": "PYSEC-2026-2289",
     "package": "transformers",
     "version": "4.57.6",
-    "expires": "2026-10-08",
-    "reason": "Patched only in Transformers 5, incompatible with the current Marker runtime. Model repositories are application-selected, with local-only inference. This remains a model supply-chain risk; see tasks/security-ml-upgrades.md."
+    "expires": "2026-11-05",
+    "reason": "Patched only in Transformers 5, which only Marker 2.0 + Surya 2 accept, a rewrite of the extraction runtime tracked in tasks/security-ml-upgrades.md. Model repositories are application-selected, with local-only inference. This remains a model supply-chain risk; see tasks/security-ml-upgrades.md."
   },
   {
     "id": "PYSEC-2026-2290",
     "package": "transformers",
     "version": "4.57.6",
-    "expires": "2026-10-08",
+    "expires": "2026-11-05",
     "reason": "The app does not load LightGlue or expose arbitrary model repositories. Marker currently requires Transformers 4; remove with the Transformers 5 migration."
   },
   {
     "id": "PYSEC-2026-3804",
     "package": "accelerate",
     "version": "1.14.0",
-    "expires": "2026-10-08",
-    "reason": "No upstream fix is published. Only the application-selected model repositories are loaded; arbitrary checkpoint imports are not exposed. Track the sharded-checkpoint loader fix in tasks/security-ml-upgrades.md."
+    "expires": "2026-11-05",
+    "reason": "No upstream fix: 1.15.0 (2026-09-09) loads sharded checkpoint weight_map paths exactly as 1.14.0 does, though the advisory's range stops at 1.14.0, so a bump would only hide it. Only the application-selected model repositories are loaded; arbitrary checkpoint imports are not exposed. Track in tasks/security-ml-upgrades.md."
   },
   {
     "id": "PYSEC-2026-3929",
     "package": "transformers",
     "version": "4.57.6",
-    "expires": "2026-10-08",
+    "expires": "2026-11-05",
     "reason": "The app does not save user-provided tokenizers/processors or chat templates through save_pretrained. Marker currently requires Transformers 4; remove with its migration."
   },
   {
     "id": "GHSA-x9r9-c232-4q39",
     "package": "transformers",
     "version": "4.57.6",
-    "expires": "2026-10-08",
+    "expires": "2026-11-05",
     "reason": "No upstream fix is published. The app never calls generate(custom_generate=...) or load_custom_generate, and every Python subprocess runs with HF_HUB_OFFLINE=1, so no remote module can be fetched. Track with the Transformers 5 migration in tasks/security-ml-upgrades.md."
   },
   {
     "id": "PYSEC-2026-4174",
     "package": "transformers",
     "version": "4.57.6",
-    "expires": "2026-10-08",
+    "expires": "2026-11-05",
     "reason": "No upstream fix is published. The app never calls generate(custom_generate=...) or load_custom_generate, and every Python subprocess runs with HF_HUB_OFFLINE=1, so no remote module can be fetched. Track with the Transformers 5 migration in tasks/security-ml-upgrades.md."
   }
 ]
