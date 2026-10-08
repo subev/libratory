@@ -1,0 +1,4 @@
+Reviewed: low
+Outcome: Reviewed in-context by Claude: JSON-only deferral of the 13 ML audit exceptions to 2026-11-05 at the user's request; reasons updated with today's findings (accelerate 1.15.0 still unfixed, Transformers 5 needs Marker 2/Surya 2). Local uv audit + check: 0 requiring action.
+By: Petur Subev
+At: 2026-10-08T17:40:18.981Z
