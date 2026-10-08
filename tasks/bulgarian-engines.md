@@ -23,6 +23,14 @@ polished; decide what stays after an A/B on a real book.
 - Abbreviations before a capitalised word: `bg_speech` keeps a sentence-final dot only after
   abbreviations that follow their noun (`г.`, `лв.`, `др.`); `гр. София`, `проф. Петров` are never
   read as sentence ends.
+- BgTTS sometimes stops a syllable early: it emits end-of-speech before the last letters. Example:
+  Frankenstein's first letter, "…по-пламенни и по-ярки." is spoken "…по-яр" (chunk 7, seed 562,
+  125 frames; seeds 1–4 give 128–135 frames and say the whole word). It is in the generated audio,
+  not the timings, and predates word timing, because generation is seeded per chunk and runs before
+  the attention pass. Attention can't detect it: in 39 of 90 corpus readings the final frames stop
+  1–3 letters short of the end even when complete, and the clipped one stops 1 short. A check needs
+  another signal (an ASR pass on the last word, or comparing two seeds' lengths), and a
+  re-synthesis would need a per-chunk seed or a "regenerate this chunk" action.
 
 ## Polish if it stays
 
