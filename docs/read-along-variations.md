@@ -56,7 +56,8 @@ The highlight can only be as fine as the timings the engine gives back.
 | Kokoro chunk holding a dash or quote its aligner cannot place | as usual | **per word** — the untimed mark folds into the word before it rather than costing the chunk its timings | `word` |
 | macOS `say` | one sentence | none | `chunk` |
 | Piper (Bulgarian) | one sentence | **per word**, from Piper's own phoneme durations: each word phonemized alone and aligned to the sentence's phonemes (`scripts/phoneme_words.py`), then mapped back from the spoken words to the written ones — none for a chunk where under 70% of the sounds match | `word` |
-| MMS, BgTTS-38M (Bulgarian) | one sentence | none | `chunk` |
+| BgTTS-38M (Bulgarian) | one sentence | **per word**, from the decoder's own cross-attention over the codes it produced: three heads that follow the text, a forward-only path through them, starts moved out of silence (`scripts/attention_words.py`), then mapped back from spoken to written words as Piper's are | `word` |
+| MMS (Bulgarian) | one sentence | none | `chunk` |
 | Pocket TTS | one sentence | none | `chunk` |
 | Cartesia | a paragraph, up to 1000 chars | **per word**, `add_timestamps` on the SSE endpoint | `word` |
 | ElevenLabs | a paragraph, up to 1000 chars | **per character**, from `/with-timestamps`, grouped on whitespace into words — dropped entirely if the characters do not rejoin to the text sent, since one drift would misplace every word after it | `word` |

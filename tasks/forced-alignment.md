@@ -80,6 +80,8 @@ Wired in: `scripts/attention_words.py` (beside `phoneme_words.py`), called from
 `synthesize_bgtts.py` per chunk; `voiceHasWordTiming` is true for `bg-bgtts:`. Old BgTTS chunks have
 no `words.json`, so a resumed run speaks them again (`needs_words`, as Piper does).
 
-Open for A: no unit test yet (it needs numpy, and `phoneme-words.test.ts` runs plain python3). The
-heads are fixed to this checkpoint (`MODEL_REVISION` pins it). A new BgTTS release means running
-`score.py scan` again.
+`attention-words.test.ts` runs `chunk_words` on hand-drawn attention through `CONDA_ENV_PATH`'s
+python, which has numpy (CI installs it beside the PDF test packages).
+
+Open for A: the heads are fixed to this checkpoint (`MODEL_REVISION` pins it). A new BgTTS release
+means running `score.py scan` again. The real check on BgTTS's own voice is listening in the reader.

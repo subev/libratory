@@ -29,4 +29,3 @@ polished; decide what stays after an A/B on a real book.
 - BgTTS in the Docker image (~1.5 GB). The desktop app builds it on request from the voice picker
   since 2026-10-07 (`scripts/install_bgtts.sh`); Piper ships in both.
 - `9 ч.` (hour without minutes) is not expanded by the normalizer.
-- Word timings for BgTTS: an autoregressive model with no durations; would need a forced aligner.
