@@ -153,4 +153,16 @@ def chunk_words(written_text, pieces, voiced, heads=HEADS):
         start, end = max(start, previous_end), max(end, previous_end)
         words.append({"text": token, "after": " " if index < len(written) - 1 else "", "startMs": start, "endMs": end})
         previous_end = end
+    return hold_through_voice(words, voiced)
+
+
+def hold_through_voice(words, voiced):
+    """Attention leaves a word for the space or <eot> after it while the word is still sounding, so
+    each end runs on through voiced frames, never past the next word's start."""
+    for index, word in enumerate(words):
+        limit = words[index + 1]["startMs"] if index + 1 < len(words) else len(voiced) * FRAME_MS
+        frame = word["endMs"] // FRAME_MS
+        while frame < len(voiced) and voiced[frame] and (frame + 1) * FRAME_MS <= limit:
+            frame += 1
+        word["endMs"] = max(word["endMs"], frame * FRAME_MS)
     return words

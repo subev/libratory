@@ -11,9 +11,9 @@ type ChunkWord = { text: string; after: string; startMs: number; endMs: number }
 const python = path.join(env.CONDA_ENV_PATH, "python");
 
 // attention_words.py needs numpy and no model: the attention here is drawn by hand, one 40 ms frame
-// per letter of the reading, with the two things real attention does that the path must survive —
-// resting on the first letter through the silence before speech, and flicking back to earlier text
-// during a pause.
+// per letter of the reading, with the things real attention does that the timings must survive —
+// resting on the first letter through the silence before speech, flicking back to earlier text
+// during a pause, and moving on from a word (to the space, or to <eot>) while it is still sounding.
 function chunkWords(written: string, spoken: string): ChunkWord[] {
   const program = `
 import json, re, sys
@@ -27,8 +27,10 @@ for c in range(len(spoken)):
     targets.append(c + 1)
     voiced.append(True)
     if c == pause_after:
-        targets += [3] * pause
-        voiced += [False] * pause
+        targets += [c + 1] * 2 + [3] * pause
+        voiced += [True] * 2 + [False] * pause
+targets += [len(spoken) + 1] * 3
+voiced += [True] * 3
 text_len = len(spoken) + 2
 attention = np.full((1, 1, len(targets), text_len), 0.1 / text_len)
 for frame, position in enumerate(targets):
@@ -50,12 +52,15 @@ describe("attention_words.chunk_words", () => {
     const [струва, number, lev, na, horata] = words;
     // Attention rests on the first letter from frame 1, but the sound starts at frame 5
     expect(струва!.startMs).toBe(200);
-    // "25 лв." was read as "двадесет и пет лева", from frame 12 to 31: shared between the two tokens
+    // "25 лв." was read as "двадесет и пет лева", from frame 12: shared between the two tokens
     expect(number!.startMs).toBe(480);
-    expect(lev!.endMs).toBe(1240);
+    // Attention leaves "лева" for the space at frame 31, and the word sounds on for three frames more
+    expect(lev!.endMs).toBe(1360);
     expect(number!.endMs).toBe(lev!.startMs);
     // Four paused frames looking back at the third letter hold the path rather than send it ahead
-    expect(na!.startMs).toBe(1440);
-    expect(horata!.startMs).toBe(1560);
+    expect(na!.startMs).toBe(1520);
+    expect(horata!.startMs).toBe(1640);
+    // The last three frames look at <eot> while the word is still sounding
+    expect(horata!.endMs).toBe(51 * 40);
   });
 });

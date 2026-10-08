@@ -64,9 +64,12 @@ function startEdge(tl: Timeline, at: number): Edge {
 function endEdge(tl: Timeline, at: number): Edge {
   const chunk = tl.chunks.find((c) => c.start < at && at <= c.end) ?? [...tl.chunks].reverse().find((c) => c.end <= at && silentBetween(tl.text, c.end, at));
   if (!chunk) return { ms: null, method: "unavailable" };
+  // A passage that closes its chunk ends with it: a reported word end can come before the sound
+  // does (BgTTS's attention leaves the last word while it is still fading), and stopping there
+  // clips it when playback switches lanes
+  if (at >= chunk.end || silentBetween(tl.text, at, chunk.end)) return { ms: chunk.endMs, method: "chunk-boundary" };
   const word = [...chunk.words].reverse().find((w) => w.start < at && silentBetween(tl.text, Math.min(at, w.end), at));
   if (word) return { ms: word.endMs, method: "provider-word" };
-  if (silentBetween(tl.text, at, chunk.end)) return { ms: chunk.endMs, method: "chunk-boundary" };
   return { ms: interpolate(tl, chunk, at), method: "interpolated" };
 }
 

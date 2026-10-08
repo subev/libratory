@@ -95,11 +95,17 @@ describe("production bilingual preparation", () => {
     expect(pairs?.map((p) => p.id)).toEqual(["p1", "p2", "p3"]);
     await expect(alignVectors(src, tgt, [[NaN]])).rejects.toThrow("Invalid sentence embedding");
   });
-  it("ends a passage at its final provider word, excluding trailing silence", () => {
+  it("ends a passage that closes its chunk with the chunk, not at the last word's reported end", () => {
     const text = "Hello world.";
     const tl = timeline(text, { version: 2, totalMs: 1500, chunks: [{ text, startMs: 0, endMs: 1500,
       words: [{ text: "Hello", after: " ", startMs: 100, endMs: 400 }, { text: "world", after: ".", startMs: 500, endMs: 1000 }] }] });
-    expect(spanTiming(tl, { start: 0, end: text.length })).toEqual({ start: { ms: 100, method: "provider-word" }, end: { ms: 1000, method: "provider-word" } });
+    expect(spanTiming(tl, { start: 0, end: text.length })).toEqual({ start: { ms: 100, method: "provider-word" }, end: { ms: 1500, method: "chunk-boundary" } });
+  });
+  it("ends a passage inside its chunk at its final provider word", () => {
+    const text = "Hello. World.";
+    const tl = timeline(text, { version: 2, totalMs: 1500, chunks: [{ text, startMs: 0, endMs: 1500,
+      words: [{ text: "Hello.", after: " ", startMs: 100, endMs: 400 }, { text: "World.", after: "", startMs: 600, endMs: 1000 }] }] });
+    expect(spanTiming(tl, { start: 0, end: 6 })).toEqual({ start: { ms: 100, method: "provider-word" }, end: { ms: 400, method: "provider-word" } });
   });
   it("does not interpolate through text missing from the recording", () => {
     const text = "Hello. Missing. Bye.";
