@@ -36,6 +36,7 @@
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.12.5",
+    "fflate": "^0.8.3",
     "franc-min": "^6.2.0",
     "graphile-worker": "^0.18.0",
     "linkedom": "^0.18.13",

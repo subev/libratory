@@ -35,12 +35,16 @@ export function hasFiles(e: React.DragEvent): boolean {
   return e.dataTransfer.types.includes("Files");
 }
 
-// Every PDF under a dropped entry, folders walked. readEntries answers in batches of at most 100,
-// so a directory is read until an empty batch. Shared by the upload zone and the assistant panel.
-export async function readEntryFiles(entry: FileSystemEntry): Promise<File[]> {
+export const isPdfFile = (file: File) => file.name.toLowerCase().endsWith(".pdf");
+export const isEpubFile = (file: File) => file.name.toLowerCase().endsWith(".epub");
+
+// Every file `accept` takes under a dropped entry, folders walked (PDFs unless told otherwise).
+// readEntries answers in batches of at most 100, so a directory is read until an empty batch.
+// Shared by the upload zone and the assistant panel.
+export async function readEntryFiles(entry: FileSystemEntry, accept: (file: File) => boolean = isPdfFile): Promise<File[]> {
   if (entry.isFile) {
     const file = await new Promise<File>((resolve, reject) => (entry as FileSystemFileEntry).file(resolve, reject));
-    return file.name.toLowerCase().endsWith(".pdf") ? [file] : [];
+    return accept(file) ? [file] : [];
   }
   if (entry.isDirectory) {
     const reader = (entry as FileSystemDirectoryEntry).createReader();
@@ -50,7 +54,7 @@ export async function readEntryFiles(entry: FileSystemEntry): Promise<File[]> {
       if (batch.length === 0) break;
       entries.push(...batch);
     }
-    const nested = await Promise.all(entries.map(readEntryFiles));
+    const nested = await Promise.all(entries.map((child) => readEntryFiles(child, accept)));
     return nested.flat();
   }
   return [];
@@ -60,6 +64,6 @@ export async function readEntryFiles(entry: FileSystemEntry): Promise<File[]> {
 // under the entries, in name order
 export async function droppedPdfs({ entries, files }: DroppedItems): Promise<File[]> {
   if (!entries.some((entry) => entry.isDirectory)) return files;
-  const collected = (await Promise.all(entries.map(readEntryFiles))).flat();
+  const collected = (await Promise.all(entries.map((entry) => readEntryFiles(entry)))).flat();
   return collected.sort((a, b) => a.name.localeCompare(b.name));
 }

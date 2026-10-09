@@ -41,6 +41,22 @@ function digestJobLive(digestJob: { status: string; updatedAt: string } | null |
   return Date.now() - new Date(digestJob.updatedAt).getTime() < 15 * 60_000;
 }
 
+
+function noSourceFilesNote(kind: "digest" | "api" | "ebook"): string {
+  switch (kind) {
+    case "digest":
+      return "Chapters were written from other books in your library — a digest has no source files to upload or extract.";
+    case "api":
+      return "Chapters arrived through the API — this book has no source files to upload or extract.";
+    case "ebook":
+      return "Chapters came from the EPUB's own table of contents — its text needed no extraction, so there is nothing to re-read.";
+    default: {
+      const unhandled: never = kind;
+      throw new Error(`unhandled book kind ${unhandled}`);
+    }
+  }
+}
+
 export function BookDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -1075,9 +1091,7 @@ export function BookDetail() {
             />
           ) : (
             <p className="text-sm text-(--text-muted)" data-testid="synthetic-no-input">
-              {book.kind === "digest"
-                ? "Chapters were written from other books in your library — a digest has no source files to upload or extract."
-                : "Chapters arrived through the API — this book has no source files to upload or extract."}
+              {noSourceFilesNote(book.kind)}
             </p>
           )}
 

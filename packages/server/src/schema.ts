@@ -89,7 +89,8 @@ export type SearchIndexJob = {
 
 export type BookOrigin =
   | { type: "digest"; sourceBookIds: string[]; prompt: string; model: string }
-  | { type: "api"; client?: string };
+  | { type: "api"; client?: string }
+  | { type: "ebook"; filename: string };
 
 export type DigestJob = {
   status: "running" | "done" | "failed";
@@ -154,7 +155,7 @@ export const books = pgTable("books", {
   id: uuid("id").primaryKey().defaultRandom(),
   title: text("title").notNull(),
   // "pdf" books have filename/pdfPath; synthetic kinds (digest, ...) have neither
-  kind: text("kind").$type<"pdf" | "digest" | "api">().notNull().default("pdf"),
+  kind: text("kind").$type<"pdf" | "digest" | "api" | "ebook">().notNull().default("pdf"),
   filename: text("filename"),
   pdfPath: dataPath("pdf_path"),
   outputPath: dataPath("output_path"),

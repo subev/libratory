@@ -17,6 +17,9 @@ import { rm } from "node:fs/promises";
 import { createCustomPocketVoice } from "./lib/pocket-voices.ts";
 import { UPLOAD_RATE_LIMIT } from "./lib/request-limits.ts";
 import { createPdfBook, ensurePdfDir, newPdfBookId, pdfFileName, PdfBookInputError } from "./lib/pdf-books.ts";
+import { createEbookBook } from "./lib/ebook-books.ts";
+import { EpubImportError } from "./lib/epub-import.ts";
+import { deleteBook } from "./lib/delete-book.ts";
 
 const connectionString = env.DATABASE_URL;
 
@@ -95,6 +98,47 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
       return reply.send(book);
     } catch (err) {
       if (err instanceof PdfBookInputError) return reply.code(400).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  // One EPUB is one book; the original is kept beside where a PDF's would be, for a later re-import.
+  fastify.post("/upload/ebook", { config: { rateLimit: UPLOAD_RATE_LIMIT } }, async (request, reply) => {
+    const { bookId, pdfDir: bookDir } = newPdfBookId();
+    await ensurePdfDir(bookDir);
+    const epubPath = path.join(bookDir, "source.epub");
+
+    // Whatever fails — an oversized stream, an unreadable file, an insert half done — leaves no book behind
+    try {
+      let filename: string | null = null;
+      const fields: Record<string, string> = {};
+      for await (const part of request.parts()) {
+        if (part.type === "file") {
+          if (filename === null && part.filename.toLowerCase().endsWith(".epub")) {
+            await pipeline(part.file, createWriteStream(epubPath));
+            filename = part.filename;
+          } else {
+            part.file.resume();
+          }
+        } else {
+          fields[part.fieldname] = String((part as any).value ?? "");
+        }
+      }
+
+      if (filename === null) {
+        await rm(bookDir, { recursive: true, force: true });
+        return reply.code(400).send({ error: "No EPUB file uploaded" });
+      }
+
+      const book = await createEbookBook(
+        bookId,
+        { epubPath, filename, title: fields.title, folderId: fields.folderId },
+        profileIdFromHeader(request.headers["x-profile-id"]),
+      );
+      return reply.send(book);
+    } catch (err) {
+      await deleteBook(bookId);
+      if (err instanceof EpubImportError || err instanceof PdfBookInputError) return reply.code(400).send({ error: err.message });
       throw err;
     }
   });

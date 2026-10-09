@@ -2,7 +2,7 @@
 // way the chapter tray reads its one orange button. Pure, so each state is a line in a test.
 export type NextStepBook = {
   id: string;
-  kind: "pdf" | "digest" | "api";
+  kind: "pdf" | "digest" | "api" | "ebook";
   status: string;
   structureConfirmedAt: string | Date | null;
   outputPath: string | null;

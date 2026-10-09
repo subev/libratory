@@ -143,6 +143,9 @@ importers:
       fastify:
         specifier: ^5.12.5
         version: 5.12.5
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
       franc-min:
         specifier: ^6.2.0
         version: 6.2.0

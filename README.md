@@ -52,6 +52,8 @@ Every book is a row you can open, and every chapter inside it is a row you can e
 <details>
 <summary><b>Turning a book into audio, in detail</b></summary>
 
+**A DRM-free EPUB** skips all of this: its own table of contents names the chapters, page numbers and note markers are left out, and the book is ready to narrate the moment it lands.
+
 **Chapter detection** tries plain rules first — headings, numbering, the shape of the page — and can then read the book's own table of contents with an AI model if you turn that on. You can also draw the boundaries by hand. Every upload gets instant `pdftotext` raw text, so a book is browsable in seconds — the slow Marker extraction is opt-in and can run later, or never. A scanned book is read once by Tesseract into a searchable copy kept beside the original, and everything afterwards — extraction, search, export, word-by-word read-along — works off that copy. English is built in; any other language is a one-click pack download of a few megabytes, offered right where the book's language is set. A second engine, Surya, is slower but reads photographed, curled or faded pages that Tesseract garbles — and "Try one page" shows both results beside the page image before you commit a whole book to either. A third, opt-in engine sends each page image to a cloud vision model (any configured AI provider; about a tenth of a cent a page on DeepSeek Flash), which reads any language the model does, joins words split across lines and leaves running headers and page numbers out; each page is checked against a local Tesseract read and re-asked when it comes back short. A local read supplies the word positions the model does not — Apple's Vision recogniser on a Mac, which follows skewed and clipped lines, Tesseract elsewhere — aligned to the model's words and written into the searchable copy, so search and word-by-word highlighting work as with the local engines. The reading is kept, so a better placement later is a local re-run, never another paid read.
 
 **Per chapter** you can edit the text, re-synthesize, include or exclude it, suspend and queue it, and run AI cleanup over OCR artifacts. When it narrates, it reads your edited text if there is any, then the cleaned-up extraction, then the raw text — whichever exists first. Assembly produces a single M4B with native chapter markers and a cover.
@@ -113,7 +115,7 @@ Ships with `scripts/hn-top10.mjs`, which turns any day's top Hacker News stories
 <details>
 <summary><b>How is this different from Ebook2Audiobook?</b></summary>
 
-[Ebook2Audiobook](https://github.com/DrewThomasson/ebook2audiobook) is a one-shot converter: file in, audiobook out, with voice cloning (XTTSv2) and huge language coverage. Libratory is a **library you live in**: books persist in a database with per-chapter editing, re-synthesis, AI cleanup, translations and rewrites, notes, digests, read-along export, and chat over the content of every book. PDFs are the first-class input (raw text instantly, OCR opt-in) rather than routed through an EPUB conversion, and the TTS stack is newer local models (Kokoro, Pocket TTS, BgTTS-38M) plus macOS and Cartesia voices instead of the Coqui-era engines.
+[Ebook2Audiobook](https://github.com/DrewThomasson/ebook2audiobook) is a one-shot converter: file in, audiobook out, with voice cloning (XTTSv2) and huge language coverage. Libratory is a **library you live in**: books persist in a database with per-chapter editing, re-synthesis, AI cleanup, translations and rewrites, notes, digests, read-along export, and chat over the content of every book. PDFs are the first-class input (raw text instantly, OCR opt-in) rather than routed through an EPUB conversion, a DRM-free EPUB imports straight into chapters, and the TTS stack is newer local models (Kokoro, Pocket TTS, BgTTS-38M) plus macOS and Cartesia voices instead of the Coqui-era engines.
 
 If you want "this EPUB in a cloned voice", use Ebook2Audiobook. If you want to clean up, restructure, transform, and actually work with a messy PDF collection, that's this.
 
@@ -288,7 +290,7 @@ The server applies pending migrations at boot, so a fresh database needs nothing
 All runtime data lives in `./data/` (gitignored, resolved relative to `packages/server`):
 
 ```
-data/uploads/{bookId}/            Uploaded PDFs
+data/uploads/{bookId}/            Uploaded PDFs, or an imported EPUB's source.epub
 data/tmp/{bookId}/                Marker JSON output
 data/output/{bookId}/             Chapter M4As + sync maps, M4B assemblies, exported documents
 data/output/{bookId}/{slug}/      Variant audio (language or transform slug)

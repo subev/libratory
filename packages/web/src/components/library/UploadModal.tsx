@@ -17,7 +17,7 @@ export function UploadModal({
     <Modal size="md" onClose={onClose} testId="upload-modal">
       <ModalHeader
         title="Add books"
-        subtitle={folderId ? "Uploaded into this folder" : "Drop PDFs, or a folder to scan for them"}
+        subtitle={folderId ? "Uploaded into this folder" : "Drop PDFs or EPUBs, or a folder to scan for them"}
         onClose={onClose}
       />
       <div className="p-4 overflow-y-auto">

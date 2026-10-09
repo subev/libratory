@@ -51,6 +51,17 @@ export function pdfFileName(index: number): string {
   return `${String(index).padStart(2, "0")}_${randomUUID()}.pdf`;
 }
 
+// A folder id from the caller, checked against the profile it is filing into
+export async function ownFolderId(folderId: string | null | undefined, profileId: string): Promise<string | null> {
+  if (!folderId) return null;
+  const [folder] = await db
+    .select()
+    .from(folders)
+    .where(and(eq(folders.id, folderId), eq(folders.profileId, profileId)));
+  if (!folder) throw new PdfBookInputError("Folder not found");
+  return folderId;
+}
+
 export async function createPdfBook(bookId: string, input: CreatePdfBookInput, profileId: string): Promise<Book> {
   const [firstFile] = input.files;
   if (!firstFile) throw new PdfBookInputError("No PDF files uploaded");
@@ -70,14 +81,7 @@ export async function createPdfBook(bookId: string, input: CreatePdfBookInput, p
   if (language && language.length > MAX_LANGUAGE_CHARS) {
     throw new PdfBookInputError(`language must be at most ${MAX_LANGUAGE_CHARS} characters`);
   }
-  const folderId = input.folderId || null;
-  if (folderId) {
-    const [folder] = await db
-      .select()
-      .from(folders)
-      .where(and(eq(folders.id, folderId), eq(folders.profileId, profileId)));
-    if (!folder) throw new PdfBookInputError("Folder not found");
-  }
+  const folderId = await ownFolderId(input.folderId, profileId);
 
   const now = new Date().toISOString();
   const noteJob: NoteJob | undefined = input.note

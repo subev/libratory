@@ -108,12 +108,12 @@ export function Home() {
               to have in full, which no Button variant expresses. */}
           <button
             onClick={() => setUpload(null)}
-            title="Drop PDF files or a folder anywhere in the library — folders are scanned recursively for PDFs"
+            title="Drop PDF or EPUB files or a folder anywhere in the library — folders are scanned recursively for them"
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-dashed border-(--border-input) text-xs text-(--text-muted) hover:bg-(--bg-subtle) hover:text-(--text-primary) cursor-pointer"
             data-testid="open-upload"
           >
             <IconUpload className="h-4 w-4" />
-            Drop PDFs or <span className="font-semibold text-(--accent-text)">browse…</span>
+            Drop PDFs or EPUBs, or <span className="font-semibold text-(--accent-text)">browse…</span>
           </button>
           {createFolderMutation.error && (
             <span className="text-xs text-(--danger-text)">{createFolderMutation.error.message}</span>

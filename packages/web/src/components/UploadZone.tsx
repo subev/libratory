@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, type DragEvent } from "react";
 import { useNavigate } from "react-router";
-import { captureDrop, type DroppedItems , readEntryFiles } from "../lib/dnd.ts";
+import { captureDrop, type DroppedItems, isEpubFile, isPdfFile, readEntryFiles } from "../lib/dnd.ts";
 import { profileHeaders } from "../lib/profile.ts";
 import { IconDragHandle, IconClose, IconAdd } from "./icons.tsx";
 import { Button } from "./Button.tsx";
@@ -12,6 +12,19 @@ type UploadZoneProps = {
   initialDrop?: DroppedItems | null;
   folderId?: string | null;
 };
+
+const isBookFile = (file: File) => isPdfFile(file) || isEpubFile(file);
+
+function countFiles(pdfs: number, epubs: number): string {
+  const parts = [
+    pdfs > 0 ? `${pdfs} PDF${pdfs === 1 ? "" : "s"}` : null,
+    epubs > 0 ? `${epubs} EPUB${epubs === 1 ? "" : "s"}` : null,
+  ];
+  return parts.filter(Boolean).join(", ");
+}
+
+// One upload request and the book it makes: PDFs may be joined into one book, an EPUB is always its own
+type UploadJob = { files: File[]; title: string | null; ebook: boolean };
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -36,11 +49,11 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
   function stageFiles(fileList: FileList | File[]) {
     const newFiles: File[] = [];
     for (const file of fileList) {
-      if (!file.name.toLowerCase().endsWith(".pdf")) continue;
+      if (!isBookFile(file)) continue;
       newFiles.push(file);
     }
     if (newFiles.length === 0) {
-      setError("Only PDF files are supported");
+      setError("Only PDF and EPUB files are supported");
       return;
     }
     setError(null);
@@ -62,20 +75,22 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
     });
   }, []);
 
-  function buildFormData(files: File[], title: string | null): FormData {
+  function buildFormData({ files, title, ebook }: UploadJob): FormData {
     const formData = new FormData();
     for (const file of files) {
       formData.append("file", file);
     }
     if (title) formData.append("title", title);
     if (folderId) formData.append("folderId", folderId);
-    formData.append("fullExtract", "false");
-    formData.append("skipSynthesis", "true");
+    if (!ebook) {
+      formData.append("fullExtract", "false");
+      formData.append("skipSynthesis", "true");
+    }
     return formData;
   }
 
-  async function postUpload(formData: FormData): Promise<string> {
-    const res = await fetch("/upload", { method: "POST", body: formData, headers: profileHeaders() });
+  async function postUpload(job: UploadJob): Promise<string> {
+    const res = await fetch(job.ebook ? "/upload/ebook" : "/upload", { method: "POST", body: buildFormData(job), headers: profileHeaders() });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       throw new Error(body.error ?? `Upload failed (${res.status})`);
@@ -85,39 +100,46 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
 
   async function upload() {
     if (stagedFiles.length === 0) return;
-    const asSeparateBooks = separateBooks && stagedFiles.length > 1;
+    const pdfs = stagedFiles.filter(isPdfFile);
+    const jobs: UploadJob[] = [
+      ...(separateBooks && pdfs.length > 1
+        ? pdfs.map((file) => ({ files: [file], title: null, ebook: false }))
+        : pdfs.length > 0 ? [{ files: pdfs, title: customTitle.trim() || null, ebook: false }] : []),
+      ...stagedFiles.filter(isEpubFile).map((file) => ({ files: [file], title: null, ebook: true })),
+    ];
 
     setIsUploading(true);
     setError(null);
 
     try {
-      const created: string[] = [];
-      if (asSeparateBooks) {
+      const created: { id: string; ebook: boolean }[] = [];
+      if (jobs.length === 1 && jobs[0]) {
+        created.push({ id: await postUpload(jobs[0]), ebook: jobs[0].ebook });
+      } else {
         const failures: string[] = [];
         const succeeded = new Set<File>();
-        for (const file of stagedFiles) {
+        for (const job of jobs) {
           try {
-            created.push(await postUpload(buildFormData([file], null)));
-            succeeded.add(file);
+            created.push({ id: await postUpload(job), ebook: job.ebook });
+            for (const file of job.files) succeeded.add(file);
           } catch (err) {
-            failures.push(`${file.name}: ${err instanceof Error ? err.message : "failed"}`);
+            failures.push(`${job.files.map((f) => f.name).join(", ")}: ${err instanceof Error ? err.message : "failed"}`);
           }
         }
         if (failures.length > 0) {
           // Keep only the failed files staged so a retry doesn't duplicate books
           setStagedFiles((prev) => prev.filter((f) => !succeeded.has(f)));
-          throw new Error(`${failures.length} of ${stagedFiles.length} uploads failed — ${failures.join("; ")}`);
+          throw new Error(`${failures.length} of ${jobs.length} uploads failed — ${failures.join("; ")}`);
         }
-      } else {
-        created.push(await postUpload(buildFormData(stagedFiles, customTitle.trim() || null)));
       }
 
       setStagedFiles([]);
       setCustomTitle("");
       onUploadComplete(true);
-      // The book page is where every decision lives — engine, language, chapters — so the dialog asks none of them
+      // The book page is where every decision lives — engine, language, chapters — so the dialog asks
+      // none of them. An EPUB arrives with its chapters, so there is no extraction to open.
       const [first] = created;
-      if (first) navigate(`/books/${first}?extract=1`);
+      if (first) navigate(first.ebook ? `/books/${first.id}` : `/books/${first.id}?extract=1`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
       onUploadComplete(false);
@@ -133,10 +155,10 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
     }
 
     try {
-      const collected = (await Promise.all(entries.map(readEntryFiles))).flat();
+      const collected = (await Promise.all(entries.map((entry) => readEntryFiles(entry, isBookFile)))).flat();
       collected.sort((a, b) => a.name.localeCompare(b.name));
       if (collected.length === 0) {
-        setError("No PDF files found in the dropped folder");
+        setError("No PDF or EPUB files found in the dropped folder");
         return;
       }
       // A folder is usually a collection of separate books, not volumes of one
@@ -212,8 +234,12 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
   }
 
   const hasFiles = stagedFiles.length > 0;
-  const isMultiFile = stagedFiles.length > 1;
+  const pdfCount = stagedFiles.filter(isPdfFile).length;
+  const epubCount = stagedFiles.length - pdfCount;
+  // The one-or-many choice and the volume order are about PDFs; an EPUB is a whole book on its own
+  const isMultiFile = pdfCount > 1;
   const isReorderable = isMultiFile && !separateBooks;
+  const bookCount = epubCount + (pdfCount === 0 ? 0 : separateBooks && isMultiFile ? pdfCount : 1);
   const totalSize = stagedFiles.reduce((sum, file) => sum + file.size, 0);
 
 
@@ -229,7 +255,7 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf"
+          accept=".pdf,.epub"
           multiple
           onChange={handleFileSelect}
           className="hidden"
@@ -238,7 +264,7 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
           <div className="text-left space-y-1" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 px-3 pb-2 border-b border-(--border)">
               <span className="text-xs font-medium text-(--text-secondary)">
-                {stagedFiles.length} PDF{stagedFiles.length === 1 ? "" : "s"} · {formatFileSize(totalSize)}
+                {countFiles(pdfCount, epubCount)} · {formatFileSize(totalSize)}
               </span>
               {isReorderable && <span className="text-xs text-(--text-faint)">drag to set the volume order</span>}
               <button
@@ -267,9 +293,15 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
                 {isMultiFile && (
                   <span className="text-xs font-mono text-(--text-muted) w-5 text-right shrink-0">{index + 1}</span>
                 )}
-                <span className="shrink-0 h-6 rounded px-1.5 bg-(--danger-bg) flex items-center">
-                  <span className="text-(--danger-text) text-[10px] font-bold">PDF</span>
-                </span>
+                {isEpubFile(file) ? (
+                  <span className="shrink-0 h-6 rounded px-1.5 bg-(--success-bg) flex items-center">
+                    <span className="text-(--success-text) text-[10px] font-bold">EPUB</span>
+                  </span>
+                ) : (
+                  <span className="shrink-0 h-6 rounded px-1.5 bg-(--danger-bg) flex items-center">
+                    <span className="text-(--danger-text) text-[10px] font-bold">PDF</span>
+                  </span>
+                )}
                 <span className="min-w-0 flex-1 text-sm text-(--text-primary) truncate">{file.name}</span>
                 <span className="shrink-0 text-xs text-(--text-muted)">{formatFileSize(file.size)}</span>
                 <button
@@ -293,8 +325,8 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
           </div>
         ) : (
           <div>
-            <p className="text-lg font-medium text-(--text-secondary)">Drop PDF files or a folder here</p>
-            <p className="text-sm text-(--text-muted) mt-1">or click to browse — folders are scanned recursively for PDFs</p>
+            <p className="text-lg font-medium text-(--text-secondary)">Drop PDF or EPUB files, or a folder, here</p>
+            <p className="text-sm text-(--text-muted) mt-1">or click to browse — folders are scanned recursively for PDFs and EPUBs</p>
           </div>
         )}
       </div>
@@ -303,7 +335,7 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
         <div className="rounded-lg border border-(--border) bg-(--bg-card) divide-y divide-(--divide)">
           {isMultiFile && (
             <fieldset className="p-4 space-y-2" data-testid="upload-mode">
-              <legend className="text-xs font-medium text-(--text-secondary) mb-1">These {stagedFiles.length} files are</legend>
+              <legend className="text-xs font-medium text-(--text-secondary) mb-1">These {pdfCount} PDFs are</legend>
               {[
                 { separate: false, label: "One book", detail: "Volumes of a single title, joined in the order above." },
                 { separate: true, label: "Separate books", detail: "Each PDF becomes its own book, titled after its filename." },
@@ -333,7 +365,7 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
                     type="text"
                     value={customTitle}
                     onChange={(e) => setCustomTitle(e.target.value)}
-                    placeholder={stagedFiles[0]?.name.replace(/\.pdf$/i, "").replace(/[_-]/g, " ")}
+                    placeholder={stagedFiles.find(isPdfFile)?.name.replace(/\.pdf$/i, "").replace(/[_-]/g, " ")}
                     className="w-full px-3 py-2 text-sm border border-(--border-input) rounded-md bg-(--bg-input) text-(--text-primary) placeholder:text-(--text-faint)"
                   />
                 </label>
@@ -347,10 +379,14 @@ export function UploadZone({ onUploadComplete, folderId = null, initialDrop = nu
               onClick={upload}
               disabled={isUploading}
             >
-              {isUploading ? "Uploading..." : separateBooks && isMultiFile ? "Upload and create books" : "Upload and create a book"}
-              {isMultiFile ? ` (${stagedFiles.length} ${separateBooks ? "books" : "files"})` : ""}
+              {isUploading ? "Uploading..." : bookCount > 1 ? `Upload and create ${bookCount} books` : "Upload and create a book"}
+              {bookCount === 1 && isMultiFile ? ` (${pdfCount} files)` : ""}
             </Button>
-            <p className="min-w-0 flex-1 text-xs text-(--text-muted)">Raw text lands in seconds. You land on the book, where chapters, OCR and voices are decided.</p>
+            <p className="min-w-0 flex-1 text-xs text-(--text-muted)">
+              {pdfCount > 0
+                ? "Raw text lands in seconds. You land on the book, where chapters, OCR and voices are decided."
+                : "Chapters come from the EPUB's table of contents. You land on the book, ready to pick a voice."}
+            </p>
           </div>
         </div>
       )}

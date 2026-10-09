@@ -1,6 +1,7 @@
 const KINDS = {
   digest: { label: "digest", title: "Digest — AI summary chapters from other books" },
   api: { label: "api", title: "Created through the external API by a script or another project" },
+  ebook: { label: "epub", title: "Imported from an EPUB — chapters from its table of contents" },
 } as const;
 
 // The library list and the search results describe the same book, so they say it the same way.
