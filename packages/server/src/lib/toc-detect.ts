@@ -165,6 +165,7 @@ export function buildTierPrompt(toc: TocResult, opts: { translateTo?: string; to
         "- Do NOT select sections inside a chapter, even when they have their own page numbers.",
         "- Also select substantial front and back matter a listener would want as its own chapter (introduction, preface, prologue, epilogue, afterword, appendices with prose). Do not select the index, bibliography, notes, or the table of contents itself.",
         "- For each selected entry, give a clean, readable title: fix OCR artifacts, broken spacing, and casing. Keep the book's original language — do not translate the title.",
+        "- When chapter numbering restarts in each part, name the part in the title (\"Part Two, Chapter I: Emanations\"), so no two chapters read the same.",
         ...(opts.translateTo ? [`- Also provide "translated": the cleaned title translated into ${opts.translateTo}.`] : []),
       ].join("\n"),
       opts.translateTo
@@ -382,7 +383,7 @@ async function selectFromToc(
   }
   await log(`[AI] ${chosen.length} of ${toc.entries.length} table-of-contents entries are chapters${where}`);
 
-  const pageMap = buildPageMap(findAnchors(toc.entries, catalog));
+  const pageMap = buildPageMap(findAnchors(toc.entries, catalog), size.totalPages);
   await log(
     pageMap
       ? `[AI] Printed page → PDF page offset${where}: ${pageMap.summary} (${pageMap.anchors.length} anchors)`

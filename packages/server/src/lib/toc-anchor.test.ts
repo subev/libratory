@@ -77,6 +77,26 @@ describe("buildPageMap", () => {
     expect(drifting?.summary).toBe("+6 at p3 drifting to 0 at p123");
   });
 
+  // A two-up scan of The Hero with a Thousand Faces: read 1:1, only one part of the book chained, and
+  // the offset extrapolated from it put Part One's chapters on negative PDF pages (2026-10)
+  it("fits a scan with two printed pages per PDF page", () => {
+    const printed = [3, 23, 28, 37, 45, 54, 63, 71, 83, 89, 100, 111, 116, 138, 159, 179, 192, 237, 242, 249, 253, 261, 268, 275];
+    const anchors = printed.map((p, i) => ({ entry: i, printed: p, pdf: Math.floor(p / 2) + 34 }));
+    expect(buildPageMap(anchors)?.summary).not.toContain("printed pages per PDF page");
+    const map = buildPageMap(anchors, 247);
+    expect(map?.anchors).toHaveLength(printed.length);
+    expect(map?.summary).toBe("2 printed pages per PDF page, +34");
+    expect(map?.expected(46)).toBe(57);
+    expect(map?.expected(300)).toBe(184);
+  });
+
+  it("keeps one printed page per PDF page when the contents fits the PDF, even across missing pages", () => {
+    // Six pages missing after p54 break the 1:1 chain, and at two pages per PDF page the hole happens to line up
+    const printed = Array.from({ length: 20 }, (_, i) => 6 + i * 6);
+    const map = buildPageMap(printed.map((p, i) => ({ entry: i, printed: p, pdf: p + (p < 60 ? 10 : 4) })), 130);
+    expect(map?.summary).toBe("+4");
+  });
+
   it("summarizes a constant offset as one number", () => {
     const map = buildPageMap([{ entry: 10, printed: 1, pdf: 4 }, { entry: 11, printed: 10, pdf: 13 }, { entry: 12, printed: 30, pdf: 33 }]);
     expect(map?.summary).toBe("+3");
@@ -141,6 +161,14 @@ describe("locateEntries", () => {
     );
     expect(located).toEqual([{ entry: 0, blockIndex: 30 }]);
     expect(unresolved[0]?.entry).toBe(1);
+  });
+
+  it("offers the headings nearest the expected page when running heads fill the window", () => {
+    const runningHeads = [13, 14, 15, 16, 17].flatMap((page) => [0, 1, 2].map((k) => heading(page * 10 + k, "INTRODUCTION TO THE EDITION", page)));
+    const crowded = [...runningHeads, heading(180, "Ackn0wledgments", 18)];
+    const { unresolved } = locateEntries([{ index: 0, titles: ["Acknowledgments"], page: 15 }], crowded, pageMap);
+    expect(unresolved[0]?.candidates).toHaveLength(12);
+    expect(unresolved[0]?.candidates.at(-1)?.blockIndex).toBe(180);
   });
 
   it("matches by title alone without a page map and offers similar headings otherwise", () => {

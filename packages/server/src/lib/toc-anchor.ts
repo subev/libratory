@@ -92,15 +92,17 @@ export function findAnchors(entries: TocEntry[], catalog: HeadingCatalogEntry[])
   return anchors;
 }
 
+// A two-up scan photographs a spread, so each PDF page carries two printed pages
+const PRINTED_PER_PDF_PAGE = [1, 2];
+
 // Longest chain with non-decreasing PDF pages and bounded offset drift: missing scan pages drift, an index match jumps
-export function buildPageMap(anchors: PageAnchor[]): PageMap | null {
-  const sorted = [...anchors].sort((a, b) => a.printed - b.printed || a.pdf - b.pdf);
-  if (sorted.length < MIN_ANCHORS) return null;
+function longestChain(sorted: PageAnchor[], perPage: number): PageAnchor[] {
+  const offset = (a: PageAnchor) => a.pdf - a.printed / perPage;
   const best = sorted.map(() => 1);
   const prev = sorted.map(() => -1);
   sorted.forEach((b, j) => {
     sorted.slice(0, j).forEach((a, i) => {
-      if (a.entry === b.entry || b.pdf < a.pdf || Math.abs(b.pdf - b.printed - (a.pdf - a.printed)) > MAX_OFFSET_DRIFT) return;
+      if (a.entry === b.entry || b.pdf < a.pdf || Math.abs(offset(b) - offset(a)) > MAX_OFFSET_DRIFT) return;
       const score = (best[i] ?? 1) + 1;
       if (score > (best[j] ?? 1)) {
         best[j] = score;
@@ -118,6 +120,23 @@ export function buildPageMap(anchors: PageAnchor[]): PageMap | null {
     if (!anchor) break;
     chain.unshift(anchor);
   }
+  return chain;
+}
+
+// A scan missing pages can chain further at two pages per PDF page by coincidence, so that reading is
+// tried only when the contents runs past the end of the PDF — which one page per page cannot do
+export function buildPageMap(anchors: PageAnchor[], pdfPages: number | null = null): PageMap | null {
+  const sorted = [...anchors].sort((a, b) => a.printed - b.printed || a.pdf - b.pdf);
+  if (sorted.length < MIN_ANCHORS) return null;
+  const lastPrinted = Math.max(...sorted.map((a) => a.printed));
+  const scales = pdfPages !== null && lastPrinted > pdfPages ? PRINTED_PER_PDF_PAGE : [1];
+  // The scale that explains the most anchors; a tie keeps one printed page per PDF page
+  let perPage = 1;
+  let chain: PageAnchor[] = [];
+  for (const scale of scales) {
+    const candidate = longestChain(sorted, scale);
+    if (candidate.length > chain.length) [perPage, chain] = [scale, candidate];
+  }
   const first = chain[0];
   const last = chain[chain.length - 1];
   if (!first || !last || chain.length < MIN_ANCHORS) return null;
@@ -128,17 +147,18 @@ export function buildPageMap(anchors: PageAnchor[]): PageMap | null {
       if (a.printed > printed) break;
       nearest = a;
     }
-    return printed + (nearest.pdf - nearest.printed);
+    return Math.round(nearest.pdf + (printed - nearest.printed) / perPage);
   };
   // Outside the anchored span the offset is extrapolated, and front matter often restarts numbering
   const anchored = (printed: number) => printed >= first.printed && printed <= last.printed;
-  return { expected, anchored, anchors: chain, summary: summarizeOffsets(chain) };
+  const summary = summarizeOffsets(chain, perPage);
+  return { expected, anchored, anchors: chain, summary: perPage === 1 ? summary : `${perPage} printed pages per PDF page, ${summary}` };
 }
 
-function summarizeOffsets(chain: PageAnchor[]): string {
+function summarizeOffsets(chain: PageAnchor[], perPage: number): string {
   const runs: { offset: number; from: number; to: number }[] = [];
   for (const a of chain) {
-    const offset = a.pdf - a.printed;
+    const offset = Math.round(a.pdf - a.printed / perPage);
     const current = runs[runs.length - 1];
     if (current && current.offset === offset) current.to = a.printed;
     else runs.push({ offset, from: a.printed, to: a.printed });
@@ -160,6 +180,14 @@ function windowAround(catalog: HeadingCatalogEntry[], page: number, anchored: bo
   const [near, far] = anchored ? [2, 4] : [4, 6];
   const close = nearPage(catalog, page, near);
   return close.length >= 2 ? close : nearPage(catalog, page, far);
+}
+
+// Running heads can fill a window, and the first pages of it are the least likely to hold the chapter
+function closestTo(pool: HeadingCatalogEntry[], page: number): HeadingCatalogEntry[] {
+  return [...pool]
+    .sort((a, b) => Math.abs(a.page - page) - Math.abs(b.page - page) || a.blockIndex - b.blockIndex)
+    .slice(0, MAX_CANDIDATES)
+    .sort((a, b) => a.blockIndex - b.blockIndex);
 }
 
 // An entry without a printed page still starts before the next entry that has one
@@ -196,8 +224,9 @@ export function locateEntries(entries: ChapterEntry[], catalog: HeadingCatalogEn
       continue;
     }
     const bySimilarity = scored.slice(0, MAX_CANDIDATES).map((c) => c.heading);
-    const candidates =
-      expected || bySimilarity.length === 0
+    const candidates = expected
+      ? closestTo(open, expected.page)
+      : bySimilarity.length === 0
         ? open.slice(0, MAX_CANDIDATES)
         : bySimilarity.sort((a, b) => a.blockIndex - b.blockIndex);
     unresolved.push({ entry: entry.index, expectedPage: expected?.page ?? null, candidates });
