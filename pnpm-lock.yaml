@@ -14,6 +14,7 @@ overrides:
   esbuild@<0.28.1: ^0.28.2
   fast-uri@>=3 <3.1.8: ^3.1.8
   fast-uri@>=4 <4.1.5: ^4.2.1
+  handlebars@<4.7.10: ^4.7.10
   ip-address@<10.7.1: ^10.7.3
   js-yaml@>=4 <4.3.1: ^4.3.2
   picomatch@>=4 <4.0.7: ^4.0.7
@@ -156,8 +157,8 @@ importers:
         specifier: ^0.18.13
         version: 0.18.13
       music-metadata:
-        specifier: ^11.15.0
-        version: 11.15.0
+        specifier: ^11.16.1
+        version: 11.16.1
       postgres:
         specifier: ^3.4.9
         version: 3.4.9
@@ -2797,8 +2798,8 @@ packages:
     engines: {node: '>=22.18.0'}
     hasBin: true
 
-  handlebars@4.7.9:
-    resolution: {integrity: sha512-4E71E0rpOaQuJR2A3xDZ+GM1HyWYv1clR58tC8emQNeQe3RH7MAzSbat+V0wG78LQBo6m6bzSG/L4pBuCsgnUQ==}
+  handlebars@4.7.10:
+    resolution: {integrity: sha512-P5VJMVM7qgBn6vjXMw8WG9uVI+ncf2pi72j4de4yz5ZULLj2RGqLYaKOYGsgyrViQ0tePOVlN1tDCCXXtFqXKg==}
     engines: {node: '>=0.4.7'}
     hasBin: true
 
@@ -3714,8 +3715,8 @@ packages:
   mupdf@1.28.0:
     resolution: {integrity: sha512-ACUnbpECaQ5JLq04pwd89lS+0IGMest5qL5tb08g9TAR7bDtfqflHEkb2Xm3o4rvC/szguLiV+WEbW9kstj8Sg==}
 
-  music-metadata@11.15.0:
-    resolution: {integrity: sha512-TN+kO1/oOc8UzDW5N3vSDncBcv9WyNnQQe/NFMcFWq6G1+zVeYUkGvkYpQ/S8wb8vKtUD7i78dIaY0cv+cmPRA==}
+  music-metadata@11.16.1:
+    resolution: {integrity: sha512-uR/mHK6eyfl8h3jVCobF5b38Mfg1IDJMiBxIVbmm5F+G1OXEFcUpQHveO84tJBAqvY93GCRY2R4kDyx7s06Rug==}
     engines: {node: '>=18'}
 
   mustache@4.2.0:
@@ -6542,7 +6543,7 @@ snapshots:
       fast-xml-parser: 5.7.0
       fs-extra: 11.2.0
       github-slugger: 2.0.0
-      handlebars: 4.7.9
+      handlebars: 4.7.10
       hast-util-to-html: 9.0.5
       hastscript: 9.0.1
       mime-types: 3.0.1
@@ -8010,7 +8011,7 @@ snapshots:
       - supports-color
       - typescript
 
-  handlebars@4.7.9:
+  handlebars@4.7.10:
     dependencies:
       minimist: 1.2.8
       neo-async: 2.6.2
@@ -9170,7 +9171,7 @@ snapshots:
 
   mupdf@1.28.0: {}
 
-  music-metadata@11.15.0:
+  music-metadata@11.16.1:
     dependencies:
       '@borewit/text-codec': 0.2.2
       '@tokenizer/token': 0.3.0

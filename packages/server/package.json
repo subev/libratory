@@ -40,7 +40,7 @@
     "franc-min": "^6.2.0",
     "graphile-worker": "^0.18.0",
     "linkedom": "^0.18.13",
-    "music-metadata": "^11.15.0",
+    "music-metadata": "^11.16.1",
     "postgres": "^3.4.9",
     "zod": "^4.5.4"
   },
