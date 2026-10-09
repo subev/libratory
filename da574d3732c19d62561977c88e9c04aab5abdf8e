@@ -1,0 +1,4 @@
+Reviewed: high
+Outcome: Reviewed inline by Claude (Opus 5.5): full diff incl. new epub-import/ebook-books modules, upload route, UploadZone/dnd, docs. Fixed: a failed EPUB import (oversized stream, foreign folder, partial chapter insert) now goes through deleteBook so no row or file is left; added a foreign-folder test and an upload-dir check. Declined: none. Gaps: partial-insert failure not reproducible without mocking Drizzle.
+By: Petur Subev
+At: 2026-10-09T14:28:43.286Z
