@@ -386,6 +386,13 @@ function installUpdater() {
   });
 }
 
+// The page the window is on, so the browser lands where the app was — unless the window is still on
+// the first-run screen, a file:// page no browser could open.
+function pageUrl(base) {
+  const current = win?.webContents.getURL();
+  return current && new URL(current).origin === new URL(base).origin ? current : base;
+}
+
 function menu(url) {
   return Menu.buildFromTemplate([
     { role: "appMenu" },
@@ -394,7 +401,7 @@ function menu(url) {
       submenu: [
         // The app is a local server and a page, so any browser works — and this is the way out if
         // the embedded webview ever renders something badly.
-        { label: "Open in your browser", accelerator: "CmdOrCtrl+Shift+O", click: () => shell.openExternal(url) },
+        { label: "Open in your browser", accelerator: "CmdOrCtrl+Shift+O", click: () => shell.openExternal(pageUrl(url)) },
         { type: "separator" },
         { role: "reload" }, { role: "toggleDevTools" }, { type: "separator" },
         { role: "resetZoom" }, { role: "zoomIn" }, { role: "zoomOut" }, { type: "separator" },
