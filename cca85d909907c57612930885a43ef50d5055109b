@@ -1,0 +1,4 @@
+Reviewed: medium
+Outcome: Reviewed inline by Claude (Opus) over origin/main..HEAD: desktop pageUrl (origin check, file:// first-run fallback) and toc page map (scale-2 gated on contents past PDF end, tie keeps 1:1, nearest-12 candidates, part-naming prompt rule). Label-tail matching removed during review as book-specific. No open findings. Gaps: no live Propose run, no cross-library replay. lint/typecheck/test green (1033/165/43).
+By: Petur Subev
+At: 2026-10-09T20:41:18.021Z
