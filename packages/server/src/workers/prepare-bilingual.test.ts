@@ -123,11 +123,12 @@ describe("bilingual jobs and publication", () => {
     expect(silent?.bilingual?.[0]?.doc.source.narration?.totalMs).toBe(1000);
     expect(silent?.bilingual?.[0]?.doc.target.narration).toBeNull();
     expect(silent?.bilingual?.[0]?.audio).toEqual([]);
-    // Nothing narrated at all is no layer; one narrated chapter carries the un-narrated one too.
+    // Nothing narrated at all is no layer; with no pages, a chapter the export left out is not in
+    // the manifest at all — its text is not in the file either, so it would open on nothing.
     expect(await buildP2afLayer(book, new Map(), null, ["German"])).toBeNull();
     const other = row(await getDb().insert(chapters).values({ bookId, index: 1, title: "Second", rawText: "Second chapter.", status: "done", selected: true, audioPath: audio, durationMs: 1000 }).returning());
     const leftOut = await buildP2afLayer(book, new Map([[other.id, { base: "ch001", audioFile: "ch001.m4a" }]]), null, ["German"]);
-    expect(leftOut?.manifest.chapters.find((entry) => entry.id === chapterId)?.bilingual).toEqual([]);
+    expect(leftOut?.manifest.chapters.map((entry) => entry.id)).toEqual([other.id]);
     const withSecond = await buildP2afLayer(book, new Map([[other.id, { base: "ch001", audioFile: "ch001.m4a" }]]), null, ["German"], { chapters: new Set([chapterId]) });
     const first = withSecond?.manifest.chapters.find((entry) => entry.id === chapterId);
     expect(first?.audio).toBeNull();
