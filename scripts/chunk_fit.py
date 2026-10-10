@@ -74,7 +74,13 @@ def drop_stale_chunks(chunks_dir, cached_texts, chunk_texts, words_file):
     index, and the cut can change between versions: from the first changed sentence on, every
     index would name a different chunk, and a run interrupted after rewriting the manifest would
     hand the next resume another cut's audio under a text that now matches."""
-    if not chunks_dir or not cached_texts:
+    if not chunks_dir:
+        return
+    if not cached_texts:
+        # No manifest to compare against: nothing cached can be trusted by index
+        for name in os.listdir(chunks_dir):
+            if name.startswith("chunk-") and (name.endswith(".wav") or name.endswith(".words.json")):
+                os.remove(os.path.join(chunks_dir, name))
         return
     for index, cached in enumerate(cached_texts, start=1):
         if index <= len(chunk_texts) and chunk_texts[index - 1] == cached:

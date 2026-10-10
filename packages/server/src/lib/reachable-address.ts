@@ -9,16 +9,20 @@ const execFileAsync = promisify(execFile);
 // device that is on this Wi-Fi but not on the tailnet — the first code carried only the Tailscale
 // name, and an iPod on the same Wi-Fi could do nothing with it.
 export type Address = { origin: string; host: string; via: "tailscale" | "lan" };
-export type Reachable = Address | null;
 
 export type Interface = { name?: string; address: string; family: string; internal: boolean };
 
 // Interfaces no phone is on the other end of: VM and container bridges, tunnels, Apple's
 // peer-to-peer links. This Mac offered four bridge100-103 addresses beside its one Wi-Fi address.
-const VIRTUAL_INTERFACE = /^(bridge|vmnet|utun|tun|tap|docker|veth|br-|virbr|awdl|llw|ap)\d*/;
+const VIRTUAL_INTERFACE = /^(bridge|vmnet|utun|tun|tap|docker|veth|virbr|awdl|llw|ap)\d*$|^br-/;
 
 function isVirtual(i: Interface): boolean {
   return i.name !== undefined && VIRTUAL_INTERFACE.test(i.name);
+}
+
+// Self-assigned on a port with no DHCP: nothing a phone could reach it by
+function isLinkLocal(address: string): boolean {
+  return address.startsWith("169.254.");
 }
 
 function isTailnetAddress(address: string): boolean {
@@ -43,18 +47,10 @@ export function reachableAddresses(
   if (tailscaleName) list.push(address(tailscaleName, "tailscale"));
   else if (tailnet) list.push(address(tailnet.address, "tailscale"));
   for (const i of external) {
-    if (isTailnetAddress(i.address) || isVirtual(i) || list.some((a) => a.host === i.address)) continue;
+    if (isTailnetAddress(i.address) || isLinkLocal(i.address) || isVirtual(i) || list.some((a) => a.host === i.address)) continue;
     list.push(address(i.address, "lan"));
   }
   return list;
-}
-
-export function pickReachable(
-  interfaces: Interface[],
-  tailscaleName: string | null,
-  port: number,
-): Reachable {
-  return reachableAddresses(interfaces, tailscaleName, port)[0] ?? null;
 }
 
 // The MagicDNS name, from the CLI when it is there. Finder-launched apps get no PATH worth the
@@ -97,8 +93,4 @@ function hostInterfaces(): Interface[] {
 
 export async function reachableAddressList(port: number): Promise<Address[]> {
   return reachableAddresses(hostInterfaces(), await tailscaleName(), port);
-}
-
-export async function reachableAddress(port: number): Promise<Reachable> {
-  return (await reachableAddressList(port))[0] ?? null;
 }

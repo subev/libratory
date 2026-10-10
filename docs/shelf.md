@@ -50,7 +50,10 @@ tRPC API stays exactly as unexposed as before.
 
 `machine` is the server's hostname, or the public host when `PUBLIC_ORIGIN` is set — what groups
 shelves on the reader side, since two profiles on one machine share an address. `via` is
-`tailscale`, `lan` or `internet`; a reader should treat an unknown value as "other". `addresses`
+`tailscale`, `lan` or `internet`; a reader should treat an unknown value as "other". Behind a
+proxy (`PUBLIC_ORIGIN` set) the rate limits count per client address the proxy reports
+(`CF-Connecting-IP`, else the first `X-Forwarded-For`), since every socket is the proxy's; a server
+reached directly counts per socket and reads no such header. `addresses`
 is every way to this server, best first — the same list the code's `s` and `a` carry — so a reader
 can keep them all with the shelf and try the next when the current one does not connect (a `401`
 is the key, not the network), remembering whichever answered. `/shelf/pair*` is rate-limited per IP (`PAIR_RATE_LIMIT`).
@@ -189,7 +192,10 @@ upload dialog accepts it like any EPUB), a file that carries `p2af/book.json` co
 disk as `chNNN.m4a`, its sync map rebuilt from the cue document, its text from the cues, and the
 EPUB itself moved under the book's outputs as the shelf document — so a server that never
 synthesizes still serves a shelf, and the workshop's reader and player work on the imported book.
-A chapter the export left unnarrated arrives suspended with whatever text the layer carried. The
+A chapter the export left unnarrated arrives suspended with whatever text the layer carried. A
+recording must be an `.m4a` or `.mp3` member (the output directory is served as it is), and an
+archive that lists one name twice is refused, because extracting such a name writes every member
+of it while the listing declares the size of one. The
 voices come from the layer — each manifest chapter's `voice` label and each bilingual lane's
 `narration.voice` — so the imported document names them as the exporting machine did; an export
 from before 2026-10-11 carries none and its `voice` is null. A bilingual

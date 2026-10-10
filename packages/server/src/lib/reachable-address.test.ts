@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { pickReachable, reachableAddresses, type Interface } from "./reachable-address.ts";
+import { reachableAddresses, type Interface } from "./reachable-address.ts";
 
 const lo: Interface = { address: "127.0.0.1", family: "IPv4", internal: true };
 const lan: Interface = { address: "192.168.4.12", family: "IPv4", internal: false };
 const lan6: Interface = { address: "fe80::1", family: "IPv6", internal: false };
 const tailnet: Interface = { address: "100.101.102.103", family: "IPv4", internal: false };
 
-describe("pickReachable", () => {
+describe("reachableAddresses, first entry", () => {
+  const pickReachable = (interfaces: Interface[], name: string | null, port: number) => reachableAddresses(interfaces, name, port)[0] ?? null;
   it("prefers the Tailscale name, which keeps working off Wi-Fi", () => {
     expect(pickReachable([lo, lan, tailnet], "mini.tail4a2f.ts.net", 3034)).toEqual({
       host: "mini.tail4a2f.ts.net",

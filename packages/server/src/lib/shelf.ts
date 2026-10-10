@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, count, desc, eq, inArray } from "drizzle-orm";
+import { and, count, countDistinct, desc, eq, inArray } from "drizzle-orm";
 import { db } from "../db.ts";
 import { env, envFilePath } from "../env.ts";
 import { books, devices, documents, shelfDownloads, shelfFetches, DEFAULT_PROFILE_ID, type DocumentNarration } from "../schema.ts";
@@ -212,6 +212,10 @@ export function groupByBook(docs: ShelfDocument[], deviceId: string | null): She
 }
 
 export async function shelfBookCount(profileId: string): Promise<number> {
-  const docs = await shelfDocuments(profileId, { includeHidden: false });
-  return new Set(docs.map((d) => d.bookId)).size;
+  const [row] = await db
+    .select({ n: countDistinct(documents.bookId) })
+    .from(documents)
+    .innerJoin(books, eq(documents.bookId, books.id))
+    .where(and(eq(books.profileId, profileId), eq(documents.shelfHidden, false), inArray(documents.format, [...SHELF_FORMATS])));
+  return row?.n ?? 0;
 }

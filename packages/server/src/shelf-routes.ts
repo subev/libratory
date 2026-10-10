@@ -65,6 +65,13 @@ function countryOf(request: FastifyRequest): string | null {
   return typeof value === "string" && /^[A-Z]{2}$/.test(value) ? value : null;
 }
 
+// Every way to this server, best first, so a reader can fall back from the Tailscale name to the
+// LAN address when it is on the same Wi-Fi and not on the tailnet; `via` names the first
+async function describeAddresses() {
+  const addresses = await shelfAddresses();
+  return { via: addresses[0]?.via ?? "lan", addresses: addresses.map(({ origin, via }) => ({ origin, via })) };
+}
+
 export function registerShelfRoutes(fastify: FastifyInstance) {
   fastify.get("/shelf/pair/:token", { config: { rateLimit: PAIR_RATE_LIMIT } }, async (request, reply) => {
     const { token } = request.params as { token: string };
@@ -73,15 +80,11 @@ export function registerShelfRoutes(fastify: FastifyInstance) {
     if (peek === "gone") return reply.code(410).send({ error: "This pairing code has been used or has expired" });
     const profile = await profileNamed(peek.profileId);
     if (!profile) return reply.code(404).send({ error: "Unknown pairing code" });
-    const addresses = await shelfAddresses();
     return {
       machine: machineName(),
       profile,
       bookCount: await shelfBookCount(profile.id),
-      via: addresses[0]?.via ?? "lan",
-      // Every way to this server, best first, so a reader can fall back from the Tailscale name
-      // to the LAN address when it is on the same Wi-Fi and not on the tailnet
-      addresses: addresses.map(({ origin, via }) => ({ origin, via })),
+      ...(await describeAddresses()),
       expiresAt: peek.expiresAt.toISOString(),
     };
   });
@@ -107,7 +110,7 @@ export function registerShelfRoutes(fastify: FastifyInstance) {
       machine: machineName(),
       profile,
       bookCount: await shelfBookCount(profile.id),
-      addresses: (await shelfAddresses()).map(({ origin, via }) => ({ origin, via })),
+      ...(await describeAddresses()),
     };
   });
 
@@ -142,9 +145,11 @@ export function registerShelfRoutes(fastify: FastifyInstance) {
     // Recorded only once the file is known to be there: a missing file must not show as "on phones"
     const present = await access(row.outputPath).then(() => true, () => false);
     if (!present) return reply.code(404).send({ error: "The file is missing on the server" });
-    if (caller.device) {
+    if (!startsDownload(request)) {
+      // A HEAD that only sizes the file, or a range that continues it, is not another download
+    } else if (caller.device) {
       await db.insert(shelfDownloads).values({ deviceId: caller.device.id, documentId }).onConflictDoNothing();
-    } else if (startsDownload(request)) {
+    } else {
       const userAgent = request.headers["user-agent"];
       await db.insert(shelfFetches).values({ documentId, userAgent: typeof userAgent === "string" ? userAgent.slice(0, 200) : null, country: countryOf(request) });
     }

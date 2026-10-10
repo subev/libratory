@@ -36,7 +36,7 @@ import { createFastifyOptions } from "./fastify-config.ts";
 import { isUuid } from "./lib/uuid.ts";
 import { modelCatalog, seedCatalogFromDisk } from "./lib/model-catalog.ts";
 import { registerErrorHandler } from "./lib/error-handler.ts";
-import { PREVIEW_RATE_LIMIT } from "./lib/request-limits.ts";
+import { clientKey, PREVIEW_RATE_LIMIT } from "./lib/request-limits.ts";
 
 const { PORT } = env;
 
@@ -68,7 +68,7 @@ async function main() {
     callback(null, { origin: isAllowedOrigin(req.headers.origin, req.headers.host, trustedHosts) });
   });
   await fastify.register(multipart, { limits: { fileSize: 500 * 1024 * 1024 } });
-  await fastify.register(rateLimit, { global: false });
+  await fastify.register(rateLimit, { global: false, keyGenerator: (request) => clientKey(request.headers, request.ip, env.PUBLIC_ORIGIN !== undefined) });
 
   await fastify.register(fastifyStatic, {
     root: outputDir,
@@ -293,7 +293,7 @@ async function main() {
   // The port before the job queue: the worker's first act is a sweep that treats every locked job
   // as a dead process's, and a second server booting beside a running one — the desktop app
   // launched over `pnpm dev` — used to sweep the first one's running jobs and only then fail on
-  // the port. Failing on the port first touches nothing.
+  // the port. The migrations and the staged-file sweep above are idempotent; the job sweep is not.
   await fastify.listen({ port: PORT, host: env.HOST });
   console.log(`Server running on http://localhost:${PORT}`);
 

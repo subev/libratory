@@ -28,7 +28,7 @@ vi.mock("./paths.ts", async (importOriginal) => {
   };
 });
 
-import { attachSyncedEpubDocument, createSyncedEpubBook, syncedEpubManifest } from "./synced-epub-books.ts";
+import { attachSyncedEpubDocument, createSyncedEpubBook, entriesFromListing, syncedEpubManifest } from "./synced-epub-books.ts";
 import { EpubImportError } from "./epub-import.ts";
 
 const AUDIO = new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112, 77, 52, 65, 32]);
@@ -155,6 +155,28 @@ describe("createSyncedEpubBook", () => {
     files["OEBPS/p2af/book.json"] = strToU8(JSON.stringify(manifest));
     await writeFile(epub, zipSync(files));
     await expect(createSyncedEpubBook(crypto.randomUUID(), { epubPath: epub, filename: "baddesc.epub" }, DEFAULT_PROFILE_ID)).rejects.toThrow(EpubImportError);
+  });
+
+  it("refuses a recording that is not an M4A or MP3, since the output directory is served as it is", async () => {
+    const epub = path.join(tmpRoot, "html.epub");
+    const { unzipSync } = await import("fflate");
+    const files = unzipSync(readaloudEpub());
+    const manifest = JSON.parse(new TextDecoder().decode(files["OEBPS/p2af/book.json"]));
+    manifest.chapters[0].audio = "../audio/ch000.html";
+    files["OEBPS/p2af/book.json"] = strToU8(JSON.stringify(manifest));
+    files["OEBPS/audio/ch000.html"] = strToU8("<script>alert(1)</script>");
+    await writeFile(epub, zipSync(files));
+    await expect(createSyncedEpubBook(crypto.randomUUID(), { epubPath: epub, filename: "html.epub" }, DEFAULT_PROFILE_ID)).rejects.toThrow("not an M4A or MP3");
+  });
+
+  it("refuses a listing that names a member twice, since extracting it writes every one", () => {
+    const listing = [
+      "Archive:  dup.epub", "  Length      Date    Time    Name", "---------  ---------- -----   ----",
+      "  1000000  10-11-2026 01:00   OEBPS/audio/a.m4a", "  1000000  10-11-2026 01:00   OEBPS/audio/a.m4a",
+      "---------                     -------", "  2000000                     2 files",
+    ].join("\n");
+    expect(() => entriesFromListing(listing)).toThrow(EpubImportError);
+    expect(entriesFromListing(listing.replace("OEBPS/audio/a.m4a\n  1000000", "OEBPS/audio/b.m4a\n  1000000")).size).toBe(2);
   });
 
   it("refuses an archive that declares far more audio than it holds", async () => {

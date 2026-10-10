@@ -43,12 +43,32 @@ type Entry = { name: string; size: number };
 // have fewer columns than an entry and fall through the pattern
 async function listEntries(epub: string): Promise<Map<string, Entry>> {
   const { stdout } = await execFileAsync("unzip", ["-l", epub], { maxBuffer: TEXT_BUFFER });
+  return entriesFromListing(stdout);
+}
+
+// A name listed twice is refused: `unzip -p` streams every member of that name, so the size the
+// listing declares for it is not the size extracting it writes
+export function entriesFromListing(listing: string): Map<string, Entry> {
   const entries = new Map<string, Entry>();
-  for (const line of stdout.split("\n")) {
+  for (const line of listing.split("\n")) {
     const m = /^\s*(\d+)\s+\S+\s+\S+\s+(.+?)\s*$/.exec(line);
-    if (m && m[1] !== undefined && m[2] !== undefined) entries.set(m[2], { name: m[2], size: Number(m[1]) });
+    if (!m || m[1] === undefined || m[2] === undefined) continue;
+    if (entries.has(m[2])) throw new EpubImportError(`The read-along EPUB lists "${path.posix.basename(m[2])}" twice`);
+    entries.set(m[2], { name: m[2], size: Number(m[1]) });
   }
   return entries;
+}
+
+// A recording lands under the output directory, which /files/* serves as it is: only the two
+// encodings an export writes may name the file, never whatever extension the archive carried
+function audioExtension(entry: string): string {
+  const ext = path.posix.extname(entry).toLowerCase();
+  if (ext !== ".m4a" && ext !== ".mp3") throw new EpubImportError(`The read-along EPUB's recording "${path.posix.basename(entry)}" is not an M4A or MP3 file`);
+  return ext;
+}
+
+function chapterSummary(count: number): string {
+  return count === 1 ? "1" : `1-${count}`;
 }
 
 // unzip reads a member name as a pattern; the few characters that would make it one are escaped
@@ -158,33 +178,26 @@ async function narrationFromLayer(epub: string, bookJson: string, entries: Map<s
   type Side = { levels: CueGranularity[]; ms: number; voices: Set<string> };
   const original: Side = { levels: [], ms: 0, voices: new Set() };
   const translation: Side = { levels: [], ms: 0, voices: new Set() };
-  const voiceOf = (value: unknown): string | null => (typeof value === "string" && value.trim() ? value.trim() : null);
+  const add = (side: Side, level: CueGranularity, ms: unknown, voice: unknown) => {
+    side.levels.push(level);
+    side.ms += typeof ms === "number" ? ms : 0;
+    if (typeof voice === "string" && voice.trim()) side.voices.add(voice.trim());
+  };
+  // The document is listed under its first translation; a second one's recording is not its lane
+  const { language: key } = documentFormatOf(manifest);
   for (const ch of manifest.chapters) {
     const cuesEntry = ch.cues ? layerEntryPath(bookJson, ch.cues) : null;
     const hasCues = cuesEntry !== null && entries.has(cuesEntry);
     if (hasCues) {
       const doc = readJson<ReaderCues>(await readEntry(epub, cuesEntry), isReaderCues, `cues for "${ch.title}"`);
-      original.levels.push(levelOf(doc.granularity));
-      original.ms += doc.totalMs;
-      const voice = voiceOf((ch as { voice?: unknown }).voice);
-      if (voice) original.voices.add(voice);
+      add(original, levelOf(doc.granularity), doc.totalMs, (ch as { voice?: unknown }).voice);
     }
-    for (const pair of ch.bilingual ?? []) {
+    for (const pair of (ch.bilingual ?? []).filter((p) => p.key === key)) {
       const entry = layerEntryPath(bookJson, pair.url);
       if (!entries.has(entry)) continue;
       const doc = readJson(await readEntry(epub, entry), (v): v is { source?: { narration?: LaneNarration }; target?: { narration?: LaneNarration } } => typeof v === "object" && v !== null, `pairing for "${ch.title}"`);
-      if (!hasCues && doc.source?.narration) {
-        original.levels.push(laneLevel(doc.source.narration));
-        original.ms += typeof doc.source.narration.totalMs === "number" ? doc.source.narration.totalMs : 0;
-        const voice = voiceOf(doc.source.narration.voice);
-        if (voice) original.voices.add(voice);
-      }
-      if (doc.target?.narration) {
-        translation.levels.push(laneLevel(doc.target.narration));
-        translation.ms += typeof doc.target.narration.totalMs === "number" ? doc.target.narration.totalMs : 0;
-        const voice = voiceOf(doc.target.narration.voice);
-        if (voice) translation.voices.add(voice);
-      }
+      if (!hasCues && doc.source?.narration) add(original, laneLevel(doc.source.narration), doc.source.narration.totalMs, doc.source.narration.voice);
+      if (doc.target?.narration) add(translation, laneLevel(doc.target.narration), doc.target.narration.totalMs, doc.target.narration.voice);
     }
   }
   const lane = (side: Side): NarrationLane | null =>
@@ -222,7 +235,7 @@ export async function createSyncedEpubBook(bookId: string, input: CreateSyncedEp
       title: entry.title,
       text: doc ? chapterTextFromCues(doc) : carried,
       audioEntry: doc ? audioEntry : null,
-      audioPath: doc && audioEntry ? path.join(outDir, chapterFile(index, path.posix.extname(audioEntry))) : null,
+      audioPath: doc && audioEntry ? path.join(outDir, chapterFile(index, audioExtension(audioEntry))) : null,
       sync: doc ? syncMapFromCues(doc) : null,
       durationMs: doc?.totalMs ?? entry.durationMs,
     });
@@ -289,7 +302,7 @@ export async function createSyncedEpubBook(bookId: string, input: CreateSyncedEp
     format,
     outputPath: documentPath,
     chapterCount: imported.length,
-    chapterSummary: imported.length === 1 ? "1" : `1-${imported.length}`,
+    chapterSummary: chapterSummary(imported.length),
     chapterIds: JSON.stringify(rows.map((r) => r.id)),
     narration: { original: originalLane(await laneFromRecordings(recordings), layerNarration.original), translation: layerNarration.translation },
   });
@@ -322,7 +335,7 @@ export async function attachSyncedEpubDocument(bookId: string, input: CreateSync
       format,
       outputPath: documentPath,
       chapterCount: manifest.chapters.length,
-      chapterSummary: manifest.chapters.length === 1 ? "1" : `1-${manifest.chapters.length}`,
+      chapterSummary: chapterSummary(manifest.chapters.length),
       chapterIds: "[]",
       narration,
     })

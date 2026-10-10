@@ -27,7 +27,6 @@ const ADDRESSES = [
   { host: "192.168.4.12", origin: "http://192.168.4.12:3034", via: "lan" as const },
 ];
 vi.mock("./lib/reachable-address.ts", () => ({
-  reachableAddress: vi.fn(async () => ADDRESSES[0]),
   reachableAddressList: vi.fn(async () => ADDRESSES),
 }));
 
@@ -249,6 +248,9 @@ describe("the shelf", () => {
     const auth = { authorization: `Bearer ${deviceKey}` };
 
     expect((await app.inject({ method: "GET", url: `/shelf/documents/${doc.id}` })).statusCode).toBe(401);
+    // A HEAD that only sizes the file is not a download the owner should see
+    expect((await app.inject({ method: "HEAD", url: `/shelf/documents/${doc.id}`, headers: auth })).statusCode).toBe(200);
+    expect(await getDb().select().from(shelfDownloads).where(eq(shelfDownloads.deviceId, deviceId))).toEqual([]);
     const res = await app.inject({ method: "GET", url: `/shelf/documents/${doc.id}`, headers: auth });
     expect(res.statusCode).toBe(200);
     expect(res.headers["content-type"]).toBe("application/epub+zip");

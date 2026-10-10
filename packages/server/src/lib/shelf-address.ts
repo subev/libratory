@@ -22,10 +22,6 @@ export async function shelfAddresses(): Promise<ShelfAddress[]> {
   return reachableAddressList(env.PORT);
 }
 
-export async function shelfAddress(): Promise<ShelfAddress | null> {
-  return (await shelfAddresses())[0] ?? null;
-}
-
 // What groups shelves on the reader: the host the world knows, or this machine's name. Under a
 // proxy the hostname is a container id, which groups nothing.
 export function machineName(): string {

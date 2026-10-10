@@ -17,7 +17,6 @@ const { mockReachable } = vi.hoisted(() => ({
   })),
 }));
 vi.mock("../lib/reachable-address.ts", () => ({
-  reachableAddress: mockReachable,
   reachableAddressList: async () => { const a = await mockReachable(); return a ? [a] : []; },
 }));
 vi.mock("../lib/env-file.ts", () => ({ updateEnvFile: vi.fn() }));

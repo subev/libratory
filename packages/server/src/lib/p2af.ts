@@ -35,8 +35,7 @@ function sourcePath(index: number): string {
 // A chapter the export left out keeps its pages and loses its narration — the same shape as a
 // chapter nobody has narrated yet, which both readers already know how to show. With no pages
 // there is nothing of it to keep: the text rides in the EPUB layer, which carries only the exported
-// chapters, so such an entry would open on nothing — six narrated tales out of a 73-chapter
-// collection shipped as 73 chapters, 67 of them blank, and read as a broken download.
+// chapters, so such an entry would open on nothing.
 export async function buildP2afLayer(
   book: Book,
   exported: Map<string, ExportedChapter>,

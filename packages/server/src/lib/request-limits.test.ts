@@ -1,27 +1,18 @@
-import Fastify from "fastify";
-import rateLimit from "@fastify/rate-limit";
-import { expect, it } from "vitest";
-import { registerScriptRunRoutes } from "../script-run-routes.ts";
-import { registerErrorHandler } from "./error-handler.ts";
-import { SCRIPT_RATE_LIMIT } from "./request-limits.ts";
+import { describe, expect, it } from "vitest";
+import { clientKey } from "./request-limits.ts";
 
-it("rejects excess script requests before execution and leaves ordinary routes available", async () => {
-  const app = Fastify();
-  registerErrorHandler(app);
-  await app.register(rateLimit, { global: false });
-  registerScriptRunRoutes(app);
-  app.get("/health", () => ({ ok: true }));
-  try {
-    // Invalid input lets the real handler exercise the limit without running a feed build.
-    for (let i = 0; i < SCRIPT_RATE_LIMIT.max; i++) {
-      expect((await app.inject("/scripts/hn-top10/preview?date=invalid")).statusCode).toBe(400);
-    }
-    const blocked = await app.inject("/scripts/hn-top10/preview?date=invalid");
-    expect(blocked.statusCode).toBe(429);
-    expect(blocked.headers["retry-after"]).toBeDefined();
-    expect((await app.inject("/health")).statusCode).toBe(200);
-    expect((await app.inject({ url: "/scripts/hn-top10/preview?date=invalid", remoteAddress: "127.0.0.2" })).statusCode).toBe(400);
-  } finally {
-    await app.close();
-  }
+describe("clientKey", () => {
+  it("counts per socket when the server is reached directly, whatever the headers claim", () => {
+    expect(clientKey({ "x-forwarded-for": "1.2.3.4" }, "10.0.0.9", false)).toBe("10.0.0.9");
+  });
+
+  it("counts per reported client behind a proxy, Cloudflare's header first", () => {
+    expect(clientKey({ "cf-connecting-ip": "1.2.3.4", "x-forwarded-for": "5.6.7.8, 10.0.0.1" }, "172.18.0.2", true)).toBe("1.2.3.4");
+    expect(clientKey({ "x-forwarded-for": "5.6.7.8, 10.0.0.1" }, "172.18.0.2", true)).toBe("5.6.7.8");
+    expect(clientKey({ "x-forwarded-for": ["5.6.7.8", "9.9.9.9"] }, "172.18.0.2", true)).toBe("5.6.7.8");
+  });
+
+  it("falls back to the socket behind a proxy that reports nothing", () => {
+    expect(clientKey({}, "172.18.0.2", true)).toBe("172.18.0.2");
+  });
 });

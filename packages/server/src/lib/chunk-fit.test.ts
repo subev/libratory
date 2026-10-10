@@ -111,4 +111,22 @@ print(json.dumps(sorted(os.listdir(d))))
     if (run.status !== 0) throw new Error(run.stderr);
     expect(JSON.parse(run.stdout)).toEqual(["chunk-001.wav", "chunk-001.words.json", "chunk-003.wav", "chunk-003.words.json", "chunks.json"]);
   });
+
+  it("trusts nothing cached when there is no manifest to compare against", () => {
+    const program = `
+import json, os, sys, tempfile
+sys.path.insert(0, ${JSON.stringify(scriptPath(""))})
+from chunk_fit import cached_chunk_texts, drop_stale_chunks
+d = tempfile.mkdtemp()
+for i in range(1, 3):
+    open(os.path.join(d, f"chunk-{i:03d}.wav"), "w").close()
+    open(os.path.join(d, f"chunk-{i:03d}.words.json"), "w").close()
+open(os.path.join(d, "unrelated.txt"), "w").close()
+drop_stale_chunks(d, cached_chunk_texts(d), ["a", "b"], lambda i: f"chunk-{i:03d}.words.json")
+print(json.dumps(sorted(os.listdir(d))))
+`;
+    const run = spawnSync("python3", ["-c", program], { encoding: "utf-8" });
+    if (run.status !== 0) throw new Error(run.stderr);
+    expect(JSON.parse(run.stdout)).toEqual(["unrelated.txt"]);
+  });
 });
