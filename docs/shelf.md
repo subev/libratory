@@ -65,6 +65,7 @@ Every authenticated call updates `devices.last_seen_at`.
   "books": [
     {
       "id": "…", "title": "Der Prozess", "author": "Kafka", "language": "German",
+      "source": "Project Gutenberg", "rights": "Public domain",
       "editions": [
         { "documentId": "…", "format": "epub-bilingual", "language": "English",
           "label": "German and English", "chapterCount": 10, "bytes": 168820736,
@@ -82,7 +83,9 @@ Every authenticated call updates `devices.last_seen_at`.
 }
 ```
 
-A book's `language` is a name in English from the book's language code (`Intl.DisplayNames`); an
+A book's `source` and `rights` are what the owner typed under Book details ("Project Gutenberg",
+"Public domain"), null when empty, so a reader leaves the line out rather than invent it. A
+book's `language` is a name in English from the book's language code (`Intl.DisplayNames`); an
 edition's `language` is the translation's name as the variant key stores it, `null` for the
 original. `label` is the line a row shows: the language first, because that is what a reader picks
 by. `bytes` is `null` when the file is missing on disk. `downloaded` is whether *this* device has

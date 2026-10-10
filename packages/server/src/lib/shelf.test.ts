@@ -33,6 +33,8 @@ describe("groupByBook", () => {
     bookId: "b1",
     title: "Der Prozess",
     author: "Kafka",
+    textSource: null,
+    rights: null,
     bookLanguage: "de",
     format: "epub-sync",
     language: null,
@@ -61,6 +63,12 @@ describe("groupByBook", () => {
       ["b1", "German", [["d1", true], ["d2", false]]],
       ["b2", "French", [["d3", false]]],
     ]);
+  });
+
+  it("carries the copy's source and rights onto the book", () => {
+    const [book] = groupByBook([doc({ textSource: "Project Gutenberg", rights: "Public domain" })], null);
+    expect(book).toMatchObject({ source: "Project Gutenberg", rights: "Public domain" });
+    expect(groupByBook([doc({})], null)[0]).toMatchObject({ source: null, rights: null });
   });
 
   it("marks nothing downloaded for the public, which has no device", () => {

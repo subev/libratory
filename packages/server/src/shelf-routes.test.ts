@@ -51,7 +51,7 @@ async function makeProfile(name: string) {
 
 async function makeDocument(profileId: string, over: Partial<typeof documents.$inferInsert> = {}) {
   const db = getDb();
-  const book = row(await db.insert(books).values({ title: "Der Prozess", author: "Kafka", language: "de", profileId }).returning());
+  const book = row(await db.insert(books).values({ title: "Der Prozess", author: "Kafka", language: "de", textSource: "Project Gutenberg", rights: "Public domain", profileId }).returning());
   const outputPath = path.join(testOutputDir, book.id, `${over.format ?? "epub-sync"}-${Math.random().toString(36).slice(2)}.epub`);
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, "PK\u0003\u0004 not really an epub");
@@ -221,7 +221,7 @@ describe("the shelf", () => {
     expect(body.profile).toEqual({ id: mine.id, name: "Petur" });
     expect(body.device).toEqual({ id: deviceId, name: "Petur's iPhone" });
     expect(body.books).toHaveLength(1);
-    expect(body.books[0]).toMatchObject({ id: book.id, title: "Der Prozess", author: "Kafka", language: "German" });
+    expect(body.books[0]).toMatchObject({ id: book.id, title: "Der Prozess", author: "Kafka", language: "German", source: "Project Gutenberg", rights: "Public domain" });
     expect(body.books[0].editions.map((e: { documentId: string; label: string; downloaded: boolean }) => [e.documentId, e.label, e.downloaded])).toEqual([
       [bilingual.doc.id, "German and English", false],
       [doc.id, "German, read-along", false],

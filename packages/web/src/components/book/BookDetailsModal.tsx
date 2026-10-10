@@ -10,21 +10,27 @@ import { BOOK_LANGUAGE_OPTIONS } from "../../lib/languages.ts";
 export function BookDetailsModal({
   author,
   language,
+  textSource,
+  rights,
   onSave,
   onClose,
 }: {
   author: string | null;
   language: string | null;
-  onSave: (next: { author: string | null; language: string | null }) => void;
+  textSource: string | null;
+  rights: string | null;
+  onSave: (next: { author: string | null; language: string | null; textSource: string | null; rights: string | null }) => void;
   onClose: () => void;
 }) {
   const [draftAuthor, setDraftAuthor] = useState(author ?? "");
   const [draftLanguage, setDraftLanguage] = useState(language ?? "");
+  const [draftSource, setDraftSource] = useState(textSource ?? "");
+  const [draftRights, setDraftRights] = useState(rights ?? "");
 
   const field = "w-full rounded border border-(--border-input) bg-(--bg-input) px-2 py-1.5 text-sm text-(--text-primary)";
 
   function save() {
-    onSave({ author: draftAuthor.trim() || null, language: draftLanguage || null });
+    onSave({ author: draftAuthor.trim() || null, language: draftLanguage || null, textSource: draftSource.trim() || null, rights: draftRights.trim() || null });
     onClose();
   }
 
@@ -52,6 +58,29 @@ export function BookDetailsModal({
             ))}
           </select>
           <span className="block mt-1 text-xs text-(--text-muted)">Decides which voices the picker offers first.</span>
+        </label>
+        <label className="block">
+          <span className="block mb-1 text-xs font-medium text-(--text-secondary)">Text source</span>
+          <input
+            value={draftSource}
+            onChange={(e) => setDraftSource(e.target.value)}
+            placeholder="Project Gutenberg"
+            title="Where the text came from — shown on a public shelf's book page"
+            className={field}
+            data-testid="book-details-source"
+          />
+        </label>
+        <label className="block">
+          <span className="block mb-1 text-xs font-medium text-(--text-secondary)">Rights</span>
+          <input
+            value={draftRights}
+            onChange={(e) => setDraftRights(e.target.value)}
+            placeholder="Public domain"
+            title="What may be done with it — shown on a public shelf's book page"
+            className={field}
+            data-testid="book-details-rights"
+          />
+          <span className="block mt-1 text-xs text-(--text-muted)">Both are what makes a free shelf trustworthy; a reader leaves the line out when they are empty.</span>
         </label>
       </div>
       <div className="flex items-center gap-2 px-4 py-3 border-t border-(--border)">

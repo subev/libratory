@@ -189,6 +189,9 @@ export const books = pgTable("books", {
   language: text("language"),
   // Who wrote it, for a shelf that sorts by more than title — the PDF's own metadata when it has any
   author: text("author"),
+  // What a public shelf says about a copy: where the text came from and what may be done with it
+  textSource: text("text_source"),
+  rights: text("rights"),
   skipSynthesis: boolean("skip_synthesis").notNull().default(false),
   totalChapters: integer("total_chapters").notNull().default(0),
   noteJob: jsonb("note_job").$type<NoteJob>(),

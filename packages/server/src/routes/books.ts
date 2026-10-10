@@ -475,6 +475,9 @@ export const booksRouter = router({
       language: z.string().max(8).nullable().optional(),
       // "" clears it, so a wrong guess from the PDF can be taken back rather than only corrected
       author: z.string().max(200).nullable().optional(),
+      // Shown on a public shelf's book page: "Project Gutenberg", "Public domain"; "" clears
+      textSource: z.string().max(200).nullable().optional(),
+      rights: z.string().max(200).nullable().optional(),
     }))
     .mutation(async ({ input }) => {
       const updates: Record<string, unknown> = { updatedAt: new Date() };
@@ -490,6 +493,8 @@ export const booksRouter = router({
       if (input.chapterModel !== undefined) updates.chapterModel = canonicalKey(input.chapterModel);
       if (input.language !== undefined) updates.language = input.language || null;
       if (input.author !== undefined) updates.author = input.author?.trim() || null;
+      if (input.textSource !== undefined) updates.textSource = input.textSource?.trim() || null;
+      if (input.rights !== undefined) updates.rights = input.rights?.trim() || null;
       await db.update(books).set(updates).where(eq(books.id, input.id));
       return { success: true };
     }),
