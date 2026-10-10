@@ -1,0 +1,4 @@
+Reviewed: low
+Outcome: in-context review (a four-line filter guarded on manifest.pages, matching the variant layer's existing rule); two new DB-backed tests, lint and typecheck green; the re-exported Six Tales file checked for six manifest chapters before upload
+By: Petur Subev
+At: 2026-10-10T22:19:38Z
