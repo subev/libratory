@@ -22,8 +22,13 @@ vi.mock("./lib/paths.ts", async (importOriginal) => {
 });
 
 // The Tailscale probe shells out; the route only needs an answer
+const ADDRESSES = [
+  { host: "mini.tail4a2f.ts.net", origin: "http://mini.tail4a2f.ts.net:3034", via: "tailscale" as const },
+  { host: "192.168.4.12", origin: "http://192.168.4.12:3034", via: "lan" as const },
+];
 vi.mock("./lib/reachable-address.ts", () => ({
-  reachableAddress: vi.fn(async () => ({ host: "mini.tail4a2f.ts.net", origin: "http://mini.tail4a2f.ts.net:3034", via: "tailscale" })),
+  reachableAddress: vi.fn(async () => ADDRESSES[0]),
+  reachableAddressList: vi.fn(async () => ADDRESSES),
 }));
 
 import { registerShelfRoutes } from "./shelf-routes.ts";
@@ -85,6 +90,11 @@ describe("pairing", () => {
     const peek = await app.inject({ method: "GET", url: `/shelf/pair/${token}` });
     expect(peek.statusCode).toBe(200);
     expect(peek.json()).toMatchObject({ profile: { id: profile.id, name: "Petur" }, bookCount: 1, via: "tailscale" });
+    // Every way in, best first: a phone on the Wi-Fi but not on the tailnet falls back to the LAN address
+    expect(peek.json().addresses).toEqual([
+      { origin: "http://mini.tail4a2f.ts.net:3034", via: "tailscale" },
+      { origin: "http://192.168.4.12:3034", via: "lan" },
+    ]);
     expect(typeof peek.json().machine).toBe("string");
 
     const paired = await app.inject({ method: "POST", url: "/shelf/pair", payload: { token, name: "Petur's iPhone" } });

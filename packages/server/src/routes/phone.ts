@@ -7,7 +7,7 @@ import { router, publicProcedure } from "../trpc.ts";
 import { books, devices, documents, profiles, shelfDownloads, DEFAULT_PROFILE_ID } from "../schema.ts";
 import { updateEnvFile } from "../lib/env-file.ts";
 import { PAIRING_TTL_MS, pairLink, pairingTokens } from "../lib/pairing.ts";
-import { machineName, shelfAddress } from "../lib/shelf-address.ts";
+import { machineName, shelfAddresses } from "../lib/shelf-address.ts";
 import { publicShelfProfileId, setPublicShelfProfile, shelfDocuments } from "../lib/shelf.ts";
 import { NETWORK_ACCESS, currentNetworkAccess, setNetworkAccess } from "../lib/network-access.ts";
 
@@ -23,15 +23,16 @@ export const phoneRouter = router({
   pairingCode: publicProcedure.query(async ({ ctx }) => {
     const profileId = ctx.profileId ?? DEFAULT_PROFILE_ID;
     const [profile] = await db.select({ name: profiles.name }).from(profiles).where(eq(profiles.id, profileId));
-    const reachable = await shelfAddress();
+    const [reachable = null, ...alternatives] = await shelfAddresses();
     // A public name is reached through a proxy, which may well forward to loopback
     const loopbackOnly = LOOPBACK.has(env.HOST) && reachable?.via !== "internet";
     const access = currentNetworkAccess();
     const isPublic = publicShelfProfileId() === profileId;
-    const base = { profileName: profile?.name ?? "Default", machine: machineName(), reachable, loopbackOnly, access, isPublic };
+    // The LAN addresses ride in the code behind the Tailscale name, for a phone on this Wi-Fi only
+    const base = { profileName: profile?.name ?? "Default", machine: machineName(), reachable, alternatives, loopbackOnly, access, isPublic };
     if (!reachable || loopbackOnly || access === "none") return { ...base, code: null };
     const { token, expiresAt } = pairingTokens.mint(profileId);
-    const link = pairLink(env.PAIR_LINK_BASE, reachable.origin, token);
+    const link = pairLink(env.PAIR_LINK_BASE, reachable.origin, token, alternatives.map((a) => a.origin));
     // The quiet zone is part of the image, so the page needs no white ground of its own
     const svg = await QRCode.toString(link, { type: "svg", margin: 2, errorCorrectionLevel: "M" });
     return {

@@ -53,5 +53,14 @@ describe("pairLink", () => {
     const params = new URLSearchParams(url.hash.slice(1));
     expect(params.get("s")).toBe("http://mini.tail4a2f.ts.net:3034");
     expect(params.get("t")).toBe("abc+/=");
+    expect(params.getAll("a")).toEqual([]);
+  });
+
+  it("carries each fallback address as its own a, after s and before t", () => {
+    const link = pairLink("https://libratory.dev/pair", "http://mini.tail4a2f.ts.net:3034", "tok", ["http://192.168.4.12:3034", "http://10.0.0.7:3034"]);
+    const params = new URLSearchParams(new URL(link).hash.slice(1));
+    expect(params.get("s")).toBe("http://mini.tail4a2f.ts.net:3034");
+    expect(params.getAll("a")).toEqual(["http://192.168.4.12:3034", "http://10.0.0.7:3034"]);
+    expect(params.get("t")).toBe("tok");
   });
 });

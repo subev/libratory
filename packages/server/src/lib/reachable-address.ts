@@ -4,11 +4,22 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-// Where a phone can reach this server. A Tailscale name keeps working off Wi-Fi, so it wins; the
-// LAN address is the fallback that works only on the same network, and the page says so.
-export type Reachable = { origin: string; host: string; via: "tailscale" | "lan" } | null;
+// Where a phone can reach this server. A Tailscale name keeps working off Wi-Fi, so it comes
+// first; a LAN address works only on the same network, and rides along as the fallback for a
+// device that is on this Wi-Fi but not on the tailnet — the first code carried only the Tailscale
+// name, and an iPod on the same Wi-Fi could do nothing with it.
+export type Address = { origin: string; host: string; via: "tailscale" | "lan" };
+export type Reachable = Address | null;
 
-export type Interface = { address: string; family: string; internal: boolean };
+export type Interface = { name?: string; address: string; family: string; internal: boolean };
+
+// Interfaces no phone is on the other end of: VM and container bridges, tunnels, Apple's
+// peer-to-peer links. This Mac offered four bridge100-103 addresses beside its one Wi-Fi address.
+const VIRTUAL_INTERFACE = /^(bridge|vmnet|utun|tun|tap|docker|veth|br-|virbr|awdl|llw|ap)\d*/;
+
+function isVirtual(i: Interface): boolean {
+  return i.name !== undefined && VIRTUAL_INTERFACE.test(i.name);
+}
 
 function isTailnetAddress(address: string): boolean {
   // Tailscale hands out 100.64.0.0/10
@@ -18,17 +29,32 @@ function isTailnetAddress(address: string): boolean {
   return second >= 64 && second <= 127;
 }
 
+// Every address a phone could use, best first: the Tailscale name (else the tailnet address, for
+// a tailnet without MagicDNS), then each LAN address. Empty with nothing but loopback.
+export function reachableAddresses(
+  interfaces: Interface[],
+  tailscaleName: string | null,
+  port: number,
+): Address[] {
+  const external = interfaces.filter((i) => !i.internal && i.family === "IPv4");
+  const address = (host: string, via: Address["via"]): Address => ({ host, origin: `http://${host}:${port}`, via });
+  const tailnet = external.find((i) => isTailnetAddress(i.address));
+  const list: Address[] = [];
+  if (tailscaleName) list.push(address(tailscaleName, "tailscale"));
+  else if (tailnet) list.push(address(tailnet.address, "tailscale"));
+  for (const i of external) {
+    if (isTailnetAddress(i.address) || isVirtual(i) || list.some((a) => a.host === i.address)) continue;
+    list.push(address(i.address, "lan"));
+  }
+  return list;
+}
+
 export function pickReachable(
   interfaces: Interface[],
   tailscaleName: string | null,
   port: number,
 ): Reachable {
-  const external = interfaces.filter((i) => !i.internal && i.family === "IPv4");
-  const tailnet = external.find((i) => isTailnetAddress(i.address));
-  const host = tailscaleName ?? tailnet?.address ?? external.find((i) => !isTailnetAddress(i.address))?.address;
-  if (!host) return null;
-  const via = tailscaleName || tailnet ? "tailscale" : "lan";
-  return { host, origin: `http://${host}:${port}`, via };
+  return reachableAddresses(interfaces, tailscaleName, port)[0] ?? null;
 }
 
 // The MagicDNS name, from the CLI when it is there. Finder-launched apps get no PATH worth the
@@ -66,9 +92,13 @@ function dnsNameOf(status: unknown): string | null {
 }
 
 function hostInterfaces(): Interface[] {
-  return Object.values(networkInterfaces()).flatMap((list) => list ?? []);
+  return Object.entries(networkInterfaces()).flatMap(([name, list]) => (list ?? []).map((i) => ({ ...i, name })));
+}
+
+export async function reachableAddressList(port: number): Promise<Address[]> {
+  return reachableAddresses(hostInterfaces(), await tailscaleName(), port);
 }
 
 export async function reachableAddress(port: number): Promise<Reachable> {
-  return pickReachable(hostInterfaces(), await tailscaleName(), port);
+  return (await reachableAddressList(port))[0] ?? null;
 }

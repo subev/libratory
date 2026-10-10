@@ -22,7 +22,10 @@ code for the profile it is on.
    reached: `PUBLIC_ORIGIN` when one is configured (a server behind a proxy, `https://…`), else a
    Tailscale MagicDNS name when the CLI reports one, else the tailnet address, else the first LAN
    address with the port over plain `http` (`lib/shelf-address.ts`, `lib/reachable-address.ts`).
-   `t` is the token. Both ride in the fragment so the site the link names never sees the token.
+   Each `a` (repeatable, in order of preference) is a fallback for when `s` does not answer — the
+   LAN addresses, for a device on the same Wi-Fi but not on the tailnet; a reader that knows only
+   `s` still pairs. `t` is the token. All ride in the fragment so the site the link names never
+   sees the token.
 3. The reader scans the code. It may **peek** at the shelf before adding it, then **pair**, which
    spends the token and answers with a device key. The key is shown once; only its SHA-256 is kept
    (`devices.key_hash`).
@@ -40,14 +43,17 @@ tRPC API stays exactly as unexposed as before.
 
 | Method and path | Auth | Answer |
 | --- | --- | --- |
-| `GET /shelf/pair/:token` | none | `200 { machine, profile:{id,name}, bookCount, via:"tailscale"\|"lan", expiresAt }`. `404` unknown, `410` spent or expired. Does **not** spend the token. |
-| `POST /shelf/pair` body `{ token, name }` | none | `200 { deviceId, deviceKey, machine, profile:{id,name}, bookCount }`. Spends the token. `400` without a name, `404` unknown, `410` gone. `name` is what the device is called on the owner's page. |
+| `GET /shelf/pair/:token` | none | `200 { machine, profile:{id,name}, bookCount, via:"tailscale"\|"lan", addresses:[{origin,via}], expiresAt }`. `404` unknown, `410` spent or expired. Does **not** spend the token. |
+| `POST /shelf/pair` body `{ token, name }` | none | `200 { deviceId, deviceKey, machine, profile:{id,name}, bookCount, addresses:[{origin,via}] }`. Spends the token. `400` without a name, `404` unknown, `410` gone. `name` is what the device is called on the owner's page. |
 | `GET /shelf` | `Authorization: Bearer <deviceKey>`, or nothing on a public shelf | `200 { machine, profile:{id,name}, public, device:{id,name}\|null, books:[…] }` — see below. |
 | `GET /shelf/documents/:documentId` | bearer | The EPUB (`application/epub+zip`, `Content-Disposition: attachment`). Records the download for the owner's "on phones" column, once per device and file. `404` for a file that is hidden, not a shelf format, or another profile's. |
 
 `machine` is the server's hostname, or the public host when `PUBLIC_ORIGIN` is set — what groups
 shelves on the reader side, since two profiles on one machine share an address. `via` is
-`tailscale`, `lan` or `internet`; a reader should treat an unknown value as "other". `/shelf/pair*` is rate-limited per IP (`PAIR_RATE_LIMIT`).
+`tailscale`, `lan` or `internet`; a reader should treat an unknown value as "other". `addresses`
+is every way to this server, best first — the same list the code's `s` and `a` carry — so a reader
+can keep them all with the shelf and try the next when the current one does not connect (a `401`
+is the key, not the network), remembering whichever answered. `/shelf/pair*` is rate-limited per IP (`PAIR_RATE_LIMIT`).
 
 A `401` means the shelf does not know this key: it was never issued, or the owner pressed
 **Forget**. The reader should say so and offer to remove the shelf; what it already downloaded is

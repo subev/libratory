@@ -22,7 +22,9 @@ type MintedCode = { link: string; image: string; expiresInMs: number };
 // Keyed by its link, so a new code mounts a new countdown. The deadline is this clock plus the
 // server's TTL, taken once on mount, so a browser clock far from the server's never sees a fresh
 // code as dead and mints forever.
-function PairingCode({ code, host, port, onExpired }: { code: MintedCode; host: string; port: string; onExpired: () => void }) {
+type Alternative = { origin: string; host: string; via: "tailscale" | "lan" | "internet" };
+
+function PairingCode({ code, host, port, alternatives, onExpired }: { code: MintedCode; host: string; port: string; alternatives: Alternative[]; onExpired: () => void }) {
   const [deadline] = useState(() => Date.now() + code.expiresInMs);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -51,6 +53,15 @@ function PairingCode({ code, host, port, onExpired }: { code: MintedCode; host: 
             {host}:{port}
           </span>
         </div>
+        {/* The LAN address is in the code too: a phone on this Wi-Fi but not on the tailnet uses it */}
+        {alternatives.map((a) => (
+          <div key={a.origin} className="flex justify-between gap-3">
+            <span>{a.via === "lan" ? "On this Wi-Fi only" : "Also at"}</span>
+            <span className="font-mono text-(--text-secondary)">
+              {a.host}:{new URL(a.origin).port}
+            </span>
+          </div>
+        ))}
         {/* The same link as text, for a reader with no camera — the simulator pastes it */}
         <div className="flex items-center gap-2">
           <code className="flex-1 min-w-0 truncate font-mono text-[11px] text-(--text-secondary) select-all" title={code.link} data-testid="pairing-link">
@@ -130,7 +141,7 @@ function PairingCard() {
         </div>
       ) : data?.code && data.reachable ? (
         <>
-          <PairingCode key={data.code.link} code={data.code} host={data.reachable.host} port={new URL(data.reachable.origin).port} onExpired={refresh} />
+          <PairingCode key={data.code.link} code={data.code} host={data.reachable.host} port={new URL(data.reachable.origin).port} alternatives={data.alternatives} onExpired={refresh} />
           {data.access === "all" ? (
             <div className="flex flex-col gap-2 px-3 py-2 rounded-md bg-(--warning-bg) text-sm text-(--warning-text)" data-testid="all-access-notice">
               <span>

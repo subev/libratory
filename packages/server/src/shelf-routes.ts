@@ -9,7 +9,7 @@ import { isUuid } from "./lib/uuid.ts";
 import { outputDir } from "./lib/paths.ts";
 import { PAIR_RATE_LIMIT, SHELF_RATE_LIMIT } from "./lib/request-limits.ts";
 import { pairingTokens } from "./lib/pairing.ts";
-import { machineName, shelfAddress } from "./lib/shelf-address.ts";
+import { machineName, shelfAddresses } from "./lib/shelf-address.ts";
 import { groupByBook, hashDeviceKey, newDeviceKey, publicShelfProfileId, shelfBookCount, shelfDocuments } from "./lib/shelf.ts";
 import { contentDisposition } from "./lib/content-disposition.ts";
 
@@ -73,12 +73,15 @@ export function registerShelfRoutes(fastify: FastifyInstance) {
     if (peek === "gone") return reply.code(410).send({ error: "This pairing code has been used or has expired" });
     const profile = await profileNamed(peek.profileId);
     if (!profile) return reply.code(404).send({ error: "Unknown pairing code" });
-    const reachable = await shelfAddress();
+    const addresses = await shelfAddresses();
     return {
       machine: machineName(),
       profile,
       bookCount: await shelfBookCount(profile.id),
-      via: reachable?.via ?? "lan",
+      via: addresses[0]?.via ?? "lan",
+      // Every way to this server, best first, so a reader can fall back from the Tailscale name
+      // to the LAN address when it is on the same Wi-Fi and not on the tailnet
+      addresses: addresses.map(({ origin, via }) => ({ origin, via })),
       expiresAt: peek.expiresAt.toISOString(),
     };
   });
@@ -104,6 +107,7 @@ export function registerShelfRoutes(fastify: FastifyInstance) {
       machine: machineName(),
       profile,
       bookCount: await shelfBookCount(profile.id),
+      addresses: (await shelfAddresses()).map(({ origin, via }) => ({ origin, via })),
     };
   });
 

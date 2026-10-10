@@ -16,7 +16,10 @@ const { mockReachable } = vi.hoisted(() => ({
     via: "lan",
   })),
 }));
-vi.mock("../lib/reachable-address.ts", () => ({ reachableAddress: mockReachable }));
+vi.mock("../lib/reachable-address.ts", () => ({
+  reachableAddress: mockReachable,
+  reachableAddressList: async () => { const a = await mockReachable(); return a ? [a] : []; },
+}));
 vi.mock("../lib/env-file.ts", () => ({ updateEnvFile: vi.fn() }));
 
 import { phoneRouter } from "./phone.ts";

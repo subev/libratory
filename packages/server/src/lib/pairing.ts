@@ -60,7 +60,12 @@ export const pairingTokens = createPairingTokens();
 
 // The fragment keeps the token out of the site's logs: a universal link hands the whole URL to the
 // app, and a fallback page on the site can read it client-side.
-export function pairLink(base: string, serverOrigin: string, token: string): string {
-  const params = new URLSearchParams({ s: serverOrigin, t: token });
+// `s` is the address to try first; each `a` is one to try when it does not answer — the LAN
+// address for a device on the same Wi-Fi but not on the tailnet. A reader that knows only `s`
+// still pairs the way it did.
+export function pairLink(base: string, serverOrigin: string, token: string, alternatives: string[] = []): string {
+  const params = new URLSearchParams({ s: serverOrigin });
+  for (const origin of alternatives) params.append("a", origin);
+  params.set("t", token);
   return `${base}#${params.toString()}`;
 }
