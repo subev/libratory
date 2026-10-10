@@ -1,0 +1,4 @@
+Reviewed: low
+Outcome: in-context; a five-line merge in the words writer, both real lines verified through Kokoro, python3-driven test for the merge and the give-up case, lint green
+By: Petur Subev
+At: 2026-10-10T23:17:31Z
