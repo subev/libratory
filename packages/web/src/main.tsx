@@ -20,6 +20,7 @@ const Reader = lazy(() => import("./pages/Reader.tsx").then((m) => ({ default: m
 const Components = lazy(() => import("./pages/Components.tsx").then((m) => ({ default: m.Components })));
 const OcrTryPage = lazy(() => import("./pages/OcrTryPage.tsx").then((m) => ({ default: m.OcrTryPage })));
 const ReaderOpen = lazy(() => import("./pages/ReaderOpen.tsx").then((m) => ({ default: m.ReaderOpen })));
+const PhonePage = lazy(() => import("./pages/PhonePage.tsx").then((m) => ({ default: m.PhonePage })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -63,6 +64,7 @@ createRoot(document.getElementById("root")!).render(
                 <Route path="/books/:id/read" element={<Suspense fallback={null}><Reader /></Suspense>} />
                 <Route path="/books/:id/ocr" element={<Suspense fallback={null}><OcrTryPage /></Suspense>} />
                 <Route path="/open" element={<Suspense fallback={null}><ReaderOpen /></Suspense>} />
+                <Route path="/phone" element={<Suspense fallback={null}><PhonePage /></Suspense>} />
                 <Route path="/components" element={<Suspense fallback={null}><Components /></Suspense>} />
               </Routes>
                   </div>

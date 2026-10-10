@@ -71,6 +71,7 @@ export default defineConfig(({ mode }) => {
         "/download": API,
         "/audio": API,
         "/files": API,
+        "/shelf": API,
         "/preview": API,
         "/read": API,
         "/ocr": API,

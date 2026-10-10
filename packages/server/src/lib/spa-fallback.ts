@@ -10,6 +10,7 @@ import type { FastifyInstance } from "fastify";
 const CLIENT_ROUTES = [
   /^\/$/,
   /^\/open$/,
+  /^\/phone$/,
   /^\/folders\/[^/]+$/,
   /^\/books\/[^/]+$/,
   /^\/books\/[^/]+\/read$/,

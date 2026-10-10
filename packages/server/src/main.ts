@@ -20,6 +20,9 @@ import { registerApiRoutes } from "./api-routes.ts";
 import { registerMcpRoutes } from "./mcp-routes.ts";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { registerScriptRunRoutes } from "./script-run-routes.ts";
+import { registerShelfRoutes } from "./shelf-routes.ts";
+import { contentDisposition } from "./lib/content-disposition.ts";
+import { registerNetworkAccessGuard } from "./lib/network-access.ts";
 import { ensureDataDirs, outputDir, previewsDir } from "./lib/paths.ts";
 import { isAllowedOrigin, parseTrustedHosts } from "./lib/cors.ts";
 import { registerSpaFallback } from "./lib/spa-fallback.ts";
@@ -57,6 +60,8 @@ async function main() {
   const fastify = Fastify(createFastifyOptions());
   // Before any register: a child scope inherits the handler its parent had when the scope was made.
   registerErrorHandler(fastify);
+  // Next, before CORS and every plugin: what the network may reach is decided before anything can answer
+  registerNetworkAccessGuard(fastify);
 
   const trustedHosts = parseTrustedHosts(env.TRUSTED_HOSTS);
   await fastify.register(cors, () => (req: FastifyRequest, callback: (error: Error | null, options: FastifyCorsOptions) => void) => {
@@ -96,14 +101,7 @@ async function main() {
   registerApiRoutes(fastify);
   registerMcpRoutes(fastify, trustedHosts);
   registerScriptRunRoutes(fastify);
-
-  // Names what the browser saves from extensionless audio URLs (e.g. the <audio>
-  // player's own download menu, which ignores the <a download> attribute)
-  const contentDisposition = (type: "inline" | "attachment", filename: string): string => {
-    const fallback = filename.replace(/[^\x20-\x7E]/g, "_").replace(/["\\]/g, "_");
-    const utf8 = encodeURIComponent(filename).replace(/['()*]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase());
-    return `${type}; filename="${fallback}"; filename*=UTF-8''${utf8}`;
-  };
+  registerShelfRoutes(fastify);
 
   fastify.get("/pdf/:fileId", async (request, reply) => {
     const { fileId } = request.params as { fileId: string };

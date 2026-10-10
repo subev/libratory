@@ -63,6 +63,7 @@ export {
   PaperPlaneRight as IconSend,
   Lightbulb as IconTip,
   Paperclip as IconAttach,
+  DeviceMobile as IconPhone,
 } from "@phosphor-icons/react";
 
 import type { ReactNode } from "react";

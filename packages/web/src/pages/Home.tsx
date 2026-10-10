@@ -5,22 +5,18 @@ import { BookList } from "../components/BookList.tsx";
 import { BookSearchResults } from "../components/BookSearchResults.tsx";
 import { Breadcrumbs } from "../components/Breadcrumbs.tsx";
 import { Button } from "../components/Button.tsx";
-import { ProfileSwitcher } from "../components/ProfileSwitcher.tsx";
-import { SettingsModal } from "../components/SettingsModal.tsx";
-import { AssistantToggle } from "../components/assistant/AssistantPanel.tsx";
-import { ThemeToggle } from "../components/ThemeToggle.tsx";
+import { LibraryHeader } from "../components/library/LibraryHeader.tsx";
 import { LibraryShell } from "../components/library/LibraryShell.tsx";
 import { LibraryFilters } from "../components/library/LibraryFilters.tsx";
 import { filterCounts, type LibraryFilter } from "../lib/library-filter.ts";
 import { UploadModal } from "../components/library/UploadModal.tsx";
-import { IconAdd, IconBook, IconSettings, IconUpload } from "../components/icons.tsx";
+import { IconAdd, IconUpload } from "../components/icons.tsx";
 import type { DragItems, DroppedItems } from "../lib/dnd.ts";
 
 export function Home() {
   const utils = trpc.useUtils();
   const { folderId = null } = useParams<{ folderId: string }>();
   const [search, setSearch] = useState("");
-  const [showSettings, setShowSettings] = useState(false);
   // undefined is shut; null or a drop is open, so the two can never disagree
   const [upload, setUpload] = useState<DroppedItems | null | undefined>(undefined);
   const [filter, setFilter] = useState<LibraryFilter>("all");
@@ -59,37 +55,7 @@ export function Home() {
 
   return (
     <LibraryShell
-      header={
-        <div className="flex items-center gap-2 h-12 px-4 border-b border-(--border) bg-(--bg-card)">
-          <h1 className="font-(family-name:--stack-display) text-[17px] font-semibold tracking-tight text-(--text-primary)">
-            Libratory
-          </h1>
-          <ProfileSwitcher />
-          <div className="flex-1" />
-          <Button
-            variant="secondary"
-            size="sm"
-            to="/open"
-            title="Open a synced EPUB and read along on its own pages — nothing is uploaded"
-            data-testid="open-container-link"
-          >
-            <IconBook className="h-4 w-4" />
-            Open a read-along EPUB
-          </Button>
-          <AssistantToggle />
-          <ThemeToggle />
-          <Button
-            variant="icon"
-            size="sm"
-            onClick={() => setShowSettings(true)}
-            title="AI model settings"
-            aria-label="AI model settings"
-            data-testid="settings-gear"
-          >
-            <IconSettings className="h-4 w-4" />
-          </Button>
-        </div>
-      }
+      header={<LibraryHeader page="library" />}
       bar={
         <div className="flex items-center gap-2 h-11 px-4 border-b border-(--border) bg-(--bg-card)">
           <Breadcrumbs
@@ -166,7 +132,6 @@ export function Home() {
           onAddBooks={() => setUpload(null)}
         />
       )}
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {upload !== undefined && (
         <UploadModal
           folderId={folderId}

@@ -319,8 +319,29 @@ export const documents = pgTable("documents", {
   chapterCount: integer("chapter_count").notNull(),
   chapterSummary: text("chapter_summary").notNull(),
   chapterIds: text("chapter_ids").notNull(),
+  // Hidden from the phone shelf; the file and the row stay
+  shelfHidden: boolean("shelf_hidden").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// A phone paired to one profile's shelf. The key itself is handed out once at pairing and only its
+// hash is kept, so a database read never yields a credential.
+export const devices = pgTable("devices", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  profileId: uuid("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  keyHash: text("key_hash").notNull().unique(),
+  pairedAt: timestamp("paired_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Which documents a phone has fetched — the owner's "on phones" column, and nothing more: the
+// server counts downloads and never learns what was read.
+export const shelfDownloads = pgTable("shelf_downloads", {
+  deviceId: uuid("device_id").notNull().references(() => devices.id, { onDelete: "cascade" }),
+  documentId: uuid("document_id").notNull().references(() => documents.id, { onDelete: "cascade" }),
+  downloadedAt: timestamp("downloaded_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique("shelf_downloads_device_document").on(t.deviceId, t.documentId)]);
 
 export const notes = pgTable("notes", {
   id: uuid("id").primaryKey().defaultRandom(),

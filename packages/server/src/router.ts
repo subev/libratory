@@ -22,6 +22,7 @@ import { ocrLanguagesRouter } from "./routes/ocr-languages.ts";
 import { ocrTryRouter } from "./routes/ocr-try.ts";
 import { secretsRouter } from "./routes/secrets.ts";
 import { workersRouter } from "./routes/workers.ts";
+import { phoneRouter } from "./routes/phone.ts";
 
 export const appRouter = router({
   books: booksRouter,
@@ -46,6 +47,7 @@ export const appRouter = router({
   ocrTry: ocrTryRouter,
   secrets: secretsRouter,
   workers: workersRouter,
+  phone: phoneRouter,
 });
 
 export type AppRouter = typeof appRouter;

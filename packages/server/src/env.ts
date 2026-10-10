@@ -28,6 +28,12 @@ const envSchema = z.object({
   // because DNS rebinding cannot produce one. Set it when a reverse proxy or an mDNS/tailnet name
   // fronts the server; see lib/cors.ts.
   TRUSTED_HOSTS: z.string().default(""),
+  // What an address other than this machine may reach once HOST binds the network: nothing, the
+  // phone shelf, or everything. Unset means `all` in Docker and `none` elsewhere (lib/network-access.ts).
+  NETWORK_ACCESS: z.enum(["none", "shelf", "all"]).optional(),
+  // What the Phone page's QR encodes: a universal link the Camera opens the reader app with, the
+  // server's own address and the pairing token in its fragment (lib/pairing.ts).
+  PAIR_LINK_BASE: z.string().default("https://libratory.dev/pair"),
   CONDA_ENV_PATH: z.string().default(path.join(repoRoot, ".venv", "bin")),
   SCRIPTS_DIR: z.string().default(path.join(repoRoot, "scripts")),
   WEB_DIR: z.string().default(path.join(repoRoot, "packages", "web", "dist")),
