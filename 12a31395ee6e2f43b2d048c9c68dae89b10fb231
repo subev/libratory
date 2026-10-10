@@ -1,0 +1,4 @@
+Reviewed: low
+Outcome: in-context review (additive list beside the existing pick, link params appended, routes map the list); tests for the list, the virtual-interface filter, the link shape and the peek answer; lint, typecheck, web tests and e2e smoke green; a minted code on the dev server checked by hand
+By: Petur Subev
+At: 2026-10-10T22:32:18Z
