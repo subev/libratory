@@ -1,0 +1,4 @@
+Reviewed: medium
+Outcome: Sonnet agent review (docs/review-2026-10-11-chunk-fit.md) plus in-context read: 1 low-medium finding (resume could reuse another cut's audio) fixed with a purge before the manifest write; test gaps filled (multi-chunk tokenizer, space fallback, purge); real Kokoro runs verified
+By: Petur Subev
+At: 2026-10-10T21:10:57Z
