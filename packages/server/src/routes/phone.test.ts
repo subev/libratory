@@ -85,6 +85,19 @@ describe("phone.pairingCode", () => {
     expect(out.code?.expiresInMs).toBeGreaterThan(0);
   });
 
+  it("follows PUBLIC_ORIGIN behind a proxy, loopback or not", async () => {
+    env.HOST = "127.0.0.1";
+    env.PUBLIC_ORIGIN = "https://shelf.example.org";
+    try {
+      const out = await phoneRouter.createCaller({}).pairingCode();
+      expect(out).toMatchObject({ loopbackOnly: false, machine: "shelf.example.org", reachable: { origin: "https://shelf.example.org", host: "shelf.example.org", via: "internet" } });
+      const params = new URLSearchParams(new URL(out.code!.link).hash.slice(1));
+      expect(params.get("s")).toBe("https://shelf.example.org");
+    } finally {
+      env.PUBLIC_ORIGIN = undefined;
+    }
+  });
+
   it("mints nothing when the machine has no network address", async () => {
     mockReachable.mockResolvedValueOnce(null);
     expect(await phoneRouter.createCaller({}).pairingCode()).toMatchObject({ reachable: null, code: null });

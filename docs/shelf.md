@@ -19,9 +19,10 @@ code for the profile it is on.
    ```
 
    `PAIR_LINK_BASE` defaults to `https://libratory.dev/pair`. `s` is where the server can be
-   reached — a Tailscale MagicDNS name when the CLI reports one, else the tailnet address, else the
-   first LAN address (`lib/reachable-address.ts`) — with the port, over plain `http`. `t` is the
-   token. Both ride in the fragment so the site the link names never sees the token.
+   reached: `PUBLIC_ORIGIN` when one is configured (a server behind a proxy, `https://…`), else a
+   Tailscale MagicDNS name when the CLI reports one, else the tailnet address, else the first LAN
+   address with the port over plain `http` (`lib/shelf-address.ts`, `lib/reachable-address.ts`).
+   `t` is the token. Both ride in the fragment so the site the link names never sees the token.
 3. The reader scans the code. It may **peek** at the shelf before adding it, then **pair**, which
    spends the token and answers with a device key. The key is shown once; only its SHA-256 is kept
    (`devices.key_hash`).
@@ -44,8 +45,9 @@ tRPC API stays exactly as unexposed as before.
 | `GET /shelf` | `Authorization: Bearer <deviceKey>` | `200 { machine, profile:{id,name}, device:{id,name}, books:[…] }` — see below. |
 | `GET /shelf/documents/:documentId` | bearer | The EPUB (`application/epub+zip`, `Content-Disposition: attachment`). Records the download for the owner's "on phones" column, once per device and file. `404` for a file that is hidden, not a shelf format, or another profile's. |
 
-`machine` is the server's hostname — what groups shelves on the reader side, since two profiles on
-one machine share an address. `/shelf/pair*` is rate-limited per IP (`PAIR_RATE_LIMIT`).
+`machine` is the server's hostname, or the public host when `PUBLIC_ORIGIN` is set — what groups
+shelves on the reader side, since two profiles on one machine share an address. `via` is
+`tailscale`, `lan` or `internet`; a reader should treat an unknown value as "other". `/shelf/pair*` is rate-limited per IP (`PAIR_RATE_LIMIT`).
 
 A `401` means the shelf does not know this key: it was never issued, or the owner pressed
 **Forget**. The reader should say so and offer to remove the shelf; what it already downloaded is
@@ -66,10 +68,14 @@ Every authenticated call updates `devices.last_seen_at`.
       "editions": [
         { "documentId": "…", "format": "epub-bilingual", "language": "English",
           "label": "German and English", "chapterCount": 10, "bytes": 168820736,
-          "createdAt": "2026-10-10T09:12:00.000Z", "downloaded": true },
+          "createdAt": "2026-10-10T09:12:00.000Z", "downloaded": true,
+          "narrated": true, "durationMs": 18120000, "voice": "Thorsten, Amy",
+          "level": "word", "levels": { "source": "word", "target": "sentence" } },
         { "documentId": "…", "format": "epub-sync", "language": null,
           "label": "German, read-along", "chapterCount": 10, "bytes": 77594624,
-          "createdAt": "2026-10-10T09:05:00.000Z", "downloaded": false }
+          "createdAt": "2026-10-10T09:05:00.000Z", "downloaded": false,
+          "narrated": true, "durationMs": 8400000, "voice": "Thorsten",
+          "level": "word", "levels": { "source": "word", "target": null } }
       ]
     }
   ]
@@ -81,6 +87,15 @@ edition's `language` is the translation's name as the variant key stores it, `nu
 original. `label` is the line a row shows: the language first, because that is what a reader picks
 by. `bytes` is `null` when the file is missing on disk. `downloaded` is whether *this* device has
 fetched the file. Newest first within a book.
+
+The narration fields come from the export (`documents.narration`, `lib/document-narration.ts`),
+never from opening the file: `narrated` is false for a bilingual export written with neither
+recording; `durationMs` is the running time across both lanes; `voice` names the voices across
+both lanes; `level` is the finest cue level a reader gets, `word` (every chapter timed by word),
+`sentence` (some) or `chunk` (none, a whole synthesis chunk lights); `levels` gives it per lane,
+`source` for the original text's narration and `target` for the translation's. Exports written
+before these were recorded are filled in once at the next server start from their sync maps; the
+fields are null until then.
 
 There is no cover endpoint yet: a book's only artwork is drawn into its M4B and deleted after, so a
 reader draws a title tile.
@@ -129,6 +144,28 @@ records.
   its own in-app camera, which needs no link at all. A custom scheme is one `PAIR_LINK_BASE` away.
 - **Nothing to the internet.** The page prints the address a device on the same network or
   tailnet can reach; it opens no port and creates no account.
+
+## Books that were made elsewhere
+
+The synced EPUB is the exchange format as well as the download: dropped on `/upload/ebook` (the
+upload dialog accepts it like any EPUB), a file that carries `p2af/book.json` comes back as a
+**finished** book rather than text chapters (`lib/synced-epub-books.ts`, pure parts in
+`lib/synced-epub.ts`). Each narrated chapter's audio is taken out of the archive straight onto
+disk as `chNNN.m4a`, its sync map rebuilt from the cue document, its text from the cues, and the
+EPUB itself moved under the book's outputs as the shelf document — so a server that never
+synthesizes still serves a shelf, and the workshop's reader and player work on the imported book.
+A chapter the export left unnarrated arrives suspended with whatever text the layer carried. The
+voices are not recorded in the layer, so the imported document's `voice` is null. A bilingual
+export is recognised by its chapters' translation entries and listed as `epub-bilingual`; only the
+original lane's narration is restored into chapters, the file itself is served whole.
+
+## Deploying behind a proxy
+
+The README's Docker section has the Caddy block: `/shelf/*` open, everything else behind
+`basic_auth`, `PUBLIC_ORIGIN` naming the public https origin and `TRUSTED_HOSTS` its host. Over
+https there is no ATS exception to make and the universal link is the natural way in. Pairing is
+unchanged: the owner opens the Phone page through the proxy's login, the QR carries the public
+origin, the phone scans it.
 
 ## Not in this round
 

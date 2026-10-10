@@ -27,6 +27,7 @@ vi.mock("./lib/reachable-address.ts", () => ({
 }));
 
 import { registerShelfRoutes } from "./shelf-routes.ts";
+import { env } from "./env.ts";
 import { pairingTokens } from "./lib/pairing.ts";
 
 const apps: Array<ReturnType<typeof Fastify>> = [];
@@ -99,6 +100,18 @@ describe("pairing", () => {
     const [device] = await getDb().select().from(devices).where(eq(devices.profileId, profile.id));
     expect(device?.name).toBe("Petur's iPhone");
     expect(device?.keyHash).not.toContain(paired.json().deviceKey);
+  });
+
+  it("names the public host as the machine and says internet behind a proxy", async () => {
+    const app = await createApp();
+    env.PUBLIC_ORIGIN = "https://shelf.example.org";
+    try {
+      const { token } = pairingTokens.mint(DEFAULT_PROFILE_ID);
+      const peek = await app.inject({ method: "GET", url: `/shelf/pair/${token}` });
+      expect(peek.json()).toMatchObject({ machine: "shelf.example.org", via: "internet" });
+    } finally {
+      env.PUBLIC_ORIGIN = undefined;
+    }
   });
 
   it("refuses a body without a name", async () => {

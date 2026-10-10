@@ -3,6 +3,7 @@ import { quickAddJob } from "graphile-worker";
 import { db } from "../db.ts";
 import { appendLog } from "../lib/log.ts";
 import { env } from "../env.ts";
+import { backfillDocumentNarration } from "../lib/document-narration.ts";
 
 const connectionString = env.DATABASE_URL;
 
@@ -10,6 +11,14 @@ const connectionString = env.DATABASE_URL;
 // (exhausted, or still locked by a dead worker) will never run again on its own. This
 // runs once at boot, before this process's runner starts, so any lock it sees is orphaned.
 export async function sweepStrandedWork() {
+  // Shelf rows from before narration was recorded at export: read their sync maps once
+  try {
+    const filled = await backfillDocumentNarration();
+    if (filled > 0) console.log(`[sweep] Recorded narration details for ${filled} earlier export${filled === 1 ? "" : "s"}`);
+  } catch (err) {
+    console.error(`[sweep] Narration backfill failed: ${err instanceof Error ? err.message : err}`);
+  }
+
   const [probe] = (await db.execute(
     sql`SELECT to_regclass('graphile_worker._private_jobs') AS jobs_table`,
   )) as unknown as Array<{ jobs_table: string | null }>;

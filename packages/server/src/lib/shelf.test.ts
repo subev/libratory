@@ -42,6 +42,7 @@ describe("groupByBook", () => {
     bytes: 1,
     createdAt: new Date("2026-10-01"),
     hidden: false,
+    narration: null,
     downloadedBy: [],
     ...over,
   });
@@ -58,6 +59,20 @@ describe("groupByBook", () => {
     expect(books.map((b) => [b.id, b.language, b.editions.map((e) => [e.documentId, e.downloaded])])).toEqual([
       ["b1", "German", [["d1", true], ["d2", false]]],
       ["b2", "French", [["d3", false]]],
+    ]);
+  });
+
+  it("flattens the recorded narration onto each edition, and says so when there is none yet", () => {
+    const [book] = groupByBook(
+      [
+        doc({ id: "d1", narration: { original: { level: "word", durationMs: 8400000, voice: "Thorsten" }, translation: null } }),
+        doc({ id: "d2", format: "epub-bilingual", language: "English", narration: null }),
+      ],
+      "phone",
+    );
+    expect(book?.editions.map((e) => [e.narrated, e.durationMs, e.voice, e.level, e.levels])).toEqual([
+      [true, 8400000, "Thorsten", "word", { source: "word", target: null }],
+      [false, null, null, null, { source: null, target: null }],
     ]);
   });
 });

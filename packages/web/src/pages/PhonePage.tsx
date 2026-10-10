@@ -195,6 +195,11 @@ function PhonesCard({ profileName }: { profileName: string | undefined }) {
   );
 }
 
+function narrationVoices(narration: { original: { voice: string | null } | null; translation: { voice: string | null } | null } | null): string {
+  const voices = [narration?.original?.voice, narration?.translation?.voice].filter(Boolean).join(", ");
+  return voices ? `${voices} · ` : "";
+}
+
 const COLUMNS = "grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_72px_108px_32px]";
 
 function ShelfTable({ profileName }: { profileName: string | undefined }) {
@@ -252,6 +257,7 @@ function ShelfTable({ profileName }: { profileName: string | undefined }) {
             <div className="min-w-0">
               <div className="truncate text-(--text-primary)">{d.label}</div>
               <div className="text-xs text-(--text-muted) truncate">
+                {narrationVoices(d.narration)}
                 {formatOutputDate(d.createdAt)}
                 {d.hidden ? " · hidden from phones" : ""}
               </div>

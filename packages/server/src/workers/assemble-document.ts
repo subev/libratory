@@ -18,6 +18,7 @@ import { mkdir, writeFile, rm } from "node:fs/promises";
 import path from "node:path";
 
 import { buildBilingualExportLayer, type BilingualExportOptions } from "../lib/bilingual-export.ts";
+import { bilingualNarration, laneFromRecordings, type Recording } from "../lib/document-narration.ts";
 
 export type AssembleDocumentPayload = {
   bookId: string;
@@ -197,7 +198,7 @@ async function assembleReadaloud(
   log: (msg: string) => Promise<void>,
   chapterIds?: string[],
 ) {
-  type Candidate = { id: string; index: number; title: string; audioPath: string | null; durationMs: number | null; chunkDir: string; link?: string };
+  type Candidate = { id: string; index: number; title: string; audioPath: string | null; durationMs: number | null; chunkDir: string; link?: string; voice: string | null };
 
   let candidates: Candidate[];
   if (language) {
@@ -210,6 +211,7 @@ async function assembleReadaloud(
         audioPath: chapterVariants.audioPath,
         durationMs: chapterVariants.audioDurationMs,
         audioStatus: chapterVariants.audioStatus,
+        synthesizedWith: chapterVariants.synthesizedWith,
         source: chapters.source,
       })
       .from(chapterVariants)
@@ -229,6 +231,7 @@ async function assembleReadaloud(
         durationMs: r.durationMs,
         chunkDir: translationChunkPreviewDir(bookId, language, r.index),
         link: chapterLink(r),
+        voice: r.synthesizedWith?.voice ?? null,
       }));
   } else {
     const rows = await db
@@ -244,11 +247,13 @@ async function assembleReadaloud(
       durationMs: ch.durationMs,
       chunkDir: chapterChunkPreviewDir(bookId, ch.index),
       link: chapterLink(ch),
+      voice: ch.synthesizedWith?.voice ?? null,
     }));
   }
 
   const readaloudChapters: ReadaloudChapter[] = [];
   const includedIds: string[] = [];
+  const recordings: Recording[] = [];
   const skipped: string[] = [];
   for (const ch of candidates) {
     if (!ch.audioPath || !ch.durationMs) {
@@ -262,6 +267,7 @@ async function assembleReadaloud(
     }
     readaloudChapters.push({ id: ch.id, index: ch.index, title: ch.title, audioPath: ch.audioPath, sync, link: ch.link });
     includedIds.push(ch.id);
+    recordings.push({ audioPath: ch.audioPath, durationMs: ch.durationMs, voice: ch.voice });
   }
 
   if (skipped.length > 0) {
@@ -312,6 +318,7 @@ async function assembleReadaloud(
     await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
   }
 
+  const lane = await laneFromRecordings(recordings);
   await db.insert(documents).values({
     bookId,
     language,
@@ -320,6 +327,7 @@ async function assembleReadaloud(
     chapterCount: readaloudChapters.length,
     chapterSummary: buildChapterSummary(readaloudChapters.map((ch) => ch.index)),
     chapterIds: JSON.stringify(includedIds),
+    narration: language ? { original: null, translation: lane } : { original: lane, translation: null },
   });
 }
 
@@ -411,7 +419,8 @@ async function assembleBilingual(book: typeof books.$inferSelect, key: string, o
       await attachReaderLayer(outputPath, workDir, layer);
     }
     await db.insert(documents).values({ bookId: book.id, language: key, format: "epub-bilingual",
-      outputPath, chapterIds: JSON.stringify(selected.map((chapter) => chapter.id)), chapterCount: selected.length, chapterSummary: buildChapterSummary(selected.map((chapter) => chapter.index)) });
+      outputPath, chapterIds: JSON.stringify(selected.map((chapter) => chapter.id)), chapterCount: selected.length, chapterSummary: buildChapterSummary(selected.map((chapter) => chapter.index)),
+      narration: await bilingualNarration(selected.map((chapter) => chapter.id), key, { sourceAudio: options.sourceAudio, targetAudio: options.targetAudio }) });
   } catch (error) {
     await rm(outputPath, { force: true });
     throw error;

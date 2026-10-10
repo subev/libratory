@@ -18,6 +18,7 @@ import { createCustomPocketVoice } from "./lib/pocket-voices.ts";
 import { UPLOAD_RATE_LIMIT } from "./lib/request-limits.ts";
 import { createPdfBook, ensurePdfDir, newPdfBookId, pdfFileName, PdfBookInputError } from "./lib/pdf-books.ts";
 import { createEbookBook } from "./lib/ebook-books.ts";
+import { createSyncedEpubBook, syncedEpubManifest } from "./lib/synced-epub-books.ts";
 import { EpubImportError } from "./lib/epub-import.ts";
 import { deleteBook } from "./lib/delete-book.ts";
 
@@ -130,11 +131,12 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
         return reply.code(400).send({ error: "No EPUB file uploaded" });
       }
 
-      const book = await createEbookBook(
-        bookId,
-        { epubPath, filename, title: fields.title, folderId: fields.folderId },
-        profileIdFromHeader(request.headers["x-profile-id"]),
-      );
+      const input = { epubPath, filename, title: fields.title, folderId: fields.folderId };
+      const profileId = profileIdFromHeader(request.headers["x-profile-id"]);
+      // A Libratory read-along export comes back as a finished book; any other EPUB as text
+      const book = (await syncedEpubManifest(epubPath))
+        ? await createSyncedEpubBook(bookId, input, profileId)
+        : await createEbookBook(bookId, input, profileId);
       return reply.send(book);
     } catch (err) {
       await deleteBook(bookId);

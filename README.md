@@ -190,6 +190,26 @@ Nothing in the image is Linux-specific, so the same command is also the Windows 
 
 The port is published on **127.0.0.1 deliberately**: there is no login, so anyone who can reach it can read and delete everything. Postgres is not published at all by the install file (the checkout's development file binds it to 127.0.0.1:5433) — its password is the default `libratory`. To serve your LAN, replace the mapping in an override file passed after the first, `-f oci://ghcr.io/subev/libratory-compose -f override.yaml` (`services: app: ports: !override ["3034:3034"]` — Compose *appends* a plain `ports` entry, and the second binding then fails on the port the first already holds) — and know who is on that network — or front it with a reverse proxy or Tailscale. The image sets `NETWORK_ACCESS=all` because a container is a server you put behind a login of your own; `NETWORK_ACCESS=shelf` instead answers the network only the phone shelf (`docs/shelf.md`), which is what a laptop does by default.
 
+**Behind Caddy, with a public shelf.** A reverse proxy is the login. The shape that keeps the shelf open to paired phones and everything else behind a password — `docs/shelf.md` has the rest, and `PUBLIC_ORIGIN` is what makes the pairing code carry the public name:
+
+```caddyfile
+shelf.example.org {
+	encode zstd gzip
+	@shelf path /shelf /shelf/*
+	handle @shelf {
+		reverse_proxy libratory:3034
+	}
+	handle {
+		basic_auth {
+			you $2a$14$...   # caddy hash-password
+		}
+		reverse_proxy libratory:3034
+	}
+}
+```
+
+with, on the `libratory` service, `PUBLIC_ORIGIN=https://shelf.example.org` and `TRUSTED_HOSTS=shelf.example.org` (the browser's `Origin` has to match a name the server trusts, or every POST through the proxy is refused). Books are made on a machine that can synthesize and brought over as read-along EPUBs: drop one on the upload page there and it comes back as a finished book with its narration and lands on the shelf — the server never needs the PDF or the models.
+
 The server tells browsers apart from strangers by matching their `Origin` against the Host they asked for. Reaching it by address — `http://192.168.1.50:3034`, `http://100.x.y.z:3034` — needs no configuration. Reaching it by *name* does: set `TRUSTED_HOSTS=library.example.com` (comma-separated, `host:port` when it is not the default port), because a name that vouches for itself is exactly what a DNS-rebinding page sends. A reverse proxy must also forward the original `Host` header (nginx: `proxy_set_header Host $host;` — Caddy already does), or every browser POST looks foreign and gets rejected.
 
 </details>

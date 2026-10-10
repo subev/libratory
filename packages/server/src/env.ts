@@ -34,6 +34,10 @@ const envSchema = z.object({
   // What the Phone page's QR encodes: a universal link the Camera opens the reader app with, the
   // server's own address and the pairing token in its fragment (lib/pairing.ts).
   PAIR_LINK_BASE: z.string().default("https://libratory.dev/pair"),
+  // Behind a proxy the server cannot see the address the world reaches it by: this is it, as an
+  // origin (`https://shelf.example.org`), and the pair link and the shelf's "machine" follow it
+  // (lib/shelf-address.ts). Unset on a laptop, where the network address is found at runtime.
+  PUBLIC_ORIGIN: z.url().optional(),
   CONDA_ENV_PATH: z.string().default(path.join(repoRoot, ".venv", "bin")),
   SCRIPTS_DIR: z.string().default(path.join(repoRoot, "scripts")),
   WEB_DIR: z.string().default(path.join(repoRoot, "packages", "web", "dist")),

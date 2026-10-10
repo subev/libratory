@@ -1,17 +1,15 @@
-import os from "node:os";
 import { access } from "node:fs/promises";
 import path from "node:path";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "./db.ts";
-import { env } from "./env.ts";
 import { books, devices, documents, profiles, shelfDownloads } from "./schema.ts";
 import { isUuid } from "./lib/uuid.ts";
 import { outputDir } from "./lib/paths.ts";
 import { PAIR_RATE_LIMIT } from "./lib/request-limits.ts";
 import { pairingTokens } from "./lib/pairing.ts";
-import { reachableAddress } from "./lib/reachable-address.ts";
+import { machineName, shelfAddress } from "./lib/shelf-address.ts";
 import { groupByBook, hashDeviceKey, newDeviceKey, shelfBookCount, shelfDocuments } from "./lib/shelf.ts";
 import { contentDisposition } from "./lib/content-disposition.ts";
 
@@ -52,9 +50,9 @@ export function registerShelfRoutes(fastify: FastifyInstance) {
     if (peek === "gone") return reply.code(410).send({ error: "This pairing code has been used or has expired" });
     const profile = await profileNamed(peek.profileId);
     if (!profile) return reply.code(404).send({ error: "Unknown pairing code" });
-    const reachable = await reachableAddress(env.PORT);
+    const reachable = await shelfAddress();
     return {
-      machine: os.hostname(),
+      machine: machineName(),
       profile,
       bookCount: await shelfBookCount(profile.id),
       via: reachable?.via ?? "lan",
@@ -80,7 +78,7 @@ export function registerShelfRoutes(fastify: FastifyInstance) {
     return {
       deviceId: device.id,
       deviceKey,
-      machine: os.hostname(),
+      machine: machineName(),
       profile,
       bookCount: await shelfBookCount(profile.id),
     };
@@ -93,7 +91,7 @@ export function registerShelfRoutes(fastify: FastifyInstance) {
     if (!profile) return reply.code(401).send({ error: "This shelf is gone" });
     const docs = await shelfDocuments(profile.id, { includeHidden: false });
     return {
-      machine: os.hostname(),
+      machine: machineName(),
       profile,
       device: { id: device.id, name: device.name },
       books: groupByBook(docs, device.id),

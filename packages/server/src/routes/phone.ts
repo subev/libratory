@@ -1,4 +1,3 @@
-import os from "node:os";
 import { and, countDistinct, desc, eq, inArray } from "drizzle-orm";
 import QRCode from "qrcode";
 import { z } from "zod";
@@ -8,7 +7,7 @@ import { router, publicProcedure } from "../trpc.ts";
 import { books, devices, documents, profiles, shelfDownloads, DEFAULT_PROFILE_ID } from "../schema.ts";
 import { updateEnvFile } from "../lib/env-file.ts";
 import { PAIRING_TTL_MS, pairLink, pairingTokens } from "../lib/pairing.ts";
-import { reachableAddress } from "../lib/reachable-address.ts";
+import { machineName, shelfAddress } from "../lib/shelf-address.ts";
 import { shelfDocuments } from "../lib/shelf.ts";
 import { NETWORK_ACCESS, currentNetworkAccess, setNetworkAccess } from "../lib/network-access.ts";
 
@@ -24,10 +23,11 @@ export const phoneRouter = router({
   pairingCode: publicProcedure.query(async ({ ctx }) => {
     const profileId = ctx.profileId ?? DEFAULT_PROFILE_ID;
     const [profile] = await db.select({ name: profiles.name }).from(profiles).where(eq(profiles.id, profileId));
-    const reachable = await reachableAddress(env.PORT);
-    const loopbackOnly = LOOPBACK.has(env.HOST);
+    const reachable = await shelfAddress();
+    // A public name is reached through a proxy, which may well forward to loopback
+    const loopbackOnly = LOOPBACK.has(env.HOST) && reachable?.via !== "internet";
     const access = currentNetworkAccess();
-    const base = { profileName: profile?.name ?? "Default", machine: os.hostname(), reachable, loopbackOnly, access };
+    const base = { profileName: profile?.name ?? "Default", machine: machineName(), reachable, loopbackOnly, access };
     if (!reachable || loopbackOnly || access === "none") return { ...base, code: null };
     const { token, expiresAt } = pairingTokens.mint(profileId);
     const link = pairLink(env.PAIR_LINK_BASE, reachable.origin, token);

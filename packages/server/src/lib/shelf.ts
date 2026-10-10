@@ -1,8 +1,9 @@
 import { createHash, randomBytes } from "node:crypto";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "../db.ts";
-import { books, devices, documents, shelfDownloads } from "../schema.ts";
+import { books, devices, documents, shelfDownloads, type DocumentNarration } from "../schema.ts";
 import { fileSize } from "./disk-usage.ts";
+import { narrationSummary, type NarrationSummary } from "./document-narration.ts";
 
 // The shelf is derived, never curated: a profile's finished read-along and bilingual EPUBs, as
 // they are. Hiding one is the only edit, and it hides the row, not the file.
@@ -24,6 +25,7 @@ export type ShelfDocument = {
   bytes: number | null;
   createdAt: Date;
   hidden: boolean;
+  narration: DocumentNarration | null;
   downloadedBy: { deviceId: string; name: string }[];
 };
 
@@ -82,6 +84,7 @@ export async function shelfDocuments(profileId: string, options: { includeHidden
       outputPath: documents.outputPath,
       createdAt: documents.createdAt,
       hidden: documents.shelfHidden,
+      narration: documents.narration,
     })
     .from(documents)
     .innerJoin(books, eq(documents.bookId, books.id))
@@ -129,7 +132,7 @@ export type ShelfBook = {
   title: string;
   author: string | null;
   language: string | null;
-  editions: {
+  editions: ({
     documentId: string;
     format: ShelfFormat;
     language: string | null;
@@ -138,7 +141,7 @@ export type ShelfBook = {
     bytes: number | null;
     createdAt: Date;
     downloaded: boolean;
-  }[];
+  } & NarrationSummary)[];
 };
 
 export function groupByBook(docs: ShelfDocument[], deviceId: string): ShelfBook[] {
@@ -160,6 +163,7 @@ export function groupByBook(docs: ShelfDocument[], deviceId: string): ShelfBook[
       bytes: doc.bytes,
       createdAt: doc.createdAt,
       downloaded: doc.downloadedBy.some((d) => d.deviceId === deviceId),
+      ...narrationSummary(doc.narration),
     });
     byBook.set(doc.bookId, book);
   }

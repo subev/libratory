@@ -1,5 +1,6 @@
 import type { PairArtifact, LinkArtifact, BilingualJob } from "./lib/bilingual-preparation.ts";
 import type { ExtractionSettings } from "./lib/extraction-presets.ts";
+import type { CueGranularity } from "./lib/reader-format.ts";
 import { sql } from "drizzle-orm";
 import { fromStoredPath, toStoredPath } from "./lib/paths.ts";
 import { pgTable, uuid, text, real, integer, timestamp, boolean, jsonb, unique, index, vector, customType, type AnyPgColumn } from "drizzle-orm/pg-core";
@@ -90,7 +91,9 @@ export type SearchIndexJob = {
 export type BookOrigin =
   | { type: "digest"; sourceBookIds: string[]; prompt: string; model: string }
   | { type: "api"; client?: string }
-  | { type: "ebook"; filename: string };
+  | { type: "ebook"; filename: string }
+  // A Libratory read-along export brought back as a finished book, its narration restored from the file
+  | { type: "synced-epub"; filename: string };
 
 export type DigestJob = {
   status: "running" | "done" | "failed";
@@ -112,6 +115,12 @@ export type VariantParams = {
 // What a chapter's audio was made with, and when — `at` is ISO, and audio made before it was
 // recorded gets its file's modified time at boot (lib/synthesized-at.ts).
 export type SynthesizedWith = { voice?: string; speed?: number | null; at?: string };
+
+// What a shelf document's narration is like, recorded at export so a listing never opens the
+// files: a lane per narrated text (the original, the translation), each with the cue level the
+// reader gets, the running time and the voice names. Both null is a text-only bilingual export.
+export type NarrationLane = { level: CueGranularity; durationMs: number; voice: string | null };
+export type DocumentNarration = { original: NarrationLane | null; translation: NarrationLane | null };
 
 export type VariantVoices = Record<string, { voice?: string; speed?: number }>;
 
@@ -321,6 +330,8 @@ export const documents = pgTable("documents", {
   chapterIds: text("chapter_ids").notNull(),
   // Hidden from the phone shelf; the file and the row stay
   shelfHidden: boolean("shelf_hidden").notNull().default(false),
+  // Null on rows written before it existed, until the startup backfill reads their sync maps
+  narration: jsonb("narration").$type<DocumentNarration>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
