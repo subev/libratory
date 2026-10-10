@@ -93,6 +93,7 @@ export async function buildManifest(book: Book): Promise<ReaderManifest> {
       id: book.id,
       title: book.title,
       author: book.author,
+      description: book.description,
       language: languageCode(book.language),
       medianBodyPt: medianBodyPt(geometryPages),
       // Nothing serves a cover over HTTP; a container carries one and says where

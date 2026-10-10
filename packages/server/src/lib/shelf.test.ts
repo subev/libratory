@@ -35,6 +35,7 @@ describe("groupByBook", () => {
     author: "Kafka",
     textSource: null,
     rights: null,
+    description: null,
     bookLanguage: "de",
     format: "epub-sync",
     language: null,

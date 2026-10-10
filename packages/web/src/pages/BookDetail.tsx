@@ -1362,6 +1362,7 @@ export function BookDetail() {
           language={book.language ?? null}
           textSource={book.textSource ?? null}
           rights={book.rights ?? null}
+          description={book.description ?? null}
           onSave={(patch) => updateSettingsMutation.mutate({ id: book.id, ...patch })}
           onClose={() => setShowDetails(false)}
         />

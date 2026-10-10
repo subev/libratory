@@ -38,6 +38,7 @@ export async function createEbookBook(bookId: string, input: CreateEbookBookInpu
       title: title.slice(0, 500),
       kind: "ebook",
       author: parsed.author,
+      description: parsed.description,
       // Publisher templates often leave the package language at a default, so the text decides first
       language: detectLanguage(allText) ?? packageLanguage(parsed.language),
       origin: { type: "ebook", filename: input.filename },

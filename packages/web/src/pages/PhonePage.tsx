@@ -72,6 +72,7 @@ function PairingCard() {
   const listen = trpc.phone.listenOnNetwork.useMutation();
   const setAccess = trpc.phone.setNetworkAccess.useMutation({ onSuccess: () => utils.phone.pairingCode.invalidate() });
   const setPublic = trpc.phone.setPublic.useMutation({ onSuccess: () => utils.phone.pairingCode.invalidate() });
+  const paired = trpc.phone.devices.useQuery().data?.length ?? 0;
   const refresh = useCallback(() => void utils.phone.pairingCode.invalidate(), [utils]);
 
   const data = code.data;
@@ -111,6 +112,7 @@ function PairingCard() {
           <span>
             Not shared. The network can reach nothing on this server, so there is no code to scan
             {data.isPublic ? ", and the public shelf is marked but unreachable" : ""}.
+            {paired > 0 ? ` The ${paired === 1 ? "phone" : `${paired} phones`} paired below get "sharing is off" until you share again.` : ""}
           </span>
           <Button variant="primary" size="sm" className="self-start" onClick={() => setAccess.mutate({ access: "shelf" })} disabled={busy} data-testid="share-shelf">
             Share this shelf on the network

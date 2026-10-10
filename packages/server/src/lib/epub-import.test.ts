@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { strToU8, zipSync } from "fflate";
-import { EpubImportError, parseEpub } from "./epub-import.ts";
+import { EpubImportError, parseEpub, descriptionText } from "./epub-import.ts";
 
 const CONTAINER = `<?xml version="1.0"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
@@ -255,5 +255,15 @@ describe("parseEpub", () => {
   it("refuses a file that is not an EPUB", () => {
     expect(() => parseEpub(strToU8("%PDF-1.4 not a zip"))).toThrow(EpubImportError);
     expect(() => parseEpub(zipSync({ "readme.txt": strToU8("hello") }))).toThrow(/no package file/);
+  });
+});
+
+describe("descriptionText", () => {
+  it("keeps paragraphs, drops markup, and caps by character", () => {
+    expect(descriptionText("<p>First   para.</p><p>Second<br/>line</p>")).toBe("First para.\n\nSecond\n\nline");
+    expect(descriptionText("  plain  text  ")).toBe("plain text");
+    expect(descriptionText("")).toBeNull();
+    expect(descriptionText(null)).toBeNull();
+    expect(Array.from(descriptionText("😀".repeat(3000)) ?? "")).toHaveLength(2000);
   });
 });

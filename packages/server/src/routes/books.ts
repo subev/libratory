@@ -478,6 +478,7 @@ export const booksRouter = router({
       // Shown on a public shelf's book page: "Project Gutenberg", "Public domain"; "" clears
       textSource: z.string().max(200).nullable().optional(),
       rights: z.string().max(200).nullable().optional(),
+      description: z.string().max(2000).nullable().optional(),
     }))
     .mutation(async ({ input }) => {
       const updates: Record<string, unknown> = { updatedAt: new Date() };
@@ -495,6 +496,7 @@ export const booksRouter = router({
       if (input.author !== undefined) updates.author = input.author?.trim() || null;
       if (input.textSource !== undefined) updates.textSource = input.textSource?.trim() || null;
       if (input.rights !== undefined) updates.rights = input.rights?.trim() || null;
+      if (input.description !== undefined) updates.description = input.description?.trim() || null;
       await db.update(books).set(updates).where(eq(books.id, input.id));
       return { success: true };
     }),

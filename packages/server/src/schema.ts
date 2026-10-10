@@ -192,6 +192,8 @@ export const books = pgTable("books", {
   // What a public shelf says about a copy: where the text came from and what may be done with it
   textSource: text("text_source"),
   rights: text("rights"),
+  // A sentence to a paragraph about the book, for a shelf's catalogue
+  description: text("description"),
   skipSynthesis: boolean("skip_synthesis").notNull().default(false),
   totalChapters: integer("total_chapters").notNull().default(0),
   noteJob: jsonb("note_job").$type<NoteJob>(),

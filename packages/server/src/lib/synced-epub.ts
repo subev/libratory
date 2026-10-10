@@ -77,5 +77,7 @@ export function isReaderCues(value: unknown): value is ReaderCues {
 export function isReaderManifest(value: unknown): value is ReaderManifest {
   if (typeof value !== "object" || value === null) return false;
   const v = value as { format?: unknown; book?: unknown; chapters?: unknown };
-  return typeof v.format === "string" && v.format.startsWith("p2af/") && typeof v.book === "object" && v.book !== null && Array.isArray(v.chapters);
+  if (typeof v.format !== "string" || !v.format.startsWith("p2af/") || typeof v.book !== "object" || v.book === null || !Array.isArray(v.chapters)) return false;
+  const description = (v.book as { description?: unknown }).description;
+  return description === undefined || description === null || typeof description === "string";
 }

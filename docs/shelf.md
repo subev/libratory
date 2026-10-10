@@ -66,6 +66,7 @@ Every authenticated call updates `devices.last_seen_at`.
     {
       "id": "…", "title": "Der Prozess", "author": "Kafka", "language": "German",
       "source": "Project Gutenberg", "rights": "Public domain",
+      "description": "A young scientist builds a creature and abandons it; the creature learns what that costs.",
       "editions": [
         { "documentId": "…", "format": "epub-bilingual", "language": "English",
           "label": "German and English", "chapterCount": 10, "bytes": 168820736,
@@ -84,7 +85,10 @@ Every authenticated call updates `devices.last_seen_at`.
 ```
 
 A book's `source` and `rights` are what the owner typed under Book details ("Project Gutenberg",
-"Public domain"), null when empty, so a reader leaves the line out rather than invent it. A
+"Public domain"), null when empty, so a reader leaves the line out rather than invent it.
+`description` is the same kind of field — plain text, a sentence to a paragraph — filled from an
+EPUB's own `dc:description` on import and carried in a read-along export's layer, so a book brought
+to a public shelf keeps it. A
 book's `language` is a name in English from the book's language code (`Intl.DisplayNames`); an
 edition's `language` is the translation's name as the variant key stores it, `null` for the
 original. `label` is the line a row shows: the language first, because that is what a reader picks

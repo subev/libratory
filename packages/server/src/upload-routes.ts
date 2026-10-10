@@ -18,7 +18,7 @@ import { createCustomPocketVoice } from "./lib/pocket-voices.ts";
 import { UPLOAD_RATE_LIMIT } from "./lib/request-limits.ts";
 import { createPdfBook, ensurePdfDir, newPdfBookId, pdfFileName, PdfBookInputError } from "./lib/pdf-books.ts";
 import { createEbookBook } from "./lib/ebook-books.ts";
-import { createSyncedEpubBook, syncedEpubManifest } from "./lib/synced-epub-books.ts";
+import { attachSyncedEpubDocument, createSyncedEpubBook, syncedEpubManifest } from "./lib/synced-epub-books.ts";
 import { EpubImportError } from "./lib/epub-import.ts";
 import { deleteBook } from "./lib/delete-book.ts";
 
@@ -133,6 +133,16 @@ export function registerUploadRoutes(fastify: FastifyInstance) {
 
       const input = { epubPath, filename, title: fields.title, folderId: fields.folderId };
       const profileId = profileIdFromHeader(request.headers["x-profile-id"]);
+      // With a bookId the export becomes another edition of that book rather than a new one
+      if (fields.bookId) {
+        if (!isUuid(fields.bookId)) {
+          await rm(bookDir, { recursive: true, force: true });
+          return reply.code(400).send({ error: "Invalid book id" });
+        }
+        const attached = await attachSyncedEpubDocument(fields.bookId, input, profileId);
+        await rm(bookDir, { recursive: true, force: true });
+        return reply.send({ bookId: fields.bookId, ...attached });
+      }
       // A Libratory read-along export comes back as a finished book; any other EPUB as text
       const book = (await syncedEpubManifest(epubPath))
         ? await createSyncedEpubBook(bookId, input, profileId)

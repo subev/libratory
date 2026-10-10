@@ -19,6 +19,7 @@ export type ShelfDocument = {
   author: string | null;
   textSource: string | null;
   rights: string | null;
+  description: string | null;
   // The book's own language, a code; a document's is the translation's name
   bookLanguage: string | null;
   format: ShelfFormat;
@@ -98,6 +99,7 @@ export async function shelfDocuments(profileId: string, options: { includeHidden
       author: books.author,
       textSource: books.textSource,
       rights: books.rights,
+      description: books.description,
       bookLanguage: books.language,
       format: documents.format,
       language: documents.language,
@@ -166,6 +168,7 @@ export type ShelfBook = {
   // Where the text came from and what may be done with it; null leaves the line out
   source: string | null;
   rights: string | null;
+  description: string | null;
   editions: ({
     documentId: string;
     format: ShelfFormat;
@@ -189,6 +192,7 @@ export function groupByBook(docs: ShelfDocument[], deviceId: string | null): She
       language: languageName(doc.bookLanguage),
       source: doc.textSource,
       rights: doc.rights,
+      description: doc.description,
       editions: [],
     };
     book.editions.push({

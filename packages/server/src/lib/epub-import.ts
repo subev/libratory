@@ -9,6 +9,8 @@ export type ParsedEpub = {
   title: string | null;
   author: string | null;
   language: string | null;
+  // dc:description, with any markup a publisher put in it reduced to text
+  description: string | null;
   chapters: { title: string; text: string }[];
 };
 
@@ -117,6 +119,7 @@ export function parseEpub(bytes: Uint8Array): ParsedEpub {
     title: firstText(opf, "title"),
     author: firstText(opf, "creator"),
     language: firstText(opf, "language"),
+    description: descriptionText(elements(opf, "description")[0]?.textContent ?? null),
     chapters,
   };
 }
@@ -210,6 +213,20 @@ function descendants(root: DomDocument | DomElement): DomElement[] {
     for (const child of root.children) visit(child);
   }
   return out;
+}
+
+// Publishers put HTML inside dc:description; paragraph breaks survive as blank lines, tags go,
+// and the cap counts characters rather than code units so it cannot split a pair
+export function descriptionText(raw: string | null): string | null {
+  if (!raw) return null;
+  const text = raw
+    .replace(/<\/p>|<br\s*\/?>/gi, "\n\n")
+    .replace(/<[^>]+>/g, "")
+    .split(/\n\s*\n/)
+    .map((para) => para.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n\n");
+  return text ? Array.from(text).slice(0, 2000).join("") : null;
 }
 
 function firstText(root: DomDocument, name: string): string | null {

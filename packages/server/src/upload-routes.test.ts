@@ -356,6 +356,21 @@ function tinyEpub(): Uint8Array {
   });
 }
 
+describe("POST /upload/ebook with a bookId", () => {
+  it("refuses a bad id and leaves no upload directory behind", async () => {
+    await resetDb(getDb());
+    const app = await createApp();
+    const { payload, headers } = multipartBody([
+      { name: "bookId", value: "not-a-uuid" },
+      { name: "file", value: "PK\u0003\u0004", filename: "x.epub" },
+    ]);
+    const before = (await readdir(uploadsDir).catch(() => [])).length;
+    const res = await app.inject({ method: "POST", url: "/upload/ebook", payload, headers });
+    expect(res.statusCode).toBe(400);
+    expect((await readdir(uploadsDir).catch(() => [])).length).toBe(before);
+  });
+});
+
 describe("POST /upload/ebook", () => {
   beforeEach(async () => {
     await resetDb(getDb());

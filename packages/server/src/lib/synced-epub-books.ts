@@ -4,15 +4,17 @@ import { copyFile, mkdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { promisify } from "node:util";
+import { eq } from "drizzle-orm";
 import { db } from "../db.ts";
-import { books, chapters, documents, type Book } from "../schema.ts";
+import { books, chapters, documents, type Book, type DocumentNarration, type NarrationLane } from "../schema.ts";
 import { EpubImportError } from "./epub-import.ts";
 import { appendLog } from "./log.ts";
 import { bookOutputDir } from "./paths.ts";
 import { ownFolderId } from "./pdf-books.ts";
 import { queueIndexBook } from "./search-index.ts";
 import { syncMapPath, type SyncMap } from "./sync-map.ts";
-import { laneFromRecordings, type Recording } from "./document-narration.ts";
+import { combineLevels, laneFromRecordings, type Recording } from "./document-narration.ts";
+import type { CueGranularity } from "./reader-format.ts";
 import type { ReaderCues, ReaderManifest } from "./reader-format.ts";
 import { chapterTextFromCues, documentFormatOf, isReaderCues, isReaderManifest, layerEntryPath, syncMapFromCues } from "./synced-epub.ts";
 
@@ -113,6 +115,16 @@ function chapterFile(index: number, ext: string): string {
   return `ch${String(index).padStart(3, "0")}${ext}`;
 }
 
+// A second export under the same name must not land on the first's bytes
+async function freePath(dir: string, filename: string): Promise<string> {
+  const ext = path.extname(filename);
+  const base = filename.slice(0, filename.length - ext.length);
+  for (let n = 1; ; n++) {
+    const candidate = path.join(dir, n === 1 ? filename : `${base} (${n})${ext}`);
+    if (!(await stat(candidate).then(() => true, () => false))) return candidate;
+  }
+}
+
 function safeName(filename: string): string {
   return path.basename(filename).replace(/[^\w.\- ]+/g, "_").slice(0, 150) || "book.epub";
 }
@@ -126,6 +138,51 @@ type ImportedChapter = {
   sync: SyncMap | null;
   durationMs: number | null;
 };
+
+const LEVELS = new Set<string>(["word", "sentence", "chunk"]);
+
+function levelOf(granularity: unknown): CueGranularity {
+  return typeof granularity === "string" && LEVELS.has(granularity) ? (granularity as CueGranularity) : "chunk";
+}
+
+type LaneNarration = { totalMs?: unknown; anchors?: unknown } | null | undefined;
+function laneLevel(narration: LaneNarration): CueGranularity {
+  const anchors = Array.isArray(narration?.anchors) ? narration.anchors : [];
+  return anchors.some((a: unknown) => typeof a === "object" && a !== null && (a as { kind?: unknown }).kind === "word") ? "word" : "sentence";
+}
+
+// What the file says about its own narration: the cue documents' granularity for the original
+// lane, and the bilingual documents' anchors for the translation's — so an edition kept whole
+// is described as the reader will find it, not guessed
+async function narrationFromLayer(epub: string, bookJson: string, entries: Map<string, Entry>, manifest: ReaderManifest): Promise<DocumentNarration> {
+  const original: { levels: CueGranularity[]; ms: number } = { levels: [], ms: 0 };
+  const translation: { levels: CueGranularity[]; ms: number } = { levels: [], ms: 0 };
+  for (const ch of manifest.chapters) {
+    const cuesEntry = ch.cues ? layerEntryPath(bookJson, ch.cues) : null;
+    const hasCues = cuesEntry !== null && entries.has(cuesEntry);
+    if (hasCues) {
+      const doc = readJson<ReaderCues>(await readEntry(epub, cuesEntry), isReaderCues, `cues for "${ch.title}"`);
+      original.levels.push(levelOf(doc.granularity));
+      original.ms += doc.totalMs;
+    }
+    for (const pair of ch.bilingual ?? []) {
+      const entry = layerEntryPath(bookJson, pair.url);
+      if (!entries.has(entry)) continue;
+      const doc = readJson(await readEntry(epub, entry), (v): v is { source?: { narration?: LaneNarration }; target?: { narration?: LaneNarration } } => typeof v === "object" && v !== null, `pairing for "${ch.title}"`);
+      if (!hasCues && doc.source?.narration) {
+        original.levels.push(laneLevel(doc.source.narration));
+        original.ms += typeof doc.source.narration.totalMs === "number" ? doc.source.narration.totalMs : 0;
+      }
+      if (doc.target?.narration) {
+        translation.levels.push(laneLevel(doc.target.narration));
+        translation.ms += typeof doc.target.narration.totalMs === "number" ? doc.target.narration.totalMs : 0;
+      }
+    }
+  }
+  const lane = (side: { levels: CueGranularity[]; ms: number }): NarrationLane | null =>
+    side.levels.length === 0 ? null : { level: combineLevels(side.levels), durationMs: side.ms, voice: null };
+  return { original: lane(original), translation: lane(translation) };
+}
 
 export async function createSyncedEpubBook(bookId: string, input: CreateSyncedEpubBookInput, profileId: string): Promise<Book> {
   const found = await syncedEpubManifest(input.epubPath);
@@ -169,7 +226,8 @@ export async function createSyncedEpubBook(bookId: string, input: CreateSyncedEp
   }
 
   // The file itself is the shelf document, so it lives with the book's other outputs
-  const documentPath = path.join(outDir, safeName(input.filename));
+  const layerNarration = await narrationFromLayer(input.epubPath, bookJson, entries, manifest);
+  const documentPath = await freePath(outDir, safeName(input.filename));
   await move(input.epubPath, documentPath);
 
   const folderId = await ownFolderId(input.folderId, profileId);
@@ -181,6 +239,7 @@ export async function createSyncedEpubBook(bookId: string, input: CreateSyncedEp
       title: title.slice(0, 500),
       kind: "ebook",
       author: manifest.book.author,
+      description: typeof manifest.book.description === "string" ? Array.from(manifest.book.description).slice(0, 2000).join("") : null,
       language: manifest.book.language || null,
       origin: { type: "synced-epub", filename: input.filename },
       voice: "kokoro:af_heart",
@@ -217,10 +276,49 @@ export async function createSyncedEpubBook(bookId: string, input: CreateSyncedEp
     chapterCount: imported.length,
     chapterSummary: imported.length === 1 ? "1" : `1-${imported.length}`,
     chapterIds: JSON.stringify(rows.map((r) => r.id)),
-    narration: { original: await laneFromRecordings(recordings), translation: null },
+    narration: { original: (await laneFromRecordings(recordings)) ?? layerNarration.original, translation: layerNarration.translation },
   });
 
   await appendLog(bookId, `Imported read-along EPUB "${input.filename}": ${imported.length} chapter${imported.length === 1 ? "" : "s"}, ${withAudio.length} with narration, on the shelf as ${format}`);
   await queueIndexBook(bookId);
   return book;
+}
+
+// A second edition of a book already on the shelf — the bilingual copy beside the read-along — is
+// the file as a document on that book, nothing restored into chapters: the phone groups editions
+// by book, and a second import would have made a second book
+export async function attachSyncedEpubDocument(bookId: string, input: CreateSyncedEpubBookInput, profileId: string): Promise<{ documentId: string }> {
+  const [book] = await db.select({ id: books.id, profileId: books.profileId }).from(books).where(eq(books.id, bookId));
+  if (!book || book.profileId !== profileId) throw new EpubImportError("No such book to attach the file to");
+  const found = await syncedEpubManifest(input.epubPath);
+  if (!found) throw new EpubImportError("Not a Libratory read-along EPUB");
+  const { manifest, entry: bookJson, entries } = found;
+  const outDir = bookOutputDir(bookId);
+  await mkdir(outDir, { recursive: true });
+  const documentPath = await freePath(outDir, safeName(input.filename));
+  const { format, language } = documentFormatOf(manifest);
+  const narration = await narrationFromLayer(input.epubPath, bookJson, entries, manifest);
+  // The row first: a move that fails then leaves a row to delete rather than a file nobody knows
+  const [doc] = await db
+    .insert(documents)
+    .values({
+      bookId,
+      language,
+      format,
+      outputPath: documentPath,
+      chapterCount: manifest.chapters.length,
+      chapterSummary: manifest.chapters.length === 1 ? "1" : `1-${manifest.chapters.length}`,
+      chapterIds: "[]",
+      narration,
+    })
+    .returning({ id: documents.id });
+  if (!doc) throw new Error("Failed to record the document");
+  try {
+    await move(input.epubPath, documentPath);
+  } catch (err) {
+    await db.delete(documents).where(eq(documents.id, doc.id));
+    throw err;
+  }
+  await appendLog(bookId, `Attached read-along EPUB "${input.filename}" as a ${format} edition`);
+  return { documentId: doc.id };
 }

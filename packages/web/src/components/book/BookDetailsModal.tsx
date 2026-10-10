@@ -12,6 +12,7 @@ export function BookDetailsModal({
   language,
   textSource,
   rights,
+  description,
   onSave,
   onClose,
 }: {
@@ -19,18 +20,26 @@ export function BookDetailsModal({
   language: string | null;
   textSource: string | null;
   rights: string | null;
-  onSave: (next: { author: string | null; language: string | null; textSource: string | null; rights: string | null }) => void;
+  description: string | null;
+  onSave: (next: { author: string | null; language: string | null; textSource: string | null; rights: string | null; description: string | null }) => void;
   onClose: () => void;
 }) {
   const [draftAuthor, setDraftAuthor] = useState(author ?? "");
   const [draftLanguage, setDraftLanguage] = useState(language ?? "");
   const [draftSource, setDraftSource] = useState(textSource ?? "");
   const [draftRights, setDraftRights] = useState(rights ?? "");
+  const [draftDescription, setDraftDescription] = useState(description ?? "");
 
   const field = "w-full rounded border border-(--border-input) bg-(--bg-input) px-2 py-1.5 text-sm text-(--text-primary)";
 
   function save() {
-    onSave({ author: draftAuthor.trim() || null, language: draftLanguage || null, textSource: draftSource.trim() || null, rights: draftRights.trim() || null });
+    onSave({
+      author: draftAuthor.trim() || null,
+      language: draftLanguage || null,
+      textSource: draftSource.trim() || null,
+      rights: draftRights.trim() || null,
+      description: draftDescription.trim() || null,
+    });
     onClose();
   }
 
@@ -81,6 +90,18 @@ export function BookDetailsModal({
             data-testid="book-details-rights"
           />
           <span className="block mt-1 text-xs text-(--text-muted)">Both are what makes a free shelf trustworthy; a reader leaves the line out when they are empty.</span>
+        </label>
+        <label className="block">
+          <span className="block mb-1 text-xs font-medium text-(--text-secondary)">Description</span>
+          <textarea
+            value={draftDescription}
+            onChange={(e) => setDraftDescription(e.target.value)}
+            rows={3}
+            placeholder="A sentence or three about the book, for a shelf's catalogue"
+            title="Shown under the title on a shelf; an EPUB's own description lands here on import"
+            className={field}
+            data-testid="book-details-description"
+          />
         </label>
       </div>
       <div className="flex items-center gap-2 px-4 py-3 border-t border-(--border)">

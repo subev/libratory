@@ -28,7 +28,7 @@ vi.mock("./paths.ts", async (importOriginal) => {
   };
 });
 
-import { createSyncedEpubBook, syncedEpubManifest } from "./synced-epub-books.ts";
+import { attachSyncedEpubDocument, createSyncedEpubBook, syncedEpubManifest } from "./synced-epub-books.ts";
 import { EpubImportError } from "./epub-import.ts";
 
 const AUDIO = new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112, 77, 52, 65, 32]);
@@ -146,6 +146,17 @@ describe("createSyncedEpubBook", () => {
     await expect(createSyncedEpubBook(crypto.randomUUID(), { epubPath: epub, filename: "broken.epub" }, DEFAULT_PROFILE_ID)).rejects.toThrow(/unexpected shape/);
   });
 
+  it("refuses a manifest whose description is not text", async () => {
+    const epub = path.join(tmpRoot, "baddesc.epub");
+    const { unzipSync } = await import("fflate");
+    const files = unzipSync(readaloudEpub());
+    const manifest = JSON.parse(new TextDecoder().decode(files["OEBPS/p2af/book.json"]));
+    manifest.book.description = { html: "<b>no</b>" };
+    files["OEBPS/p2af/book.json"] = strToU8(JSON.stringify(manifest));
+    await writeFile(epub, zipSync(files));
+    await expect(createSyncedEpubBook(crypto.randomUUID(), { epubPath: epub, filename: "baddesc.epub" }, DEFAULT_PROFILE_ID)).rejects.toThrow(EpubImportError);
+  });
+
   it("refuses an archive that declares far more audio than it holds", async () => {
     const epub = path.join(tmpRoot, "bomb.epub");
     const { unzipSync } = await import("fflate");
@@ -154,6 +165,33 @@ describe("createSyncedEpubBook", () => {
     files["OEBPS/audio/ch000.m4a"] = new Uint8Array(4 * 1024 * 1024);
     await writeFile(epub, zipSync(files, { level: 9 }));
     await expect(createSyncedEpubBook(crypto.randomUUID(), { epubPath: epub, filename: "bomb.epub" }, DEFAULT_PROFILE_ID)).rejects.toThrow(/far more audio/);
+  });
+
+  it("attaches a second export to an existing book as another edition, restoring nothing", async () => {
+    const db = getDb();
+    const first = path.join(tmpRoot, "first.epub");
+    await writeFile(first, readaloudEpub());
+    const bookId = crypto.randomUUID();
+    await createSyncedEpubBook(bookId, { epubPath: first, filename: "first.epub" }, DEFAULT_PROFILE_ID);
+    const second = path.join(tmpRoot, "second.epub");
+    await writeFile(second, readaloudEpub());
+    const { documentId } = await attachSyncedEpubDocument(bookId, { epubPath: second, filename: "second.epub" }, DEFAULT_PROFILE_ID);
+    const docs = await db.select().from(documents).where(eq(documents.bookId, bookId));
+    expect(docs).toHaveLength(2);
+    expect(docs.find((d) => d.id === documentId)).toMatchObject({ format: "epub-sync", chapterCount: 2, chapterIds: "[]" });
+    expect(await db.select().from(chapters).where(eq(chapters.bookId, bookId))).toHaveLength(2);
+    await expect(stat(second)).rejects.toThrow();
+    // The same export name again lands beside the first, never on it
+    const third = path.join(tmpRoot, "second.epub");
+    await writeFile(third, readaloudEpub());
+    await attachSyncedEpubDocument(bookId, { epubPath: third, filename: "second.epub" }, DEFAULT_PROFILE_ID);
+    const paths = (await db.select({ p: documents.outputPath }).from(documents).where(eq(documents.bookId, bookId))).map((d) => path.basename(d.p));
+    expect(paths.filter((n) => n.startsWith("second"))).toEqual(["second.epub", "second (2).epub"]);
+    expect((await stat(path.join(path.dirname(docs[0]?.outputPath ?? ""), "second (2).epub"))).size).toBeGreaterThan(0);
+    // Not for another profile's book
+    const other = crypto.randomUUID();
+    await writeFile(second, readaloudEpub());
+    await expect(attachSyncedEpubDocument(other, { epubPath: second, filename: "second.epub" }, DEFAULT_PROFILE_ID)).rejects.toThrow(EpubImportError);
   });
 
   it("refuses a plain EPUB", async () => {
