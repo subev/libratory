@@ -290,6 +290,13 @@ async function main() {
   await sweepStaged().catch((err: unknown) => console.error("[staged] sweep failed:", err));
   setInterval(() => sweepStaged().catch((err: unknown) => console.error("[staged] sweep failed:", err)), 60 * 60 * 1000).unref();
 
+  // The port before the job queue: the worker's first act is a sweep that treats every locked job
+  // as a dead process's, and a second server booting beside a running one — the desktop app
+  // launched over `pnpm dev` — used to sweep the first one's running jobs and only then fail on
+  // the port. Failing on the port first touches nothing.
+  await fastify.listen({ port: PORT, host: env.HOST });
+  console.log(`Server running on http://localhost:${PORT}`);
+
   await startWorker();
 
   // Warm the model catalog in the background: resolveLlm reads it synchronously so a job never
@@ -302,9 +309,6 @@ async function main() {
   // the warm-up was meant to close. A local read is not the download the comment above rules out.
   seedCatalogFromDisk();
   void modelCatalog().catch(() => {});
-
-  await fastify.listen({ port: PORT, host: env.HOST });
-  console.log(`Server running on http://localhost:${PORT}`);
 
   const shutdown = async () => {
     await stopWorker();

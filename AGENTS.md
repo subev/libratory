@@ -1027,6 +1027,7 @@ Facts agents get wrong without reading the suite first:
 ## Gotchas
 
 - Docker Postgres is on port **5433**, not 5432. Another Docker postgres may conflict — check `docker ps`.
+- **`main.ts` takes the port before it starts the workers.** The worker's first act is a sweep that treats every locked job as a dead process's; a second server booting beside a running one (the desktop app launched over `pnpm dev`, both on the same Postgres) swept the first one's running jobs and only then failed on the port. Keep `fastify.listen` ahead of `startWorker`.
 - Marker output is nested in a subdirectory. Code in `lib/marker.ts` searches one level deep for the JSON.
 - `metadata` field in Marker JSON output is optional — always null-check it.
 - **Cancel preserves done chapters** — only sets non-done chapters to `suspended`. Synthesis cancel aborts the TTS subprocess via DB-status polling (SIGKILL). Extraction cancel (`books.cancel`, `bookFiles.cancel`) kills the marker subprocess through the in-memory registry in `lib/extract-registry.ts` — the registry is lost on a dev-server restart, but the extract worker's conditional status updates keep an orphaned marker run from overwriting the cancel.
