@@ -7,6 +7,7 @@ import { chapters, chapterVariants, type Book } from "../schema.ts";
 import { listMarkerSources } from "./marker-sources.ts";
 import { languageCode } from "./readaloud-epub.ts";
 import { buildCues, buildManifest, buildVariantCues, chapterLink } from "./reader-doc.ts";
+import { voiceLabel } from "./document-narration.ts";
 import { READER_FORMAT, type ReaderCues, type ReaderManifest, type ReaderText } from "./reader-format.ts";
 import type { BilingualDocument } from "./bilingual-format.ts";
 import { appendLog } from "./log.ts";
@@ -75,10 +76,12 @@ export async function buildP2afLayer(
       const path = `cues/${file.base}.json`;
       entry.audio = `../audio/${file.audioFile}`;
       entry.cues = path;
+      entry.voice = voiceLabel(chapter?.synthesizedWith?.voice);
       cues.push({ path, doc });
     } else {
       entry.audio = null;
       entry.cues = null;
+      entry.voice = null;
     }
     // A selected chapter with no narration of its own still carries its pages and its translation:
     // the reader shows both texts and plays whichever recording the file has. A chapter the
@@ -161,6 +164,7 @@ export async function buildVariantP2afLayer(
       cues: doc ? path : null,
       text: null,
       durationMs: doc ? variant.audioDurationMs : null,
+      voice: doc ? voiceLabel(variant.synthesizedWith?.voice) : null,
       pageStart: null,
       pageEnd: null,
       mode: "text",
@@ -197,7 +201,7 @@ export async function buildTextP2afLayer(
     const resource = `text/${chapter.id}.json`;
     const entry: ReaderManifest["chapters"][number] = {
       id: chapter.id, i: chapter.index, title: chapter.title, text: resource,
-      audio: null, cues: null, durationMs: null, pageStart: null, pageEnd: null,
+      audio: null, cues: null, durationMs: null, voice: null, pageStart: null, pageEnd: null,
       mode: "text", why: "generated", bilingual: [],
     };
     layer.manifest.chapters.push(entry);

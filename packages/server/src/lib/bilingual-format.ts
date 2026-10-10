@@ -19,6 +19,8 @@ const narration = z.object({
   revision,
   audio: id,
   totalMs: z.number().positive(),
+  // The narrator's label, for a shelf that only imports the file; absent in older documents
+  voice: z.string().nullable().optional(),
   anchors: z.array(anchor),
   qualityNotes: z.array(z.string()),
 });

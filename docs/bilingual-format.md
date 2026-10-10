@@ -70,7 +70,9 @@ Cancelled/failed jobs keep completed batches; only an explicit retry continues w
 answers stay in the database and never enter the reading document.
 
 Original-language synced EPUB exports include current prepared translations for chapters carried
-with primary cues. Translation-only exports remain single-lane. Original-language text EPUB exports carry selected
+with primary cues. Translation-only exports remain single-lane. A lane's `narration.voice`
+(optional, since 2026-10-11) is the narrator's label, so a server that only imports the file can
+name the voices; readers may ignore it. Original-language text EPUB exports carry selected
 chapter text in `p2af/text/<chapter-id>.json` and current bilingual documents without either
 narration. Their primary `audio`, `cues` and `durationMs` fields are null, and `text` references a
 real `ReaderText` resource. All paths are relative to `book.json`; each resource is declared in the

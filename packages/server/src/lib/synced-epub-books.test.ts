@@ -56,7 +56,7 @@ function readaloudEpub(): Uint8Array {
     sources: [],
     pages: [],
     chapters: [
-      { i: 0, id: "a", title: "Verhaftung", audio: "../audio/ch000.m4a", cues: "cues/ch000.json", text: null, durationMs: 4000, pageStart: null, pageEnd: null, mode: "text" },
+      { i: 0, id: "a", title: "Verhaftung", audio: "../audio/ch000.m4a", cues: "cues/ch000.json", text: null, durationMs: 4000, voice: "Thorsten", pageStart: null, pageEnd: null, mode: "text" },
       { i: 1, id: "b", title: "Nachwort", audio: null, cues: null, text: "text/b.json", durationMs: null, pageStart: null, pageEnd: null, mode: "text" },
     ],
   };
@@ -114,7 +114,7 @@ describe("createSyncedEpubBook", () => {
     expect(sync.chunks[0].words).toHaveLength(2);
 
     const [doc] = await db.select().from(documents).where(eq(documents.bookId, bookId));
-    expect(doc).toMatchObject({ format: "epub-sync", language: null, chapterCount: 2, narration: { original: { level: "word", durationMs: 4000, voice: null }, translation: null } });
+    expect(doc).toMatchObject({ format: "epub-sync", language: null, chapterCount: 2, narration: { original: { level: "word", durationMs: 4000, voice: "Thorsten" }, translation: null } });
     expect(path.basename(doc?.outputPath ?? "")).toBe("Der_Prozess_readaloud_20261010_091200.epub");
     expect((await stat(doc?.outputPath ?? "")).size).toBeGreaterThan(0);
     await expect(stat(epub)).rejects.toThrow();

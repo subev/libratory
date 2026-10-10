@@ -190,7 +190,9 @@ disk as `chNNN.m4a`, its sync map rebuilt from the cue document, its text from t
 EPUB itself moved under the book's outputs as the shelf document — so a server that never
 synthesizes still serves a shelf, and the workshop's reader and player work on the imported book.
 A chapter the export left unnarrated arrives suspended with whatever text the layer carried. The
-voices are not recorded in the layer, so the imported document's `voice` is null. A bilingual
+voices come from the layer — each manifest chapter's `voice` label and each bilingual lane's
+`narration.voice` — so the imported document names them as the exporting machine did; an export
+from before 2026-10-11 carries none and its `voice` is null. A bilingual
 export is recognised by its chapters' translation entries and listed as `epub-bilingual`; only the
 original lane's narration is restored into chapters, the file itself is served whole.
 

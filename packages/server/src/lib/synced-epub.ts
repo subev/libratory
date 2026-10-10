@@ -79,5 +79,6 @@ export function isReaderManifest(value: unknown): value is ReaderManifest {
   const v = value as { format?: unknown; book?: unknown; chapters?: unknown };
   if (typeof v.format !== "string" || !v.format.startsWith("p2af/") || typeof v.book !== "object" || v.book === null || !Array.isArray(v.chapters)) return false;
   const description = (v.book as { description?: unknown }).description;
-  return description === undefined || description === null || typeof description === "string";
+  const text = (value: unknown) => value === undefined || value === null || typeof value === "string";
+  return text(description) && v.chapters.every((ch) => typeof ch === "object" && ch !== null && text((ch as { voice?: unknown }).voice));
 }

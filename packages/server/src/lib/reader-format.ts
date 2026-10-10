@@ -28,6 +28,9 @@ export type ReaderChapter = {
   // containers can instead carry the text inside their cue document.
   text: string | null;
   durationMs: number | null;
+  // Who read it, as a label ("Emma", "Dimitar"); null without narration. A container carries it
+  // so a shelf that only imports the file can still name the voice.
+  voice?: string | null;
   pageStart: number | null;
   pageEnd: number | null;
   mode: "page" | "text";

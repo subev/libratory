@@ -145,7 +145,7 @@ function levelOf(granularity: unknown): CueGranularity {
   return typeof granularity === "string" && LEVELS.has(granularity) ? (granularity as CueGranularity) : "chunk";
 }
 
-type LaneNarration = { totalMs?: unknown; anchors?: unknown } | null | undefined;
+type LaneNarration = { totalMs?: unknown; anchors?: unknown; voice?: unknown } | null | undefined;
 function laneLevel(narration: LaneNarration): CueGranularity {
   const anchors = Array.isArray(narration?.anchors) ? narration.anchors : [];
   return anchors.some((a: unknown) => typeof a === "object" && a !== null && (a as { kind?: unknown }).kind === "word") ? "word" : "sentence";
@@ -155,8 +155,10 @@ function laneLevel(narration: LaneNarration): CueGranularity {
 // lane, and the bilingual documents' anchors for the translation's — so an edition kept whole
 // is described as the reader will find it, not guessed
 async function narrationFromLayer(epub: string, bookJson: string, entries: Map<string, Entry>, manifest: ReaderManifest): Promise<DocumentNarration> {
-  const original: { levels: CueGranularity[]; ms: number } = { levels: [], ms: 0 };
-  const translation: { levels: CueGranularity[]; ms: number } = { levels: [], ms: 0 };
+  type Side = { levels: CueGranularity[]; ms: number; voices: Set<string> };
+  const original: Side = { levels: [], ms: 0, voices: new Set() };
+  const translation: Side = { levels: [], ms: 0, voices: new Set() };
+  const voiceOf = (value: unknown): string | null => (typeof value === "string" && value.trim() ? value.trim() : null);
   for (const ch of manifest.chapters) {
     const cuesEntry = ch.cues ? layerEntryPath(bookJson, ch.cues) : null;
     const hasCues = cuesEntry !== null && entries.has(cuesEntry);
@@ -164,6 +166,8 @@ async function narrationFromLayer(epub: string, bookJson: string, entries: Map<s
       const doc = readJson<ReaderCues>(await readEntry(epub, cuesEntry), isReaderCues, `cues for "${ch.title}"`);
       original.levels.push(levelOf(doc.granularity));
       original.ms += doc.totalMs;
+      const voice = voiceOf((ch as { voice?: unknown }).voice);
+      if (voice) original.voices.add(voice);
     }
     for (const pair of ch.bilingual ?? []) {
       const entry = layerEntryPath(bookJson, pair.url);
@@ -172,16 +176,27 @@ async function narrationFromLayer(epub: string, bookJson: string, entries: Map<s
       if (!hasCues && doc.source?.narration) {
         original.levels.push(laneLevel(doc.source.narration));
         original.ms += typeof doc.source.narration.totalMs === "number" ? doc.source.narration.totalMs : 0;
+        const voice = voiceOf(doc.source.narration.voice);
+        if (voice) original.voices.add(voice);
       }
       if (doc.target?.narration) {
         translation.levels.push(laneLevel(doc.target.narration));
         translation.ms += typeof doc.target.narration.totalMs === "number" ? doc.target.narration.totalMs : 0;
+        const voice = voiceOf(doc.target.narration.voice);
+        if (voice) translation.voices.add(voice);
       }
     }
   }
-  const lane = (side: { levels: CueGranularity[]; ms: number }): NarrationLane | null =>
-    side.levels.length === 0 ? null : { level: combineLevels(side.levels), durationMs: side.ms, voice: null };
+  const lane = (side: Side): NarrationLane | null =>
+    side.levels.length === 0 ? null : { level: combineLevels(side.levels), durationMs: side.ms, voice: side.voices.size ? [...side.voices].join(", ") : null };
   return { original: lane(original), translation: lane(translation) };
+}
+
+// The restored recordings say what the lane is; the voices are the layer's, since a restored chapter
+// knows no voice id and the label is all the exporting machine wrote down
+function originalLane(restored: NarrationLane | null, layer: NarrationLane | null): NarrationLane | null {
+  if (!restored) return layer;
+  return { ...restored, voice: restored.voice ?? layer?.voice ?? null };
 }
 
 export async function createSyncedEpubBook(bookId: string, input: CreateSyncedEpubBookInput, profileId: string): Promise<Book> {
@@ -276,7 +291,7 @@ export async function createSyncedEpubBook(bookId: string, input: CreateSyncedEp
     chapterCount: imported.length,
     chapterSummary: imported.length === 1 ? "1" : `1-${imported.length}`,
     chapterIds: JSON.stringify(rows.map((r) => r.id)),
-    narration: { original: (await laneFromRecordings(recordings)) ?? layerNarration.original, translation: layerNarration.translation },
+    narration: { original: originalLane(await laneFromRecordings(recordings), layerNarration.original), translation: layerNarration.translation },
   });
 
   await appendLog(bookId, `Imported read-along EPUB "${input.filename}": ${imported.length} chapter${imported.length === 1 ? "" : "s"}, ${withAudio.length} with narration, on the shelf as ${format}`);

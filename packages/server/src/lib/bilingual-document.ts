@@ -1,3 +1,4 @@
+import { voiceLabel } from "./document-narration.ts";
 import path from "node:path";
 import { stat } from "node:fs/promises";
 import { and, eq, sql } from "drizzle-orm";
@@ -29,7 +30,7 @@ export async function bilingualReferencesForBook(bookId: string) {
       language: row.language ?? row.key, url: `/read/bilingual/${row.variantId}.json` }));
 }
 
-async function narration(text: string, pairs: BilingualPair[], side: "source" | "target", audioPath: string | null, url: string): Promise<BilingualLane["narration"]> {
+async function narration(text: string, pairs: BilingualPair[], side: "source" | "target", audioPath: string | null, url: string, voice: string | null): Promise<BilingualLane["narration"]> {
   if (!audioPath) return null;
   try {
     const before = await stat(audioPath), beforeSync = await stat(syncMapPath(audioPath));
@@ -41,7 +42,7 @@ async function narration(text: string, pairs: BilingualPair[], side: "source" | 
     const after = await stat(audioPath), afterSync = await stat(syncMapPath(audioPath));
     if (before.mtimeMs !== after.mtimeMs || before.size !== after.size || beforeSync.mtimeMs !== afterSync.mtimeMs || beforeSync.size !== afterSync.size) throw new ChangedNarration("Narration changed while reading timing");
     const boundaries = graphemeBoundaries(text);
-    return { revision, audio: url, totalMs: map.totalMs,
+    return { revision, audio: url, totalMs: map.totalMs, voice,
       qualityNotes: [...(path.extname(audioPath).toLowerCase() === ".mp3" ? ["This older MP3 may seek to the wrong words, especially late in a chapter. Convert the recordings from the chapter’s Bilingual reading controls, then reopen the reader or export again."] : []),
         "Provider word times are not independently verified. Passages without word times use chunk boundaries or estimates.",
         ...(tl.chunks.length < map.chunks.length ? ["Some recorded passages could not be matched to the text; timing is unavailable there."] : [])],
@@ -66,8 +67,8 @@ export async function buildBilingualDocument(variantId: string, options?: { sour
   if (!current || !row?.pairs) return null;
   const data = row.pairs, pairs = preparedPairs(data, row.links);
   const narrations = options?.textOnly ? [null, null] : await Promise.all([
-    options?.sourceAudio === false ? null : narration(context.source, pairs, "source", context.chapter.status === "done" ? context.chapter.audioPath : null, options?.source ?? `/audio/chapter/${context.chapter.id}`),
-    options?.targetAudio === false ? null : narration(context.target, pairs, "target", context.variant.audioStatus === "done" ? context.variant.audioPath : null, options?.target ?? `/audio/translation/${variantId}`),
+    options?.sourceAudio === false ? null : narration(context.source, pairs, "source", context.chapter.status === "done" ? context.chapter.audioPath : null, options?.source ?? `/audio/chapter/${context.chapter.id}`, voiceLabel(context.chapter.synthesizedWith?.voice)),
+    options?.targetAudio === false ? null : narration(context.target, pairs, "target", context.variant.audioStatus === "done" ? context.variant.audioPath : null, options?.target ?? `/audio/translation/${variantId}`, voiceLabel(context.variant.synthesizedWith?.voice)),
   ]).catch((error: unknown) => {
     if (error instanceof ChangedNarration) return null;
     throw error;

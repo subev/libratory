@@ -1,3 +1,4 @@
+import { voiceLabel } from "./document-narration.ts";
 import { bilingualReferencesForBook } from "./bilingual-document.ts";
 import { bookFileOrder } from "./book-file-order.ts";
 import { asc, eq } from "drizzle-orm";
@@ -112,6 +113,7 @@ export async function buildManifest(book: Book): Promise<ReaderManifest> {
         cues: chapter.audioPath ? `/read/chapter/${chapter.id}/cues.json` : null,
         text: chapterText(chapter).trim() ? `/read/chapter/${chapter.id}/text.json` : null,
         durationMs: chapter.durationMs,
+        voice: chapter.audioPath ? voiceLabel(chapter.synthesizedWith?.voice) : null,
         pageStart: chapter.pageStart === null ? null : offset + chapter.pageStart - 1,
         pageEnd: chapter.pageEnd === null ? null : offset + chapter.pageEnd - 1,
         ...chapterMode(chapter),
