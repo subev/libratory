@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from chunk_fit import cached_chunk_texts, drop_stale_chunks, fit_chunks  # noqa: E402
 from phoneme_words import chunk_words, has_word_spaces  # noqa: E402
 
 # Kokoro predicts durations in frames of 600 samples at 24 kHz (40 frames a second)
@@ -182,53 +183,19 @@ def main():
         if not segment:
             continue
         try:
-            ps, tokens = pipeline.g2p(segment)
-            if tokens is None:
-                # espeak-backed languages (fr/es/it/pt/hi) return phonemes with no token
-                # structure; en_tokenize is English-only, so chunk the segment as-is and let
-                # the MAX_PHONEMES splitter below cut it to size.
-                if ps.strip():
-                    phoneme_chunks.append(ps)
-                    chunk_texts.append(segment)
-                    chunk_tokens.append(None)
-                    chunk_espeak.append(has_word_spaces(segment))
-            else:
-                for gs, chunk_ps, tks in pipeline.en_tokenize(tokens):
-                    if chunk_ps.strip():
-                        phoneme_chunks.append(chunk_ps)
-                        chunk_texts.append(gs.strip())
-                        chunk_tokens.append(tks)
-                        chunk_espeak.append(False)
+            # A sentence over the voice pack's 510 phonemes is split by its text and read again,
+            # so every piece keeps its tokens; chunk_fit.py has the one exception
+            pieces = fit_chunks(pipeline.g2p, pipeline.en_tokenize, segment)
         except Exception as e:
             print(f"G2P error on segment: {e}", file=sys.stderr)
             continue
-
-    MAX_PHONEMES = 510
-    safe_chunks = []
-    safe_texts = []
-    safe_tokens = []
-    safe_espeak = []
-    for ps, gs, tks, espeak in zip(phoneme_chunks, chunk_texts, chunk_tokens, chunk_espeak):
-        # Cutting the phoneme string desynchronizes it from the tokens, so no timings at all
-        was_split = len(ps) > MAX_PHONEMES
-        while len(ps) > MAX_PHONEMES:
-            split_at = ps.rfind(' ', 0, MAX_PHONEMES)
-            if split_at <= 0:
-                split_at = MAX_PHONEMES
-            safe_chunks.append(ps[:split_at])
-            safe_texts.append(gs)
-            safe_tokens.append(None)
-            safe_espeak.append(False)
-            ps = ps[split_at:].lstrip()
-        if ps.strip():
-            safe_chunks.append(ps)
-            safe_texts.append(gs)
-            safe_tokens.append(None if was_split else tks)
-            safe_espeak.append(espeak and not was_split)
-    phoneme_chunks = safe_chunks
-    chunk_texts = safe_texts
-    chunk_tokens = safe_tokens
-    chunk_espeak = safe_espeak
+        for ps, gs, tks, timed in pieces:
+            phoneme_chunks.append(ps)
+            chunk_texts.append(gs)
+            chunk_tokens.append(tks)
+            # espeak-backed languages (fr/es/it/pt/hi) have no tokens: their words are timed by
+            # alignment instead (espeak_chunk_words), given spaces to align to
+            chunk_espeak.append(timed and tks is None and has_word_spaces(gs))
 
     total_chunks = len(phoneme_chunks)
     if total_chunks == 0:
@@ -236,6 +203,8 @@ def main():
         sys.exit(1)
 
     if args.chunks_dir:
+        # A resume reuses chunks by index, so chunks this run cuts differently go first
+        drop_stale_chunks(args.chunks_dir, cached_chunk_texts(args.chunks_dir), chunk_texts, chunk_words_file)
         write_chunk_manifest(args.chunks_dir, chunk_texts)
 
     print(json.dumps({

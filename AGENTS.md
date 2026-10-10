@@ -902,7 +902,7 @@ Intentionally minimal — Kokoro handles numbers/dates/abbreviations natively. W
 - Model: `hexgrad/Kokoro-82M` (82M params, Apache-2.0), cached locally
 - Python subprocess: `scripts/synthesize.py` called from `lib/kokoro.ts`
 - Two-step synthesis: G2P + `en_tokenize` phoneme chunking upfront (exact chunk count), then `KPipeline.infer()` loop per chunk
-- **510 phoneme limit**: Voice pack tensor has 510 entries (indices 0-509). `en_tokenize` can produce chunks >510 chars. `synthesize.py` splits oversized chunks at space boundaries to stay within limits.
+- **510 phoneme limit**: Voice pack tensor has 510 entries (indices 0-509). `en_tokenize` can produce chunks >510 chars. `scripts/chunk_fit.py` splits such a sentence by its *text* at a clause boundary and reads each half again, so every piece keeps its tokens and word timings (cutting the phoneme string lost them, and the sync map carried the sentence twice); only a run with no space to cut at is still cut in its phonemes.
 - Uses MPS (Metal Performance Shaders) on Apple Silicon; CUDA or CPU elsewhere (torch decides)
 - Subprocess timeout: **3 hours** (configurable in `lib/kokoro.ts`)
 - Env vars: `PYTORCH_ENABLE_MPS_FALLBACK=1`, `HF_HUB_OFFLINE=1`, Python env path via `CONDA_ENV_PATH`
