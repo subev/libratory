@@ -10,7 +10,7 @@ import { LibraryShell } from "../components/library/LibraryShell.tsx";
 import { LibraryFilters } from "../components/library/LibraryFilters.tsx";
 import { filterCounts, type LibraryFilter } from "../lib/library-filter.ts";
 import { UploadModal } from "../components/library/UploadModal.tsx";
-import { IconAdd, IconUpload } from "../components/icons.tsx";
+import { IconAdd, IconBook, IconUpload } from "../components/icons.tsx";
 import type { DragItems, DroppedItems } from "../lib/dnd.ts";
 
 export function Home() {
@@ -70,6 +70,16 @@ export function Home() {
             ]}
           />
           <div className="flex-1" />
+          <Button
+            variant="secondary"
+            size="sm"
+            to="/open"
+            title="Open a synced EPUB and read along on its own pages — nothing is uploaded"
+            data-testid="open-container-link"
+          >
+            <IconBook className="h-4 w-4" />
+            Open a read-along EPUB
+          </Button>
           {/* button-ok: a dashed edge is the affordance — it reads as the drop target the page used
               to have in full, which no Button variant expresses. */}
           <button

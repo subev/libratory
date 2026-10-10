@@ -656,8 +656,12 @@ packages/web/src/
                         hidden — unmounting ChapterTable clears nine filters and stops playback);
                         StageTabs.tsx, BookHeader.tsx, VariantMenu.tsx, ExportModal.tsx,
                         BookDetailsModal.tsx, ResourceRow.tsx
-    library/            The library page's shell. LibraryHeader.tsx (title, profile, Open EPUB, Phone, assistant,
-                        theme, settings — shared with /phone), LibraryShell.tsx (pinned header/bar/filters, one
+    library/            The library page's shell. LibraryHeader.tsx is the **app bar on every page** — the
+                        library, /phone and a book: name (a link home off the library), profile, Phone, then
+                        assistant, theme, settings; a page's own row sits under it (the library's crumbs with
+                        Open EPUB / Drop PDFs / New folder, the book's crumbs, neighbours, title and actions in
+                        BookHeader.tsx) — before 2026-10-11 the book page drew one row of its own with the
+                        toggles in different places. LibraryShell.tsx (pinned header/bar/filters, one
                         pane that is also the PDF drop target, useLibraryLayout width context),
                         LibraryFilters.tsx (chips + search + showing-count), UploadModal.tsx
     BookFilesSection.tsx    Tab 1 body: source-file table, add files, re-extract, extraction settings

@@ -23,6 +23,7 @@ import { Button } from "../components/Button.tsx";
 import { BookShell, TabPanel, WithShellLayout } from "../components/book/BookShell.tsx";
 import { ActivityDot, StageTabs } from "../components/book/StageTabs.tsx";
 import { BookHeader } from "../components/book/BookHeader.tsx";
+import { LibraryHeader } from "../components/library/LibraryHeader.tsx";
 import { BookDetailsModal } from "../components/book/BookDetailsModal.tsx";
 import { ActionTray, type TrayAction } from "../components/ActionTray.tsx";
 import { ExportModal, type ExportFormat, type ExportFormatId } from "../components/book/ExportModal.tsx";
@@ -854,54 +855,57 @@ export function BookDetail() {
   return (
     <BookShell
       header={
-        <BookHeader
-          bookId={book.id}
-          title={book.title}
-          headMeta={headMeta}
-          crumbs={[
-            { to: "/", label: "Home" },
-            ...(book.folderPath ?? []).map((f) => ({ to: `/folders/${f.id}`, label: f.name })),
-          ]}
-          onRename={(title) => renameMutation.mutate({ id: book.id, title })}
-          prevBook={prevBook ?? null}
-          nextBook={nextBook ?? null}
-          position={bookIndex >= 0 ? { index: bookIndex + 1, total: orderedBooks.length, sortKey: bookSort.key } : null}
-          onNavigate={(target) => navigate(`/books/${target}`)}
-          canRead={canRead}
-          readTitle={readTitle}
-          lanes={variantLanes}
-          activeVariant={activeVariant}
-          bookLanguage={book.language ?? null}
-          chapterCount={book.chapters.length}
-          onSwitchVariant={setActiveVariant}
-          onAddVariant={() => setShowTranslation(true)}
-          addVariantDisabled={book.chapters.length === 0}
-          addVariantTitle={
-            book.chapters.length === 0
-              ? "Extract chapters first"
-              : "Translate or rewrite chapters (ELI5, summary, custom prompts) and review side by side"
-          }
-          onExtract={() => {
-            // Not a workaround any more — Modal portals to the body, so this opens from anywhere. It
-            // switches because the modal is *about* the file list: its copy points at it, and its
-            // "selected files" scope is a selection you cannot see from another tab.
-            setTab("files");
-            setExtractOpen(true);
-          }}
-          extractDisabled={book.kind !== "pdf"}
-          extractTitle={
-            book.kind !== "pdf"
-              ? "Synthetic book — its chapters were not extracted from a file"
-              : "Choose what to re-read and with which settings"
-          }
-          onDetails={() => setShowDetails(true)}
-          onDiskUsage={() => setShowDiskUsage(true)}
-          diskTotal={diskTotal}
-          deleteAudio={deleteAudioAction}
-          onDeleteBook={() => {
-            if (confirm("Delete this book and all its audio?")) deleteMutation.mutate({ id: book.id });
-          }}
-        />
+        <>
+          <LibraryHeader page="book" />
+          <BookHeader
+            bookId={book.id}
+            title={book.title}
+            headMeta={headMeta}
+            crumbs={[
+              { to: "/", label: "Home" },
+              ...(book.folderPath ?? []).map((f) => ({ to: `/folders/${f.id}`, label: f.name })),
+            ]}
+            onRename={(title) => renameMutation.mutate({ id: book.id, title })}
+            prevBook={prevBook ?? null}
+            nextBook={nextBook ?? null}
+            position={bookIndex >= 0 ? { index: bookIndex + 1, total: orderedBooks.length, sortKey: bookSort.key } : null}
+            onNavigate={(target) => navigate(`/books/${target}`)}
+            canRead={canRead}
+            readTitle={readTitle}
+            lanes={variantLanes}
+            activeVariant={activeVariant}
+            bookLanguage={book.language ?? null}
+            chapterCount={book.chapters.length}
+            onSwitchVariant={setActiveVariant}
+            onAddVariant={() => setShowTranslation(true)}
+            addVariantDisabled={book.chapters.length === 0}
+            addVariantTitle={
+              book.chapters.length === 0
+                ? "Extract chapters first"
+                : "Translate or rewrite chapters (ELI5, summary, custom prompts) and review side by side"
+            }
+            onExtract={() => {
+              // Not a workaround any more — Modal portals to the body, so this opens from anywhere. It
+              // switches because the modal is *about* the file list: its copy points at it, and its
+              // "selected files" scope is a selection you cannot see from another tab.
+              setTab("files");
+              setExtractOpen(true);
+            }}
+            extractDisabled={book.kind !== "pdf"}
+            extractTitle={
+              book.kind !== "pdf"
+                ? "Synthetic book — its chapters were not extracted from a file"
+                : "Choose what to re-read and with which settings"
+            }
+            onDetails={() => setShowDetails(true)}
+            onDiskUsage={() => setShowDiskUsage(true)}
+            diskTotal={diskTotal}
+            deleteAudio={deleteAudioAction}
+            onDeleteBook={() => {
+              if (confirm("Delete this book and all its audio?")) deleteMutation.mutate({ id: book.id });
+            }}
+          />
+        </>
       }
       tabs={
         <StageTabs

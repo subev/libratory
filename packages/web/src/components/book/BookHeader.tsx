@@ -1,9 +1,7 @@
 import { Breadcrumbs } from "../Breadcrumbs.tsx";
 import { Button } from "../Button.tsx";
-import { AssistantToggle } from "../assistant/AssistantPanel.tsx";
 import { EditableTitle } from "../EditableTitle.tsx";
 import { Menu, MenuDivider, MenuItem } from "../Menu.tsx";
-import { ThemeToggle } from "../ThemeToggle.tsx";
 import { VariantMenu, type VariantLane } from "./VariantMenu.tsx";
 import { useShellLayout } from "./BookShell.tsx";
 import {
@@ -76,8 +74,10 @@ export function BookHeader({
 }) {
   const layout = useShellLayout();
 
+  // The book's own row, under the app bar LibraryHeader draws on every page: where the book sits,
+  // the way to its neighbours, its name, and the actions that are about this book
   return (
-    <div className="flex items-center gap-3 h-12 px-4 border-b border-(--border) bg-(--bg-card)">
+    <div className="flex items-center gap-3 h-11 px-4 border-b border-(--border) bg-(--bg-card)">
       <Breadcrumbs items={crumbs} />
 
       <div className="flex items-center gap-1 shrink-0">
@@ -116,13 +116,11 @@ export function BookHeader({
       <div className="w-px h-5 bg-(--border) shrink-0" />
 
       <div className="min-w-0 flex items-baseline gap-3">
-        <EditableTitle title={title} onRename={onRename} className="text-lg font-semibold text-(--text-primary) truncate" />
+        <EditableTitle title={title} onRename={onRename} className="font-(family-name:--stack-display) text-base font-semibold tracking-tight text-(--text-primary) truncate" />
         {layout.showHeadMeta && <span className="text-xs text-(--text-muted) whitespace-nowrap shrink-0">{headMeta}</span>}
       </div>
 
       <div className="flex-1" />
-
-      <AssistantToggle />
 
       <Button variant="secondary" size="sm" to={`/books/${bookId}/read`} disabled={!canRead} title={readTitle} data-testid="book-read-link">
         <IconBook className="h-4 w-4" />
@@ -139,8 +137,6 @@ export function BookHeader({
         addDisabled={addVariantDisabled}
         addTitle={addVariantTitle}
       />
-
-      <ThemeToggle />
 
       <Menu
         align="right"
