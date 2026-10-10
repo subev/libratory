@@ -104,6 +104,26 @@ describe("phone.pairingCode", () => {
   });
 });
 
+describe("phone.setPublic", () => {
+  it("marks the caller's profile as the public shelf, live, and clears only its own", async () => {
+    const mine = await makeProfile("Commons");
+    const caller = phoneRouter.createCaller({ profileId: mine.id });
+    try {
+      expect((await caller.pairingCode()).isPublic).toBe(false);
+      expect(await caller.setPublic({ public: true })).toEqual({ public: true });
+      expect(updateEnvFile).toHaveBeenCalledWith(expect.any(String), "PUBLIC_SHELF_PROFILE", mine.id);
+      expect((await caller.pairingCode()).isPublic).toBe(true);
+      // Another profile turning itself off does not touch the public one
+      await phoneRouter.createCaller({}).setPublic({ public: false });
+      expect((await caller.pairingCode()).isPublic).toBe(true);
+      expect(await caller.setPublic({ public: false })).toEqual({ public: false });
+      expect(env.PUBLIC_SHELF_PROFILE).toBeUndefined();
+    } finally {
+      env.PUBLIC_SHELF_PROFILE = undefined;
+    }
+  });
+});
+
 describe("phone.devices / forget", () => {
   it("lists the profile's phones with how many books each took, and forgets only its own", async () => {
     const mine = await makeProfile("Petur");

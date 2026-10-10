@@ -11,8 +11,11 @@ test("phone: the Phone page opens from the library, and the shelf gives a strang
   await expect(page.getByTestId("phones-card")).toContainText("No phone has scanned the code yet");
   await expect(page.getByTestId("shelf-table")).toContainText("Nothing yet");
 
-  // The four shelf routes answer, and answer nothing without a key or a code
-  expect((await request.get("/shelf")).status()).toBe(401);
+  // The shelf routes answer, and answer nothing to a stranger — unless the server has a public
+  // shelf, which is the one listing anyone may read
+  const bare = await request.get("/shelf");
+  if (bare.status() === 200) expect(await bare.json()).toMatchObject({ public: true, device: null });
+  else expect(bare.status()).toBe(401);
   expect((await request.get("/shelf", { headers: { authorization: "Bearer not-a-key" } })).status()).toBe(401);
   expect((await request.get("/shelf/pair/not-a-code")).status()).toBe(404);
   expect((await request.post("/shelf/pair", { data: { token: "not-a-code", name: "e2e" } })).status()).toBe(404);

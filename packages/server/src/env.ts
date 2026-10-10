@@ -38,6 +38,9 @@ const envSchema = z.object({
   // origin (`https://shelf.example.org`), and the pair link and the shelf's "machine" follow it
   // (lib/shelf-address.ts). Unset on a laptop, where the network address is found at runtime.
   PUBLIC_ORIGIN: z.url().optional(),
+  // The profile whose shelf answers the world with no pairing (a profile id, or `default`). The
+  // owner's Phone page writes it; unset means every shelf needs a device key.
+  PUBLIC_SHELF_PROFILE: z.string().regex(/^(default|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i).optional(),
   CONDA_ENV_PATH: z.string().default(path.join(repoRoot, ".venv", "bin")),
   SCRIPTS_DIR: z.string().default(path.join(repoRoot, "scripts")),
   WEB_DIR: z.string().default(path.join(repoRoot, "packages", "web", "dist")),

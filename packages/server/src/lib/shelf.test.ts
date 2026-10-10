@@ -44,6 +44,7 @@ describe("groupByBook", () => {
     hidden: false,
     narration: null,
     downloadedBy: [],
+    fetches: 0,
     ...over,
   });
 
@@ -60,6 +61,11 @@ describe("groupByBook", () => {
       ["b1", "German", [["d1", true], ["d2", false]]],
       ["b2", "French", [["d3", false]]],
     ]);
+  });
+
+  it("marks nothing downloaded for the public, which has no device", () => {
+    const [book] = groupByBook([doc({ id: "d1", downloadedBy: [{ deviceId: "phone", name: "Petur's iPhone" }] })], null);
+    expect(book?.editions[0]?.downloaded).toBe(false);
   });
 
   it("flattens the recorded narration onto each edition, and says so when there is none yet", () => {

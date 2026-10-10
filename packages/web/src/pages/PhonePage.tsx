@@ -71,6 +71,7 @@ function PairingCard() {
   const code = trpc.phone.pairingCode.useQuery(undefined, { staleTime: Infinity, refetchOnWindowFocus: false });
   const listen = trpc.phone.listenOnNetwork.useMutation();
   const setAccess = trpc.phone.setNetworkAccess.useMutation({ onSuccess: () => utils.phone.pairingCode.invalidate() });
+  const setPublic = trpc.phone.setPublic.useMutation({ onSuccess: () => utils.phone.pairingCode.invalidate() });
   const refresh = useCallback(() => void utils.phone.pairingCode.invalidate(), [utils]);
 
   const data = code.data;
@@ -107,9 +108,22 @@ function PairingCard() {
         </p>
       ) : data?.access === "none" ? (
         <div className="flex flex-col gap-2 px-3 py-2 rounded-md bg-(--bg-subtle) text-sm text-(--text-secondary)" data-testid="not-shared-notice">
-          <span>Not shared. The network can reach nothing on this server, so there is no code to scan.</span>
+          <span>
+            Not shared. The network can reach nothing on this server, so there is no code to scan
+            {data.isPublic ? ", and the public shelf is marked but unreachable" : ""}.
+          </span>
           <Button variant="primary" size="sm" className="self-start" onClick={() => setAccess.mutate({ access: "shelf" })} disabled={busy} data-testid="share-shelf">
             Share this shelf on the network
+          </Button>
+        </div>
+      ) : data?.isPublic ? (
+        <div className="flex flex-col gap-2 px-3 py-2 rounded-md bg-(--warning-bg) text-sm text-(--warning-text)" data-testid="public-notice">
+          <span>
+            This shelf is public: every reader that knows this server's address lists it and downloads from it, with
+            nothing to pair. Hide a file from the shelf to keep it to yourself.
+          </span>
+          <Button variant="warning" size="sm" className="self-start" onClick={() => { if (confirm("Make this shelf private again? Readers that list it will see nothing until they pair.")) setPublic.mutate({ public: false }); }} disabled={setPublic.isPending} data-testid="make-private">
+            Make it private
           </Button>
         </div>
       ) : data?.code && data.reachable ? (
@@ -138,6 +152,20 @@ function PairingCard() {
         <div className="h-48 rounded-md bg-(--bg-subtle)" />
       )}
       {setAccess.error && <span className="text-xs text-(--danger-text)">{setAccess.error.message}</span>}
+      {setPublic.error && <span className="text-xs text-(--danger-text)">{setPublic.error.message}</span>}
+      {data && !data.isPublic && (
+        <div className="flex items-center justify-between gap-3 text-xs text-(--text-muted)">
+          <span>A server for everyone needs no pairing: a public shelf lists for any reader that knows its address.</span>
+          <Button
+            size="sm"
+            onClick={() => { if (confirm("Make this shelf public? Anyone who knows this server's address can list and download every file on it, no pairing. Only do this on a server you meant to be public.")) setPublic.mutate({ public: true }); }}
+            disabled={setPublic.isPending}
+            data-testid="make-public"
+          >
+            Make it public
+          </Button>
+        </div>
+      )}
 
       <p className="text-xs text-(--text-muted) text-pretty">
         The phone needs a way to reach this machine: the same Wi-Fi, or Tailscale on both. This page exposes nothing to
@@ -228,7 +256,7 @@ function ShelfTable({ profileName }: { profileName: string | undefined }) {
           <span>Book</span>
           <span>Export</span>
           <span className="text-right">Size</span>
-          <span>On phones</span>
+          <span>Downloads</span>
           <span />
         </div>
         {docs.length === 0 && (
@@ -264,7 +292,7 @@ function ShelfTable({ profileName }: { profileName: string | undefined }) {
             </div>
             <span className="text-right tabular-nums text-(--text-secondary)">{d.bytes === null ? "—" : formatBytes(d.bytes)}</span>
             <span className="text-xs text-(--text-muted) truncate">
-              {d.downloadedBy.length === 0 ? "—" : d.downloadedBy.map((p) => p.name).join(", ")}
+              {[...d.downloadedBy.map((p) => p.name), ...(d.fetches > 0 ? [`${d.fetches} public`] : [])].join(", ") || "—"}
             </span>
             <Menu
               testId="shelf-row-menu"

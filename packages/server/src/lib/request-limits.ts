@@ -5,3 +5,5 @@ export const SCRIPT_RATE_LIMIT = { max: 20, timeWindow: 60_000 };
 export const PREVIEW_RATE_LIMIT = { max: 120, timeWindow: 60_000 };
 // A pairing token is 24 random bytes; the limit is against a phone stuck in a retry loop, not a guess
 export const PAIR_RATE_LIMIT = { max: 60, timeWindow: 60_000 };
+// A public shelf answers the world: a listing a second is a reader stuck in a loop, not a person
+export const SHELF_RATE_LIMIT = { max: 120, timeWindow: 60_000 };

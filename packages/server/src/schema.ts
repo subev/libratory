@@ -354,6 +354,17 @@ export const shelfDownloads = pgTable("shelf_downloads", {
   downloadedAt: timestamp("downloaded_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [unique("shelf_downloads_device_document").on(t.deviceId, t.documentId)]);
 
+// A download from the public shelf, where there is no device to tie it to: what was fetched,
+// when, what fetched it (the reader's User-Agent) and from where when the proxy says — never
+// an address, never an install id, so it is analytics and not tracking.
+export const shelfFetches = pgTable("shelf_fetches", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  documentId: uuid("document_id").notNull().references(() => documents.id, { onDelete: "cascade" }),
+  userAgent: text("user_agent"),
+  country: text("country"),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const notes = pgTable("notes", {
   id: uuid("id").primaryKey().defaultRandom(),
   // null = library-wide answer (scope.kind === "library")

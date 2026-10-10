@@ -42,7 +42,7 @@ tRPC API stays exactly as unexposed as before.
 | --- | --- | --- |
 | `GET /shelf/pair/:token` | none | `200 { machine, profile:{id,name}, bookCount, via:"tailscale"\|"lan", expiresAt }`. `404` unknown, `410` spent or expired. Does **not** spend the token. |
 | `POST /shelf/pair` body `{ token, name }` | none | `200 { deviceId, deviceKey, machine, profile:{id,name}, bookCount }`. Spends the token. `400` without a name, `404` unknown, `410` gone. `name` is what the device is called on the owner's page. |
-| `GET /shelf` | `Authorization: Bearer <deviceKey>` | `200 { machine, profile:{id,name}, device:{id,name}, books:[…] }` — see below. |
+| `GET /shelf` | `Authorization: Bearer <deviceKey>`, or nothing on a public shelf | `200 { machine, profile:{id,name}, public, device:{id,name}\|null, books:[…] }` — see below. |
 | `GET /shelf/documents/:documentId` | bearer | The EPUB (`application/epub+zip`, `Content-Disposition: attachment`). Records the download for the owner's "on phones" column, once per device and file. `404` for a file that is hidden, not a shelf format, or another profile's. |
 
 `machine` is the server's hostname, or the public host when `PUBLIC_ORIGIN` is set — what groups
@@ -144,6 +144,28 @@ records.
   its own in-app camera, which needs no link at all. A custom scheme is one `PAIR_LINK_BASE` away.
 - **Nothing to the internet.** The page prints the address a device on the same network or
   tailnet can reach; it opens no port and creates no account.
+
+## The public case
+
+The home case pairs each phone to a shelf. A server for everyone needs no pairing: the owner
+presses **Make it public** on the Phone page (`phone.setPublic`, which writes
+`PUBLIC_SHELF_PROFILE` to `.env` and applies it live), and from then on that one profile's shelf
+answers `GET /shelf` and `GET /shelf/documents/:id` with **no credential at all**, with
+`public: true` and `device: null` in the listing. A reader with a built-in entry for the address
+lists it on every install. The pairing routes keep working, so a device key still answers for its
+own profile on the same server, and any `Authorization` header that is not a device key this
+server issued is still a 401 — only a request that offers nothing is the public. Both routes are
+rate-limited per address (`SHELF_RATE_LIMIT`). The public shelf needs the network to reach the
+server like any other: `NETWORK_ACCESS` at least `shelf`, or the proxy in front.
+
+What a public download leaves behind is analytics, not tracking (`shelf_fetches`), counted once
+when the file is asked for from its start — a resumed range or a HEAD is the same download — the
+document, the moment, the reader's `User-Agent` — `Libratory-Reader/<version> (iOS <os>; <model>)` — and a
+two-letter country only when the proxy supplies `CF-IPCountry`. No address, no install id, no
+cookie. The owner's page shows the count per file beside the paired phones that fetched it.
+
+Only a profile meant for the world should be made public: everything on its shelf is then one
+URL away for anyone, and hiding a file is the only way back short of making it private again.
 
 ## Books that were made elsewhere
 

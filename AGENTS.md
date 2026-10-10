@@ -473,6 +473,8 @@ Connection string via `DATABASE_URL` env var (required, validated by Zod).
 
 **devices** — id (uuid), profileId (FK profiles, cascade), name (what the phone is called on the owner's Phone page), keyHash (SHA-256 of the device key, unique — the key itself is answered once at pairing and never stored), pairedAt, lastSeenAt (touched by every `/shelf` call). A phone paired to one profile's shelf; `phone.forget` deletes the row and the key stops working at the next call.
 
+**shelf_fetches** — id, documentId (FK documents, cascade), userAgent, country (from `CF-IPCountry` when a proxy sets it), at: a download from the **public** shelf (`PUBLIC_SHELF_PROFILE`, the Phone page's "Make it public"), where there is no device — analytics, never an address or an install id.
+
 **shelf_downloads** — deviceId (FK devices, cascade), documentId (FK documents, cascade), downloadedAt; unique per pair. The owner's "on phones" column and the device's `downloaded` flag — the server counts downloads and never learns what was read. The whole phone shelf (pairing token, `/shelf/*`, the Phone page) is `docs/shelf.md`.
 
 **chat_messages** — id (uuid), conversationId (FK, cascade), seq (unique per conversation), role (`user` | `assistant`), parts (jsonb — the AI SDK UI parts as streamed: text, tool calls with results, `data-sources`), status (`complete` | `stopped` | `failed`), error, model + modelLabel (what actually answered), createdAt.
@@ -768,7 +770,7 @@ fixed zinc.
 
 **search**: `library` (hybrid FTS + vector search over `book_chunks`, profile-scoped, optional folder subtree scope, RRF fusion + cross-language grouping — see Library Chat below) / `indexStatus` (per-profile index coverage counts for the chat UI hint)
 
-**phone**: `pairingCode` (mints a profile-bound token, answers the QR as an SVG data URL plus the reachable address; `code: null` with `loopbackOnly` while `HOST` is loopback, `reachable: null` with no network address, or `access: "none"` while the network may reach nothing) · `listenOnNetwork` (writes `HOST=0.0.0.0` to `.env`; a restart applies it) · `setNetworkAccess` (`none` | `shelf` | `all`, written to `.env` and applied live) · `devices` / `forget` · `shelf` (the profile's shelf files, hidden ones included, with who fetched each) / `setHidden` — all profile-scoped
+**phone**: `pairingCode` (mints a profile-bound token, answers the QR as an SVG data URL plus the reachable address; `code: null` with `loopbackOnly` while `HOST` is loopback, `reachable: null` with no network address, or `access: "none"` while the network may reach nothing) · `listenOnNetwork` (writes `HOST=0.0.0.0` to `.env`; a restart applies it) · `setNetworkAccess` (`none` | `shelf` | `all`, written to `.env` and applied live) · `setPublic` (marks the caller's profile the one public shelf, `PUBLIC_SHELF_PROFILE`, live) · `devices` / `forget` · `shelf` (the profile's shelf files, hidden ones included, with who fetched each) / `setHidden` — all profile-scoped
 
 ## HTTP Endpoints (non-tRPC)
 

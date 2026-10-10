@@ -6,7 +6,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getDb, resetDb, row } from "../test/setup.ts";
-import { books, devices, documents, profiles, shelfDownloads, DEFAULT_PROFILE_ID } from "./schema.ts";
+import { books, devices, documents, profiles, shelfDownloads, shelfFetches, DEFAULT_PROFILE_ID } from "./schema.ts";
 
 vi.mock("./db.ts", async () => {
   const { getDb } = await import("../test/setup.ts");
@@ -118,6 +118,77 @@ describe("pairing", () => {
     const app = await createApp();
     const { token } = pairingTokens.mint(DEFAULT_PROFILE_ID);
     expect((await app.inject({ method: "POST", url: "/shelf/pair", payload: { token } })).statusCode).toBe(400);
+  });
+});
+
+describe("the public shelf", () => {
+  it("answers anyone for the public profile, counts the download anonymously, and still knows a paired device", async () => {
+    const app = await createApp();
+    const mine = await makeProfile("Commons");
+    const theirs = await makeProfile("Petur");
+    const { book, doc } = await makeDocument(mine.id);
+    await makeDocument(theirs.id);
+    env.PUBLIC_SHELF_PROFILE = mine.id;
+    try {
+      const res = await app.inject({ method: "GET", url: "/shelf" });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toMatchObject({ public: true, device: null, profile: { id: mine.id, name: "Commons" } });
+      expect(res.json().books.map((b: { id: string }) => b.id)).toEqual([book.id]);
+      expect(res.json().books[0].editions[0].downloaded).toBe(false);
+
+      const dl = await app.inject({ method: "GET", url: `/shelf/documents/${doc.id}`, headers: { "user-agent": "Libratory-Reader/1.2 (iOS 18.1; iPhone16,2)", "cf-ipcountry": "BG" } });
+      expect(dl.statusCode).toBe(200);
+      const fetches = await getDb().select().from(shelfFetches);
+      expect(fetches.map((f) => [f.documentId, f.userAgent, f.country])).toEqual([[doc.id, "Libratory-Reader/1.2 (iOS 18.1; iPhone16,2)", "BG"]]);
+      expect(await getDb().select().from(shelfDownloads)).toEqual([]);
+
+      // A paired device on another profile still sees its own shelf, not the public one
+      const { deviceKey } = await pair(app, theirs.id);
+      const own = await app.inject({ method: "GET", url: "/shelf", headers: { authorization: `Bearer ${deviceKey}` } });
+      expect(own.json()).toMatchObject({ public: false, profile: { id: theirs.id } });
+      // A wrong key is still refused, public shelf or not
+      expect((await app.inject({ method: "GET", url: "/shelf", headers: { authorization: "Bearer nope" } })).statusCode).toBe(401);
+      // The other profile's files are not on the public shelf
+      const foreign = await makeDocument(theirs.id);
+      expect((await app.inject({ method: "GET", url: `/shelf/documents/${foreign.doc.id}` })).statusCode).toBe(404);
+    } finally {
+      env.PUBLIC_SHELF_PROFILE = undefined;
+    }
+  });
+
+  it("counts a public download once, never for a probe, and never for a hidden or sized request", async () => {
+    const app = await createApp();
+    const { doc } = await makeDocument(DEFAULT_PROFILE_ID);
+    const hidden = await makeDocument(DEFAULT_PROFILE_ID, { shelfHidden: true });
+    env.PUBLIC_SHELF_PROFILE = "default";
+    try {
+      expect((await app.inject({ method: "HEAD", url: `/shelf/documents/${doc.id}` })).statusCode).toBe(200);
+      expect((await app.inject({ method: "GET", url: `/shelf/documents/${doc.id}`, headers: { range: "bytes=0-0" } })).statusCode).toBe(206);
+      expect((await app.inject({ method: "GET", url: `/shelf/documents/${doc.id}`, headers: { range: "bytes=5-" } })).statusCode).toBe(206);
+      expect((await app.inject({ method: "GET", url: `/shelf/documents/${hidden.doc.id}` })).statusCode).toBe(404);
+      expect((await getDb().select().from(shelfFetches)).map((f) => f.documentId)).toEqual([doc.id]);
+      // An offered credential that is not a device key is refused, public shelf or not
+      expect((await app.inject({ method: "GET", url: "/shelf", headers: { authorization: "Basic abc" } })).statusCode).toBe(401);
+      expect((await app.inject({ method: "GET", url: "/shelf", headers: { authorization: "Bearer " } })).statusCode).toBe(401);
+      // The public listing names no device and no count
+      const listing = await app.inject({ method: "GET", url: "/shelf" });
+      expect(JSON.stringify(listing.json())).not.toMatch(/downloadedBy|fetches|deviceId/);
+    } finally {
+      env.PUBLIC_SHELF_PROFILE = undefined;
+    }
+  });
+
+  it("resolves `default` to the default profile", async () => {
+    const app = await createApp();
+    await makeDocument(DEFAULT_PROFILE_ID);
+    env.PUBLIC_SHELF_PROFILE = "default";
+    try {
+      const res = await app.inject({ method: "GET", url: "/shelf" });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().books).toHaveLength(1);
+    } finally {
+      env.PUBLIC_SHELF_PROFILE = undefined;
+    }
   });
 });
 

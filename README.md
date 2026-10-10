@@ -208,7 +208,7 @@ shelf.example.org {
 }
 ```
 
-with, on the `libratory` service, `PUBLIC_ORIGIN=https://shelf.example.org` and `TRUSTED_HOSTS=shelf.example.org` (the browser's `Origin` has to match a name the server trusts, or every POST through the proxy is refused). Books are made on a machine that can synthesize and brought over as read-along EPUBs: drop one on the upload page there and it comes back as a finished book with its narration and lands on the shelf — the server never needs the PDF or the models.
+with, on the `libratory` service, `PUBLIC_ORIGIN=https://shelf.example.org`, `TRUSTED_HOSTS=shelf.example.org` and `PUBLIC_SHELF_PROFILE=default` (the shelf answers every reader with no pairing; leave it unset for a private server) (the browser's `Origin` has to match a name the server trusts, or every POST through the proxy is refused). Books are made on a machine that can synthesize and brought over as read-along EPUBs: drop one on the upload page there and it comes back as a finished book with its narration and lands on the shelf — the server never needs the PDF or the models.
 
 The server tells browsers apart from strangers by matching their `Origin` against the Host they asked for. Reaching it by address — `http://192.168.1.50:3034`, `http://100.x.y.z:3034` — needs no configuration. Reaching it by *name* does: set `TRUSTED_HOSTS=library.example.com` (comma-separated, `host:port` when it is not the default port), because a name that vouches for itself is exactly what a DNS-rebinding page sends. A reverse proxy must also forward the original `Host` header (nginx: `proxy_set_header Host $host;` — Caddy already does), or every browser POST looks foreign and gets rejected.
 

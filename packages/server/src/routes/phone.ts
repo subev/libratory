@@ -8,7 +8,7 @@ import { books, devices, documents, profiles, shelfDownloads, DEFAULT_PROFILE_ID
 import { updateEnvFile } from "../lib/env-file.ts";
 import { PAIRING_TTL_MS, pairLink, pairingTokens } from "../lib/pairing.ts";
 import { machineName, shelfAddress } from "../lib/shelf-address.ts";
-import { shelfDocuments } from "../lib/shelf.ts";
+import { publicShelfProfileId, setPublicShelfProfile, shelfDocuments } from "../lib/shelf.ts";
 import { NETWORK_ACCESS, currentNetworkAccess, setNetworkAccess } from "../lib/network-access.ts";
 
 // The workshop's Phone page: a code that adds the current profile's shelf to a phone, the phones
@@ -27,7 +27,8 @@ export const phoneRouter = router({
     // A public name is reached through a proxy, which may well forward to loopback
     const loopbackOnly = LOOPBACK.has(env.HOST) && reachable?.via !== "internet";
     const access = currentNetworkAccess();
-    const base = { profileName: profile?.name ?? "Default", machine: machineName(), reachable, loopbackOnly, access };
+    const isPublic = publicShelfProfileId() === profileId;
+    const base = { profileName: profile?.name ?? "Default", machine: machineName(), reachable, loopbackOnly, access, isPublic };
     if (!reachable || loopbackOnly || access === "none") return { ...base, code: null };
     const { token, expiresAt } = pairingTokens.mint(profileId);
     const link = pairLink(env.PAIR_LINK_BASE, reachable.origin, token);
@@ -52,6 +53,16 @@ export const phoneRouter = router({
     updateEnvFile(envFilePath, "HOST", "0.0.0.0");
     return { restartNeeded: true };
   }),
+
+  // One profile's shelf answers the world with no pairing: the public case. Off clears it.
+  setPublic: publicProcedure
+    .input(z.object({ public: z.boolean() }))
+    .mutation(({ ctx, input }) => {
+      const profileId = ctx.profileId ?? DEFAULT_PROFILE_ID;
+      if (input.public) setPublicShelfProfile(profileId);
+      else if (publicShelfProfileId() === profileId) setPublicShelfProfile(null);
+      return { public: publicShelfProfileId() === profileId };
+    }),
 
   // Live: the guard reads the setting per request, so sharing starts and stops with no restart
   setNetworkAccess: publicProcedure

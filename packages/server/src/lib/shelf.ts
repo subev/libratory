@@ -1,7 +1,9 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { db } from "../db.ts";
-import { books, devices, documents, shelfDownloads, type DocumentNarration } from "../schema.ts";
+import { env, envFilePath } from "../env.ts";
+import { books, devices, documents, shelfDownloads, shelfFetches, DEFAULT_PROFILE_ID, type DocumentNarration } from "../schema.ts";
+import { updateEnvFile } from "./env-file.ts";
 import { fileSize } from "./disk-usage.ts";
 import { narrationSummary, type NarrationSummary } from "./document-narration.ts";
 
@@ -27,7 +29,23 @@ export type ShelfDocument = {
   hidden: boolean;
   narration: DocumentNarration | null;
   downloadedBy: { deviceId: string; name: string }[];
+  // Anonymous downloads from the public shelf
+  fetches: number;
 };
+
+// The one profile the world may read without pairing — the public shelf — or null
+export function publicShelfProfileId(): string | null {
+  const value = env.PUBLIC_SHELF_PROFILE;
+  if (!value) return null;
+  return value === "default" ? DEFAULT_PROFILE_ID : value;
+}
+
+// Written to .env and applied in memory, like sharing: the switch is live
+export function setPublicShelfProfile(profileId: string | null): void {
+  const value = profileId === DEFAULT_PROFILE_ID ? "default" : profileId;
+  updateEnvFile(envFilePath, "PUBLIC_SHELF_PROFILE", value);
+  env.PUBLIC_SHELF_PROFILE = value ?? undefined;
+}
 
 export function newDeviceKey(): string {
   return randomBytes(32).toString("base64url");
@@ -110,6 +128,14 @@ export async function shelfDocuments(profileId: string, options: { includeHidden
     list.push({ deviceId: d.deviceId, name: d.name });
     downloadedBy.set(d.documentId, list);
   }
+  const fetchCounts = rows.length === 0
+    ? []
+    : await db
+        .select({ documentId: shelfFetches.documentId, n: count() })
+        .from(shelfFetches)
+        .where(inArray(shelfFetches.documentId, rows.map((r) => r.id)))
+        .groupBy(shelfFetches.documentId);
+  const fetches = new Map(fetchCounts.map((f) => [f.documentId, f.n]));
 
   return Promise.all(
     rows.map(async ({ outputPath, format, ...row }) => {
@@ -121,6 +147,7 @@ export async function shelfDocuments(profileId: string, options: { includeHidden
         label: editionLabel(format, row.bookLanguage, row.language),
         bytes: await fileSize(outputPath),
         downloadedBy: downloadedBy.get(row.id) ?? [],
+        fetches: fetches.get(row.id) ?? 0,
       };
     }),
   );
@@ -144,7 +171,8 @@ export type ShelfBook = {
   } & NarrationSummary)[];
 };
 
-export function groupByBook(docs: ShelfDocument[], deviceId: string): ShelfBook[] {
+// Without a device (the public shelf) nothing is "downloaded" from the reader's point of view
+export function groupByBook(docs: ShelfDocument[], deviceId: string | null): ShelfBook[] {
   const byBook = new Map<string, ShelfBook>();
   for (const doc of docs) {
     const book = byBook.get(doc.bookId) ?? {
@@ -162,7 +190,7 @@ export function groupByBook(docs: ShelfDocument[], deviceId: string): ShelfBook[
       chapterCount: doc.chapterCount,
       bytes: doc.bytes,
       createdAt: doc.createdAt,
-      downloaded: doc.downloadedBy.some((d) => d.deviceId === deviceId),
+      downloaded: deviceId !== null && doc.downloadedBy.some((d) => d.deviceId === deviceId),
       ...narrationSummary(doc.narration),
     });
     byBook.set(doc.bookId, book);
