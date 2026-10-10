@@ -1,0 +1,4 @@
+Reviewed: low
+Outcome: in-context; two lines moved so listen precedes startWorker, verified by the dev server restarting and serving; typecheck and lint green
+By: Petur Subev
+At: 2026-10-10T22:44:32Z
