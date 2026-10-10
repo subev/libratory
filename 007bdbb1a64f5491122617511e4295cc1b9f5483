@@ -1,0 +1,4 @@
+Reviewed: low
+Outcome: in-context review of the diff (a move of existing controls between two rows, no new logic); lint, typecheck, web unit tests and e2e smoke green; both pages checked by screenshot
+By: Petur Subev
+At: 2026-10-10T21:38:52Z
