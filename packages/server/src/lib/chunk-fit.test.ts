@@ -93,6 +93,42 @@ print(json.dumps(fit_chunks(g2p, en_tokenize, text, 40)))
   });
 });
 
+describe("synthesize.write_chunk_words", () => {
+  // synthesize.py imports Kokoro only inside main(), so the words writer runs under any python3
+  function words(tokens: { text: string; whitespace: string; start?: number; end?: number }[]) {
+    const program = `
+import json, os, sys, tempfile
+from types import SimpleNamespace
+sys.path.insert(0, ${JSON.stringify(scriptPath(""))})
+from synthesize import write_chunk_words, chunk_words_file
+tokens = [SimpleNamespace(text=t["text"], whitespace=t["whitespace"], start_ts=t.get("start"), end_ts=t.get("end")) for t in json.load(sys.stdin)]
+d = tempfile.mkdtemp()
+write_chunk_words(d, 1, tokens)
+p = os.path.join(d, chunk_words_file(1))
+print(json.dumps(json.load(open(p)) if os.path.exists(p) else None))
+`;
+    const run = spawnSync("python3", ["-c", program], { input: JSON.stringify(tokens), encoding: "utf-8" });
+    if (run.status !== 0) throw new Error(run.stderr);
+    return JSON.parse(run.stdout) as { text: string; after: string; startMs: number; endMs: number }[] | null;
+  }
+
+  it("folds a contraction's untimed tail into the word before it instead of dropping the chunk", () => {
+    const out = words([
+      { text: "“", whitespace: "" },
+      { text: "did", whitespace: "", start: 0.1, end: 0.4 },
+      { text: "n’t", whitespace: " " },
+      { text: "I", whitespace: "", start: 0.5, end: 0.6 },
+      { text: "?", whitespace: "" },
+    ]);
+    expect(out?.map((w) => w.text + w.after).join("")).toBe("didn’t I?");
+    expect(out?.[0]).toMatchObject({ text: "didn’t", after: " ", startMs: 100, endMs: 400 });
+  });
+
+  it("still gives up on a real word with no timing and nothing to attach it to", () => {
+    expect(words([{ text: "lost", whitespace: " " }, { text: "found", whitespace: "", start: 0, end: 0.3 }])).toBeNull();
+  });
+});
+
 describe("chunk_fit.drop_stale_chunks", () => {
   it("removes the audio of every index the new cut changed, and keeps the rest", () => {
     const program = `

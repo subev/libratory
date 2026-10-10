@@ -79,6 +79,13 @@ def write_chunk_words(chunks_dir, index, tokens):
             # A dash or a quote can come back untimed, and abandoning the chunk over one of those
             # cost every word in it its timing. Only a real word with no timing is unplaceable.
             if re.search(r"[^\W_]", text):
+                # A contraction's tail comes back as a token of its own with no phonemes when the
+                # apostrophe is curly ("did" + "n’t"): it belongs to the word before it, and
+                # abandoning the chunk over it cost every word in it its timing
+                if words and not words[-1]["after"]:
+                    words[-1]["text"] += text
+                    words[-1]["after"] = token.whitespace or ""
+                    continue
                 return
             # Its spacing still belongs between the neighbours, or cues weld words together
             if words:
