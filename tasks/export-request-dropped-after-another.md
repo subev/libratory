@@ -1,16 +1,17 @@
-# A second export request for the same book answers success and queues nothing
+# Queue a second export for a book instead of refusing it
 
-Seen three times on 2026-10-11 while filling the public shelf by script: `books.exportDocument`
-called for a book's `epub-bilingual` right after an `epub-sync` request for the same book (within
-a second) returned `{ success: true }` and produced no job, no log line and no document. The same
-request sent on its own a minute later ran at once. Reproduced for the Carol (Spanish) twice and
-Frankenstein (Bulgarian) once; the four `epub-sync` requests sent in the same burst all ran.
+`books.exportDocument` refuses with "Assembly already in progress" while the book's status is
+`assembling`, and the assembly pool starts a queued export within milliseconds of the request, so
+two requests for one book sent back to back — a read-along EPUB and then its bilingual edition —
+always lose the second one. Scripts filling the public shelf on 2026-10-11 hit it three times; the
+refusal is named, so a careful caller sees it, but the UI's single Export dialog cannot and an
+agent scripting exports has to sleep between calls.
 
-Suspects, unverified: the `documentJobKey` with `jobKeyMode: "replace"` on a key that does not
-include the format, so the bilingual request replaces the sync one or vice versa; or the
-`books.status === "assembling"` check racing the first job's status write and an error path that
-still answers success. Start at `routes/books.ts` `exportDocument` and `lib/output-readiness.ts`.
+The refusal predates the per-format `jobKey` (`documentJobKey`, `jobKeyMode: "replace"`), which
+already collapses repeat requests for the *same* output. With that in place a second export of a
+different format or language can simply queue: the pool is serial per book anyway, and the worker
+sets and clears `assembling` around each job. Keep the refusal for `books.assemble` (an M4B over
+chapters that may be mid-export) only if something still depends on it.
 
-Fix should make the second request either queue beside the first or refuse by name; a success
-that does nothing is the worst of the three. A test: two requests for one book, different formats,
-in one tick, expect two jobs.
+Test: two `exportDocument` calls for one book, different formats, in one tick, expect two jobs and
+two documents.
