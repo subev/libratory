@@ -1,0 +1,4 @@
+Reviewed: low
+Outcome: in-context; a deny-list extension, a snapshot filter and a sort on the server, price/search on the web; tests for each pure piece; checked by screenshot of the Settings dropdown
+By: Petur Subev
+At: 2026-10-11T05:43:13Z
