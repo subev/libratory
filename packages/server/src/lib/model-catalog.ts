@@ -19,6 +19,10 @@ export type CatalogModel = {
   supportsTemperature?: boolean;
   // modalities.input names "image"
   vision?: boolean;
+  // Dollars per million tokens, as the catalog lists them — what a picker should say beside a name
+  cost?: { input: number; output: number };
+  // ISO date; newest first is the one order a long provider listing reads well in
+  releasedAt?: string;
 };
 
 // provider id -> native model id -> metadata
@@ -47,6 +51,10 @@ export function extract(raw: unknown): Catalog {
       const limit = model.limit as Record<string, unknown> | null;
       const numeric = (of: unknown) => (typeof of === "number" && of > 0 ? of : undefined);
       const flag = (of: unknown) => (typeof of === "boolean" ? of : undefined);
+      const cost = model.cost as Record<string, unknown> | null;
+      const price = typeof cost?.input === "number" && typeof cost?.output === "number" && cost.input >= 0 && cost.output >= 0
+        ? { input: cost.input, output: cost.output }
+        : undefined;
       byId.set(id, {
         label: typeof model.name === "string" ? model.name : id,
         contextTokens: numeric(limit?.context),
@@ -54,6 +62,8 @@ export function extract(raw: unknown): Catalog {
         supportsJsonFormat: flag(model.structured_output),
         supportsTemperature: flag(model.temperature),
         vision: inputModalities(model.modalities)?.includes("image"),
+        cost: price,
+        releasedAt: typeof model.release_date === "string" ? model.release_date : undefined,
       });
     }
     catalog.set(providerId, byId);

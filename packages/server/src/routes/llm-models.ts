@@ -1,18 +1,22 @@
 import { z } from "zod";
 import { router, publicProcedure } from "../trpc.ts";
 import { availableModels, canonicalKey, llmStatus, modelChoice, modelKeySchema, setDefaultModelKey } from "../lib/llm.ts";
+import { catalogModel } from "../lib/model-catalog.ts";
 import { startLocalServer } from "../lib/llm-server-control.ts";
 import { env } from "../env.ts";
 
 export const llmModelsRouter = router({
   list: publicProcedure.query(async () =>
-    (await availableModels()).map(({ key, label, hint, source, contextTokens, supportsTools, vision, recommended }) => ({
+    (await availableModels()).map(({ key, label, hint, source, contextTokens, supportsTools, vision, recommended, cost, provider, modelId }) => ({
       key,
       label,
       hint,
       source,
       contextTokens,
       supportsTools,
+      // Dollars per million tokens, in and out — from the def when a listing built it, else the
+      // catalog for a pinned pick; null when nobody knows (a local server)
+      cost: cost ?? catalogModel(provider, modelId)?.cost ?? null,
       // null = not reported; the OCR model picker disables only a definite false
       vision: vision ?? null,
       // The pickers show the curated set by default and everything else behind a "show all" row;

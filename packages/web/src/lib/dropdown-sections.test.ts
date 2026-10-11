@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sectionsOf } from "./dropdown-sections.ts";
+import { matchesQuery, sectionsOf } from "./dropdown-sections.ts";
 
 describe("sectionsOf", () => {
   it("groups a contiguous run of rows under one heading", () => {
@@ -49,5 +49,15 @@ describe("sectionsOf", () => {
 
   it("has no sections to render for an empty list", () => {
     expect(sectionsOf([])).toEqual([]);
+  });
+});
+
+describe("matchesQuery", () => {
+  it("matches every typed word against the label and the hint, case aside", () => {
+    const option = { label: "GPT-5 Mini", hint: "$0.25 / $2 per M · 400k" };
+    expect(matchesQuery(option, "gpt mini")).toBe(true);
+    expect(matchesQuery(option, "$0.25")).toBe(true);
+    expect(matchesQuery(option, "mini pro")).toBe(false);
+    expect(matchesQuery(option, "  ")).toBe(true);
   });
 });

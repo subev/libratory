@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { cloudDef, cloudKey, cloudModelListed, parseCloudKey } from "./cloud-models.ts";
+import { cloudDef, cloudKey, cloudModelListed, newestFirst, parseCloudKey, withoutSnapshots } from "./cloud-models.ts";
 import { useTempDataDir } from "../../test/data-dir.ts";
 
 let restoreDataDir: (() => void) | undefined;
@@ -92,5 +92,20 @@ describe("cloudModelListed", () => {
       deepseek: { at: Date.now() - 25 * 60 * 60 * 1000, ids: ["deepseek-flash"] },
     });
     expect(cloudModelListed("deepseek", "released-yesterday")).toBeUndefined();
+  });
+});
+
+describe("withoutSnapshots", () => {
+  it("drops a dated snapshot beside its alias and keeps one that stands alone", () => {
+    const ids = ["gpt-5.5", "gpt-5.5-2026-04-23", "gpt-4-0613", "gpt-4", "o3-2025-04-16", "gpt-5.6-sol"];
+    expect(withoutSnapshots(ids.map((modelId) => ({ modelId }))).map((m) => m.modelId)).toEqual(["gpt-5.5", "gpt-4", "o3-2025-04-16", "gpt-5.6-sol"]);
+  });
+});
+
+describe("newestFirst", () => {
+  it("puts the newest release first and an undated model, the newest of all, before it", () => {
+    const def = (label: string, releasedAt?: string) => ({ ...cloudDef("openai", label.toLowerCase()), label, releasedAt });
+    const sorted = newestFirst([def("Old", "2024-05-13"), def("New", "2026-07-09"), def("Unknown"), def("Mid", "2025-08-07")]);
+    expect(sorted.map((m) => m.label)).toEqual(["Unknown", "New", "Mid", "Old"]);
   });
 });

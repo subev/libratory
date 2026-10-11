@@ -6,6 +6,7 @@ import { SHOW_ALL_MODELS, collapsibleModels, useLlmModels } from "../lib/use-llm
 import { formatTokens } from "../lib/ai-presets.ts";
 import { Button } from "./Button.tsx";
 import { Dropdown } from "./Dropdown.tsx";
+import { formatPrice } from "./ModelPicker.tsx";
 import { OcrLanguagePacksSettings } from "./OcrLanguagePacksSettings.tsx";
 
 type SecretVar = RouterInputs["secrets"]["set"]["envVar"];
@@ -164,9 +165,10 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               options={[
                 { value: "", label: "Automatic — V4 Flash when configured, else the first available model" },
                 ...(chosenMissing ? [{ value: chosenDefault, label: `${defaultModel?.steppedOver ?? chosenDefault} (not available right now)` }] : []),
-                ...shownModels.map((m) => ({ value: m.key, label: m.label, hint: `${m.hint} · ${formatTokens(m.contextTokens)} context`, group: m.source })),
+                ...shownModels.map((m) => ({ value: m.key, label: m.label, hint: `${m.cost ? formatPrice(m.cost) : m.hint} · ${formatTokens(m.contextTokens)}`, group: m.source })),
                 ...(hiddenModels > 0 ? [{ value: SHOW_ALL_MODELS, label: `Show all ${models.length} models`, group: "", keepOpen: true }] : []),
               ]}
+              searchable={showAllModels}
               testId="settings-default-model-select"
             />
             <p className="mt-2 text-xs text-(--text-muted)">

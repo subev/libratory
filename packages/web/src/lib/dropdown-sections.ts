@@ -16,3 +16,10 @@ export function sectionsOf<T extends Sectionable>(options: T[]): { group: string
   }
   return sections;
 }
+
+// A search over the rows: every word typed must appear somewhere in the label or the hint,
+// whatever the case, so "gpt mini" finds "GPT-5 Mini" and "$0.2" finds a price.
+export function matchesQuery(option: { label: string; hint?: string }, query: string): boolean {
+  const haystack = `${option.label} ${option.hint ?? ""}`.toLowerCase();
+  return query.toLowerCase().split(/\s+/).filter(Boolean).every((word) => haystack.includes(word));
+}

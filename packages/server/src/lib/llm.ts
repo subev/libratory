@@ -38,6 +38,9 @@ export type LlmModelDef = {
   recommended?: boolean;
   // json_object mode is an OpenAI-compatible wire feature
   supportsJsonFormat: boolean;
+  // Dollars per million tokens when a catalog knows; the pickers show it, nothing decides on it
+  cost?: { input: number; output: number };
+  releasedAt?: string;
   // Reads page images (the "llm" OCR engine). Undefined when nothing reported either way — a local
   // server's model, say — and the provider then answers for itself.
   vision?: boolean;

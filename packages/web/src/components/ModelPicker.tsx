@@ -4,6 +4,12 @@ import { formatTokens } from "../lib/ai-presets.ts";
 import { Dropdown } from "./Dropdown.tsx";
 import type { LlmModel } from "../lib/use-llm-models.ts";
 
+// "$0.66 / $1.98 per M" — in, then out, per million tokens
+export function formatPrice(cost: { input: number; output: number }): string {
+  const dollars = (n: number) => (n >= 10 ? `$${Math.round(n)}` : `$${Number(n.toFixed(2))}`);
+  return `${dollars(cost.input)} / ${dollars(cost.output)} per M`;
+}
+
 export const ModelPicker = memo(function ModelPicker({
   value,
   onChange,
@@ -58,7 +64,8 @@ export const ModelPicker = memo(function ModelPicker({
     return {
       value: m.key,
       label: `${m.label}${noTools ? " (no chat tools)" : noVision ? " (cannot read images)" : ""}`,
-      hint: `${m.hint} · ${formatTokens(m.contextTokens)} context`,
+      // The price is what a pick is made by; the provider's line was only ever "Listed by X"
+      hint: `${m.cost ? formatPrice(m.cost) : m.hint} · ${formatTokens(m.contextTokens)}`,
       disabled: noTools || noVision,
       group: m.source,
     };
@@ -78,8 +85,9 @@ export const ModelPicker = memo(function ModelPicker({
       ]}
       placeholder={models.length === 0 ? "No AI model available" : "Choose a model"}
       disabled={models.length === 0}
-      width="w-80"
+      width="w-96"
       placement={placement}
+      searchable={showAll}
       testId={testId}
     />
   );

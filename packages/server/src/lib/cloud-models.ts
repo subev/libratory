@@ -145,6 +145,8 @@ export function cloudDef(provider: LlmSecretProvider, modelId: string, fromListi
     supportsTools: pick(native?.supportsTools, pick(known?.supportsTools, PROVIDER_DEFAULTS[provider].supportsTools ?? false)),
     supportsJsonFormat: pick(native?.supportsJsonFormat, pick(known?.supportsJsonFormat, PROVIDER_DEFAULTS[provider].supportsJsonFormat ?? false)),
     vision: native?.vision ?? known?.vision,
+    cost: known?.cost,
+    releasedAt: known?.releasedAt,
   };
 }
 
@@ -218,11 +220,34 @@ function idsOf(entries: { id?: unknown }[] | undefined): Listed[] {
   return (entries ?? []).flatMap((e) => (typeof e.id === "string" ? [{ modelId: e.id }] : []));
 }
 
-// The families in OpenAI's listing that cannot answer a chat completion. A deny-list of model
-// kinds rather than an allow-list of names: kinds change rarely, names every few weeks.
-const NON_CHAT = /embedding|whisper|tts|dall-e|moderation|transcribe|realtime|computer-use|^sora|^davinci|^babbage|image|audio/i;
+// The families in OpenAI's listing that cannot answer a chat completion, or that nobody would pick
+// for a book: coding and search variants, the rolling "chat-latest" aliases, the 3.5 line. A
+// deny-list of model kinds rather than an allow-list of names: kinds change rarely, names every
+// few weeks.
+const NON_CHAT = /embedding|whisper|tts|dall-e|moderation|transcribe|realtime|computer-use|^sora|^davinci|^babbage|image|audio|codex|search|chat-latest|instruct|^gpt-3\.5/i;
 function isChatModel(id: string): boolean {
   return !NON_CHAT.test(id);
+}
+
+// A dated snapshot ("gpt-5.5-2026-04-23", "gpt-4-0613") beside the alias it is a snapshot of is the
+// same model twice in a list that is already long; the alias stays, and a snapshot with no alias
+// listed is kept, since it is then the only name for that model.
+const SNAPSHOT = /^(.*?)-(\d{4}-\d{2}-\d{2}|\d{4})$/;
+export function withoutSnapshots<T extends { modelId: string }>(listed: T[]): T[] {
+  const ids = new Set(listed.map((m) => m.modelId));
+  return listed.filter((m) => {
+    const alias = SNAPSHOT.exec(m.modelId)?.[1];
+    return !(alias && ids.has(alias));
+  });
+}
+
+// Newest first within a provider, by the catalog's release date; a model the catalog has not
+// caught up with — the newest of all, usually — goes first, then undated ones by name.
+export function newestFirst(models: LlmModelDef[]): LlmModelDef[] {
+  return [...models].sort((a, b) => {
+    const da = a.releasedAt ?? "9999", db = b.releasedAt ?? "9999";
+    return db.localeCompare(da) || a.label.localeCompare(b.label);
+  });
 }
 
 // Google filters on the generation methods instead of the name — the model itself says whether it
@@ -273,7 +298,7 @@ async function probe(provider: LlmSecretProvider): Promise<Listed[]> {
     }
     const listed = listing.models(body);
     const chat = listing.chat;
-    return chat ? listed.filter((m) => chat(m.modelId)) : listed;
+    return withoutSnapshots(chat ? listed.filter((m) => chat(m.modelId)) : listed);
   } catch {
     return [];
   }
@@ -302,7 +327,7 @@ async function discoverProvider(provider: LlmSecretProvider): Promise<CloudDisco
   if (listed.length === 0) return server;
   server.running = true;
   recordListing(provider, listed);
-  server.models = listed.map((m) => cloudDef(provider, m.modelId, m.native));
+  server.models = newestFirst(listed.map((m) => cloudDef(provider, m.modelId, m.native)));
   return server;
 }
 

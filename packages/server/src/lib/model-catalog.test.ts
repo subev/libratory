@@ -33,6 +33,8 @@ describe("model catalog cache", () => {
           limit: { context: 1_000_000 },
           tool_call: true,
           structured_output: true,
+          cost: { input: 0.66, output: 1.98, cache_read: 0.022 },
+          release_date: "2026-05-02",
         },
       },
     },
@@ -41,6 +43,14 @@ describe("model catalog cache", () => {
   it("recovers exactly what it persisted", () => {
     writeDisk(payload);
     expect(readDisk()?.catalog).toEqual(extract(payload));
+  });
+
+  it("reads the price per million tokens and the release date, which the pickers show", () => {
+    const model = extract(payload).get("deepseek")?.get("deepseek-v4-pro");
+    expect(model).toMatchObject({ cost: { input: 0.66, output: 1.98 }, releasedAt: "2026-05-02" });
+    const bare = extract({ x: { models: { m: { name: "m", cost: { input: "free" } } } } }).get("x")?.get("m");
+    expect(bare?.cost).toBeUndefined();
+    expect(bare?.releasedAt).toBeUndefined();
   });
 
   it("keeps the context window across the round trip", () => {
@@ -52,6 +62,8 @@ describe("model catalog cache", () => {
       supportsTools: true,
       supportsJsonFormat: true,
       supportsTemperature: undefined,
+      cost: { input: 0.66, output: 1.98 },
+      releasedAt: "2026-05-02",
     });
   });
 

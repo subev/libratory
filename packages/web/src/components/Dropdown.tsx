@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "./Button.tsx";
 import { Menu, MenuItem } from "./Menu.tsx";
-import { sectionsOf } from "../lib/dropdown-sections.ts";
+import { matchesQuery, sectionsOf } from "../lib/dropdown-sections.ts";
 import { IconChevronDown } from "./icons.tsx";
 
 export type DropdownOption = { value: string; label: string; hint?: string; disabled?: boolean; group?: string;
@@ -25,6 +25,7 @@ export function Dropdown({
   align = "left",
   width = "w-72",
   icon,
+  searchable = false,
 }: {
   value: string;
   options: DropdownOption[];
@@ -39,9 +40,14 @@ export function Dropdown({
   align?: "left" | "right";
   width?: string;
   icon?: ReactNode;
+  // A search field above the rows, for a list too long to scan — a provider's whole catalogue
+  searchable?: boolean;
 }) {
+  const [query, setQuery] = useState("");
   const active = options.find((o) => o.value === value);
-  const sections = sectionsOf(options);
+  // A row that acts on the menu stays whatever the search says: it is how the long list opened
+  const visible = searchable && query.trim() ? options.filter((o) => o.keepOpen || matchesQuery(o, query)) : options;
+  const sections = sectionsOf(visible);
   return (
     <Menu
       testId={`${testId}-menu`}
@@ -69,6 +75,20 @@ export function Dropdown({
     >
       {(close) => (
         <div className="max-h-80 overflow-y-auto py-1" role="listbox">
+          {searchable && (
+            <div className="px-2 pb-1 pt-1">
+              <input
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Escape" && query) { e.stopPropagation(); setQuery(""); } }}
+                placeholder="Search…"
+                className="w-full px-2 py-1 text-xs rounded-md border border-(--border-input) bg-(--bg-card) text-(--text-primary) outline-none"
+                data-testid={`${testId}-search`}
+              />
+            </div>
+          )}
+          {sections.length === 0 && <div className="px-3 py-2 text-xs text-(--text-faint)">Nothing matches</div>}
           {sections.map((section, index) => (
             // Keyed by position: two headerless sections are ordinary (a row above the groups and
             // "Show all" below them), so the group name alone is not unique.
@@ -77,12 +97,15 @@ export function Dropdown({
               {section.options.map((o) => (
                 <MenuItem
                   key={o.value}
-                  onClick={() => { onChange(o.value); if (!o.keepOpen) close(); }}
+                  onClick={() => { onChange(o.value); if (!o.keepOpen) { setQuery(""); close(); } }}
                   title={o.hint}
                   disabled={o.disabled}
                   testId={`${testId}-option-${o.value}`}
                 >
-                  <span className={o.value === value ? "font-medium text-(--accent-text)" : ""}>{o.label}</span>
+                  <span className="flex items-baseline justify-between gap-3">
+                    <span className={o.value === value ? "font-medium text-(--accent-text)" : ""}>{o.label}</span>
+                    {o.hint && <span className="shrink-0 text-[11px] text-(--text-faint)">{o.hint}</span>}
+                  </span>
                 </MenuItem>
               ))}
             </div>
