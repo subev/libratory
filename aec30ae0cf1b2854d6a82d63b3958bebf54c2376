@@ -1,0 +1,4 @@
+Reviewed: high
+Outcome: Menu portal + fixed placement reviewed in-context, three findings fixed before commit (fill width, growth reposition, host fallback). Lint, typecheck, 166 web tests and browser checks passed; e2e not run (API port held by the desktop app). See docs/review-2026-10-12-menu-portal.md.
+By: Petur Subev
+At: 2026-10-12T17:00:05Z
