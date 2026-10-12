@@ -264,7 +264,7 @@ function ShelfTable({ profileName }: { profileName: string | undefined }) {
           {docs.length} {docs.length === 1 ? "file" : "files"} · {formatBytes(totalBytes)}
         </span>
       </div>
-      <div className="border border-(--border) rounded-lg bg-(--bg-card) overflow-hidden" data-testid="shelf-table">
+      <div className="border border-(--border) rounded-lg bg-(--bg-card)" data-testid="shelf-table">
         <div className={`grid ${COLUMNS} gap-3 px-4 py-2 border-b border-(--border) text-[11px] tracking-wide uppercase text-(--text-muted)`}>
           <span>Book</span>
           <span>Export</span>
@@ -281,7 +281,7 @@ function ShelfTable({ profileName }: { profileName: string | undefined }) {
         {docs.map((d, i) => (
           <div
             key={d.id}
-            className={`grid ${COLUMNS} gap-3 items-center px-4 py-2.5 ${i < docs.length - 1 ? "border-b border-(--border)" : ""} ${d.hidden ? "opacity-60" : ""}`}
+            className={`grid ${COLUMNS} gap-3 items-center px-4 py-2.5 ${i < docs.length - 1 ? "border-b border-(--border)" : ""}`}
             data-testid="shelf-row"
           >
             <div className="flex items-center gap-2.5 min-w-0">
@@ -300,8 +300,8 @@ function ShelfTable({ profileName }: { profileName: string | undefined }) {
               <div className="text-xs text-(--text-muted) truncate">
                 {narrationVoices(d.narration)}
                 {formatOutputDate(d.createdAt)}
-                {d.hidden ? " · hidden from phones" : ""}
               </div>
+              {d.hidden && <div className="text-xs font-medium text-(--text-primary)">Hidden from phones</div>}
             </div>
             <span className="text-right tabular-nums text-(--text-secondary)">{d.bytes === null ? "—" : formatBytes(d.bytes)}</span>
             <span className="text-xs text-(--text-muted) truncate">
