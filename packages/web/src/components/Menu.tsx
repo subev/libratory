@@ -1,5 +1,32 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useTopmostEscape } from "./Modal.tsx";
+
+const GAP = 6;
+
+// Fixed coordinates for the panel, measured from the trigger. The chosen side flips when the panel
+// would run off the viewport on the requested one and fits on the other.
+function placePanel(
+  trigger: DOMRect,
+  panel: { width: number; height: number },
+  align: "left" | "right",
+  placement: "below" | "above",
+) {
+  const viewportW = document.documentElement.clientWidth;
+  const viewportH = document.documentElement.clientHeight;
+  const fitsBelow = trigger.bottom + GAP + panel.height <= viewportH;
+  const fitsAbove = trigger.top - GAP - panel.height >= 0;
+  const above = placement === "above" ? fitsAbove || !fitsBelow : !fitsBelow && fitsAbove;
+  const fitsRight = trigger.left + panel.width <= viewportW;
+  const fitsLeft = trigger.right - panel.width >= 0;
+  const alignRight = align === "right" ? fitsLeft || !fitsRight : !fitsRight && fitsLeft;
+  return {
+    top: above ? "" : `${trigger.bottom + GAP}px`,
+    bottom: above ? `${viewportH - trigger.top + GAP}px` : "",
+    left: alignRight ? "" : `${trigger.left}px`,
+    right: alignRight ? `${viewportW - trigger.right}px` : "",
+  };
+}
 
 // One popover for the three the book page needs — the book menu, the variant picker and the tray's
 // overflow. Escape comes from Modal.tsx's stack, so a menu opened over a dialog closes itself first.
@@ -23,9 +50,43 @@ export function Menu({
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  // Portalled to the body and positioned `fixed`: an `absolute` panel inside a table's overflow-x
+  // wrapper (which clips vertically too) was cut off on the last rows. The position is written to
+  // the panel's style from a layout effect, so it never paints at the wrong spot.
+  const panel = useRef<HTMLDivElement>(null);
+  // Into the dialog's own subtree when opened from one: aria-modal hides everything outside it from
+  // assistive tech, and a fixed panel is not clipped by the dialog's overflow-hidden anyway.
+  const [host, setHost] = useState<HTMLElement | null>(null);
 
   const close = useCallback(() => setOpen(false), []);
+  const toggle = useCallback(() => setOpen((o) => !o), []);
   useTopmostEscape(close, open);
+
+  const fill = width === "w-full";
+  const reposition = useCallback(() => {
+    const trigger = root.current?.getBoundingClientRect();
+    const el = panel.current;
+    if (!trigger || !el) return;
+    if (fill) el.style.width = `${trigger.width}px`;
+    Object.assign(el.style, placePanel(trigger, { width: el.offsetWidth, height: el.offsetHeight }, align, placement));
+    el.style.visibility = "";
+  }, [align, placement, fill]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    reposition();
+    // The trigger moves when any ancestor scrolls or the window resizes, and the panel changes size
+    // when a searchable list is filtered; either can change which side fits.
+    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("resize", reposition);
+    const observer = new ResizeObserver(reposition);
+    if (panel.current) observer.observe(panel.current);
+    return () => {
+      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("resize", reposition);
+      observer.disconnect();
+    };
+  }, [open, reposition]);
 
   // Held in a ref, not in the effect below: closing the menu re-runs that effect, and a swallow
   // registered inside it would be torn down by its own cleanup before the click it exists to eat.
@@ -43,7 +104,8 @@ export function Menu({
   useEffect(() => {
     if (!open) return;
     function onPointerDown(e: PointerEvent) {
-      if (root.current?.contains(e.target as Node)) return;
+      const target = e.target as Node;
+      if (root.current?.contains(target) || panel.current?.contains(target)) return;
       setOpen(false);
       // The click this pointerdown becomes is still on its way to whatever is underneath — a Modal's
       // scrim, or the next button along. One dismissal is one dismissal.
@@ -69,18 +131,25 @@ export function Menu({
   }, [open, clearSwallow]);
 
   return (
-    <div ref={root} className="relative">
-      {trigger({ open, toggle: () => setOpen(!open) })}
-      {open && (
-        <div
-          className={`absolute z-50 ${width} p-1.5 rounded-xl border border-(--border) bg-(--bg-card) shadow-2xl ${
-            align === "right" ? "right-0" : "left-0"
-          } ${placement === "above" ? "bottom-full mb-1.5" : "top-full mt-1.5"}`}
-          data-testid={testId}
-        >
-          {children(close)}
-        </div>
-      )}
+    <div
+      ref={root}
+      className="relative"
+      onClickCapture={(e) => setHost(e.currentTarget.closest<HTMLElement>('[role="dialog"]') ?? document.body)}
+    >
+      {trigger({ open, toggle })}
+      {open &&
+        createPortal(
+          // z above Modal's z-[60]: a menu opened inside a dialog must still paint over it.
+          <div
+            ref={panel}
+            className={`fixed z-[70] ${fill ? "" : width} p-1.5 rounded-xl border border-(--border) bg-(--bg-card) shadow-2xl`}
+            style={{ visibility: "hidden" }}
+            data-testid={testId}
+          >
+            {children(close)}
+          </div>,
+          host ?? document.body,
+        )}
     </div>
   );
 }

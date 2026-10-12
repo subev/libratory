@@ -48,6 +48,16 @@ user says “review done”, read that recorded file directly; do not ask them t
 tell the reviewer to save it. Do not create a placeholder report that could be mistaken for a
 completed review.
 
+### Keeping libratory.dev current
+
+The site lives in `~/repos/libratory-site` (`subev/libratory-site`, public; Vite + React) and falls
+behind the code more than anything else in the project. It usually has its own agent running in
+Herdr (`herdr agent list`, match on `cwd`). When a user-visible feature lands — something a reader
+of the site would want to know Libratory can now do — propose a brief for that agent in your
+**Cross-repo follow-ups** instead of leaving the site for later: what the feature does for a
+reader, where it belongs on the page, a screenshot or recording worth using, and anything still
+unreleased that must stay off the site.
+
 ## Voice — how this project speaks in public
 
 There is no team behind this, so nothing written outward says "we". Leave the actor out where the
@@ -708,8 +718,11 @@ packages/web/src/
     BilingualSelection.tsx  The tray's Bilingual reading panel: pair and link the selected chapters
     BilingualPreparation.tsx The same for one chapter, inside the chapter modal
     DiskUsage.tsx       useDiskUsageTotal (labels the book-menu item) + DiskUsageModal (breakdown + chunk cleanup)
-    Menu.tsx            The one popover — book menu, variant picker, tray overflow. Its outside-click
-                        is swallowed, or dismissing a menu inside a dialog would close the dialog too
+    Menu.tsx            The one popover — book menu, variant picker, tray overflow, row menus. Portalled
+                        (into the enclosing dialog, else the body) and positioned `fixed` from the trigger,
+                        flipping sides when it would leave the viewport — an absolute panel inside a
+                        table's overflow wrapper was clipped on the last rows. Its outside-click is
+                        swallowed, or dismissing a menu inside a dialog would close the dialog too
     SegmentedControl.tsx  Promoted out of Reader.tsx; "raised" and "accent" skins
     MarkdownBlock.tsx   Markdown renderer for notes/AI answers
     VoicePicker.tsx     Trigger for the voice library modal (labelled field); queries only the engine owning the current selection to resolve its label
@@ -746,7 +759,7 @@ fixed zinc.
 
 ## tRPC Routes
 
-**books** (library): `list` ({folders, books} for one folder, profile-scoped, activity/failure/size stats + recursive folder rollups + hasText/hasPages flags + per-book `filterState` and per-folder subtree `filterCounts`) · `search` (title words across all folders, returns folder paths) · `textAvailability` (which books have chapters or raw text — digest precheck) · `get` · `logs` / `clearLogs` · `rename` · `updateSettings` · `moveToFolder` · `delete` / `deleteMany` · `diskUsage` / `cleanupChunks`
+**books** (library): `list` ({folders, books} for one folder, profile-scoped, activity/failure/size stats + recursive folder rollups + hasText/hasPages flags + per-book `filterState` and per-folder subtree `filterCounts`) · `search` (title words across all folders, returns folder paths) · `textAvailability` (which books have chapters or raw text — digest precheck) · `get` · `logs` / `clearLogs` · `rename` · `updateSettings` · `moveToFolder` · `moveToProfile` (lands unfiled; the book's notes and search chunks follow it) · `delete` / `deleteMany` · `diskUsage` / `cleanupChunks`
 
 **books** (pipeline): `upload` (legacy tRPC path) · `retry` (full re-extract; `forgetTextLayer` drops the OCR copies first) · `extractChapters` · `processSelected` · `cancel` · `assemble` · `assemblies` / `deleteAssembly` · `structure` / `proposeChapters` / `applyChapterBoundaries` / `redetectChapters` · `chapterList` · `rawTextStats` (Ask AI itself is the assistant's `analyze_text` tool)
 
