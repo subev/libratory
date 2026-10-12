@@ -9,8 +9,8 @@ import { IconBook, IconHide, IconMore, IconShow } from "../components/icons.tsx"
 import { formatBytes, formatOutputDate, formatRelativeTime } from "../lib/format.ts";
 
 // The workshop's Phone page: the QR that adds this profile's shelf to a phone, the phones already on
-// it, and the shelf they see. The shelf is derived from the profile's finished read-along and
-// bilingual EPUBs — there is no second place to publish to, and hiding is the only edit.
+// it, and the shelf they see. The shelf is derived from the profile's finished EPUBs — there is
+// no second place to publish to, and hiding is the only edit.
 
 function mmss(ms: number): string {
   const s = Math.ceil(ms / 1000);
@@ -256,7 +256,7 @@ function ShelfTable({ profileName }: { profileName: string | undefined }) {
         <div>
           <div className="text-base font-semibold tracking-tight text-(--text-primary)">{profileName ? `On ${profileName}'s shelf` : "On this shelf"}</div>
           <p className="mt-0.5 text-sm text-(--text-secondary) text-pretty">
-            Every read-along and bilingual EPUB this profile has exported. A paired phone sees this list and nothing
+            Every text-only, read-along and bilingual EPUB this profile has exported. A paired phone sees this list and nothing
             else: not the PDFs, not the other profiles, no way to change anything.
           </p>
         </div>
@@ -274,7 +274,7 @@ function ShelfTable({ profileName }: { profileName: string | undefined }) {
         </div>
         {docs.length === 0 && (
           <p className="px-4 py-6 text-sm text-(--text-muted)">
-            Nothing yet. Export a read-along or bilingual EPUB from a book's Outputs tab and it appears here the moment
+            Nothing yet. Export an EPUB from a book's Outputs tab and it appears here the moment
             it finishes.
           </p>
         )}

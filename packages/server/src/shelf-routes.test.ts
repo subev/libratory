@@ -202,6 +202,35 @@ describe("the public shelf", () => {
 });
 
 describe("the shelf", () => {
+  it("surfaces a new text-only EPUB first and lets a paired phone download it", async () => {
+    const app = await createApp();
+    const mine = await makeProfile("Petur");
+    const { book } = await makeDocument(mine.id, { createdAt: new Date("2026-09-27") });
+    await makeDocument(mine.id, { createdAt: new Date("2026-10-11") });
+    const { doc } = await makeDocument(mine.id, { bookId: book.id, format: "epub", createdAt: new Date("2026-10-12") });
+    const textOnly = await makeDocument(mine.id, { format: "epub", createdAt: new Date("2026-10-10") });
+    const hidden = await makeDocument(mine.id, { format: "epub", shelfHidden: true });
+    const foreign = await makeDocument((await makeProfile("Mira")).id, { format: "epub" });
+    const { deviceKey, bookCount } = await pair(app, mine.id);
+    const headers = { authorization: `Bearer ${deviceKey}` };
+
+    expect(bookCount).toBe(3);
+    const res = await app.inject({ method: "GET", url: "/shelf", headers });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().books).toHaveLength(3);
+    expect(res.json().books[0]).toMatchObject({ id: book.id });
+    expect(res.json().books[0].editions[0]).toMatchObject({
+      documentId: doc.id, format: "epub", label: "German, text only",
+      createdAt: "2026-10-12T00:00:00.000Z", narrated: false,
+    });
+    expect(res.json().books[2].id).toBe(textOnly.book.id);
+    const download = await app.inject({ method: "GET", url: `/shelf/documents/${doc.id}`, headers });
+    expect(download.statusCode).toBe(200);
+    expect(download.headers["content-type"]).toBe("application/epub+zip");
+    expect((await app.inject({ method: "GET", url: `/shelf/documents/${hidden.doc.id}`, headers })).statusCode).toBe(404);
+    expect((await app.inject({ method: "GET", url: `/shelf/documents/${foreign.doc.id}`, headers })).statusCode).toBe(404);
+  });
+
   it("answers 401 to no key, a wrong key, and a forgotten phone", async () => {
     const app = await createApp();
     expect((await app.inject({ method: "GET", url: "/shelf" })).statusCode).toBe(401);

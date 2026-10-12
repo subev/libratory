@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import { editionLabel, groupByBook, hashDeviceKey, newDeviceKey, type ShelfDocument } from "./shelf.ts";
 
 describe("editionLabel", () => {
+  it("names a text-only EPUB by its written language", () => {
+    expect(editionLabel("epub", "de", null)).toBe("German, text only");
+    expect(editionLabel("epub", "de", "English")).toBe("English, text only");
+    expect(editionLabel("epub", null, null)).toBe("Text only");
+  });
+
   it("names a bilingual EPUB by both languages", () => {
     expect(editionLabel("epub-bilingual", "de", "English")).toBe("German and English");
   });

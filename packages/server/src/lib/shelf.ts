@@ -7,9 +7,9 @@ import { updateEnvFile } from "./env-file.ts";
 import { fileSize } from "./disk-usage.ts";
 import { narrationSummary, type NarrationSummary } from "./document-narration.ts";
 
-// The shelf is derived, never curated: a profile's finished read-along and bilingual EPUBs, as
+// The shelf is derived, never curated: a profile's finished EPUBs, as
 // they are. Hiding one is the only edit, and it hides the row, not the file.
-export const SHELF_FORMATS = ["epub-sync", "epub-bilingual"] as const;
+export const SHELF_FORMATS = ["epub", "epub-sync", "epub-bilingual"] as const;
 export type ShelfFormat = (typeof SHELF_FORMATS)[number];
 
 export type ShelfDocument = {
@@ -73,6 +73,10 @@ export function languageName(code: string | null): string | null {
 export function editionLabel(format: ShelfFormat, bookLanguage: string | null, language: string | null): string {
   const original = languageName(bookLanguage);
   switch (format) {
+    case "epub": {
+      const written = language ?? original;
+      return written ? `${written}, text only` : "Text only";
+    }
     case "epub-bilingual":
       return original && language ? `${original} and ${language}` : (language ?? "Bilingual");
     case "epub-sync": {
@@ -86,7 +90,7 @@ export function editionLabel(format: ShelfFormat, bookLanguage: string | null, l
   }
 }
 
-function isShelfFormat(format: string): format is ShelfFormat {
+export function isShelfFormat(format: string): format is ShelfFormat {
   return (SHELF_FORMATS as readonly string[]).includes(format);
 }
 
@@ -145,7 +149,7 @@ export async function shelfDocuments(profileId: string, options: { includeHidden
 
   return Promise.all(
     rows.map(async ({ outputPath, format, ...row }) => {
-      // The query already filtered to the two formats; the guard is what the type needs
+      // The query already filtered to shelf formats; the guard is what the type needs
       if (!isShelfFormat(format)) throw new Error(`unexpected shelf format ${format}`);
       return {
         ...row,

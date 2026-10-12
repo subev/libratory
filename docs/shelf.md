@@ -1,7 +1,7 @@
 # The phone shelf
 
-A profile's finished read-along and bilingual EPUBs, reachable by a paired device over the local
-network or a tailnet. The shelf is derived, never curated: every `epub-sync` and `epub-bilingual`
+A profile's finished text-only, read-along and bilingual EPUBs, reachable by a paired device over the local
+network or a tailnet. The shelf is derived, never curated: every `epub`, `epub-sync` and `epub-bilingual`
 row in `documents` for the profile is on it unless hidden, so there is no second place to publish
 to. The server never learns what was read — it counts downloads and nothing else.
 
@@ -102,7 +102,8 @@ book's `language` is a name in English from the book's language code (`Intl.Disp
 edition's `language` is the translation's name as the variant key stores it, `null` for the
 original. `label` is the line a row shows: the language first, because that is what a reader picks
 by. `bytes` is `null` when the file is missing on disk. `downloaded` is whether *this* device has
-fetched the file. Newest first within a book.
+fetched the file. Editions are newest first within a book, and books are ordered by their newest
+visible export. A text-only `epub` has a label such as "German, text only" and `narrated: false`.
 
 The narration fields come from the export (`documents.narration`, `lib/document-narration.ts`),
 never from opening the file: `narrated` is false for a bilingual export written with neither

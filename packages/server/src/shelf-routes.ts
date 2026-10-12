@@ -10,7 +10,7 @@ import { outputDir } from "./lib/paths.ts";
 import { PAIR_RATE_LIMIT, SHELF_RATE_LIMIT } from "./lib/request-limits.ts";
 import { pairingTokens } from "./lib/pairing.ts";
 import { machineName, shelfAddresses } from "./lib/shelf-address.ts";
-import { groupByBook, hashDeviceKey, newDeviceKey, publicShelfProfileId, shelfBookCount, shelfDocuments } from "./lib/shelf.ts";
+import { groupByBook, hashDeviceKey, isShelfFormat, newDeviceKey, publicShelfProfileId, shelfBookCount, shelfDocuments } from "./lib/shelf.ts";
 import { contentDisposition } from "./lib/content-disposition.ts";
 
 // The only surface a phone can reach, and it is read-only: list a profile's finished shelf, fetch
@@ -139,7 +139,7 @@ export function registerShelfRoutes(fastify: FastifyInstance) {
       .from(documents)
       .innerJoin(books, eq(documents.bookId, books.id))
       .where(eq(documents.id, documentId));
-    const onShelf = row && row.profileId === caller.profileId && !row.hidden && (row.format === "epub-sync" || row.format === "epub-bilingual");
+    const onShelf = row && row.profileId === caller.profileId && !row.hidden && isShelfFormat(row.format);
     if (!onShelf) return reply.code(404).send({ error: "Not on this shelf" });
 
     // Recorded only once the file is known to be there: a missing file must not show as "on phones"
