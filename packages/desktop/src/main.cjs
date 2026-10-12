@@ -1,5 +1,6 @@
 // The window: this file starts child processes and points a BrowserWindow at a local url.
 const { app, BrowserWindow, Menu, shell, dialog, ipcMain } = require("electron");
+const { contextMenuTemplate } = require("./editing.cjs");
 const { execFileSync, spawn } = require("node:child_process");
 const { createWriteStream, renameSync, statSync } = require("node:fs");
 const { readFile } = require("node:fs/promises");
@@ -396,6 +397,7 @@ function pageUrl(base) {
 function menu(url) {
   return Menu.buildFromTemplate([
     { role: "appMenu" },
+    { role: "editMenu" },
     {
       label: "View",
       submenu: [
@@ -473,6 +475,10 @@ app.whenReady().then(() => {
     }
   });
   Menu.setApplicationMenu(menu(`http://127.0.0.1:${PORT}`));
+  win.webContents.on("context-menu", (_event, params) => {
+    const template = contextMenuTemplate(params);
+    if (win && template.length) Menu.buildFromTemplate(template).popup({ window: win });
+  });
   win.loadFile(path.join(__dirname, "first-run.html"));
   win.webContents.once("did-finish-load", () => {
     win?.webContents.send("steps", STEPS.map(({ id, label }) => ({ id, label })));
