@@ -44,6 +44,10 @@ function locateWords(text: string, range: Span, reported: { text: string; startM
 }
 
 export function spanTiming(tl: Timeline, span: Span): SpanTiming {
+  // Unspoken separators must not borrow opposing edges from neighbouring recordings.
+  if (silentBetween(tl.text, span.start, span.end)) {
+    return { start: { ms: null, method: "unavailable" }, end: { ms: null, method: "unavailable" } };
+  }
   return { start: startEdge(tl, span.start), end: endEdge(tl, span.end) };
 }
 

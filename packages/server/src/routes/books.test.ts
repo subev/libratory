@@ -36,6 +36,29 @@ import { collectBlocksFromMarkerOutput, type FlatBlock } from "../lib/marker.ts"
 
 const mockCollectBlocks = vi.mocked(collectBlocksFromMarkerOutput);
 
+describe("booksRouter.pendingDocumentExports", () => {
+  it("excludes exhausted exports while retaining queued, retryable and running jobs", async () => {
+    const db = getDb();
+    await resetDb(db);
+    await ensureGraphileTables(db);
+    const bookId = crypto.randomUUID();
+    await insertJob(db, "assembleDocument", { bookId, format: "epub-bilingual" }, { attempts: 1 });
+    await insertJob(db, "assembleDocument", { bookId, format: "epub" });
+    await insertJob(db, "assembleDocument", { bookId, format: "pdf" }, { attempts: 1, maxAttempts: 2 });
+    await insertJob(db, "assembleDocument", { bookId, format: "epub-sync" }, { attempts: 1, lockedAt: new Date() });
+    await insertJob(db, "assembleDocument", { bookId: crypto.randomUUID(), format: "epub" });
+    await insertJob(db, "assemble", { bookId });
+
+    const pending = await booksRouter.createCaller({}).pendingDocumentExports({ bookId });
+    expect(pending).toHaveLength(3);
+    expect(pending).toEqual(expect.arrayContaining([
+      { format: "epub", language: null, running: false, waiting: false },
+      { format: "pdf", language: null, running: false, waiting: false },
+      { format: "epub-sync", language: null, running: true, waiting: false },
+    ]));
+  });
+});
+
 describe("booksRouter.updateSettings", () => {
   beforeEach(async () => {
     await resetDb(getDb());

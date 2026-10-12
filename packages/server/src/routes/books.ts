@@ -1174,6 +1174,7 @@ export const booksRouter = router({
         FROM graphile_worker._private_jobs j
         JOIN graphile_worker._private_tasks t ON t.id = j.task_id
         WHERE t.identifier = 'assembleDocument' AND j.payload->>'bookId' = ${input.bookId}
+          AND (j.locked_at IS NOT NULL OR j.attempts < j.max_attempts)
       `)) as unknown as Array<{
         format: "pdf" | "epub" | "epub-sync" | "epub-bilingual";
         language: string | null;

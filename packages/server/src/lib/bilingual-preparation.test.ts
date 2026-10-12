@@ -112,4 +112,15 @@ describe("production bilingual preparation", () => {
     const tl = timeline(text, { version: 1, totalMs: 2000, chunks: [{ text: "Hello.", startMs: 0, endMs: 1000 }, { text: "Bye.", startMs: 1000, endMs: 2000 }] });
     expect(spanTiming(tl, { start: 7, end: 15 })).toEqual({ start: { ms: null, method: "unavailable" }, end: { ms: null, method: "unavailable" } });
   });
+  it("leaves an unspoken separator between chunks untimed instead of reversing its edges", () => {
+    const text = "Hello. . . . Bye.";
+    const tl = timeline(text, { version: 2, totalMs: 2000, chunks: [
+      { text: "Hello.", startMs: 0, endMs: 1000 },
+      { text: "Bye.", startMs: 1000, endMs: 2000,
+        words: [{ text: "Bye", after: ".", startMs: 1040, endMs: 1900 }] },
+    ] });
+    expect(spanTiming(tl, { start: 7, end: 12 })).toEqual({
+      start: { ms: null, method: "unavailable" }, end: { ms: null, method: "unavailable" },
+    });
+  });
 });
