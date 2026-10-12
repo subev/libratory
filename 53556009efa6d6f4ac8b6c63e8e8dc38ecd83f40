@@ -1,0 +1,4 @@
+Reviewed: high
+Outcome: Reviewed full outgoing range from 78830cb through HEAD, including shelf and desktop fixes, new files, tests and docs. No blocking findings. Lint/typecheck passed; 1341 tests passed, 5 private-fixture tests skipped. Native Command-V and context menu verified; physical iOS and packaged update untested. Report: docs/review-2026-10-12-shelf-desktop-release.md
+By: Petur Subev
+At: 2026-10-12T12:48:10.230Z
