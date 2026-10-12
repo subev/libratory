@@ -1,0 +1,4 @@
+Reviewed: high
+Outcome: Reviewed full outgoing range from 6b9d4b53: bilingual separator timing, pending-export filtering, regression tests and review report. No findings. Lint, typecheck, 1343 tests passed (5 skipped); real four-chapter export layer validated. See docs/review-2026-10-13-bilingual-export.md.
+By: Petur Subev
+At: 2026-10-12T21:18:35.658Z
