@@ -1,0 +1,4 @@
+Reviewed: high
+Outcome: Full outgoing range from 5355600 reviewed: shelf-menu clipping, opacity, and hidden-status fixes plus report; no blockers. Lint, typecheck, 1341 tests and headless menu checks passed. See docs/review-2026-10-12-shelf-menu.md.
+By: Petur Subev
+At: 2026-10-12T15:58:51.396Z
