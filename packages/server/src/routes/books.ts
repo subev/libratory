@@ -6,7 +6,7 @@ import { z } from "zod";
 import { canonicalKey, modelKeySchema } from "../lib/llm.ts";
 import { router, publicProcedure } from "../trpc.ts";
 import { db } from "../db.ts";
-import { books, bookFiles, chapters, bookLogs, assemblies, documents, chapterVariants, folders, DEFAULT_PROFILE_ID, OCR_ENGINES } from "../schema.ts";
+import { books, bookFiles, chapters, bookLogs, assemblies, documents, chapterVariants, folders, profiles, notes, bookChunks, DEFAULT_PROFILE_ID, OCR_ENGINES } from "../schema.ts";
 import type { Book, Chapter } from "../schema.ts";
 import { eq, desc, asc, gt, and, or, ne, inArray, ilike, isNotNull, sql, count } from "drizzle-orm";
 import { uploadsDir, bookOutputDir, bookFileOutDir } from "../lib/paths.ts";
@@ -33,6 +33,7 @@ import { countAsciiNonAscii } from "../lib/token-estimate.ts";
 import { assembleJobKey, documentJobKey, inFlightInputs, outputChapters } from "../lib/output-readiness.ts";
 import { owedJobs } from "../lib/owed-jobs.ts";
 import { randomUUID } from "node:crypto";
+import { profileIdSchema } from "../lib/profile-id.ts";
 import path from "node:path";
 import { mkdir, unlink, rm } from "node:fs/promises";
 import { quickAddJob } from "graphile-worker";
@@ -1414,6 +1415,36 @@ export const booksRouter = router({
         .set({ folderId: input.folderId, updatedAt: new Date() })
         .where(and(inArray(books.id, input.ids), eq(books.profileId, profileId)));
       return { moved: input.ids.length };
+    }),
+
+  // Folders belong to one profile, so a book arrives unfiled. Its notes and search chunks carry a
+  // copy of the profile and move with it; chat conversations that quoted it stay where they were.
+  moveToProfile: publicProcedure
+    .input(z.object({
+      ids: z.array(z.string().uuid()).min(1).max(100),
+      profileId: profileIdSchema,
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const fromProfileId = ctx.profileId ?? DEFAULT_PROFILE_ID;
+      if (input.profileId === fromProfileId) throw new Error("The books are already in that profile");
+      const [target] = await db.select({ id: profiles.id }).from(profiles).where(eq(profiles.id, input.profileId));
+      if (!target) throw new Error("Profile not found");
+      return db.transaction(async (tx) => {
+        const moved = await tx
+          .update(books)
+          .set({ profileId: input.profileId, folderId: null, updatedAt: new Date() })
+          .where(and(inArray(books.id, input.ids), eq(books.profileId, fromProfileId)))
+          .returning({ id: books.id });
+        const ids = moved.map((b) => b.id);
+        if (ids.length > 0) {
+          await tx.update(notes).set({ profileId: input.profileId }).where(inArray(notes.bookId, ids));
+          await tx
+            .update(bookChunks)
+            .set({ profileId: input.profileId, folderId: null })
+            .where(inArray(bookChunks.bookId, ids));
+        }
+        return { moved: ids.length };
+      });
     }),
 
   assemblies: publicProcedure

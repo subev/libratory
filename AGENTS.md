@@ -702,7 +702,7 @@ packages/web/src/
     ChapterCrafting.tsx Chapter crafting: outline + source (pages/text) + PDF pane, starts at any block, undo, preserving apply
     VariantModal.tsx    Variant start/progress modal: language + rewrite-preset + custom-prompt targets, live side-by-side view
     DigestModal.tsx     Create-digest modal (prompt presets, text-availability warnings + exclusion)
-    FolderPickerModal.tsx Move-to-folder tree picker
+    FolderPickerModal.tsx Move-to-folder tree picker, with other profiles as destinations for books
     Breadcrumbs.tsx     Droppable folder breadcrumbs
     BookSearchResults.tsx Search results across all folders with folder-path breadcrumbs
     BookList.tsx        Books overview table (activity pills, no-text pill, languages, outputs, size)

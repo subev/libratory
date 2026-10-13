@@ -2,9 +2,13 @@ import { useMemo, useState } from "react";
 import { trpc } from "../trpc.ts";
 import { Modal, ModalHeader } from "./Modal.tsx";
 import { Button } from "./Button.tsx";
-import { IconFolder } from "./icons.tsx";
+import { IconFolder, IconProfile } from "./icons.tsx";
+import { getStoredProfileId } from "../lib/profile.ts";
 
 type FolderNode = { id: string; name: string; depth: number };
+
+// A folder (null = unfiled) in this profile, or the home of another profile
+type Target = { kind: "folder"; id: string | null } | { kind: "profile"; id: string; name: string };
 
 export function FolderPickerModal({
   bookIds,
@@ -19,7 +23,9 @@ export function FolderPickerModal({
 }) {
   const utils = trpc.useUtils();
   const { data: allFolders = [] } = trpc.folders.list.useQuery();
-  const [targetId, setTargetId] = useState<string | null>(null);
+  const { data: profiles = [] } = trpc.profiles.list.useQuery();
+  const [target, setTarget] = useState<Target>({ kind: "folder", id: null });
+  const targetId = target.kind === "folder" ? target.id : null;
   const [newName, setNewName] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
   const [moveError, setMoveError] = useState<string | null>(null);
@@ -50,12 +56,18 @@ export function FolderPickerModal({
     return nodes;
   }, [allFolders, folderIds]);
 
+  // A stale stored id falls back to the default on the server, so it does here too
+  const stored = getStoredProfileId();
+  const currentProfileId = profiles.some((p) => p.id === stored) ? stored : profiles.find((p) => p.isDefault)?.id;
+  const otherProfiles = profiles.filter((p) => p.id !== currentProfileId);
+
   const moveBooksMutation = trpc.books.moveToFolder.useMutation();
+  const moveToProfileMutation = trpc.books.moveToProfile.useMutation();
   const moveFolderMutation = trpc.folders.move.useMutation();
   const createMutation = trpc.folders.create.useMutation({
     onSuccess: (folder) => {
       setNewName(null);
-      setTargetId(folder.id);
+      setTarget({ kind: "folder", id: folder.id });
       utils.folders.list.invalidate();
     },
   });
@@ -71,9 +83,14 @@ export function FolderPickerModal({
     setMoving(true);
     setMoveError(null);
     try {
-      if (bookIds.length > 0) await moveBooksMutation.mutateAsync({ ids: bookIds, folderId: targetId });
-      for (const id of folderIds) {
-        await moveFolderMutation.mutateAsync({ id, parentId: targetId });
+      if (target.kind === "profile") {
+        await moveToProfileMutation.mutateAsync({ ids: bookIds, profileId: target.id });
+        utils.profiles.list.invalidate();
+      } else {
+        if (bookIds.length > 0) await moveBooksMutation.mutateAsync({ ids: bookIds, folderId: target.id });
+        for (const id of folderIds) {
+          await moveFolderMutation.mutateAsync({ id, parentId: target.id });
+        }
       }
       utils.books.list.invalidate();
       utils.folders.list.invalidate();
@@ -87,30 +104,46 @@ export function FolderPickerModal({
     }
   }
 
-  // button-ok: a radio row picking the move destination, not an action — the move button below acts
-  const row = (id: string | null, label: string, depth: number, folderIcon = false) => (
-    <button
-      key={id ?? "root"}
-      onClick={() => setTargetId(id)}
-      className={`w-full text-left px-3 py-1.5 rounded text-sm flex items-center gap-2 ${
-        targetId === id ? "bg-(--bg-selected) text-(--text-primary)" : "text-(--text-secondary) hover:bg-(--bg-subtle)"
-      }`}
-      style={{ paddingLeft: `${12 + depth * 16}px` }}
-      data-testid="folder-picker-row"
-    >
-      <span className={`w-3 h-3 rounded-full border shrink-0 ${targetId === id ? "bg-(--accent) border-(--accent)" : "border-(--border)"}`} />
-      {folderIcon && <IconFolder className="h-4 w-4 shrink-0" />}
-      <span className="truncate">{label}</span>
-    </button>
-  );
+  const row = (next: Target, label: string, depth: number, icon?: "folder" | "profile", disabledReason?: string) => {
+    const selected = target.kind === next.kind && target.id === next.id;
+    return (
+      // button-ok: a radio row picking the move destination, not an action — the move button below acts
+      <button
+        key={`${next.kind}:${next.id ?? "root"}`}
+        onClick={() => setTarget(next)}
+        disabled={!!disabledReason}
+        title={disabledReason}
+        className={`w-full text-left px-3 py-1.5 rounded text-sm flex items-center gap-2 disabled:opacity-50 ${
+          selected ? "bg-(--bg-selected) text-(--text-primary)" : "text-(--text-secondary) enabled:hover:bg-(--bg-subtle)"
+        }`}
+        style={{ paddingLeft: `${12 + depth * 16}px` }}
+        data-testid={next.kind === "profile" ? "folder-picker-profile-row" : "folder-picker-row"}
+      >
+        <span className={`w-3 h-3 rounded-full border shrink-0 ${selected ? "bg-(--accent) border-(--accent)" : "border-(--border)"}`} />
+        {icon === "folder" && <IconFolder className="h-4 w-4 shrink-0" />}
+        {icon === "profile" && <IconProfile className="h-4 w-4 shrink-0" />}
+        <span className="truncate">{label}</span>
+      </button>
+    );
+  };
+  const profileDisabled = folderIds.length > 0
+    ? "A folder stays in its profile — select only books to move them to another profile"
+    : undefined;
 
   return (
     <Modal size="sm" onClose={onClose} testId="folder-picker-modal">
       <ModalHeader title={`Move ${itemLabel} to…`} onClose={onClose} />
 
       <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-        {row(null, "Unfiled (home)", 0)}
-        {tree.map((n) => row(n.id, n.name, n.depth, true))}
+        {row({ kind: "folder", id: null }, "Unfiled (home)", 0)}
+        {tree.map((n) => row({ kind: "folder", id: n.id }, n.name, n.depth, "folder"))}
+        {otherProfiles.length > 0 && (
+          <>
+            <p className="px-3 pt-3 pb-1 text-xs text-(--text-muted)">Another profile — arrives unfiled</p>
+            {otherProfiles.map((p) =>
+              row({ kind: "profile", id: p.id, name: p.name }, p.name, 0, "profile", profileDisabled))}
+          </>
+        )}
       </div>
 
       <div className="border-t border-(--border) px-4 py-3 shrink-0 space-y-2">
@@ -148,7 +181,7 @@ export function FolderPickerModal({
             disabled={moving || itemCount === 0}
             data-testid="folder-picker-move"
           >
-            {moving ? "Moving..." : `Move ${itemLabel}`}
+            {moving ? "Moving..." : `Move ${itemLabel}${target.kind === "profile" ? ` to ${target.name}` : ""}`}
           </Button>
         </div>
       </div>

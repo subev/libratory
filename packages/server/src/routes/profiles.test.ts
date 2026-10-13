@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getDb, resetDb, row } from "../../test/setup.ts";
-import { books, folders, profiles, DEFAULT_PROFILE_ID } from "../schema.ts";
+import { bookChunks, books, folders, notes, profiles, DEFAULT_PROFILE_ID } from "../schema.ts";
 import { eq } from "drizzle-orm";
 
 vi.mock("../db.ts", async () => {
@@ -138,5 +138,44 @@ describe("profile scoping", () => {
     await defaultCaller.moveToFolder({ ids: [herBook.id], folderId: myFolder.id });
     const after = row(await db.select().from(books).where(eq(books.id, herBook.id)));
     expect(after.folderId).toBeNull();
+  });
+});
+
+describe("booksRouter.moveToProfile", () => {
+  it("moves a book to another profile's home, with its notes and search chunks", async () => {
+    const db = getDb();
+    const other = await makeProfile("Wife");
+    const myFolder = row(await db.insert(folders).values({ name: "Mine" }).returning());
+    const book = row(await db.insert(books).values({ title: "Shared", folderId: myFolder.id }).returning());
+    const stays = row(await db.insert(books).values({ title: "Stays" }).returning());
+    await db.insert(notes).values({ bookId: book.id, prompt: "p", model: "flash", result: "r", scope: { kind: "book-raw", files: 1 } });
+    await db.insert(bookChunks).values({
+      bookId: book.id, profileId: DEFAULT_PROFILE_ID, folderId: myFolder.id, source: "raw",
+      seq: 0, text: "hello", charStart: 0, charEnd: 5, sourceHash: "h",
+    });
+
+    expect(await booksRouter.createCaller({}).moveToProfile({ ids: [book.id], profileId: other.id })).toEqual({ moved: 1 });
+
+    const moved = row(await db.select().from(books).where(eq(books.id, book.id)));
+    expect(moved).toMatchObject({ profileId: other.id, folderId: null });
+    expect(row(await db.select().from(notes).where(eq(notes.bookId, book.id))).profileId).toBe(other.id);
+    expect(row(await db.select().from(bookChunks).where(eq(bookChunks.bookId, book.id)))).toMatchObject({ profileId: other.id, folderId: null });
+    expect(row(await db.select().from(books).where(eq(books.id, stays.id))).profileId).toBe(DEFAULT_PROFILE_ID);
+
+    const herList = await booksRouter.createCaller({ profileId: other.id }).list({ folderId: null });
+    expect(herList.books.map((b) => b.title)).toEqual(["Shared"]);
+  });
+
+  it("skips another profile's books and refuses a missing or same profile", async () => {
+    const db = getDb();
+    const other = await makeProfile("Wife");
+    const third = await makeProfile("Kids");
+    const herBook = row(await db.insert(books).values({ title: "Hers", profileId: other.id }).returning());
+    const caller = booksRouter.createCaller({});
+
+    expect(await caller.moveToProfile({ ids: [herBook.id], profileId: third.id })).toEqual({ moved: 0 });
+    expect(row(await db.select().from(books).where(eq(books.id, herBook.id))).profileId).toBe(other.id);
+    await expect(caller.moveToProfile({ ids: [herBook.id], profileId: DEFAULT_PROFILE_ID })).rejects.toThrow("already in that profile");
+    await expect(caller.moveToProfile({ ids: [herBook.id], profileId: crypto.randomUUID() })).rejects.toThrow("Profile not found");
   });
 });

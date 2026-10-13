@@ -87,6 +87,26 @@ describe("placing a book", () => {
     expect((await call("set_book_settings", { id: created.id, folder: null })).folderId).toBeNull();
   });
 
+  it("moves a book to another profile with set_book_settings, and undoes it", async () => {
+    const tedi = row(await getDb().insert(profiles).values({ name: "Tedi" }).returning());
+    const call = await connect();
+    const created = await call("create_book", { title: "Frankenstein", chapters: [chapter("One")], folder: "Classics" });
+    await call("save_note", { bookId: created.id, title: "Mine", markdown: "A note" });
+
+    const moved = await call("set_book_settings", { id: created.id, profile: "tedi", folder: "Shelf" });
+    const after = row(await getDb().select().from(books).where(eq(books.id, created.id)));
+    const shelf = row(await getDb().select().from(folders).where(eq(folders.name, "Shelf")));
+    expect(after).toMatchObject({ profileId: tedi.id, folderId: shelf.id });
+    expect(shelf.profileId).toBe(tedi.id);
+    expect((await getDb().select().from(notes).where(eq(notes.bookId, created.id))).map((n) => n.profileId)).toEqual([tedi.id]);
+    expect((await call("list_books")).books).toEqual([]);
+
+    const classics = row(await getDb().select().from(folders).where(eq(folders.name, "Classics")));
+    expect(moved.undo).toEqual({ tool: "set_book_settings", input: { id: created.id, profile: DEFAULT_PROFILE_ID, folder: classics.id } });
+    await call("set_book_settings", moved.undo.input);
+    expect(row(await getDb().select().from(books).where(eq(books.id, created.id)))).toMatchObject({ profileId: DEFAULT_PROFILE_ID, folderId: classics.id });
+  });
+
   it("cuts a long listing and says so", async () => {
     const call = await connect();
     for (const title of ["Alpha", "Beta", "Alphabet"]) await call("create_book", { title, chapters: [chapter("One")] });

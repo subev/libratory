@@ -76,7 +76,7 @@ that Libratory's reader shows, and another EPUB reader shows the original alone.
 | `get_book_text` | The raw or OCR'd text of one file, independent of chapters — check OCR quality before narrating. Paged. |
 | `get_chapter` | The text the narrator reads (edited, else cleaned, else raw) with `offset`/`maxChars` paging; `language` reads a translation or rewrite of it instead. |
 | `update_chapter` | Title, narrated text, or selection of a chapter. |
-| `set_book_settings` | Title, `folder` (moves the book; `null` for the top level), voice, speed, language, author, OCR engine and its vision model (`ocrModel`), AI chapter detection after upload. A rename, a move or an author change answers with the `undo` call that reverses it. |
+| `set_book_settings` | Title, `profile` (moves the book and its notes to another profile, at its top level unless `folder` names one there), `folder` (moves the book; `null` for the top level), voice, speed, language, author, OCR engine and its vision model (`ocrModel`), AI chapter detection after upload. A rename, a move (profile or folder) or an author change answers with the `undo` call that reverses it. |
 | `manage_folder` | `create` a folder path, `rename` one, or `move` it under another (`parent: null` for the top level). Never deletes. |
 | `extract_book` | Run or redo the full extraction; `ocrEngine` (and `ocrModel`) reads the pages again with another engine. |
 | `redetect_chapters` | Detect chapters again from the extracted pages, optionally with an AI model reading the table of contents. Does not re-read pages. |

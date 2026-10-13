@@ -707,10 +707,11 @@ export function createMcpServer(profileId: string, { origin }: { origin?: string
   server.registerTool(
     "set_book_settings",
     {
-      description: "Change a book after upload: title, the folder it is filed in, narrator voice (from list_voices), speed, the language of its text, author, OCR engine, or AI chapter detection. Audio already narrated keeps the old voice until synthesize_book runs again.",
+      description: "Change a book after upload: title, the profile and folder it is filed in, narrator voice (from list_voices), speed, the language of its text, author, OCR engine, or AI chapter detection. Audio already narrated keeps the old voice until synthesize_book runs again.",
       inputSchema: {
         id: bookId,
         title: z.string().trim().min(1).max(500).optional(),
+        profile: z.string().trim().min(1).optional().describe("Move the book to another profile, by name or id. It lands at the top level there unless folder is given, which is then a folder of that profile. Its notes go with it"),
         folder: z.string().trim().min(1).nullable().optional().describe("Move the book: a path such as Work/Contracts (created when missing) or a folder id; null moves it to the top level"),
         voice: z.string().optional(),
         speed: z.number().min(0.5).max(2).optional(),
@@ -722,21 +723,27 @@ export function createMcpServer(profileId: string, { origin }: { origin?: string
         chapterModel: modelKeySchema.optional(),
       },
     },
-    async ({ title, folder, ...settings }) => {
+    async ({ title, profile, folder, ...settings }) => {
       const [before] = await db.select({ profileId: books.profileId, title: books.title, folderId: books.folderId, author: books.author }).from(books).where(eq(books.id, settings.id));
       if (!before) throw new Error("Book not found");
       if (title !== undefined) await caller.books.rename({ id: settings.id, title });
+      const profileId = profile === undefined ? before.profileId : await resolveProfileId(profile);
+      if (profileId !== before.profileId) {
+        await appRouter.createCaller({ profileId: before.profileId }).books.moveToProfile({ ids: [settings.id], profileId });
+      }
       if (folder !== undefined) {
         // A folder belongs to a profile, so the move runs as the book's own profile, not the connection's.
-        const folderId = folder === null ? null : await resolveFolderId(before.profileId, folder, { create: true });
-        await appRouter.createCaller({ profileId: before.profileId }).books.moveToFolder({ ids: [settings.id], folderId });
+        const folderId = folder === null ? null : await resolveFolderId(profileId, folder, { create: true });
+        await appRouter.createCaller({ profileId }).books.moveToFolder({ ids: [settings.id], folderId });
       }
       if (Object.keys(settings).length > 1) await caller.books.updateSettings(settings);
       // The call that puts a rename, a move or an author back, for the assistant panel's Undo.
+      // A profile move lands at the top level, so undoing it puts the folder back as well.
       // Only those: a voice or an OCR engine is chosen, not slipped, and is not undone with a click.
       const undo: Record<string, unknown> = { id: settings.id };
       if (title !== undefined) undo.title = before.title;
-      if (folder !== undefined) undo.folder = before.folderId;
+      if (profileId !== before.profileId) undo.profile = before.profileId;
+      if (folder !== undefined || profileId !== before.profileId) undo.folder = before.folderId;
       if (settings.author !== undefined) undo.author = before.author;
       return json({ ...(await getSummary(settings.id)), ...(Object.keys(undo).length > 1 ? { undo: { tool: "set_book_settings", input: undo } } : {}) });
     },

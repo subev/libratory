@@ -68,7 +68,7 @@ export function tierOf(name: AssistantToolName, input: Record<string, unknown>):
       return input.text !== undefined ? "confirm" : "quick";
     case "set_book_settings": {
       const touched = Object.keys(input).filter((k) => k !== "id" && input[k] !== undefined);
-      return touched.every((k) => k === "title" || k === "folder" || k === "author") ? "quick" : "confirm";
+      return touched.every((k) => k === "title" || k === "profile" || k === "folder" || k === "author") ? "quick" : "confirm";
     }
     case "manage_folder":
       return input.action === "create" ? "confirm" : "quick";
