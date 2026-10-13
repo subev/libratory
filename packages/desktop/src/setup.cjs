@@ -3,7 +3,33 @@
 const { spawn } = require("node:child_process");
 const { createHash } = require("node:crypto");
 const { existsSync, mkdirSync, copyFileSync, cpSync, rmSync, readFileSync } = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
+
+// The Python environment sets the floor, not Electron: torch 2.12 and later ship macOS wheels tagged
+// macosx_14_0 only, so uv on Ventura fails with "doesn't have a source distribution or wheel for the
+// current platform" — true, and no help to the person reading it. Checked here before anything is
+// downloaded. Kernel majors, not marketing names: Darwin 20–24 are macOS 11–15, Darwin 25 is 26.
+const MIN_MACOS = { darwin: 23, label: "macOS 14 Sonoma" };
+const MACOS_BY_DARWIN = { 20: "11", 21: "12", 22: "13", 23: "14", 24: "15", 25: "26" };
+
+function macosVersion(release = os.release()) {
+  return MACOS_BY_DARWIN[Number.parseInt(release, 10)] ?? null;
+}
+
+/** Null when this machine can run the app; else the help card and one-line reason to show. */
+function unsupportedMac(platform = process.platform, release = os.release()) {
+  if (platform !== "darwin") return null;
+  const major = Number.parseInt(release, 10);
+  if (!Number.isFinite(major) || major >= MIN_MACOS.darwin) return null;
+  const running = macosVersion(release);
+  return {
+    detail: `${running ? `macOS ${running}` : "This macOS"} — Libratory needs ${MIN_MACOS.label} or later`,
+    title: "This Mac needs a newer macOS",
+    body: `Libratory's speech and OCR models run on PyTorch, which no longer ships for ${running ? `macOS ${running}` : "this version of macOS"}. Every Apple Silicon Mac can run ${MIN_MACOS.label}: open System Settings → General → Software Update, install it, then open Libratory again.`,
+    links: [{ label: "How to update macOS", url: "https://support.apple.com/108382" }],
+  };
+}
 
 // Pinned and checksummed rather than `curl | sh`: piping an installer into a shell gives errors
 // like "curl: (56) Failure writing output to destination" when anything goes wrong, which tells a
@@ -183,4 +209,4 @@ async function fetchEssentialModels(python, home, onOutput) {
   });
 }
 
-module.exports = { missingTools, installHint, toolPath, syncPiper, piperPython, stageRuntime, pythonBin, uvEnv, syncPython, fetchEssentialModels, failureMessage };
+module.exports = { MIN_MACOS, macosVersion, unsupportedMac, missingTools, installHint, toolPath, syncPiper, piperPython, stageRuntime, pythonBin, uvEnv, syncPython, fetchEssentialModels, failureMessage };

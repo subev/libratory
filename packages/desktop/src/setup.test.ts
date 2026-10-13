@@ -4,8 +4,34 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { failureMessage, installHint, missingTools, stageRuntime, toolPath, uvEnv } from "./setup.cjs";
+import { failureMessage, installHint, macosVersion, missingTools, stageRuntime, toolPath, unsupportedMac, uvEnv } from "./setup.cjs";
 import pins from "../../../scripts/pins.json" with { type: "json" };
+
+// A user on macOS 13.6 got "torch==2.13.0 can't be installed because it doesn't have a source
+// distribution or wheel for the current platform" from the Python step: torch 2.12+ ships
+// macosx_14_0 wheels only. The floor is now checked before any download; scripts/cask.test.mjs
+// holds the cask's depends_on to the same version, since that is what let Homebrew install it.
+describe("the macOS floor PyTorch sets", () => {
+  it("names the running version from the kernel major", () => {
+    expect(macosVersion("22.6.0")).toBe("13");
+    expect(macosVersion("23.5.0")).toBe("14");
+    expect(macosVersion("25.0.0")).toBe("26");
+    expect(macosVersion("99.0.0")).toBeNull();
+  });
+
+  it("blocks Ventura with the version it saw and the one it needs", () => {
+    const blocked = unsupportedMac("darwin", "22.6.0");
+    expect(blocked?.detail).toBe("macOS 13 — Libratory needs macOS 14 Sonoma or later");
+    expect(blocked?.body).toContain("Software Update");
+    expect(blocked?.links[0]?.url).toMatch(/^https:\/\/support\.apple\.com\//);
+  });
+
+  it("lets Sonoma and later through, and never judges Linux", () => {
+    expect(unsupportedMac("darwin", "23.0.0")).toBeNull();
+    expect(unsupportedMac("darwin", "25.1.0")).toBeNull();
+    expect(unsupportedMac("linux", "5.15.0")).toBeNull();
+  });
+});
 
 const dirs: string[] = [];
 afterAll(async () => {

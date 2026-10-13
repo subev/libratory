@@ -234,6 +234,20 @@ async function boot() {
 // leaves "Kokoro voice" spinning forever.
 const STEPS = [
   {
+    id: "system",
+    label: "This computer",
+    async run() {
+      const unsupported = setup.unsupportedMac();
+      if (unsupported) {
+        win?.webContents.send("help", unsupported);
+        throw new Error(unsupported.detail);
+      }
+      if (process.platform !== "darwin") return `${process.platform} ${process.arch}`;
+      const version = setup.macosVersion();
+      return version ? `macOS ${version}` : "macOS";
+    },
+  },
+  {
     id: "tools",
     label: "Audio and PDF tools",
     async run() {

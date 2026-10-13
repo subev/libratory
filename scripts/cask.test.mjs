@@ -22,3 +22,11 @@ test("a malformed version or checksum is refused rather than published", () => {
   assert.throws(() => renderCask({ version: "v26.911.0", sha256: sha }), /Not a release version/);
   assert.throws(() => renderCask({ version: "26.911.0", sha256: "sha256:" + sha }), /Not a sha256/);
 });
+
+// Ventura let Homebrew install a build whose PyTorch (2.12+) has no macOS 13 wheel, so the first
+// launch died in the Python step. The desktop app checks the same floor in setup.cjs (MIN_MACOS).
+test("the macOS floor matches the PyTorch wheels the app installs", () => {
+  const cask = renderCask({ version: "26.1011.2", sha256: sha });
+  assert.match(cask, /^  depends_on macos: :sonoma$/m);
+  assert.doesNotMatch(cask, /ventura/);
+});

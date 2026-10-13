@@ -154,7 +154,7 @@ Signed and notarised; installs its own runtime on first launch, so nothing else 
 <details>
 <summary><b>Prerequisites in full</b></summary>
 
-An Apple Silicon Mac, or a Linux machine (x86_64 or arm64, CPU is enough), or Windows through Docker Desktop and WSL2. Every engine runs on all of them; Kokoro uses the GPU where there is one, the rest are CPU or cloud.
+An Apple Silicon Mac on macOS 14 Sonoma or later (PyTorch no longer ships for 13), or a Linux machine (x86_64 or arm64, CPU is enough), or Windows through Docker Desktop and WSL2. Every engine runs on all of them; Kokoro uses the GPU where there is one, the rest are CPU or cloud.
 
 - **Mac**: [Homebrew](https://brew.sh), then: `brew install ffmpeg poppler tesseract espeak-ng python@3.12 node pnpm` — for running from source, which spawns `ffmpeg`, `pdftotext` and `tesseract` off your `PATH`. The packaged app carries its own copies and needs none of this.
 - **Linux (from source)**: `ffmpeg espeak-ng poppler-utils tesseract-ocr tesseract-ocr-eng tesseract-ocr-osd zip unzip python3.12 node pnpm` from your package manager — `pnpm run setup` names whatever is missing. Or skip all of it and run the Docker image.

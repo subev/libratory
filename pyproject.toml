@@ -9,6 +9,8 @@ dependencies = [
   "misaki==0.9.4",
   "soundfile==0.13.1",
   "numpy==1.26.4",
+  # 2.12+ ships macosx_14_0 wheels only. The desktop app's MIN_MACOS, the cask's depends_on and the
+  # README all say macOS 14 because of this line; a bump that changes the wheel tags changes them.
   "torch==2.13.0",
   "setuptools>=83.0.0",
   "transformers==4.57.6",
