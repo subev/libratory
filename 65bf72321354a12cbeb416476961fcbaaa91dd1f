@@ -1,0 +1,4 @@
+Reviewed: high
+Outcome: One-line e2e helper fix for the portalled Menu, reviewed in-context; e2e smoke suite (30 tests) green locally against a spare-port stack. Note written by hand: the stamp script refuses while other streams' uncommitted files sit in the shared tree.
+By: Petur Subev
+At: 2026-10-13T07:49:30Z
