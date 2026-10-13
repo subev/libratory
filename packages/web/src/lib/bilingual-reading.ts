@@ -1,4 +1,15 @@
-import { passageAnchor, type BilingualDocument, type BilingualLane, type BilingualPair, type BilingualSide, type BilingualToken } from "../../../server/src/lib/bilingual-format.ts";
+import { linkedTokens, passageAnchor, tokensForAnchor, type BilingualAnchor, type BilingualDocument, type BilingualLane, type BilingualPair, type BilingualSide, type BilingualToken } from "../../../server/src/lib/bilingual-format.ts";
+
+export function wordHighlight(lane: BilingualLane, pair: BilingualPair | null, side: BilingualSide, anchor: BilingualAnchor | null) {
+  const range = pair?.[side];
+  const speaking = range ? tokensForAnchor(lane, anchor)
+    .filter((t) => t.range[0] >= range[0] && t.range[1] <= range[1]).map((t) => t.id) : [];
+  const groups = pair ? speaking.map((id) => linkedTokens(pair, side, id)) : [];
+  return { speaking, linked: {
+    source: [...new Set(groups.flatMap((group) => group.source))],
+    target: [...new Set(groups.flatMap((group) => group.target))],
+  } };
+}
 
 export function paragraphGroups(doc: BilingualDocument): BilingualPair[][] {
   const groups: BilingualPair[][] = [];

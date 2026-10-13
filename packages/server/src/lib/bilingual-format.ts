@@ -177,9 +177,16 @@ export function pairAtTime(doc: BilingualDocument, side: BilingualSide, ms: numb
   return ms <= (doc[side].narration?.totalMs ?? 0) ? preceding : null;
 }
 
-export function tokenAtTime(lane: BilingualLane, ms: number): BilingualToken | null {
-  const anchor = lane.narration?.anchors.find((a) => a.kind === "word" && a.start.ms !== null && a.end.ms !== null && a.end.ms > a.start.ms && ms >= a.start.ms && ms < a.end.ms);
-  return anchor ? lane.tokens.find((t) => inside(t.range, anchor.range)) ?? null : null;
+export function wordAnchorAt(lane: BilingualLane, ms: number): BilingualAnchor | null {
+  return lane.narration?.anchors.find((a) => a.kind === "word" && a.start.ms !== null && a.end.ms !== null && a.end.ms > a.start.ms && ms >= a.start.ms && ms < a.end.ms) ?? null;
+}
+
+export function tokensForAnchor(lane: BilingualLane, anchor: BilingualAnchor | null): BilingualToken[] {
+  return anchor ? lane.tokens.filter((t) => t.range[0] < anchor.range[1] && t.range[1] > anchor.range[0]) : [];
+}
+
+export function tokensAtTime(lane: BilingualLane, ms: number): BilingualToken[] {
+  return tokensForAnchor(lane, wordAnchorAt(lane, ms));
 }
 
 // Only an explicit mapping supplies a counterpart. Never flood-fill through a shared token:

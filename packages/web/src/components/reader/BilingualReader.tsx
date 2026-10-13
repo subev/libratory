@@ -1,7 +1,7 @@
 import { readingDirection } from "../../lib/reading-lang.ts";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  linkedTokens, pairAtTime, switchNarration, tokenAtTime,
+  linkedTokens, pairAtTime, switchNarration, wordAnchorAt,
   type BilingualDocument, type BilingualPair, type BilingualSide,
 } from "../../../../server/src/lib/bilingual-format.ts";
 import type { DocumentSource } from "../../lib/reader-source.ts";
@@ -12,7 +12,7 @@ import { SPEEDS, loadSpeed, saveSpeed, subscribeSpeed } from "../../lib/playback
 import { formatDuration } from "../../lib/format.ts";
 import { followCue } from "../../lib/cue-follow.ts";
 import { languageLabel as language } from "../../lib/voices.ts";
-import { paragraphGroups, pairPresentation, listenPosition, linkedText, sharesPrimaryRecording, sentenceSequence, sentenceStartIndex, nextSentenceIndex } from "../../lib/bilingual-reading.ts";
+import { paragraphGroups, pairPresentation, listenPosition, linkedText, sharesPrimaryRecording, sentenceSequence, sentenceStartIndex, nextSentenceIndex, wordHighlight } from "../../lib/bilingual-reading.ts";
 import { WordMeaning, useWordMeaning } from "./WordMeaning.tsx";
 import { BilingualPassage } from "./BilingualPassage.tsx";
 import { useWordNavigation } from "../../lib/reader-word-navigation.ts";
@@ -64,12 +64,9 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
   const landing = useRef({ ms: Math.max(0, initialMs), play: false });
   const lane = doc[side];
   const activePair = pairAtTime(doc, side, ms);
-  const activeToken = tokenAtTime(lane, ms);
-  const speakingPair = activeToken ? doc.pairs.find((pair) => {
-    const range = pair[side];
-    return range && activeToken.range[0] >= range[0] && activeToken.range[1] <= range[1];
-  }) : null;
-  const counterpart = useMemo(() => activePair && activeToken ? linkedTokens(activePair, side, activeToken.id) : null, [activePair, activeToken, side]);
+  const wordAnchor = wordAnchorAt(lane, ms);
+  const highlight = useMemo(() => wordHighlight(lane, activePair, side, wordAnchor), [lane, activePair, side, wordAnchor]);
+  const speakingKey = highlight.speaking.join(",");
   useAudioTime(audioRef, playing, setMs);
 
   const togglePlay = useCallback(() => {
@@ -94,7 +91,7 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
     if (following && !selection && content.current) followCue({ ...BAND, top: (toolbar.current?.offsetHeight ?? BAND.top) + 12 }, { root: content.current });
     // The marks move when these IDs change; the effect follows the resulting DOM geometry.
     // oxlint-disable-next-line react/exhaustive-effect-dependencies
-  }, [activePair?.id, activeToken?.id, side, following, selection]);
+  }, [activePair?.id, speakingKey, side, following, selection]);
   useEffect(() => {
     const sourceMs = side === "source" ? ms : switchNarration(doc, side, ms)?.ms;
     if (sourceMs !== undefined) onPosition(sharesPrimaryRecording(doc, chapter.audio) ? sourceMs : 0);
@@ -273,8 +270,8 @@ export function BilingualReader({ doc, source, manifest, chapter, controls, onCh
                       <BilingualPassage key={pair.id} pair={pair} lane={doc[textSide]} side={textSide} layout={presentation[textSide].get(pair.id)}
                         active={activePair === pair && (textSide === side || pair.status === "matched")}
                         current={activePair === pair && textSide === side}
-                        speakingToken={speakingPair === pair && textSide === side ? activeToken?.id ?? null : null}
-                        linked={activePair === pair && textSide !== side ? counterpart?.[textSide] ?? NO_TOKENS : NO_TOKENS}
+                        speakingTokens={activePair === pair && textSide === side ? highlight.speaking : NO_TOKENS}
+                        linked={activePair === pair && textSide !== side ? highlight.linked[textSide] : NO_TOKENS}
                         inspected={selectedPair === pair ? selected?.[textSide] ?? NO_TOKENS : NO_TOKENS}
                         meaningToken={selectedPair === pair && selection?.side === textSide ? selection.token : null}
                         tabStop={navigation.stops[textSide].pair === pair ? navigation.stops[textSide].token : null}

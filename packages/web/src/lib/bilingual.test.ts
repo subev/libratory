@@ -4,9 +4,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { execFile } from "node:child_process";
-import { BILINGUAL_FORMAT, bilingualReferences, linkedTokens, parseBilingualDocument, readBilingualDocument, switchNarration, textRevision, tokenAtTime, type BilingualDocument } from "../../../server/src/lib/bilingual-format.ts";
+import { BILINGUAL_FORMAT, bilingualReferences, linkedTokens, parseBilingualDocument, readBilingualDocument, switchNarration, textRevision, tokensAtTime, type BilingualDocument } from "../../../server/src/lib/bilingual-format.ts";
 import { containerSource } from "./reader-source.ts";
 import { readingDirection } from "./reading-lang.ts";
+import { tokenize } from "../../../server/src/lib/bilingual-segment.ts";
 
 async function fixture(): Promise<BilingualDocument> {
   const sourceText = "turned it off", targetText = "כיבה אותו";
@@ -72,7 +73,7 @@ describe("bilingual contract and playback", () => {
     expect(switchNarration(doc, "source", 1000)).toEqual({ side: "target", ms: 2500 });
     expect(switchNarration(doc, "source", 0)).toEqual({ side: "target", ms: 2500 });
     expect(switchNarration(doc, "source", 1900)).toEqual({ side: "target", ms: 2500 });
-    expect(tokenAtTime(doc.source, 1900)).toBeNull();
+    expect(tokensAtTime(doc.source, 1900)).toEqual([]);
   });
   it("does not move playback across an uncertain or missing counterpart", async () => {
     const doc = await fixture(), pair = doc.pairs[0];
@@ -103,8 +104,36 @@ describe("bilingual contract and playback", () => {
   });
   it("does not highlight a zero-duration word or invent a word between anchors", async () => {
     const doc = await fixture();
-    expect(tokenAtTime(doc.target, 2500)).toBeNull();
-    expect(tokenAtTime(doc.target, 3000)).toBeNull();
+    expect(tokensAtTime(doc.target, 2500)).toEqual([]);
+    expect(tokensAtTime(doc.target, 3000)).toEqual([]);
+  });
+  it.each([
+    ["A so-called expert.", "en", "so-called", ["so", "called"]],
+    ["Днес е по-добре.", "bg", "по-добре", ["по", "добре"]],
+    ["Oui, dit-elle.", "fr", "dit-elle", ["dit", "elle"]],
+    ["Oui, Lorsqu’elle vint.", "fr", "Lorsqu’elle", ["Lorsqu’elle"]],
+  ])("highlights every display token in the timed word in %s", async (text, language, word, expected) => {
+    const doc = await fixture(), lane = doc.source;
+    lane.text = text;
+    lane.tokens = tokenize(text, { start: 0, end: text.length }, language).map((t) => ({ id: t.id, range: [t.start, t.end] }));
+    if (!lane.narration) throw new Error("Missing narration");
+    const start = text.indexOf(word);
+    lane.narration.anchors = [{ kind: "word", range: [start, start + word.length],
+      start: { ms: 500, method: "provider-word" }, end: { ms: 1000, method: "provider-word" } }];
+    expect(tokensAtTime(lane, 750).map((t) => text.slice(...t.range))).toEqual(expected);
+  });
+  it("uses half-open intersections when a timed word covers only part of a display token", async () => {
+    const doc = await fixture(), lane = doc.source;
+    if (!lane.narration) throw new Error("Missing narration");
+    const anchor = { kind: "word" as const, range: [1, 3] as [number, number],
+      start: { ms: 500, method: "provider-word" as const }, end: { ms: 1000, method: "provider-word" as const } };
+    lane.narration.anchors = [anchor];
+    expect(tokensAtTime(lane, 500).map((t) => t.id)).toEqual([0]);
+    expect(tokensAtTime(lane, 1000)).toEqual([]);
+    anchor.range = [6, 7];
+    expect(tokensAtTime(lane, 750)).toEqual([]);
+    lane.narration = null;
+    expect(tokensAtTime(lane, 750)).toEqual([]);
   });
   it("rejects reversed or out-of-recording timestamps", async () => {
     const doc = await fixture(), anchor = doc.target.narration?.anchors[0];

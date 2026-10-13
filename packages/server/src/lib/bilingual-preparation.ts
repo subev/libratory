@@ -2,7 +2,7 @@ import { textRevision, type BilingualDocument, type BilingualPair } from "./bili
 
 export const PAIRING_VERSION = "bge-m3-dp/1";
 export const TOKENIZER_VERSION = "intl-segmenter-word/1";
-export const LINK_PROMPT_VERSION = "token-ids/1";
+export const LINK_PROMPT_VERSION = "token-ids/2";
 
 export type PairArtifact = {
   revision: string;
@@ -16,7 +16,7 @@ export type LinkArtifact = {
   pairRevision: string;
   promptVersion: string;
   byPair: Record<string, BilingualPair["links"]>;
-  batches: { pairIds: string[]; model: string; raw: string; error: string | null; inputTokens: number; outputTokens: number }[];
+  batches: { pairIds: string[]; model: string; promptVersion?: string; raw: string; error: string | null; inputTokens: number; outputTokens: number }[];
 };
 export type BilingualJob = {
   status: "queued" | "running" | "done" | "failed" | "cancelled";

@@ -2,9 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import { alignVectors } from "./bilingual-align.ts";
 import { sentences, tokenize } from "./bilingual-segment.ts";
 import { spanTiming, timeline } from "./bilingual-timing.ts";
-import { linkBatches, parseWordLinks, parseWordLinkBatch, requestWordLinks } from "./bilingual-links.ts";
+import { linkBatches, linkPrompt, parseWordLinks, parseWordLinkBatch, requestWordLinks, wordLinkSystem } from "./bilingual-links.ts";
 import { textRevision } from "./bilingual-format.ts";
 import type { PairArtifact } from "./bilingual-preparation.ts";
+import { bilingualLinkSemantics } from "./fixtures/bilingual-link-semantics.ts";
 
 const { generate } = vi.hoisted(() => ({ generate: vi.fn() }));
 vi.mock("ai", () => ({ generateText: generate }));
@@ -19,6 +20,57 @@ function fixture(): PairArtifact {
       { id: "p2", status: "matched", source: [8, 16], target: [11, 22], links: [], linksStatus: "unavailable" },
     ] };
 }
+
+function semanticArtifact(source: string, target: string): PairArtifact {
+  const lane = (text: string, language: string) => ({ id: language, language, text, textRevision: textRevision(text),
+    tokens: tokenize(text, { start: 0, end: text.length }, language).map((t) => ({ id: t.id, range: [t.start, t.end] as [number, number] })) });
+  return { revision: "semantic-fixture", aligner: "fixture", tokenizer: "intl-segmenter-word/1", source: lane(source, "en"), target: lane(target, "fr"),
+    pairs: [{ id: "p1", status: "matched", source: [0, source.length], target: [0, target.length], links: [], linksStatus: "unavailable" }] };
+}
+
+function phraseIds(lane: PairArtifact["source"], phrase: string, occurrence = 0): number[] {
+  const matches = lane.tokens.flatMap((token) => {
+    const start = token.range[0], end = start + phrase.length;
+    if (!lane.text.startsWith(phrase, start)) return [];
+    const tokens = lane.tokens.filter((t) => t.range[0] >= start && t.range[1] <= end);
+    return tokens.at(-1)?.range[1] === end ? [tokens.map((t) => t.id)] : [];
+  });
+  const ids = matches[occurrence];
+  if (!ids?.length) throw new Error(`Missing occurrence ${occurrence} of ${phrase}`);
+  return ids;
+}
+
+describe("word-link semantic fixtures and prompt contract", () => {
+  it.each(bilingualLinkSemantics)("carries exact local token text and accepts curated groups: $name", (entry) => {
+    const data = semanticArtifact(entry.source, entry.target), prompt = linkPrompt(data, data.pairs);
+    for (const lane of [data.source, data.target]) {
+      expect(prompt).toContain(`${lane.language}: ${lane.text}`);
+      expect(prompt).toContain(lane.tokens.map((t) => `${t.id}:${lane.text.slice(...t.range)}`).join(" "));
+    }
+    const expected = entry.groups.map((g) => ({ source: phraseIds(data.source, g.source, g.sourceOccurrence), target: phraseIds(data.target, g.target, g.targetOccurrence) }));
+    const raw = expected.map((g) => `p1: ${g.source.join(" ")} = ${g.target.join(" ")}`).join("\n");
+    expect(parseWordLinkBatch(raw, data, data.pairs)).toEqual({ links: { p1: expected }, error: null });
+  });
+
+  it("keeps persisted occurrence IDs when requesting a later pair alone", () => {
+    const data = fixture(), pair = data.pairs[1];
+    if (!pair) throw new Error("Missing pair");
+    expect(linkPrompt(data, [pair])).toBe("p2\nen: Go back.\n  3:Go 4:back\nde: Geh zurück.\n  3:Geh 4:zurück");
+    const system = wordLinkSystem("English", "French");
+    expect(system).toContain("do not recount words or restart numbering");
+    expect(system).toContain("Repeated words have distinct occurrence IDs");
+    expect(system).toContain("one contracted token may correspond to several tokens");
+    expect(system).toContain("I corresponds to me and you to Tu");
+    expect(system).toContain("including required prepositions and negation");
+    expect(system).toContain("Answer with token numbers only");
+  });
+
+  it("does not mistake valid IDs for a semantic guarantee", () => {
+    const data = semanticArtifact("I miss you.", "Tu me manques.");
+    const raw = `p1: ${phraseIds(data.source, "I").join(" ")} = ${phraseIds(data.target, "Tu").join(" ")}`;
+    expect(parseWordLinkBatch(raw, data, data.pairs).error).toBeNull();
+  });
+});
 
 describe("production bilingual preparation", () => {
   it("yields to the event loop and stops a large alignment when ownership is lost", async () => {
@@ -73,8 +125,9 @@ describe("production bilingual preparation", () => {
     generate.mockResolvedValueOnce({ text: "p1: -\np2: -", finishReason: "length", usage: { inputTokens: 20, outputTokens: 10 } });
     const result = await requestWordLinks(data, data.pairs, "test");
     expect(result.links).toBeNull();
-    expect(result.record).toMatchObject({ raw: "p1: -\np2: -", error: "Incomplete word-link response: length" });
-    expect(generate).toHaveBeenCalledWith(expect.objectContaining({ maxRetries: 0 }));
+    expect(result.record).toMatchObject({ promptVersion: "token-ids/2", raw: "p1: -\np2: -", error: "Incomplete word-link response: length" });
+    expect(generate).toHaveBeenCalledWith(expect.objectContaining({ maxRetries: 0,
+      prompt: linkPrompt(data, data.pairs), system: wordLinkSystem(data.source.language, data.target.language) }));
     expect(generate).toHaveBeenCalledTimes(1);
   });
   it("preserves Hebrew combining marks, German compounds and unspaced Chinese tokens", () => {

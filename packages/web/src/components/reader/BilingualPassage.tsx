@@ -10,7 +10,7 @@ type Props = {
   layout: PairLayout | undefined;
   active: boolean;
   current: boolean;
-  speakingToken: number | null;
+  speakingTokens: readonly number[];
   linked: readonly number[];
   inspected: readonly number[];
   meaningToken: number | null;
@@ -19,11 +19,11 @@ type Props = {
   onActivate: (pair: BilingualPair, side: BilingualSide, token: number, anchor: HTMLButtonElement) => void;
 };
 
-export const BilingualPassage = memo(function BilingualPassage({ pair, lane, side, layout, active, current, speakingToken, linked, inspected, meaningToken, tabStop, handlers, onActivate }: Props) {
+export const BilingualPassage = memo(function BilingualPassage({ pair, lane, side, layout, active, current, speakingTokens, linked, inspected, meaningToken, tabStop, handlers, onActivate }: Props) {
   if (!layout) return null;
   const pieces: ReactNode[] = [];
   for (const { token, before, text } of layout.tokens) {
-    const speaking = speakingToken === token.id;
+    const speaking = speakingTokens.includes(token.id);
     const selected = inspected.includes(token.id) || meaningToken === token.id;
     pieces.push(before,
       <button
