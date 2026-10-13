@@ -116,6 +116,9 @@ def main() -> None:
             # Expanding numbers can push a sentence past the encoder's 256 characters
             codes, timed_pieces = [], []
             for piece in _split_text(speakable(chunk), tokenizer, max_len):
+                # A stray OCR mark (ı, ŧ, ì) is nothing the tokenizer reads, and generate refuses it
+                if not tokenizer.encode_text(piece):
+                    continue
                 piece_codes = generate(model, tokenizer, piece, speaker, temperature=TEMPERATURE, device=device)
                 if piece_codes is None or len(piece_codes) == 0:
                     raise RuntimeError(f"No audio generated for chunk {index}: {piece[:60]!r}")
@@ -123,7 +126,10 @@ def main() -> None:
                 if args.chunks_dir:
                     attention = piece_attention(model, CrossAttention, tokenizer, piece, piece_codes, speaker)
                     timed_pieces.append((attention, *spoken_words(tokenizer, piece)))
-            waveform = codec.decode(torch.cat(codes), speaker).numpy().astype(np.float32)
+            if codes:
+                waveform = codec.decode(torch.cat(codes), speaker).numpy().astype(np.float32)
+            else:
+                waveform = np.zeros(SAMPLE_RATE // 25, dtype=np.float32)
             if args.chunks_dir:
                 os.makedirs(args.chunks_dir, exist_ok=True)
                 sf.write(os.path.join(args.chunks_dir, f"chunk-{index:03d}.wav"), waveform, SAMPLE_RATE)

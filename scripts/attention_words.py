@@ -104,7 +104,7 @@ def monotonic_path(attn):
     total[0, 0] = cost[0, 0]
     for i in range(1, frames):
         options = np.full((MAX_JUMP + 1, text), np.inf)
-        for jump in range(MAX_JUMP + 1):
+        for jump in range(min(MAX_JUMP, text - 1) + 1):
             options[jump, jump:] = total[i - 1, : text - jump]
         back[i] = options.argmin(0)
         total[i] = cost[i] + options.min(0)

@@ -63,4 +63,21 @@ describe("attention_words.chunk_words", () => {
     // The last three frames look at <eot> while the word is still sounding
     expect(horata!.endMs).toBe(51 * 40);
   });
+
+  // A lone "и" reads as <sot>, и, <eot>: three positions, shorter than the path's longest jump
+  it.skipIf(!existsSync(python))("finds a path through a text shorter than the longest jump", () => {
+    const program = `
+import json, sys
+import numpy as np
+sys.path.insert(0, ${JSON.stringify(scriptPath(""))})
+from attention_words import monotonic_path
+attention = np.full((3, 3), 0.05)
+for frame, position in enumerate([0, 1, 1]):
+    attention[frame, position] = 0.9
+print(json.dumps(monotonic_path(attention).tolist()))
+`;
+    const run = spawnSync(python, ["-c", program], { encoding: "utf-8" });
+    if (run.status !== 0) throw new Error(run.stderr);
+    expect(JSON.parse(run.stdout)).toEqual([0, 1, 1]);
+  });
 });
