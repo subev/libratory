@@ -8,9 +8,11 @@ import { preparePdfWorker } from "../../lib/map-get-or-insert.ts";
 pdfjs.GlobalWorkerOptions.workerSrc = preparePdfWorker(new URL(workerUrl, import.meta.url).href);
 
 // A retained document pins its bytes and pdf.js's page and font caches — tens of MB each. The
-// reader shows one book at a time, so anything older than the last two is a leak.
-const KEEP_DOCUMENTS = 2;
+// reader shows one book at a time, so anything older than the last two is a leak — but only once
+// no mounted page still draws from it: the crafting view can have three source files on screen.
+const KEEP_IDLE_DOCUMENTS = 2;
 const documents = new Map<string, pdfjs.PDFDocumentLoadingTask>();
+const inUse = new Map<string, number>();
 
 export function loadPdf(url: string): Promise<PDFDocumentProxy> {
   let task = documents.get(url);
@@ -24,7 +26,8 @@ export function loadPdf(url: string): Promise<PDFDocumentProxy> {
       standardFontDataUrl: "/pdfjs/standard_fonts/",
     });
     documents.set(url, task);
-    for (const [stale, old] of [...documents].slice(0, -KEEP_DOCUMENTS)) {
+    const idle = [...documents].filter(([other]) => other !== url && !inUse.get(other));
+    for (const [stale, old] of idle.slice(0, -KEEP_IDLE_DOCUMENTS)) {
       old.destroy().catch(() => {});
       documents.delete(stale);
     }
@@ -58,6 +61,13 @@ export function PdfCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [visible, setVisible] = useState(false);
   const [x, y, width, height] = crop;
+
+  useEffect(() => {
+    inUse.set(url, (inUse.get(url) ?? 0) + 1);
+    return () => {
+      inUse.set(url, Math.max(0, (inUse.get(url) ?? 1) - 1));
+    };
+  }, [url]);
 
   useEffect(() => {
     const host = hostRef.current;

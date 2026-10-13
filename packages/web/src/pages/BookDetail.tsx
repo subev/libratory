@@ -10,7 +10,7 @@ import { ChapterTable } from "../components/ChapterTable.tsx";
 import { SYNTH_BUSY, TEXT_BUSY, variantLabel } from "../lib/chapters.ts";
 import { SynthesizeModal, type SynthSettings } from "../components/SynthesizeModal.tsx";
 import { BOOK_DIALOGS } from "../../../server/src/lib/assistant-targets.ts";
-import { StructureModal } from "../components/StructureModal.tsx";
+import { ChapterCrafting } from "../components/ChapterCrafting.tsx";
 import { VariantModal } from "../components/VariantModal.tsx";
 import { BookFilesSection } from "../components/BookFilesSection.tsx";
 import { AudioOutputsSection } from "../components/AudioOutputsSection.tsx";
@@ -636,6 +636,10 @@ export function BookDetail() {
 
   // The tray's one orange button is the next step in the pipeline: look at the chapters, then narrate, then export
   const structureConfirmed = Boolean(book.structureConfirmedAt);
+  // The crafting view takes the whole stage: outline, source and PDF side by side, its own footer.
+  // Not gated on the tab: the panel stays mounted while another tab shows, so the draft survives a
+  // look at the source files.
+  const crafting = showStructure && book.kind === "pdf";
   const audioReady = book.chapters.filter((c) => c.selected && c.audioPath).length;
   const selectedInFlightNow = book.chapters.some((c) => c.selected && (c.status === "pending" || c.status === "normalizing" || c.status === "synthesizing"));
   // A book with no PDF has no structure to review: its chapters arrived as they are
@@ -911,7 +915,13 @@ export function BookDetail() {
         <StageTabs
           value={tab}
           onChange={setTab}
-          hint={tab === "chapters" ? `${chaptersWithAudio} of ${book.chapters.length} chapters have audio` : undefined}
+          hint={
+            tab === "chapters"
+              ? crafting
+                ? "Crafting chapters — the chapter list comes back when you apply or discard"
+                : `${chaptersWithAudio} of ${book.chapters.length} chapters have audio`
+              : undefined
+          }
           tabs={[
             {
               id: "files",
@@ -997,7 +1007,7 @@ export function BookDetail() {
         ) : null
       }
       tray={
-        tab === "chapters" && book.chapters.length > 0 ? (
+        tab === "chapters" && book.chapters.length > 0 && !crafting ? (
           // The page sits above the provider, so the tray takes the layout as a render prop
           <WithShellLayout>
             {(layout) => (
@@ -1172,6 +1182,17 @@ export function BookDetail() {
       </TabPanel>
 
       <TabPanel id="chapters" active={tab === "chapters"} scroll={false}>
+        {crafting ? (
+          <ChapterCrafting
+            bookId={book.id}
+            isProcessing={isProcessing}
+            chapterProposal={book.chapterProposal ?? null}
+            chapterModel={book.chapterModel ?? null}
+            files={book.files?.map((f) => ({ id: f.id, index: f.index, filename: f.filename }))}
+            onClose={() => setShowStructure(false)}
+            onChanged={invalidate}
+          />
+        ) : (
         <div className="p-4 flex flex-col min-h-0 flex-1">
           {book.chapters.length === 0 ? (
             <p className="text-sm text-(--text-muted)">No chapters yet — extract them from the source files.</p>
@@ -1274,6 +1295,7 @@ export function BookDetail() {
             </>
           )}
         </div>
+        )}
       </TabPanel>
 
       <TabPanel id="outputs" active={tab === "outputs"}>
@@ -1373,19 +1395,6 @@ export function BookDetail() {
       )}
 
       {showDiskUsage && <DiskUsageModal bookId={book.id} onClose={() => setShowDiskUsage(false)} />}
-
-      {showStructure && (
-        <StructureModal
-          bookId={book.id}
-          isProcessing={isProcessing}
-          chapterProposal={book.chapterProposal ?? null}
-          chapterModel={book.chapterModel ?? null}
-          confirmed={structureConfirmed}
-          files={book.files?.map((f) => ({ id: f.id, index: f.index, filename: f.filename }))}
-          onClose={() => setShowStructure(false)}
-          onChanged={invalidate}
-        />
-      )}
 
 
       {showSynthesize && (

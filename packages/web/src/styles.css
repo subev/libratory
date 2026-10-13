@@ -286,6 +286,7 @@
 
 @theme inline {
   --font-sans: var(--stack-sans);
+  --font-display: var(--stack-display);
   --font-reading: var(--stack-reading);
   --font-mono: var(--stack-mono);
 }

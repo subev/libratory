@@ -34,3 +34,15 @@ export function registerSpaFallback(fastify: FastifyInstance, webDir: string) {
     return reply.type("text/html").sendFile("index.html", webDir);
   });
 }
+
+// Development: Vite owns the UI on its own port, and the built bundle in web/dist is whatever the
+// last `pnpm build` left — a client days older than the server it would call, crashing on the first
+// response whose shape moved. A browser that lands on the API port is sent to Vite instead.
+export function registerDevRedirect(fastify: FastifyInstance, webOrigin: string) {
+  fastify.setNotFoundHandler((request, reply) => {
+    if (!isClientRoute(request.method, request.url)) {
+      return reply.code(404).send({ error: "Not Found" });
+    }
+    return reply.redirect(`${webOrigin}${request.url}`, 302);
+  });
+}

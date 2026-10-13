@@ -72,17 +72,19 @@ test.describe("full extraction", { tag: "@slow" }, () => {
     await preview.getByTitle("Close").click();
     await page.keyboard.press("Escape");
 
+    // Crafting takes the stage over: the outline lists the saved chapters, each with its start in the source
     await page.getByTestId("open-structure").click();
-    const modal = page.getByTestId("structure-modal");
-    await expect(modal).toBeVisible();
-    const headings = modal.getByRole("checkbox");
-    await expect(headings.first()).toBeVisible();
+    const crafting = page.getByTestId("chapter-crafting");
+    await expect(crafting).toBeVisible();
+    await expect(crafting.getByTestId("craft-chapter")).toHaveCount(3);
+    await expect(crafting.getByTestId("craft-draft-state")).toHaveText("as saved");
 
-    // apply asks for confirmation via a native dialog
-    await modal.getByRole("checkbox", { name: /Chapter 2\. The Storm/ }).uncheck();
-    page.once("dialog", (dialog) => dialog.accept());
+    // Merging the second chapter up removes its start; the text joins chapter 1
+    await crafting.getByTestId("craft-chapter").nth(1).getByTestId("craft-merge").click();
+    await expect(crafting.getByTestId("craft-chapter")).toHaveCount(2);
+    await expect(crafting.getByTestId("craft-draft-state")).toHaveText("draft");
     await page.getByTestId("apply-boundaries").click();
-    await expect(modal).not.toBeVisible();
+    await expect(crafting).not.toBeVisible();
     await expect(rows).toHaveCount(2, { timeout: 60_000 });
   });
 });

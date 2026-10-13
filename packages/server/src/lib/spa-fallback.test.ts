@@ -5,7 +5,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { registerSpaFallback } from "./spa-fallback.ts";
+import { registerDevRedirect, registerSpaFallback } from "./spa-fallback.ts";
 
 const apps: Array<ReturnType<typeof Fastify>> = [];
 
@@ -71,5 +71,23 @@ describe("registerSpaFallback", () => {
     const app = await createApp();
     const response = await app.inject({ method: "GET", url: "/assets/gone.js" });
     expect(response.statusCode).toBe(404);
+  });
+});
+
+describe("registerDevRedirect", () => {
+  it("sends a browser on a client route to Vite and keeps the API's 404s", async () => {
+    const app = Fastify();
+    apps.push(app);
+    registerDevRedirect(app, "http://localhost:3033");
+    await app.ready();
+
+    const page = await app.inject({ method: "GET", url: "/books/b-1?tab=chapters" });
+    expect(page.statusCode).toBe(302);
+    expect(page.headers.location).toBe("http://localhost:3033/books/b-1?tab=chapters");
+
+    const api = await app.inject({ method: "GET", url: "/trpc/nothing" });
+    expect(api.statusCode).toBe(404);
+    const asset = await app.inject({ method: "GET", url: "/assets/index-old.js" });
+    expect(asset.statusCode).toBe(404);
   });
 });

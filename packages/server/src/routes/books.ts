@@ -8,7 +8,7 @@ import { router, publicProcedure } from "../trpc.ts";
 import { db } from "../db.ts";
 import { books, bookFiles, chapters, bookLogs, assemblies, documents, chapterVariants, folders, DEFAULT_PROFILE_ID, OCR_ENGINES } from "../schema.ts";
 import type { Book, Chapter } from "../schema.ts";
-import { eq, desc, asc, gt, and, or, ne, inArray, ilike, isNotNull, sql } from "drizzle-orm";
+import { eq, desc, asc, gt, and, or, ne, inArray, ilike, isNotNull, sql, count } from "drizzle-orm";
 import { uploadsDir, bookOutputDir, bookFileOutDir } from "../lib/paths.ts";
 import { deleteBook } from "../lib/delete-book.ts";
 import { folderAncestors } from "../lib/folders.ts";
@@ -16,14 +16,18 @@ import { bookFilterState } from "../lib/book-filter.ts";
 import { appendLog } from "../lib/log.ts";
 import { queueIndexBook } from "../lib/search-index.ts";
 import { parseTtsVoice } from "../lib/tts.ts";
-import { collectBlocksFromMarkerOutput, sliceChaptersAtIndices, type ExtractedChapter } from "../lib/marker.ts";
+import { collectBlocksFromMarkerOutput, sliceChaptersAtIndices, type FlatBlock } from "../lib/marker.ts";
+import { blockBox, closingMarks, isTitleLike, locateSavedChapters, type AnchorBlock } from "../lib/chapter-anchors.ts";
+import { planStructure, type SlicedChapter } from "../lib/structure-plan.ts";
+import { applyStructurePlan, loadExistingChapters } from "../lib/structure-apply.ts";
+import { ensureSourceGeometry } from "../lib/page-geometry.ts";
 import { listMarkerSources } from "../lib/marker-sources.ts";
 import { cumulativeWords } from "../lib/toc-anchor.ts";
 import { abortExtract, extractRunning } from "../lib/extract-registry.ts";
 import { measureBookDiskUsage, measureDirs, removeDirs, bookTotalSizeCached, fileSize } from "../lib/disk-usage.ts";
 import { chapterChunkPreviewDir } from "../lib/chunk-previews.ts";
 import { translationChunkPreviewDir } from "../workers/synthesize-translation.ts";
-import { insertSuspendedChapters, resetChaptersKeepingInserted } from "../lib/insert-chapters.ts";
+import { resetChaptersKeepingInserted } from "../lib/insert-chapters.ts";
 import { isGarbled, replaceFileWords } from "../lib/ocr-text-layer.ts";
 import { countAsciiNonAscii } from "../lib/token-estimate.ts";
 import { assembleJobKey, documentJobKey, inFlightInputs, outputChapters } from "../lib/output-readiness.ts";
@@ -110,6 +114,10 @@ async function withFileSizes<T extends { outputPath: string }>(rows: T[]): Promi
 async function extractionRunning(bookId: string): Promise<boolean> {
   const files = await db.select({ id: bookFiles.id }).from(bookFiles).where(eq(bookFiles.bookId, bookId));
   return extractRunning([bookId, ...files.map((f) => f.id)]);
+}
+
+function sourceBlocksOf(chapter: { sourceBlocks: unknown }): AnchorBlock[] {
+  return Array.isArray(chapter.sourceBlocks) ? (chapter.sourceBlocks as AnchorBlock[]) : [];
 }
 
 export const booksRouter = router({
@@ -796,51 +804,76 @@ export const booksRouter = router({
       const [book] = await db.select().from(books).where(eq(books.id, input.id));
       if (!book) throw new Error("Book not found");
 
-      const bookChapters = await db
-        .select({ title: chapters.title, pageStart: chapters.pageStart, sourceFileIndex: chapters.sourceFileIndex })
-        .from(chapters)
-        .where(eq(chapters.bookId, input.id));
+      const extracted = (await loadExistingChapters(input.id)).filter((c) => c.source == null).sort((a, b) => a.index - b.index);
+      const variantCounts = extracted.length
+        ? await db
+            .select({ chapterId: chapterVariants.chapterId, count: count() })
+            .from(chapterVariants)
+            .where(inArray(chapterVariants.chapterId, extracted.map((c) => c.id)))
+            .groupBy(chapterVariants.chapterId)
+        : [];
+      const variantsOf = new Map(variantCounts.map((v) => [v.chapterId, Number(v.count)]));
 
       const sources = await listMarkerSources(book);
+      const fileRows = await db.select({ id: bookFiles.id, index: bookFiles.index }).from(bookFiles).where(eq(bookFiles.bookId, input.id));
       const files = [];
 
       for (const source of sources) {
+        const file = fileRows.find((f) => f.index === source.fileIndex);
+        const pdfUrl = file ? `/pdf/${file.id}` : `/pdf/book/${book.id}`;
         let allBlocks;
         try {
           allBlocks = await collectBlocksFromMarkerOutput(source.outDir);
         } catch {
-          files.push({ fileIndex: source.fileIndex, filename: source.filename, missing: true, totalWords: 0, totalPages: 0, headings: [] });
+          files.push({ fileIndex: source.fileIndex, filename: source.filename, pdfUrl, missing: true, totalWords: 0, totalPages: 0, pages: [], blocks: [], saved: [] });
           continue;
         }
 
-        const currentStarts = new Set(
-          bookChapters
-            .filter((c) => c.sourceFileIndex === source.fileIndex)
-            .map((c) => `${c.pageStart}|${c.title}`)
-        );
-
+        // The pages' own sizes, so each block's box can be drawn on the rendered page the way the
+        // reader draws its cues: in ten-thousandths of the page
+        const geometry = await ensureSourceGeometry(source).catch(() => null);
+        const pages = (geometry?.pages ?? []).map((p) => ({ p: p.i + 1, w: p.w, h: p.h }));
         const cum = cumulativeWords(allBlocks);
-        const headings = [];
-        for (const [i, b] of allBlocks.entries()) {
-          if (b.included && b.type === "SectionHeader") {
-            headings.push({
-              blockIndex: i,
-              page: b.page,
-              level: b.level ?? null,
-              text: b.text,
-              wordsBefore: cum.before[i] ?? 0,
-              isChapterStart: currentStarts.has(`${b.page}|${b.text}`),
-            });
-          }
-        }
+        const closing = closingMarks(allBlocks);
+        const blocks = allBlocks.map((b, i) => ({
+          i,
+          page: b.page,
+          type: b.type,
+          text: b.text,
+          included: b.included,
+          level: b.level ?? null,
+          heading: b.included && b.type === "SectionHeader",
+          titleLike: b.included && b.type !== "SectionHeader" && isTitleLike(b.text),
+          closingMark: closing[i] ?? false,
+          box: blockBox(b.polygon, geometry?.pages[b.page - 1]),
+        }));
+        // Where each saved chapter sits in these blocks, so the crafting view can tell a cut that
+        // keeps a chapter from one that re-cuts it
+        const inFile = extracted.filter((c) => c.sourceFileIndex === source.fileIndex);
+        const ranges = locateSavedChapters(allBlocks, inFile.map(sourceBlocksOf));
+        const saved = inFile.map((c, i) => ({
+            id: c.id,
+            index: c.index,
+            title: c.title,
+            hasAudio: !!c.audioPath,
+            durationMs: c.durationMs,
+            hasCustomText: !!c.customText,
+            variants: variantsOf.get(c.id) ?? 0,
+            pageStart: c.pageStart,
+            pageEnd: c.pageEnd,
+            range: ranges[i] ?? null,
+          }));
 
         files.push({
           fileIndex: source.fileIndex,
           filename: source.filename,
+          pdfUrl,
           missing: false,
           totalWords: cum.total,
           totalPages: allBlocks.length > 0 ? Math.max(...allBlocks.map((b) => b.page)) : 0,
-          headings,
+          pages,
+          blocks,
+          saved,
         });
       }
 
@@ -888,6 +921,8 @@ export const booksRouter = router({
             })
           )
           .min(1),
+        // What happens to an edited text override a cut breaks, by chapter id
+        resolutions: z.record(z.string().uuid(), z.enum(["keep", "drop"])).optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -897,6 +932,18 @@ export const booksRouter = router({
       if (book.status === "extracting" || book.status === "assembling") {
         throw new Error("Cannot apply chapter boundaries while book is processing");
       }
+      // Narration writes files named by chapter index, and indices are about to move
+      const busy = await db
+        .select({ id: chapters.id })
+        .from(chapters)
+        .where(and(eq(chapters.bookId, input.id), inArray(chapters.status, ["pending", "normalizing", "synthesizing"])));
+      if (busy.length > 0) throw new Error("Cannot change chapters while narration is running — cancel it first");
+      const busyVariants = await db
+        .select({ id: chapterVariants.id })
+        .from(chapterVariants)
+        .innerJoin(chapters, eq(chapterVariants.chapterId, chapters.id))
+        .where(and(eq(chapters.bookId, input.id), inArray(chapterVariants.audioStatus, ["pending", "synthesizing"])));
+      if (busyVariants.length > 0) throw new Error("Cannot change chapters while a variant is being narrated — stop it first");
 
       const sources = await listMarkerSources(book);
       const knownFiles = new Set(sources.map((s) => s.fileIndex));
@@ -904,62 +951,95 @@ export const booksRouter = router({
         if (!knownFiles.has(b.fileIndex)) throw new Error(`Unknown file index ${b.fileIndex}`);
       }
 
-      // Slice everything before deleting so a bad boundary can't destroy existing chapters
-      const perFile: { fileIndex: number | null; sliced: ExtractedChapter[] }[] = [];
+      // Slice everything before touching the database so a bad boundary can't destroy existing chapters.
+      // Text before the first start is left out on purpose: the crafting view shows it and offers to
+      // make it a chapter, which is a boundary at block 0.
+      const sliced: SlicedChapter[] = [];
+      const blocksByFile = new Map<number | null, FlatBlock[]>();
       for (const source of sources) {
         const fileBoundaries = input.boundaries.filter((b) => b.fileIndex === source.fileIndex);
+        const allBlocks = await collectBlocksFromMarkerOutput(source.outDir);
+        blocksByFile.set(source.fileIndex, allBlocks);
+        if (fileBoundaries.length === 0) continue;
         const indices = fileBoundaries.map((b) => b.blockIndex);
         const titles = new Map(fileBoundaries.filter((b) => b.title).map((b) => [b.blockIndex, b.title!]));
-        const allBlocks = await collectBlocksFromMarkerOutput(source.outDir);
         for (const i of indices) {
           if (i >= allBlocks.length) throw new Error(`Block index ${i} out of range for "${source.filename}"`);
         }
-        perFile.push({ fileIndex: source.fileIndex, sliced: sliceChaptersAtIndices(allBlocks, indices, titles) });
+        for (const ch of sliceChaptersAtIndices(allBlocks, indices, titles, { implicitPreface: false })) {
+          sliced.push({ ...ch, fileIndex: source.fileIndex });
+        }
+      }
+      if (sliced.length === 0) throw new Error("No chapter text at these boundaries");
+
+      const existing = await loadExistingChapters(input.id);
+      // Located the way the crafting view saw them, so its preview and this apply agree
+      const rangeById = new Map<string, { start: number; end: number } | null>();
+      for (const [fileIndex, blocks] of blocksByFile) {
+        const inFile = existing.filter((c) => c.source == null && c.sourceFileIndex === fileIndex).sort((a, b) => a.index - b.index);
+        locateSavedChapters(blocks, inFile.map(sourceBlocksOf)).forEach((range, i) => rangeById.set(inFile[i]?.id ?? "", range));
+      }
+      const plan = planStructure(existing, sliced, input.resolutions ?? {}, (c) => rangeById.get(c.id) ?? null);
+      const undecided = plan.undecided[0];
+      if (undecided) {
+        throw new Error(`“${undecided.title}” has edited text that this cut breaks — choose to keep or discard it first`);
+      }
+      const orphan = plan.orphanedEdits[0];
+      if (orphan) {
+        throw new Error(`The edited text of “${orphan.title}” has no chapter left to be kept on — discard it, or start a chapter over its text`);
+      }
+      const colliding = plan.collidingEdits[0];
+      if (colliding) {
+        throw new Error(`Two edited texts would land on the same chapter — only one can be kept; discard the edit of “${colliding.title}” or keep it alone`);
       }
 
-      const oldChapters = await db
-        .select({ audioPath: chapters.audioPath })
-        .from(chapters)
-        .where(eq(chapters.bookId, input.id));
-      const deletedAudioFiles = oldChapters.filter((ch) => ch.audioPath).length;
+      if (plan.unchanged) {
+        await db.update(books).set({ structureConfirmedAt: new Date(), updatedAt: new Date() }).where(eq(books.id, input.id));
+        await appendLog(input.id, "Chapter boundaries unchanged — kept every chapter, its edits, audio and outputs");
+        return reloadBook(input.id);
+      }
 
-      await rm(bookOutputDir(input.id), { recursive: true, force: true }).catch(() => {});
+      // Renaming alone cuts nothing: titles change, every output and status stays
+      if (plan.renamedOnly) {
+        await applyStructurePlan(input.id, plan);
+        await db.update(books).set({ structureConfirmedAt: new Date(), updatedAt: new Date() }).where(eq(books.id, input.id));
+        await appendLog(input.id, "Chapter boundaries unchanged — renamed chapters, kept every edit, audio and output");
+        return reloadBook(input.id);
+      }
+
+      await appendLog(input.id, `Applying ${input.boundaries.length} chapter boundaries from the saved page extraction — no OCR, transcription or synthesis`);
+      const outcome = await applyStructurePlan(input.id, plan);
+
+      // Outputs were built from the old chapter set; gone only once the new one is in
+      const oldAssemblies = await db.select().from(assemblies).where(eq(assemblies.bookId, input.id));
+      for (const a of oldAssemblies) await unlink(a.outputPath).catch(() => {});
       await db.delete(assemblies).where(eq(assemblies.bookId, input.id));
-      const keptCount = await resetChaptersKeepingInserted(input.id);
-      await db.update(books).set({ structureConfirmedAt: new Date() }).where(eq(books.id, input.id));
-
-      await appendLog(input.id, `Applying ${input.boundaries.length} manual chapter boundaries`);
-      if (oldChapters.length > 0) {
+      const oldDocuments = await db.select().from(documents).where(eq(documents.bookId, input.id));
+      for (const d of oldDocuments) await unlink(d.outputPath).catch(() => {});
+      await db.delete(documents).where(eq(documents.bookId, input.id));
+      if (outcome.removed > 0) {
         await appendLog(
           input.id,
-          `Removed ${oldChapters.length - keptCount} existing chapter${oldChapters.length - keptCount === 1 ? "" : "s"} and ${deletedAudioFiles} chapter audio file${deletedAudioFiles === 1 ? "" : "s"}`
+          `Replaced ${outcome.removed} chapter${outcome.removed === 1 ? "" : "s"} (${outcome.removedAudio} with audio); kept ${outcome.kept} unchanged`
         );
-      }
-      if (keptCount > 0) {
-        await appendLog(input.id, `Kept ${keptCount} inserted chapter${keptCount === 1 ? "" : "s"} (moved to the front, audio reset)`);
-      }
-
-      let chapterOffset = keptCount;
-      for (const { fileIndex, sliced } of perFile) {
-        await insertSuspendedChapters(input.id, sliced, chapterOffset, fileIndex);
-        chapterOffset += sliced.length;
       }
 
       await db
         .update(books)
         .set({
-          totalChapters: chapterOffset,
+          totalChapters: plan.order.length,
           chapterDetection: "manual",
           chapterProposal: null,
           status: "pending",
           error: null,
           outputPath: null,
+          structureConfirmedAt: new Date(),
           updatedAt: new Date(),
         })
         .where(eq(books.id, input.id));
 
       await queueIndexBook(input.id);
-      await appendLog(input.id, `Applied chapter boundaries: ${chapterOffset} chapters — chapters are suspended. Queue selected chapters when ready.`);
+      await appendLog(input.id, `Applied chapter boundaries: ${plan.order.length} chapters — new chapters are suspended. Queue selected chapters when ready.`);
 
       return reloadBook(input.id);
     }),

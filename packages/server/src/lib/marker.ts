@@ -268,32 +268,39 @@ export function pickNumberedChapterIndices(allBlocks: FlatBlock[]): number[] {
   return increasing.map((d) => d.index);
 }
 
+export type SlicedChapter = ExtractedChapter & { range: { start: number; end: number } };
+
+// Detection keeps the long-standing rule that enough text before the first heading becomes a
+// "Preface"; the crafting view turns that off, because there the text before the first chosen
+// start is shown and excluded on purpose, and a preface is a start the user places at block 0.
 export function sliceChaptersAtIndices(
   allBlocks: FlatBlock[],
   boundaryIndices: number[],
-  titleOverrides?: Map<number, string>
-): ExtractedChapter[] {
+  titleOverrides?: Map<number, string>,
+  { implicitPreface = true }: { implicitPreface?: boolean } = {},
+): SlicedChapter[] {
   const sorted = [...new Set(boundaryIndices)].sort((a, b) => a - b);
   if (sorted.length === 0) {
     const whole = chapterFromBlocks("Full Text", allBlocks);
-    return whole.text.trim() ? [whole] : [];
+    return whole.text.trim() ? [{ ...whole, range: { start: 0, end: allBlocks.length } }] : [];
   }
 
-  const chapters: ExtractedChapter[] = [];
+  const chapters: SlicedChapter[] = [];
   for (const [i, start] of sorted.entries()) {
     const end = sorted[i + 1] ?? allBlocks.length;
     const blocks = allBlocks.slice(start, end);
     const ch = chapterFromBlocks(titleOverrides?.get(start) ?? allBlocks[start]?.text ?? "Untitled", blocks);
     if (ch.text.trim()) {
-      chapters.push(ch);
+      chapters.push({ ...ch, range: { start, end } });
     }
   }
 
-  const prefaceBlocks = allBlocks.slice(0, sorted[0]);
-  if (prefaceBlocks.length > 0) {
+  const first = sorted[0] ?? 0;
+  const prefaceBlocks = allBlocks.slice(0, first);
+  if (implicitPreface && prefaceBlocks.length > 0) {
     const ch = chapterFromBlocks("Preface", prefaceBlocks);
     if (ch.text.trim().split(/\s+/).length > PREFACE_MIN_WORDS) {
-      chapters.unshift(ch);
+      chapters.unshift({ ...ch, range: { start: 0, end: first } });
     }
   }
 

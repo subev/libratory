@@ -1,26 +1,19 @@
-# Preserve chapter work when changing boundaries
+# Preserve chapter work when changing boundaries — what is left
 
-Page OCR, AI transcriptions, semantic layouts and word geometry are source-file
-artifacts. Chapter structure is a grouping of those artifacts; changing it must
-never trigger page recognition or transcription.
+Done (2026-10-12, chapter crafting): changing boundaries never runs OCR or transcription; a
+chapter cut from the same blocks as a saved one keeps its row, text override, variants and audio
+(its index-named files move with it); an edited text override a cut breaks needs an explicit
+keep/discard decision; only replaced chapters lose their audio. See `lib/structure-plan.ts`,
+`lib/structure-apply.ts` and `components/ChapterCrafting.tsx`.
 
-Current behavior already reuses page extraction for structure apply and chapter
-re-detection. Re-detection now checks every source before replacing any chapters,
-and keeps the existing rows and outputs when text, titles and source mappings are
-identical. A changed structure still replaces all extraction-derived chapters,
-their edits, variants and audio. Inserted chapters survive but their audio resets.
+Still open:
 
-Next improvement: match unchanged chapters by source file and exact block ranges,
-preserving their IDs, text overrides, variants, audio and reading metadata. Only
-affected chapters should require re-synthesis. Split/merge must surface edited
-text that cannot be mapped safely; never silently discard it.
-
-Build and validate the complete replacement before a transactional database swap.
-Delete obsolete artifacts only after commit. Keep a restorable previous structure
-including edits and audio references. Guard against concurrent synthesis and
-assembly. Keep page artifacts independent of chapter output cleanup and include
-them in the portable extraction archive.
-
-Tests should cover one boundary change leaving unrelated chapters intact, edited
-text across a split, inserted chapters, failed preparation/commit, repeated apply,
-and verse/prose/footnote mappings with no OCR or transcription calls.
+- A restorable previous structure. Applying replaces the old chapters outright; undo exists only
+  for the draft, not after apply. Keep a snapshot (boundaries, titles, edits, audio references)
+  that a later apply can bring back.
+- Crash recovery mid-apply. The rows change in one transaction and a failure it reports rolls the
+  staged file moves back, but a process that dies between staging the files and committing the rows
+  leaves `.moving-*` staging names or `.removed` files beside the chapters with nothing to put them back. A boot
+  sweep that finishes or reverses a staged move would close that.
+- Page artifacts in the portable extraction archive, independent of chapter output cleanup.
+- Tests for a failed preparation/commit and for verse/footnote block mappings across a cut.

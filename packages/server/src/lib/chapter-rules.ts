@@ -1,4 +1,3 @@
-// The structure modal imports this from the browser: keep it free of server-only imports
 export const PREFACE_MIN_WORDS = 50;
 const LABEL_MAX_WORDS = 120;
 const OVERSIZED_MIN_WORDS = 6000;

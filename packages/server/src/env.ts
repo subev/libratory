@@ -17,6 +17,9 @@ const envSchema = z.object({
   DATABASE_URL: z.string(),
   DATA_DIR: z.string().default("./data"),
   PORT: z.coerce.number().default(3034),
+  // Vite's port. Under `pnpm dev` a browser that lands on the API port is sent there, rather than
+  // being handed whatever `pnpm build` last left in web/dist.
+  WEB_PORT: z.coerce.number().default(3033),
   // Echoed back by /health so the desktop launcher can tell the server it spawned from whatever
   // else already had the port — usually a checkout's dev server, serving a different web bundle.
   LIBRATORY_INSTANCE: z.string().optional(),

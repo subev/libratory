@@ -1,11 +1,11 @@
 import { eq } from "drizzle-orm";
-import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ensureGraphileTables, getDb, insertJob, resetDb, row } from "../../test/setup.ts";
-import { books, bookFiles, chapters, folders, profiles } from "../schema.ts";
+import { assemblies, books, bookFiles, chapters, chapterVariants, folders, profiles } from "../schema.ts";
 
 const { mockQuickAddJob, mockDeepseekChat } = vi.hoisted(() => ({
   mockQuickAddJob: vi.fn(async () => {}),
@@ -33,6 +33,8 @@ vi.mock("../lib/marker.ts", async (importOriginal) => {
 
 import { booksRouter } from "./books.ts";
 import { collectBlocksFromMarkerOutput, type FlatBlock } from "../lib/marker.ts";
+import { bookOutputDir } from "../lib/paths.ts";
+import { syncMapPath } from "../lib/sync-map.ts";
 
 const mockCollectBlocks = vi.mocked(collectBlocksFromMarkerOutput);
 
@@ -187,20 +189,47 @@ describe("booksRouter.structure", () => {
     mockCollectBlocks.mockReset();
   });
 
-  it("returns the heading outline with word offsets and current boundaries", async () => {
-    const bookId = await insertStructureBook(getDb());
-    mockCollectBlocks.mockResolvedValue(structureBlocks);
+  it("returns every block, which are headings or title-like, and where the saved chapters sit", async () => {
+    const db = getDb();
+    const bookId = await insertStructureBook(db);
+    await db.insert(chapters).values({
+      bookId,
+      index: 1,
+      title: "Chapter 2 Middle",
+      rawText: "Chapter 2 Middle\n\nsix seven eight",
+      customText: "edited",
+      audioPath: "/tmp/ch001.m4a",
+      durationMs: 1234,
+      pageStart: 10,
+      sourceBlocks: structureBlocks.slice(3).map(({ type, text, page, included }) => ({ type, text, page, included })),
+      status: "done",
+    });
+    mockCollectBlocks.mockResolvedValue([...structureBlocks.slice(0, 2), block("Text", "THE STORM", 3), structureBlocks[2]!, block("Text", "THE END", 3), ...structureBlocks.slice(3)]);
 
     const caller = booksRouter.createCaller({});
     const { files } = await caller.structure({ id: bookId });
 
     expect(files).toHaveLength(1);
-    expect(files[0]?.fileIndex).toBeNull();
-    expect(files[0]?.totalWords).toBe(18);
-    expect(files[0]?.totalPages).toBe(11);
-    expect(files[0]?.headings).toEqual([
-      { blockIndex: 1, page: 2, level: null, text: "Chapter 1 Beginning", wordsBefore: 4, isChapterStart: true },
-      { blockIndex: 3, page: 10, level: null, text: "Chapter 2 Middle", wordsBefore: 12, isChapterStart: false },
+    const file = files[0]!;
+    expect(file.fileIndex).toBeNull();
+    expect(file.pdfUrl).toBe(`/pdf/book/${bookId}`);
+    expect(file.pages).toEqual([]);
+    expect(file.blocks.every((b) => b.box === null)).toBe(true);
+    expect(file.totalWords).toBe(22);
+    expect(file.totalPages).toBe(11);
+    // "THE STORM" opens page 3 and reads as a title; "THE END" closes it under other text, so it is demoted
+    expect(file.blocks.map((b) => [b.i, b.page, b.heading, b.titleLike, b.closingMark])).toEqual([
+      [0, 1, false, false, false],
+      [1, 2, true, false, false],
+      [2, 3, false, true, false],
+      [3, 3, false, false, false],
+      [4, 3, false, true, true],
+      [5, 10, true, false, false],
+      [6, 11, false, false, false],
+    ]);
+    expect(file.saved).toEqual([
+      expect.objectContaining({ index: 0, title: "Chapter 1 Beginning", hasAudio: false, hasCustomText: false, variants: 0, range: null }),
+      expect.objectContaining({ index: 1, title: "Chapter 2 Middle", hasAudio: true, durationMs: 1234, hasCustomText: true, range: { start: 5, end: 7 } }),
     ]);
   });
 
@@ -212,7 +241,7 @@ describe("booksRouter.structure", () => {
     const { files } = await caller.structure({ id: bookId });
 
     expect(files[0]?.missing).toBe(true);
-    expect(files[0]?.headings).toEqual([]);
+    expect(files[0]?.blocks).toEqual([]);
   });
 });
 
@@ -222,6 +251,15 @@ describe("booksRouter.applyChapterBoundaries", () => {
     mockCollectBlocks.mockReset();
     mockQuickAddJob.mockReset();
   });
+
+  // What slicing blocks [3, 5) stores on the row, so a saved chapter can be matched block for block
+  const middle = {
+    title: "Chapter 2 Middle",
+    rawText: "Chapter 2 Middle\n\nsix seven eight",
+    pageStart: 10,
+    pageEnd: 11,
+    sourceBlocks: structureBlocks.slice(3).map(({ type, text, page, included }) => ({ type, text, page, included })),
+  };
 
   it("replaces chapters by slicing at the chosen block indices", async () => {
     const db = getDb();
@@ -246,7 +284,29 @@ describe("booksRouter.applyChapterBoundaries", () => {
     expect(updated.totalChapters).toBe(2);
     expect(updated.chapterProposal).toBeNull();
     expect(updated.status).toBe("pending");
+    expect(updated.structureConfirmedAt).not.toBeNull();
     expect(mockQuickAddJob).toHaveBeenCalledWith(expect.any(Object), "indexBook", { bookId }, expect.objectContaining({ maxAttempts: 1, jobKey: `index:${bookId}` }));
+  });
+
+  it("leaves the text before the first start out rather than inventing a preface", async () => {
+    const db = getDb();
+    const bookId = await insertStructureBook(db);
+    mockCollectBlocks.mockResolvedValue(structureBlocks);
+
+    await booksRouter.createCaller({}).applyChapterBoundaries({ id: bookId, boundaries: [{ fileIndex: null, blockIndex: 3 }] });
+
+    const chs = await db.select().from(chapters).where(eq(chapters.bookId, bookId)).orderBy(chapters.index);
+    expect(chs.map((c) => c.title)).toEqual(["Chapter 2 Middle"]);
+
+    // A start at block 0 is how the front matter becomes a chapter
+    await booksRouter.createCaller({}).applyChapterBoundaries({
+      id: bookId,
+      boundaries: [{ fileIndex: null, blockIndex: 0, title: "Front matter" }, { fileIndex: null, blockIndex: 3 }],
+    });
+    const again = await db.select().from(chapters).where(eq(chapters.bookId, bookId)).orderBy(chapters.index);
+    expect(again.map((c) => c.title)).toEqual(["Front matter", "Chapter 2 Middle"]);
+    // The second chapter was cut from the same blocks, so it is the same row
+    expect(again[1]?.id).toBe(chs[0]?.id);
   });
 
   it("applies proposal title overrides to the sliced chapters", async () => {
@@ -265,6 +325,141 @@ describe("booksRouter.applyChapterBoundaries", () => {
 
     const chs = await db.select().from(chapters).where(eq(chapters.bookId, bookId)).orderBy(chapters.index);
     expect(chs.map((c) => c.title)).toEqual(["Chapter 1: The Beginning", "Chapter 2 Middle"]);
+  });
+
+  it("keeps a chapter cut from the same blocks, carrying its audio to its new index", async () => {
+    const db = getDb();
+    const bookId = await insertStructureBook(db);
+    const outDir = bookOutputDir(bookId);
+    await mkdir(outDir, { recursive: true });
+    const audioPath = path.join(outDir, "ch000.m4a");
+    await writeFile(audioPath, "audio");
+    await writeFile(syncMapPath(audioPath), "{}");
+    const keptId = crypto.randomUUID();
+    await db.delete(chapters).where(eq(chapters.bookId, bookId));
+    await db.insert(chapters).values({ id: keptId, bookId, index: 0, ...middle, status: "done", audioPath, durationMs: 5000 });
+    mockCollectBlocks.mockResolvedValue(structureBlocks);
+
+    try {
+      await booksRouter.createCaller({}).applyChapterBoundaries({
+        id: bookId,
+        boundaries: [{ fileIndex: null, blockIndex: 1 }, { fileIndex: null, blockIndex: 3, title: "Middle, renamed" }],
+      });
+
+      const chs = await db.select().from(chapters).where(eq(chapters.bookId, bookId)).orderBy(chapters.index);
+      expect(chs.map((c) => [c.id === keptId, c.index, c.title, c.status])).toEqual([
+        [false, 0, "Chapter 1 Beginning", "suspended"],
+        [true, 1, "Middle, renamed", "done"],
+      ]);
+      const kept = chs[1]!;
+      expect(kept.audioPath).toBe(path.join(outDir, "ch001.m4a"));
+      expect(kept.durationMs).toBe(5000);
+      await expect(stat(kept.audioPath!)).resolves.toBeTruthy();
+      await expect(stat(syncMapPath(kept.audioPath!))).resolves.toBeTruthy();
+      await expect(stat(audioPath)).rejects.toThrow();
+    } finally {
+      await rm(outDir, { recursive: true, force: true });
+    }
+  });
+
+  it("records the review and replaces nothing when every chapter is kept", async () => {
+    const db = getDb();
+    const bookId = await insertStructureBook(db);
+    await db.delete(chapters).where(eq(chapters.bookId, bookId));
+    const id = crypto.randomUUID();
+    await db.insert(chapters).values({ id, bookId, index: 0, ...middle, customText: "edited", status: "done", audioPath: "/tmp/x.m4a" });
+    mockCollectBlocks.mockResolvedValue(structureBlocks);
+
+    const updated = await booksRouter.createCaller({}).applyChapterBoundaries({ id: bookId, boundaries: [{ fileIndex: null, blockIndex: 3 }] });
+
+    const chs = await db.select().from(chapters).where(eq(chapters.bookId, bookId));
+    expect(chs.map((c) => [c.id, c.customText, c.audioPath])).toEqual([[id, "edited", "/tmp/x.m4a"]]);
+    expect(updated.structureConfirmedAt).not.toBeNull();
+    expect(mockQuickAddJob).not.toHaveBeenCalled();
+  });
+
+  it("renames without cutting: outputs and status stay", async () => {
+    const db = getDb();
+    const bookId = await insertStructureBook(db);
+    await db.delete(chapters).where(eq(chapters.bookId, bookId));
+    const id = crypto.randomUUID();
+    await db.insert(chapters).values({ id, bookId, index: 0, ...middle, status: "done", audioPath: "/tmp/x.m4a" });
+    await db.insert(assemblies).values({ bookId, outputPath: "/tmp/book.m4b", durationMs: 1, chapterCount: 1, chapterSummary: "", chapterIds: id });
+    await db.update(books).set({ status: "done", outputPath: "/tmp/book.m4b" }).where(eq(books.id, bookId));
+    mockCollectBlocks.mockResolvedValue(structureBlocks);
+
+    const updated = await booksRouter.createCaller({}).applyChapterBoundaries({ id: bookId, boundaries: [{ fileIndex: null, blockIndex: 3, title: "Middle, renamed" }] });
+
+    const chs = await db.select().from(chapters).where(eq(chapters.bookId, bookId));
+    expect(chs.map((c) => [c.id, c.title, c.status, c.audioPath])).toEqual([[id, "Middle, renamed", "done", "/tmp/x.m4a"]]);
+    expect(await db.select().from(assemblies).where(eq(assemblies.bookId, bookId))).toHaveLength(1);
+    expect(updated.status).toBe("done");
+    expect(updated.outputPath).toBe("/tmp/book.m4b");
+    expect(updated.structureConfirmedAt).not.toBeNull();
+    expect(mockQuickAddJob).not.toHaveBeenCalled();
+  });
+
+  it("needs a decision for an edited text override a cut breaks", async () => {
+    const db = getDb();
+    const bookId = await insertStructureBook(db);
+    await db.delete(chapters).where(eq(chapters.bookId, bookId));
+    const id = crypto.randomUUID();
+    await db.insert(chapters).values({ id, bookId, index: 0, ...middle, customText: "edited", status: "suspended" });
+    mockCollectBlocks.mockResolvedValue(structureBlocks);
+    const caller = booksRouter.createCaller({});
+    const boundaries = [{ fileIndex: null, blockIndex: 3 }, { fileIndex: null, blockIndex: 4 }];
+
+    await expect(caller.applyChapterBoundaries({ id: bookId, boundaries })).rejects.toThrow(/keep or discard/);
+    expect(await db.select().from(chapters).where(eq(chapters.bookId, bookId))).toHaveLength(1);
+
+    await caller.applyChapterBoundaries({ id: bookId, boundaries, resolutions: { [id]: "keep" } });
+    const chs = await db.select().from(chapters).where(eq(chapters.bookId, bookId)).orderBy(chapters.index);
+    expect(chs.map((c) => [c.title, c.customText])).toEqual([["Chapter 2 Middle", "edited"], ["six seven eight", null]]);
+  });
+
+  it("refuses to drop a kept edit that has nowhere to go", async () => {
+    const db = getDb();
+    const bookId = await insertStructureBook(db);
+    await db.delete(chapters).where(eq(chapters.bookId, bookId));
+    const id = crypto.randomUUID();
+    const front = {
+      title: "Front",
+      rawText: "Front matter words here\n\nChapter 1 Beginning",
+      pageStart: 1,
+      pageEnd: 2,
+      sourceBlocks: structureBlocks.slice(0, 2).map(({ type, text, page, included }) => ({ type, text, page, included })),
+    };
+    await db.insert(chapters).values({ id, bookId, index: 0, ...front, customText: "edited", status: "suspended" });
+    mockCollectBlocks.mockResolvedValue(structureBlocks);
+
+    // The edited chapter's text ends up before the first start, excluded: "keep" cannot be honoured
+    await expect(
+      booksRouter.createCaller({}).applyChapterBoundaries({ id: bookId, boundaries: [{ fileIndex: null, blockIndex: 3 }], resolutions: { [id]: "keep" } })
+    ).rejects.toThrow(/no chapter left/);
+    expect(await db.select().from(chapters).where(eq(chapters.bookId, bookId))).toHaveLength(1);
+  });
+
+  it("refuses while a variant is being narrated", async () => {
+    const db = getDb();
+    const bookId = await insertStructureBook(db);
+    const [ch] = await db.select({ id: chapters.id }).from(chapters).where(eq(chapters.bookId, bookId));
+    await db.insert(chapterVariants).values({ chapterId: ch!.id, key: "Bulgarian", text: "x", status: "done", audioStatus: "synthesizing" });
+    mockCollectBlocks.mockResolvedValue(structureBlocks);
+
+    await expect(
+      booksRouter.createCaller({}).applyChapterBoundaries({ id: bookId, boundaries: [{ fileIndex: null, blockIndex: 1 }] })
+    ).rejects.toThrow(/variant is being narrated/);
+  });
+
+  it("refuses while narration is running", async () => {
+    const db = getDb();
+    const bookId = await insertStructureBook(db);
+    await db.update(chapters).set({ status: "synthesizing" }).where(eq(chapters.bookId, bookId));
+    mockCollectBlocks.mockResolvedValue(structureBlocks);
+
+    await expect(
+      booksRouter.createCaller({}).applyChapterBoundaries({ id: bookId, boundaries: [{ fileIndex: null, blockIndex: 1 }] })
+    ).rejects.toThrow(/narration is running/);
   });
 
   it("rejects out-of-range block indices without touching existing chapters", async () => {

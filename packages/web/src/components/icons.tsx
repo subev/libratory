@@ -64,6 +64,11 @@ export {
   Lightbulb as IconTip,
   Paperclip as IconAttach,
   DeviceMobile as IconPhone,
+  ArrowsMerge as IconMerge,
+  ArrowsDownUp as IconMove,
+  ArrowUUpLeft as IconUndo,
+  ArrowUUpRight as IconRedo,
+  SpeakerHigh as IconSpeaker,
 } from "@phosphor-icons/react";
 
 import type { ReactNode } from "react";

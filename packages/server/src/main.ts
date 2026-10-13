@@ -25,7 +25,7 @@ import { contentDisposition } from "./lib/content-disposition.ts";
 import { registerNetworkAccessGuard } from "./lib/network-access.ts";
 import { ensureDataDirs, outputDir, previewsDir } from "./lib/paths.ts";
 import { isAllowedOrigin, parseTrustedHosts } from "./lib/cors.ts";
-import { registerSpaFallback } from "./lib/spa-fallback.ts";
+import { registerDevRedirect, registerSpaFallback } from "./lib/spa-fallback.ts";
 import { readablePdfPath } from "./lib/pdf-raw-text.ts";
 import { db } from "./db.ts";
 import { books, bookFiles, assemblies, documents, chapters, chapterVariants } from "./schema.ts";
@@ -75,11 +75,14 @@ async function main() {
     prefix: "/files/",
   });
 
-  // In development Vite serves the UI on its own port and proxies here. A packaged app has no
-  // Vite, so the same server hands out the built bundle — and only if it was built, which is why
-  // this is conditional rather than a hard dependency on `pnpm build` having run.
+  // In development Vite serves the UI on its own port and proxies here; a browser that opens this
+  // port by mistake is sent there, never handed a stale web/dist. A packaged app has no Vite, so
+  // the same server hands out the built bundle — and only if it was built, which is why this is
+  // conditional rather than a hard dependency on `pnpm build` having run.
   const webDir = env.WEB_DIR;
-  if (existsSync(path.join(webDir, "index.html"))) {
+  if (process.env.npm_lifecycle_event === "dev") {
+    registerDevRedirect(fastify, `http://localhost:${env.WEB_PORT}`);
+  } else if (existsSync(path.join(webDir, "index.html"))) {
     await fastify.register(fastifyStatic, { root: webDir, prefix: "/", decorateReply: false });
     registerSpaFallback(fastify, webDir);
   }
