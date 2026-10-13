@@ -1,0 +1,4 @@
+Reviewed: high
+Outcome: Chapter crafting reviewed in-context over four rounds with a Codex pane reviewing in parallel; round 4's two P2 findings (repeated passages located to one occurrence, inclusion drift read as unchanged) fixed before commit. Typecheck (working and staged tree), lint, 1174 server / 179 web / 50 desktop tests, e2e re-cut test and browser checks passed. See docs/review-2026-10-13-chapter-crafting.md. Note written by hand: the stamp script refuses while other streams' uncommitted files sit in the shared tree.
+By: Petur Subev
+At: 2026-10-13T07:35:12Z
