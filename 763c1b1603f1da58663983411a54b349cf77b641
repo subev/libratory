@@ -1,0 +1,4 @@
+Reviewed: medium
+Outcome: In-context review of the 19 stashed files (macOS 14 floor, move-to-profile, BgTTS robustness, task note): no defects found; checked tokenizer.encode_text exists, profile-scoped tables (notes, book_chunks) are both moved, help channel wired; typecheck, lint, desktop+server unit tests and e2e uc5-folders pass
+By: Petur Subev
+At: 2026-10-13T16:06:01.874Z
