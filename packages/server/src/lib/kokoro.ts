@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
-import { writeFile } from "node:fs/promises";
+import { rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { env } from "../env.ts";
@@ -116,6 +116,8 @@ export async function synthesize({ inputText, outputPath, voice, speed, chunkPre
       stdoutRl.close();
       stderrRl.close();
       signal?.removeEventListener("abort", handleAbort);
+      // The script streams into <output>.partial and renames it only once the chapter is whole
+      if (aborted || code !== 0) void rm(`${outputPath}.partial`, { force: true }).catch(() => {});
       if (aborted) {
         reject(new KokoroAbortedError());
         return;

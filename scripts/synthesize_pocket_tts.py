@@ -118,9 +118,14 @@ def main() -> None:
             loaded.append((model, resolve_voice(model, args.voice)))
         return loaded[0]
 
-    audio_parts: list[np.ndarray] = []
+    if not chunks:
+        raise RuntimeError("No audio chunks were produced")
+
     silence = np.zeros(int(SAMPLE_RATE * PAUSE_MS / 1000), dtype=np.float32)
+    # Streamed to disk rather than held: a long chapter's float32 audio runs to a gigabyte
+    partial_output = args.output + ".partial"
     total_samples = 0
+    out = sf.SoundFile(partial_output, "w", samplerate=SAMPLE_RATE, channels=1, format="WAV")
 
     for index, chunk in enumerate(chunks, start=1):
         waveform = load_existing_chunk(args.chunks_dir, index)
@@ -133,10 +138,10 @@ def main() -> None:
                 os.makedirs(args.chunks_dir, exist_ok=True)
                 sf.write(os.path.join(args.chunks_dir, f"chunk-{index:03d}.wav"), waveform, SAMPLE_RATE)
 
-        audio_parts.append(waveform)
+        out.write(waveform)
         total_samples += len(waveform)
         if index < len(chunks):
-            audio_parts.append(silence)
+            out.write(silence)
             total_samples += len(silence)
 
         print(json.dumps({
@@ -146,14 +151,11 @@ def main() -> None:
             "audioSeconds": round(total_samples / SAMPLE_RATE, 1),
         }), flush=True)
 
-    if not audio_parts:
-        raise RuntimeError("No audio chunks were produced")
-
-    full_audio = np.concatenate(audio_parts).astype(np.float32)
-    sf.write(args.output, full_audio, SAMPLE_RATE)
+    out.close()
+    os.replace(partial_output, args.output)
     print(json.dumps({
         "type": "done",
-        "audioSeconds": round(len(full_audio) / SAMPLE_RATE, 1),
+        "audioSeconds": round(total_samples / SAMPLE_RATE, 1),
         "chunks": len(chunks),
     }), flush=True)
 

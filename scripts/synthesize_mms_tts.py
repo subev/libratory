@@ -60,8 +60,15 @@ def main() -> None:
         write_chunk_manifest(args.chunks_dir, chunks)
     print(json.dumps({"type": "chunks", "total": len(chunks)}), flush=True)
 
-    audio_parts: list[np.ndarray] = []
+    if not chunks:
+        raise RuntimeError("No audio chunks were produced")
+
     sample_rate = int(model.config.sampling_rate)
+    silence = np.zeros(int(sample_rate * PAUSE_MS / 1000), dtype=np.float32)
+    # Streamed to disk rather than held: a long chapter's float32 audio runs to a gigabyte
+    partial_output = args.output + ".partial"
+    total_samples = 0
+    out = sf.SoundFile(partial_output, "w", samplerate=sample_rate, channels=1, format="WAV")
 
     for index, chunk in enumerate(chunks, start=1):
         waveform = load_existing_chunk(args.chunks_dir, index)
@@ -71,17 +78,20 @@ def main() -> None:
 
             with torch.no_grad():
                 waveform = model(**inputs).waveform.squeeze(0).detach().to("cpu").float().numpy()
+            if device.type == "mps":
+                # Each chunk is a new shape, and the MPS allocator otherwise caches every freed buffer
+                torch.mps.empty_cache()
 
             if args.chunks_dir:
                 os.makedirs(args.chunks_dir, exist_ok=True)
                 sf.write(os.path.join(args.chunks_dir, f"chunk-{index:03d}.wav"), waveform, sample_rate)
 
-        audio_parts.append(waveform)
+        out.write(waveform)
+        total_samples += len(waveform)
         if index < len(chunks):
-            silence = np.zeros(int(sample_rate * PAUSE_MS / 1000), dtype=np.float32)
-            audio_parts.append(silence)
+            out.write(silence)
+            total_samples += len(silence)
 
-        total_samples = sum(len(part) for part in audio_parts)
         total_seconds = round(total_samples / sample_rate, 1)
         print(json.dumps({
             "type": "progress",
@@ -90,12 +100,9 @@ def main() -> None:
             "audioSeconds": total_seconds,
         }), flush=True)
 
-    if not audio_parts:
-        raise RuntimeError("No audio chunks were produced")
-
-    full_audio = np.concatenate(audio_parts).astype(np.float32)
-    sf.write(args.output, full_audio, sample_rate)
-    total_seconds = round(len(full_audio) / sample_rate, 1)
+    out.close()
+    os.replace(partial_output, args.output)
+    total_seconds = round(total_samples / sample_rate, 1)
     print(json.dumps({
         "type": "done",
         "audioSeconds": total_seconds,

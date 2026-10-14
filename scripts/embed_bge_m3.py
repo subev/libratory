@@ -18,6 +18,10 @@ for line in sys.stdin:
     req = json.loads(line)
     try:
         result = model.encode(req["texts"], batch_size=16, max_length=1024)
+        if torch.backends.mps.is_available():
+            # Every request is a new batch shape, and this process lives as long as the server:
+            # without this the MPS allocator keeps each freed buffer cached
+            torch.mps.empty_cache()
         vectors = [vec.tolist() for vec in result["dense_vecs"]]
         print(json.dumps({"id": req["id"], "vectors": vectors}), flush=True)
     except Exception as exc:  # noqa: BLE001 - report to the caller, keep serving

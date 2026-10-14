@@ -110,7 +110,14 @@ def main() -> None:
         write_chunk_manifest(args.chunks_dir, chunks)
     print(json.dumps({"type": "chunks", "total": len(chunks)}), flush=True)
 
-    audio_parts: list[np.ndarray] = []
+    if not chunks:
+        raise RuntimeError("No audio chunks were produced")
+
+    silence = np.zeros(int(sample_rate * PAUSE_MS / 1000), dtype=np.float32)
+    # Streamed to disk rather than held: a long chapter's float32 audio runs to a gigabyte
+    partial_output = args.output + ".partial"
+    total_samples = 0
+    out = sf.SoundFile(partial_output, "w", samplerate=sample_rate, channels=1, format="WAV")
     for index, chunk in enumerate(chunks, start=1):
         # A chunk spoken before word timings existed is spoken again; Piper does it in a fraction of a second
         waveform = load_existing_chunk(args.chunks_dir, index, needs_words=True)
@@ -138,16 +145,18 @@ def main() -> None:
                     words = []
                 write_chunk_words(args.chunks_dir, index, words)
 
-        audio_parts.append(waveform)
+        out.write(waveform)
+        total_samples += len(waveform)
         if index < len(chunks):
-            audio_parts.append(np.zeros(int(sample_rate * PAUSE_MS / 1000), dtype=np.float32))
+            out.write(silence)
+            total_samples += len(silence)
 
-        total_seconds = round(sum(len(part) for part in audio_parts) / sample_rate, 1)
+        total_seconds = round(total_samples / sample_rate, 1)
         print(json.dumps({"type": "progress", "chunk": index, "totalChunks": len(chunks), "audioSeconds": total_seconds}), flush=True)
 
-    full_audio = np.concatenate(audio_parts).astype(np.float32)
-    sf.write(args.output, full_audio, sample_rate)
-    print(json.dumps({"type": "done", "audioSeconds": round(len(full_audio) / sample_rate, 1), "chunks": len(chunks)}), flush=True)
+    out.close()
+    os.replace(partial_output, args.output)
+    print(json.dumps({"type": "done", "audioSeconds": round(total_samples / sample_rate, 1), "chunks": len(chunks)}), flush=True)
 
 
 if __name__ == "__main__":

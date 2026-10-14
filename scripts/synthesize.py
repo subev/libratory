@@ -172,7 +172,6 @@ def main():
     lang_code = args.lang or args.voice[0]
 
     os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
-    import numpy as np
     import torch
     from kokoro import KPipeline
     import soundfile as sf
@@ -220,12 +219,19 @@ def main():
     }), flush=True)
 
     voice_pack = pipeline.load_voice(args.voice)
-    audio_chunks = []
+    # Streamed to disk: a long chapter's float32 audio held in memory runs to a gigabyte
+    partial_output = args.output + ".partial"
+    total_samples = 0
+    out = sf.SoundFile(partial_output, "w", samplerate=24000, channels=1, format="WAV")
     for i, ps in enumerate(phoneme_chunks):
         chunk_audio = load_existing_chunk(args.chunks_dir, i + 1, chunk_tokens[i] is not None or chunk_espeak[i])
         if chunk_audio is None:
             output = KPipeline.infer(pipeline.model, ps, voice_pack, args.speed)
             chunk_audio = output.audio.numpy()
+            if device == "mps":
+                # Every chunk is a new tensor shape, and the MPS allocator caches the freed buffers
+                # up to a ceiling above a 16 GB Mac's RAM — measured at ~130 MB a chunk
+                torch.mps.empty_cache()
             if chunk_tokens[i] is not None and output.pred_dur is not None:
                 join_timestamps(chunk_tokens[i], output.pred_dur, pipeline.model.vocab)
                 write_chunk_words(args.chunks_dir, i + 1, chunk_tokens[i])
@@ -239,18 +245,18 @@ def main():
             if args.chunks_dir:
                 os.makedirs(args.chunks_dir, exist_ok=True)
                 sf.write(os.path.join(args.chunks_dir, f"chunk-{i + 1:03d}.wav"), chunk_audio, 24000)
-        audio_chunks.append(chunk_audio)
-        seconds = sum(len(c) for c in audio_chunks) / 24000
+        out.write(chunk_audio)
+        total_samples += len(chunk_audio)
         print(json.dumps({
             "type": "progress",
             "chunk": i + 1,
             "totalChunks": total_chunks,
-            "audioSeconds": round(seconds, 1),
+            "audioSeconds": round(total_samples / 24000, 1),
         }), flush=True)
 
-    full_audio = np.concatenate(audio_chunks)
-    sf.write(args.output, full_audio, 24000)
-    total_seconds = round(len(full_audio) / 24000, 1)
+    out.close()
+    os.replace(partial_output, args.output)
+    total_seconds = round(total_samples / 24000, 1)
     print(json.dumps({
         "type": "done",
         "audioSeconds": total_seconds,
