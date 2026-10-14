@@ -1,0 +1,4 @@
+Reviewed: high
+Outcome: Page marks through a text edit: reviewed in full by a second session on 2026-10-14 (3 findings: diff timeout on long chapters, typed-in paragraphs taking a neighbour's kind, empty block after a split word); this session verified each fix in code and ran lint, typecheck, all unit suites and the uc8 read-along e2e spec, all green
+By: Petur Subev
+At: 2026-10-14T12:09:47.073Z
