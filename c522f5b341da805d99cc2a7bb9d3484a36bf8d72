@@ -1,0 +1,4 @@
+Reviewed: medium
+Outcome: Claude reviewed the full change inline (9 files: 6 scripts, kokoro.ts, tts.ts, AGENTS.md). Found and fixed one issue before commit: a cancelled or failed narration would leave <chapter>.wav.partial (up to ~0.5 GB) behind, so both process runners now remove it on failure. Also fixed during verification: soundfile needs format=WAV for the .partial name. Checked unchanged: PCM_16 output, progress/done seconds, MPS device checks. Verified: Kokoro 613-chunk chapter on the 16 GB M1 flat ~2.4 GB (was 9.2 GB at chunk 541), frame-identical output; MMS, BgTTS, Piper, Pocket short runs exact frame counts; embedder 2.9 GB steady; lint, typecheck, tests green.
+By: Petur Subev
+At: 2026-10-14T16:53:32.178Z
