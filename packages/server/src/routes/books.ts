@@ -32,6 +32,7 @@ import { isGarbled, replaceFileWords } from "../lib/ocr-text-layer.ts";
 import { countAsciiNonAscii } from "../lib/token-estimate.ts";
 import { assembleJobKey, documentJobKey, inFlightInputs, outputChapters } from "../lib/output-readiness.ts";
 import { owedJobs } from "../lib/owed-jobs.ts";
+import { estimateBookSynthesis, loadSynthesisQueue, synthesisThroughput } from "../lib/synthesis-eta.ts";
 import { randomUUID } from "node:crypto";
 import { profileIdSchema } from "../lib/profile-id.ts";
 import path from "node:path";
@@ -1300,6 +1301,10 @@ export const booksRouter = router({
       const cleanableChunkWavs = await measureDirs(await cleanableChunkDirs(input.bookId));
       return { ...usage, cleanableChunkWavs };
     }),
+
+  synthesisEta: publicProcedure
+    .input(z.object({ bookId: z.string().uuid() }))
+    .query(async ({ input }) => estimateBookSynthesis(await loadSynthesisQueue(), input.bookId, synthesisThroughput.rate())),
 
   cleanupChunks: publicProcedure
     .input(z.object({ bookId: z.string().uuid() }))

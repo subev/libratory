@@ -29,6 +29,7 @@ import { ActionTray, type TrayAction } from "../components/ActionTray.tsx";
 import { ExportModal, type ExportFormat, type ExportFormatId } from "../components/book/ExportModal.tsx";
 import { loadBookSort, sortBooks } from "../lib/book-sort.ts";
 import { formatBytes, formatDuration, pendingExportLabel, pendingExportSummary } from "../lib/format.ts";
+import { dur } from "../lib/ocr-try.ts";
 import { IconStructure } from "../components/icons.tsx";
 
 // Named once because it names a control, and the control has been renamed twice
@@ -338,6 +339,13 @@ export function BookDetail() {
     },
   );
 
+  const narrationQueued = !!book?.chapters?.some((c: { status: string }) => SYNTH_BUSY.includes(c.status)) ||
+    translationRows.some((t) => t.audioStatus === "pending" || t.audioStatus === "synthesizing");
+  const { data: synthesisEta } = trpc.books.synthesisEta.useQuery(
+    { bookId: id! },
+    { enabled: !!id && narrationQueued, refetchInterval: 5000 },
+  );
+
   const invalidateVariants = () => {
     utils.variants.listForBook.invalidate();
     utils.variants.list.invalidate();
@@ -601,10 +609,19 @@ export function BookDetail() {
   // synthesizing told a book stuck behind another one that all 57 of its chapters were under way
   const queuedCount = viewChapters.filter((c) => c.status === "pending").length;
   const synthesizingCount = viewChapters.filter((c) => SYNTH_BUSY.includes(c.status)).length - queuedCount;
-  const synthesisBadge = [
+  const synthesisCounts = [
     synthesizingCount > 0 ? `${synthesizingCount} synthesizing` : null,
     queuedCount > 0 ? `${queuedCount} queued` : null,
-  ].filter(Boolean).join(" · ");
+  ].filter(Boolean);
+  const eta = narrationQueued && synthesisCounts.length > 0 ? synthesisEta : null;
+  const synthesisBadge = [...synthesisCounts, eta?.seconds != null ? `${dur(eta.seconds)} left` : null].filter(Boolean).join(" · ");
+  const synthesisBadgeTitle = !eta
+    ? undefined
+    : eta.charsPerSecond == null
+      ? "Time left appears once a few chunks have been timed"
+      : `${eta.charsLeft.toLocaleString()} characters left in this book${
+          eta.chaptersAhead > 0 ? `, after ${eta.charsAhead.toLocaleString()} in ${eta.chaptersAhead} chapter(s) of other books queued first` : ""
+        }, at ${Math.round(eta.charsPerSecond * 60).toLocaleString()} characters a minute measured over the last few minutes`;
   const chaptersWithAudio = viewChapters.filter((c) => c.audioPath).length;
   const outputCount = bookAssemblies.filter((a) => (a.language ?? null) === activeVariant).length +
     viewDocuments.length;
@@ -938,7 +955,7 @@ export function BookDetail() {
               count: stagesLocked ? "—" : book.chapters.length,
               locked: stagesLocked,
               title: stagesLocked ? "Locked — extract chapters from a source file first" : "Every chapter, its audio and its text",
-              badge: synthesisBadge ? { text: synthesisBadge, tone: "synthesizing" as const } : null,
+              badge: synthesisBadge ? { text: synthesisBadge, tone: "synthesizing" as const, title: synthesisBadgeTitle } : null,
             },
             {
               id: "outputs",

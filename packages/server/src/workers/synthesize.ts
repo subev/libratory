@@ -12,6 +12,7 @@ import path from "node:path";
 import type { WorkerUtils } from "graphile-worker";
 import { chapterChunkPreviewDir, chapterChunkPreviewUrlBase, listChapterChunkPreviews } from "../lib/chunk-previews.ts";
 import { buildSyncMapFromChunks, writeSyncMap } from "../lib/sync-map.ts";
+import { synthesisThroughput } from "../lib/synthesis-eta.ts";
 
 export type SynthesizePayload = {
   chapterId: string;
@@ -114,6 +115,7 @@ export async function synthesize(payload: SynthesizePayload, { addJob: _addJob }
       log: chLog,
       signal: abortController.signal,
       onProgress: (chunk, totalChunks) => bestEffort(`[chapter ${chapterId}] progress write`, async () => {
+        synthesisThroughput.progress(`chapter:${chapterId}`, chunk, totalChunks, text.length);
         const updated = await db.update(chapters)
           .set({ progress: `${chunk}/${totalChunks}` })
           .where(and(eq(chapters.id, chapterId), ne(chapters.status, "suspended")))

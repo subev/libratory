@@ -12,6 +12,7 @@ import { mkdir, rm, unlink } from "node:fs/promises";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { buildSyncMapFromChunks, writeSyncMap } from "../lib/sync-map.ts";
+import { synthesisThroughput } from "../lib/synthesis-eta.ts";
 import type { WorkerUtils } from "graphile-worker";
 
 export type SynthesizeTranslationPayload = {
@@ -132,6 +133,7 @@ export async function synthesizeTranslation(
       log: chLog,
       signal: abortController.signal,
       onProgress: (chunk, totalChunks) => bestEffort(`[translation ${translationId}] progress write`, async () => {
+        synthesisThroughput.progress(`variant:${translationId}`, chunk, totalChunks, text.length);
         const updated = await db.update(chapterVariants)
           .set({ audioProgress: `${chunk}/${totalChunks}`, updatedAt: new Date() })
           .where(and(eq(chapterVariants.id, translationId), ne(chapterVariants.audioStatus, "suspended")))

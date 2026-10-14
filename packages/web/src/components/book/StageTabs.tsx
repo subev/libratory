@@ -16,7 +16,7 @@ type StageTab = {
   count?: number | string;
   title?: string;
   locked?: boolean;
-  badge?: { text: string; tone: StageBadgeTone } | null;
+  badge?: { text: string; tone: StageBadgeTone; title?: string } | null;
   trailing?: boolean;
 };
 
@@ -75,7 +75,7 @@ export function StageTabs({
               {tab.count !== undefined && <span className="text-(--text-faint) font-normal tabular-nums">{tab.count}</span>}
               {tab.locked && <IconLocked className="h-3 w-3" />}
               {tab.badge && (
-                <span className={`flex items-center gap-1.5 px-1.5 rounded-full text-[10.5px] font-semibold ${statusStyles[tab.badge.tone]}`}>
+                <span title={tab.badge.title} className={`flex items-center gap-1.5 px-1.5 rounded-full text-[10.5px] font-semibold ${statusStyles[tab.badge.tone]}`}>
                   <ActivityDot />
                   {layout.showLabels && tab.badge.text}
                 </span>
