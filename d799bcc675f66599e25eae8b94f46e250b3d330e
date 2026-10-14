@@ -1,0 +1,4 @@
+Reviewed: medium
+Outcome: Inline review by the implementing agent (Opus) of d799bcc, full range vs main (7 files incl. 2 new). Checked: idle chapters are suspended not pending so the library is not counted as queued; SQL coalesce matches the worker's ?? fallback; replayed cached chunks excluded from the rate. Fixed: per-row LATERAL job lookup replaced by DISTINCT ON + join. Verified: 7 new unit tests, queue SQL run on dev DB in a rolled-back txn, lint/typecheck/test green (1207/187/50). Gaps: not watched during a live synthesis; rate is in-memory and blended across engines.
+By: Petur Subev
+At: 2026-10-14T18:29:29.981Z
