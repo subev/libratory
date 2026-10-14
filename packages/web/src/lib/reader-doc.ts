@@ -107,11 +107,18 @@ export function bodyFit(medianBodyPt: number | null, cropWidthPt: number, render
 // narrated, which is what separates the last two: one has never been narrated, the other was
 // narrated before the map existed, and narrating it again is the fix.
 export const UNMAPPED: Record<ReaderUnmapped, string> = {
-  edited: "This chapter's text was edited after extraction, so the narration can't be lined up with the print.",
+  edited: "This chapter's text was edited beyond what the print can follow, so the narration can't be lined up with it.",
   generated: "This chapter's text was written rather than extracted, so there is no print to line it up with.",
   unmapped: "This chapter was narrated before pages could be lined up — re-synthesize it to mark the words.",
   unnarrated: "This chapter hasn't been narrated yet.",
 };
+
+// An edited chapter that still marks says so: the marks are placed through the edit, and how
+// much of what is spoken the print holds is what tells a reader whether to trust them
+export function editedNote(chapter: Pick<ReaderChapter, "mode" | "fit"> | undefined): string | null {
+  if (!chapter || chapter.mode !== "page" || chapter.fit === undefined) return null;
+  return `This chapter's text was edited after extraction. The print is lined up with it as a best guess — ${Math.round(chapter.fit * 100)}% of its words are still there.`;
+}
 
 // Whether the print still shows this chapter's words — a Record, so a fifth reason has to say
 // which it is rather than defaulting into showing pages of something else.

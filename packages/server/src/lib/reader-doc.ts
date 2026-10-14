@@ -6,7 +6,7 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "../db.ts";
 import { bookFiles, chapters, books, type Book, type Chapter } from "../schema.ts";
 import { cuesFromSyncMap, type Cue } from "./cues.ts";
-import { rectsForRange } from "./cue-rects.ts";
+import { rectsForRange, type RectContext } from "./cue-rects.ts";
 import { describeError } from "./errors.ts";
 import { locateChunks } from "./chunk-previews.ts";
 import { listMarkerSources, type MarkerSource } from "./marker-sources.ts";
@@ -17,6 +17,7 @@ import { chapterText } from "./chapter-text.ts";
 import type { SourceBlock } from "./marker.ts";
 import { joinTextBlocks } from "./extracted-text.ts";
 import { normalizeBlocks } from "./normalizer.ts";
+import { alignTexts, KEPT, type Span, type TextAlignment } from "./text-alignment.ts";
 import {
   READER_FORMAT,
   type CueRect,
@@ -30,14 +31,45 @@ import {
 // The reader reads these documents, never the database — every gap in them shows up here first
 export * from "./reader-format.ts";
 
-// Edited, synthetic, or never narrated — no rects rather than wrong ones, and the reason travels
-// with the document so a reader can say which it was. The pages are unaffected: they come from the
-// PDF, so a chapter that cannot be marked is still a chapter that can be read.
-export function chapterMode(chapter: Chapter): Pick<ReaderChapter, "mode" | "why"> {
+// Synthetic, never narrated, or edited past recognition — no rects rather than wrong ones, and
+// the reason travels with the document so a reader can say which it was. The pages are
+// unaffected: they come from the PDF, so a chapter that cannot be marked is still a chapter that
+// can be read. An edit that corrected the text rather than replacing it keeps its marks, placed
+// through the alignment, and says how much of what is spoken the print still holds.
+export function chapterMode(chapter: Chapter): Pick<ReaderChapter, "mode" | "why" | "fit"> {
   if (!Array.isArray(chapter.sourceBlocks)) return { mode: "text", why: "generated" };
-  if (chapter.customText) return { mode: "text", why: "edited" };
+  const alignment = chapter.customText === null ? null : editAlignment(chapter);
+  if (chapter.customText !== null && !alignment) return { mode: "text", why: "edited" };
   if (!chapter.textMap) return { mode: "text", why: chapter.audioPath ? "unmapped" : "unnarrated" };
-  return { mode: "page" };
+  return alignment ? { mode: "page", fit: Math.round(alignment.fit * 100) / 100 } : { mode: "page" };
+}
+
+// The manifest asks for every chapter on every poll, and the diff is the one expensive thing
+// here, so the last answer is kept per chapter for as long as the two texts it was built from stand
+const ALIGNMENTS = new Map<string, { texts: string; alignment: TextAlignment | null }>();
+const ALIGNMENTS_KEPT = 256;
+
+export function editAlignment(chapter: Pick<Chapter, "id" | "customText" | "cleanText">): TextAlignment | null {
+  if (!chapter.customText || !chapter.cleanText) return null;
+  const texts = `${fingerprint(chapter.customText)}:${fingerprint(chapter.cleanText)}`;
+  const cached = ALIGNMENTS.get(chapter.id);
+  if (cached && cached.texts === texts) return cached.alignment;
+  const built = alignTexts(chapter.customText, chapter.cleanText);
+  const alignment = built && built.fit >= KEPT ? built : null;
+  if (ALIGNMENTS.size >= ALIGNMENTS_KEPT) ALIGNMENTS.delete(ALIGNMENTS.keys().next().value!);
+  ALIGNMENTS.set(chapter.id, { texts, alignment });
+  return alignment;
+}
+
+// FNV-1a with the length: enough to tell one save of a chapter from the next, without holding
+// two copies of every edited chapter in memory for the comparison
+function fingerprint(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return `${text.length}.${hash.toString(16)}`;
 }
 
 // Only a chapter made from a page on the web has somewhere to send a reader; a digest's source
@@ -179,10 +211,9 @@ async function resolveRects(chapter: Chapter, cues: Cue[]): Promise<Resolved> {
   const offsets = await pageOffsets(sources);
   const geometry = loaded.get(source) ?? null;
   const offset = offsets.get(source.fileIndex) ?? 0;
-  const cleanText = chapter.cleanText;
 
   const context = {
-    cleanText,
+    cleanText: chapter.cleanText,
     textMap: chapter.textMap!,
     blocks: chapter.sourceBlocks as SourceBlock[],
     page: (blockPage: number) => ({
@@ -191,26 +222,42 @@ async function resolveRects(chapter: Chapter, cues: Cue[]): Promise<Resolved> {
     }),
   };
 
-  const ranges = locateChunks(cleanText, cues.map((cue) => cue.text));
-  const marks = printMarks(geometry?.pages ?? null, chapter);
+  return {
+    perCue: placeCues(context, cues, chapter.customText === null ? null : { text: chapter.customText, alignment: editAlignment(chapter)! }),
+    marks: printMarks(geometry?.pages ?? null, chapter),
+  };
+}
 
-  const perCue = cues.map((cue, i) => {
-    const range = ranges[i];
-    if (!range) return { rects: [], words: null };
+// Cues are slices of whatever was narrated. Narrated after an edit, a cue is found in the edited
+// text and carried onto the original through the alignment, where the map and the geometry are;
+// edited after narration, it is still found in the original itself. Either way a cue the text no
+// longer holds places nothing, and so does a sentence typed in that the print never had.
+export function placeCues(context: RectContext, cues: Cue[], edited: { text: string; alignment: TextAlignment } | null): ResolvedRects[] {
+  const texts = cues.map((cue) => cue.text);
+  const inOriginal = locateChunks(context.cleanText, texts);
+  const inEdited = edited ? locateChunks(edited.text, texts) : [];
+  const same = (start: number, end: number): Span => [start, end];
 
-    const rects = rectsForRange(context, range.start, range.end);
+  return cues.map((cue, i) => {
+    const at = inEdited[i];
+    const placed = at && edited
+      ? { text: edited.text, range: at, map: edited.alignment.toOriginal }
+      : inOriginal[i] ? { text: context.cleanText, range: inOriginal[i], map: same } : null;
+    if (!placed) return { rects: [], words: null };
+
+    const span = placed.map(placed.range.start, placed.range.end);
+    const rects = span ? rectsForRange(context, span[0], span[1]) : [];
     if (!cue.words) return { rects, words: null };
 
     // The words are located inside the cue's own slice, so the same whitespace-insensitive
     // matching that placed the cue places each word within it
-    const inCue = locateChunks(cleanText.slice(range.start, range.end), cue.words.map((word) => word.text));
-    const words = inCue.map((at) =>
-      at ? rectsForRange(context, range.start + at.start, range.start + at.end, { linesOnly: true }) : [],
-    );
+    const inCue = locateChunks(placed.text.slice(placed.range.start, placed.range.end), cue.words.map((word) => word.text));
+    const words = inCue.map((word) => {
+      const mapped = word ? placed.map(placed.range.start + word.start, placed.range.start + word.end) : null;
+      return mapped ? rectsForRange(context, mapped[0], mapped[1], { linesOnly: true }) : [];
+    });
     return { rects, words };
   });
-
-  return { perCue, marks };
 }
 
 export function buildText(chapter: Chapter): ReaderText | null {
@@ -219,16 +266,71 @@ export function buildText(chapter: Chapter): ReaderText | null {
   const plain = { format: READER_FORMAT, text };
   // Written text has no typed blocks for an edit to invalidate, only the paragraphs it was written in
   if (!Array.isArray(chapter.sourceBlocks)) return { ...plain, blocks: paragraphBlocks(text) };
-  if (chapter.customText !== null) return plain;
   const blocks = chapter.sourceBlocks as SourceBlock[];
   const raw = joinTextBlocks(blocks);
   if (raw.text !== chapter.rawText || !blocks.some((block) => block.kind)) return plain;
   const joined = chapter.cleanText === null ? raw : normalizeBlocks(blocks);
-  if (joined.text !== text) return plain;
-  return { ...plain, blocks: joined.spans.map((span) => {
+  const typed = (span: { start: number; end: number; block: number }) => {
     const block = blocks[span.block];
     return { start: span.start, end: span.end, kind: block?.kind ?? "prose", ...(block?.breakBefore ? { breakBefore: block.breakBefore } : {}) };
-  }) };
+  };
+  if (chapter.customText === null) {
+    if (joined.text !== text) return plain;
+    return { ...plain, blocks: joined.spans.map(typed) };
+  }
+  // The typed blocks describe the text before the edit; what survives of each is found through
+  // the alignment, and what the edit typed in between falls into the block before it
+  const alignment = editAlignment(chapter);
+  if (!alignment || joined.text !== chapter.cleanText) return plain;
+  const trimmedBy = chapterText(chapter).length - chapterText(chapter).trimStart().length;
+  const mapped = joined.spans.flatMap((span) => {
+    const at = alignment.toEdited(span.start, span.end);
+    return at ? [{ ...typed(span), start: at[0] - trimmedBy, end: at[1] - trimmedBy }] : [];
+  });
+  return mapped.length ? { ...plain, blocks: coverGaps(text, mapped) } : plain;
+}
+
+type TextBlock = NonNullable<ReaderText["blocks"]>[number];
+
+// Blocks are all a reader draws, so between them nothing may be left. What the alignment did not
+// place — the punctuation around a block's words, a paragraph typed in — is handed out by the
+// blank lines: text on the same paragraph as a block joins it, the one before it first, and a
+// paragraph of its own reads as prose, whatever its neighbours are. A prose block that came to
+// hold a blank line is split at it, so a paragraph typed into one reads as a paragraph.
+function coverGaps(text: string, blocks: TextBlock[]): TextBlock[] {
+  const covered: TextBlock[] = [];
+  let cursor = 0;
+  const fill = (from: number, to: number, next: TextBlock | null) => {
+    const previous = covered.at(-1);
+    const paragraphs = paragraphBlocks(text.slice(from, to)).map((p) => ({ start: from + p.start, end: from + p.end }));
+    paragraphs.forEach((paragraph, k) => {
+      if (k === 0 && previous && !blankLineBetween(text, previous.end, paragraph.start)) previous.end = paragraph.end;
+      else if (k === paragraphs.length - 1 && next && !blankLineBetween(text, paragraph.end, next.start)) next.start = paragraph.start;
+      else covered.push({ start: paragraph.start, end: paragraph.end, kind: "prose" });
+    });
+  };
+  blocks.forEach((block, i) => {
+    // A word the print split across two blocks — a hyphenated line end filed as its own block —
+    // is claimed by both; the later block keeps it, and a block with nothing else left goes
+    const next = blocks[i + 1];
+    const own = { ...block, start: Math.max(block.start, cursor), end: next && next.start < block.end ? next.start : block.end };
+    if (own.end <= own.start) return;
+    fill(cursor, own.start, own);
+    covered.push(own);
+    cursor = own.end;
+  });
+  fill(cursor, text.length, null);
+  return covered.flatMap((block) => {
+    if (block.kind !== "prose") return [block];
+    return paragraphBlocks(text.slice(block.start, block.end)).map((paragraph, i) => {
+      const { breakBefore, ...rest } = block;
+      return { ...(i === 0 && breakBefore ? block : rest), start: block.start + paragraph.start, end: block.start + paragraph.end };
+    });
+  });
+}
+
+function blankLineBetween(text: string, from: number, to: number): boolean {
+  return /\n[ \t]*\n/.test(text.slice(from, to));
 }
 
 export async function buildCues(chapter: Chapter): Promise<ReaderCues | null> {

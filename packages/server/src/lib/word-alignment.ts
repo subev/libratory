@@ -38,7 +38,7 @@ function key(token: string): string {
 
 // A token with no letters or digits — the dash that opens a line of dialogue, a stray quote —
 // carries nothing to match on; two of them are not the same word, they are two blanks.
-function similarity(a: string, b: string): number {
+export function similarity(a: string, b: string): number {
   const n = a.length;
   const m = b.length;
   if (!n || !m) return 0;

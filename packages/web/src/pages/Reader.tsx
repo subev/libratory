@@ -6,7 +6,7 @@ import { Button } from "../components/Button.tsx";
 import { SegmentedControl } from "../components/SegmentedControl.tsx";
 import { CueTranscript, TextBody } from "../components/reader/CueTranscript.tsx";
 import { CuePages } from "../components/reader/CuePages.tsx";
-import { bodyFit, chapterPages, UNMAPPED, type ReaderCues, type ReaderManifest, type Rect } from "../lib/reader-doc.ts";
+import { bodyFit, chapterPages, editedNote, UNMAPPED, type ReaderCues, type ReaderManifest, type Rect } from "../lib/reader-doc.ts";
 import { httpSource, type DocumentSource } from "../lib/reader-source.ts";
 import { formatDuration } from "../lib/format.ts";
 import { useFollowCue, type FollowBand } from "../lib/cue-follow.ts";
@@ -434,6 +434,12 @@ function SingleReader({ source, bookId, live = false, initialManifest, bilingual
             : hasPages
               ? "Its pages are below, with nothing marked on them."
               : "It reads as text rather than on the page."}
+        </p>
+      )}
+
+      {view !== "text" && editedNote(chapter) && (
+        <p className={NOTE_BANNER} data-testid="reader-edited-fit">
+          {editedNote(chapter)} Text view marks the words as they are now.
         </p>
       )}
 

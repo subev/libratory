@@ -1,5 +1,17 @@
 # Keep the print marked after a text edit
 
+Done (2026-10-14): steps 1–5 below are built. `lib/text-alignment.ts` (jsdiff `diffArrays` over
+word keys, anchored on three-word runs unique to both texts so scattered corrections cost linear
+time — a plain Myers diff measured 7 s on 20k words with 30% corrected, the anchored one stays
+under a second at 40k; replacements paired by Levenshtein similarity; capped at the edit distance
+where fit would fall under 0.6, 10 s timeout as a backstop), `reader-doc.ts` (`chapterMode` with
+`fit`, `placeCues`, block mapping with gaps handed out by blank lines), `fit` on `ReaderChapter`,
+web notes in the Reader and the chapter modal, chunk-preview pages through the alignment, `uc8`
+covers a correction and a rewrite. Reviewed by a second session on 2026-10-14 (findings in
+`.claude/`, all addressed). Left: nothing filed; the iOS reader may show `fit` the way the web does.
+
+## Background
+
 Today any `customText` on an extracted chapter takes the page marking away outright: `chapterMode`
 answers `text`/`edited`, `resolveRects` returns nothing, the web Reader lands on the transcript, the
 chapter modal stops offering Pages, and the iOS reader hides the print. AI cleanup writes

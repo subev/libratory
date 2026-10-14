@@ -33,6 +33,7 @@
     "@trpc/server": "^11.18.0",
     "@vivliostyle/cli": "11.2.0",
     "ai": "^7.0.94",
+    "diff": "^9.0.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.12.5",

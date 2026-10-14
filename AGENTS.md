@@ -177,9 +177,11 @@ lands at 8.9:1 — deliberately short of pure black on white, which is harsh ove
 
 Three warm-tinted controls sit together in the chapter toolbar and that is not an accident to be
 tidied away: **Reset** is `--danger-bg` because it discards edits, and **Edit** is `--warning-bg`
-because saving custom text drops the chapter to `mode: "text"` (`reader-doc.ts`) and the read-along
-stops following the PDF page. The old blue palette made these look unrelated; a warm one makes them
-look like siblings. They are both cautionary, so leave them cautionary.
+because saving custom text changes what the narration reads: a correction keeps the read-along on
+the PDF page as a best guess (`lib/text-alignment.ts` lines the edit up with the extracted text, and
+`reader-doc.ts` reports `fit`), a rewrite drops the chapter to `mode: "text"` and the page marks go.
+The old blue palette made these look unrelated; a warm one makes them look like siblings. They are
+both cautionary, so leave them cautionary.
 
 ### Highlighting: read-along is not annotation
 
@@ -267,7 +269,7 @@ Four things it centralises that call sites kept getting wrong:
 `soft` is the quiet register of a variant: `danger`/`warning`/`success` become a tint rather than a
 fill and `primary` becomes accent text with no fill. The type admits `soft` on those four only. Reach
 for it when a control must warn rather than shout — the chapter Edit button is `warning soft` because
-saving custom text drops the chapter to mode `"text"` and the read-along stops following the page.
+saving custom text changes what the narration reads, and a rewrite drops the chapter to mode `"text"`.
 
 **Render a control when the thing it acts on exists; disable it when that thing exists but the action
 cannot run.** Play acts on a chapter, and the chapter is there whether or not it has audio — so it

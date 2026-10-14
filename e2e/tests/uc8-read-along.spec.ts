@@ -250,16 +250,26 @@ test.describe("read along on the page", { tag: "@slow" }, () => {
     await page.getByRole("button", { name: /^Chunk 1$/ }).hover();
     await expect(page.getByTestId("cue-linked-rect").first()).toBeVisible();
 
-    // Editing the text unbinds the narration from the print. The audio outlives the edit, so the
-    // print must stop being offered the moment the save lands, not on the next reload — Read
-    // falls back to the text that will actually be spoken.
+    // A correction keeps the print: the narration is lined up with the edited text as a best
+    // guess, and the pages say so. The audio outlives the edit, so the answer has to land with
+    // the save, not on the next reload.
+    await page.getByTestId("chapter-edit").click();
+    const original = await page.getByTestId("chapter-edit-text").inputValue();
+    await page.getByTestId("chapter-edit-text").fill(original.replace(/\b(\p{L}{4,})\b/u, "$1s"));
+    await page.getByTestId("chapter-edit-save").click();
+    await expect(page.getByTestId("pages-best-guess")).toContainText("best guess");
+    await expect(page.getByTestId("cue-rect").first()).toBeVisible();
+    await expect(page.getByTestId("chapter-open-reader")).toHaveAttribute("title", /best guess/);
+
+    // Rewriting it unbinds the narration from the print — Read falls back to the text that will
+    // actually be spoken.
     await page.getByTestId("chapter-edit").click();
     await page.getByTestId("chapter-edit-text").fill("Rewritten by hand, so the print says something else now.");
     await page.getByTestId("chapter-edit-save").click();
     await expect(page.getByTestId("chapter-modal")).toContainText("Rewritten by hand");
     await expect(page.getByTestId("reader-page")).toHaveCount(0);
     await expect(page.getByTestId("cue-rect")).toHaveCount(0);
-    await expect(page.getByTestId("chapter-open-reader")).toHaveAttribute("title", /edited after extraction/);
+    await expect(page.getByTestId("chapter-open-reader")).toHaveAttribute("title", /edited beyond what the print can follow/);
 
     // Losing the print must not lose the read-along: narrate the edited text and the sentence
     // being spoken is marked in the prose itself, paragraphs and all.

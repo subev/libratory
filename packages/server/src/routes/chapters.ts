@@ -1,4 +1,4 @@
-import { buildText } from "../lib/reader-doc.ts";
+import { buildText, editAlignment } from "../lib/reader-doc.ts";
 import { z } from "zod";
 import { router, publicProcedure } from "../trpc.ts";
 import { db } from "../db.ts";
@@ -68,13 +68,16 @@ export const chaptersRouter = router({
       }
       const ranges = locateChunks(sourceText, previews.map((p) => p.text ?? ""));
       const blocks = Array.isArray(chapter.sourceBlocks) ? (chapter.sourceBlocks as SourceBlock[]) : [];
-      // The map normalize wrote describes cleanText, so it only answers for chunks taken from it
-      const textMap = chunkTextSource === "clean" ? chapter.textMap : null;
+      // The map normalize wrote describes cleanText, so it answers for chunks taken from it, and
+      // for chunks of an edited text that the alignment can carry back onto it
+      const alignment = chunkTextSource === "custom" ? editAlignment(chapter) : null;
+      const textMap = chunkTextSource === "clean" || alignment ? chapter.textMap : null;
 
       // Without a map, offsets into clean/custom text are scaled onto rawText for an
       // approximate page, bounded by the chapter's own page range either way.
       const pageForRange = (range: { start: number; end: number }): number | null => {
-        const [exactBlock] = textMap ? blocksAtRange(textMap, range.start, range.end) : [];
+        const onClean: [number, number] | null = alignment ? alignment.toOriginal(range.start, range.end) : [range.start, range.end];
+        const [exactBlock] = textMap && onClean ? blocksAtRange(textMap, onClean[0], onClean[1]) : [];
         if (exactBlock !== undefined) return blocks[exactBlock]?.page ?? null;
         const rawOffset =
           chunkTextSource === "raw"

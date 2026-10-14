@@ -35,6 +35,9 @@ export type ReaderChapter = {
   pageEnd: number | null;
   mode: "page" | "text";
   why?: ReaderUnmapped;
+  // On a chapter whose text was edited and still marks: the share of its words the print holds,
+  // 0..1. The marks are a best guess through that edit, and a reader may say so.
+  fit?: number;
   // Where a chapter written from something on the web came from. Absolute, unlike every other URL here
   link?: { url: string };
   bilingual?: { key: string; language: string; url: string }[];

@@ -58,12 +58,19 @@ anything it recognises, and say something useful about anything it does not.
   the spoken text can be pinned to the PDF, `"text"` when it cannot. A `"text"` chapter still
   lists its `pageStart`/`pageEnd`, and both surfaces still draw those pages — the pages come from
   the PDF, so they are there long before a word is spoken. `mode` carries **`why`**: `"edited"`
-  (a chapter whose text was changed after extraction), `"generated"` (text that was written
-  rather than extracted), `"unnarrated"` (nothing has spoken it yet, and the map is written while
-  a chapter is narrated), or `"unmapped"` (narrated before the map existed, so narrating it again
-  writes one). The last two are the same missing map for opposite reasons, and the document
-  separates them so neither reader has to work it out from `audio`.
-  Only a chapter with no pages at all falls back to the reflowed text.
+  (a chapter whose text was changed after extraction beyond what the print can follow),
+  `"generated"` (text that was written rather than extracted), `"unnarrated"` (nothing has spoken
+  it yet, and the map is written while a chapter is narrated), or `"unmapped"` (narrated before
+  the map existed, so narrating it again writes one). The last two are the same missing map for
+  opposite reasons, and the document separates them so neither reader has to work it out from
+  `audio`. Only a chapter with no pages at all falls back to the reflowed text.
+- **`fit`** is optional, on a `"page"` chapter whose text was edited and still marks: the share
+  of its words the print holds, 0..1. A correction — a fixed misread, a dropped page number, an
+  AI cleanup pass — keeps the chapter on its pages, its cues and words carried onto the print
+  through a word-level alignment of the edited text with the extracted one, and `fit` says how
+  much of what is spoken that print still holds. The marks are a best guess through the edit,
+  which a reader may say; a word typed in has nowhere on the page to go and draws nothing. An
+  edit that keeps under 60% of the words is a rewrite, and the chapter is `"text"`/`"edited"`.
 - **`link`** is optional: `{ "url": "https://…" }` on a chapter that was written from a page on
   the web, which is where a reader who wants the original is sent. It is the one absolute URL in the
   document — nothing here serves it and no container carries it — so a reader opens it outside
@@ -177,8 +184,11 @@ blocks were typed when they were read, carries that text with its structure:
 - Offsets are UTF-16 code units, as a JavaScript string counts them.
 
 A reader that shows the reflowed text draws `text.text` and marks each cue at its `range`; one that
-ignores both fields joins the cues' `s` as before and loses only the line breaks. An edited chapter,
-or one read before blocks were typed, carries neither.
+ignores both fields joins the cues' `s` as before and loses only the line breaks. A chapter read
+before blocks were typed carries neither; an edited one keeps its blocks, each found in the edited
+text through the same alignment that places its cues. What the edit typed in is handed out by the
+blank lines: words on the same paragraph as a block belong to it, a paragraph of its own is prose
+whatever stands beside it. A rewrite carries neither.
 
 A written chapter — `"generated"`, no blocks ever typed — carries both all the same: one `prose`
 block per paragraph of its text, split at blank lines. Whoever wrote it left the paragraphs in, and

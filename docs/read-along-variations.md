@@ -25,18 +25,19 @@ for the chapter you are looking at, and is where most reading along actually sta
 
 A chapter's pages are offered wherever the chapter has any — the Pages tab is there even when
 nothing can be marked on them, because where a chapter sits in the book is not something an
-edit or a translation takes away. What an edit does take away is the marking, and the tab says
-so in a line above the pages rather than leaving a reader waiting for a highlight. Marking is
-also what the tab's default status turns on: a chapter that can be followed opens on its pages,
-one that cannot opens on the transcript, where the words are still highlighted.
+edit or a translation takes away. A translation, or an edit that rewrote the text, does take the
+marking away, and the tab says so in a line above the pages rather than leaving a reader waiting
+for a highlight. Marking is also what the tab's default status turns on: a chapter that can be
+followed opens on its pages, one that cannot opens on the transcript, where the words are still
+highlighted.
 
 ## Where the chapter's text came from
 
 | Case | What it gets |
 | --- | --- |
 | PDF chapter, normalized text | Highlights on the page: sentence rects, and word rects where the engine timed words |
-| **AI Cleanup ran on it** | **The page mapping is lost.** Cleanup writes `customText`, which no longer corresponds to the PDF's blocks. The transcript still marks every word; the pages still open, unmarked |
-| Manually edited text | The same, for the same reason: any `customText` breaks the correspondence |
+| **AI Cleanup ran on it** | **Kept as a best guess.** Cleanup writes `customText`; a word-level alignment of it with the normalized text carries each cue and word back onto the PDF's blocks, so a repaired misread lands on the misread's own box and a dropped page number draws nothing. The manifest's `fit` says what share of the words the print still holds, and the pages say the marks are a best guess |
+| Manually edited text | The same: a correction keeps the print marked. A rewrite — under 60% of the words kept — loses the mapping; the transcript still marks every word, the pages still open, unmarked |
 | Synthetic chapter (digest, external API, note → chapter) | The transcript only — there is no page to draw on |
 | **Translated or rewritten lane** | The variant's own audio cannot be marked: its sync map lives on `chapter_translations`, which the manifest does not expose. The original's pages open unmarked, and the full reader does not list variants at all |
 | Extraction older than `chapters.text_map` | No mapping. `pnpm --filter server backfill:textmap` fixes these in place |

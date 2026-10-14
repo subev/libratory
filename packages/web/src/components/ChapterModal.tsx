@@ -14,7 +14,7 @@ import { getVoiceLabel } from "../lib/voices.ts";
 import { useBodyScrollLock } from "../lib/use-body-scroll-lock.ts";
 import { CuePages } from "./reader/CuePages.tsx";
 import { WordSpotlight } from "./reader/WordSpotlight.tsx";
-import { fetchCues, fetchManifest, printHoldsText, UNMAPPED, type ReaderCues, type ReaderManifest } from "../lib/reader-doc.ts";
+import { editedNote, fetchCues, fetchManifest, printHoldsText, UNMAPPED, type ReaderCues, type ReaderManifest } from "../lib/reader-doc.ts";
 import { useFollowCue, type FollowBand } from "../lib/cue-follow.ts";
 import { useAudioTime } from "../lib/use-audio-time.ts";
 import { usePlayPauseKey } from "../lib/play-pause-key.ts";
@@ -148,9 +148,11 @@ function ChapterModalBody({
   const isVariant = !!variant;
 
   // Both documents change under an open modal: synthesis writes the audio and the text map that
-  // puts its words on the page, and an edit leaves that map describing text nobody will hear.
-  // Neither is a reload, so the fetches below key on both rather than on the audio alone.
-  const revision = `${chapter.audioPath ?? ""}:${chapter.hasCustomText}`;
+  // puts its words on the page, and an edit changes what of that map still holds — a correction
+  // keeps the marks, a rewrite loses them, and a second edit can go either way, which the row's
+  // flag cannot say. Neither is a reload, so the fetches below key on all of it.
+  const [textEdits, setTextEdits] = useState(0);
+  const revision = `${chapter.audioPath ?? ""}:${chapter.hasCustomText}:${textEdits}`;
 
   useEffect(() => {
     fetchManifest(bookId).then(setManifest).catch(() => setManifest(null));
@@ -292,6 +294,7 @@ function ChapterModalBody({
     onSuccess: () => {
       utils.chapters.get.invalidate({ id: chapter.id });
       utils.books.get.invalidate();
+      setTextEdits((n) => n + 1);
       setIsEditing(false);
     },
   });
@@ -327,6 +330,7 @@ function ChapterModalBody({
   useEffect(() => {
     if (wasCleaningRef.current && !cleanupRunning) {
       utils.chapters.get.invalidate({ id: chapter.id });
+      setTextEdits((n) => n + 1);
     }
     wasCleaningRef.current = cleanupRunning;
   }, [cleanupRunning, chapter.id, utils]);
@@ -500,7 +504,7 @@ function ChapterModalBody({
                   <Link
                     to={`/books/${bookId}/read?chapter=${chapter.index}`}
                     className="text-(--accent-text) hover:text-(--accent-text-hover)"
-                    title={canMark ? "Follow the narration on the page itself, at full size" : markReason}
+                    title={canMark ? `Follow the narration on the page itself, at full size${editedNote(readerChapter) ? " — lined up as a best guess through the text edit" : ""}` : markReason}
                     data-testid="chapter-open-reader"
                   >
                     Open reader
@@ -807,6 +811,14 @@ function ChapterModalBody({
                     {markReason}
                   </p>
                 )}
+                {canMark && editedNote(readerChapter) ? (
+                  <p
+                    className="rounded border border-(--border) bg-(--bg-subtle) px-3 py-2 text-xs text-(--text-muted)"
+                    data-testid="pages-best-guess"
+                  >
+                    {editedNote(readerChapter)}
+                  </p>
+                ) : null}
                 <CuePages
                   manifest={manifest}
                   chapter={readerChapter}

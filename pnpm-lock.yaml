@@ -135,6 +135,9 @@ importers:
       ai:
         specifier: ^7.0.94
         version: 7.0.94(zod@4.5.4)
+      diff:
+        specifier: ^9.0.0
+        version: 9.0.0
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -2245,6 +2248,10 @@ packages:
 
   dfa@1.2.0:
     resolution: {integrity: sha512-ED3jP8saaweFTjeGX8HQPjeC1YYyZs98jGNZx6IiBvxW7JG5v492kamAQB3m2wop07CvU/RQmzcKr6bgcC5D/Q==}
+
+  diff@9.0.0:
+    resolution: {integrity: sha512-svtcdpS8CgJyqAjEQIXdb3OjhFVVYjzGAPO8WGCmRbrml64SPw/jJD4GoE98aR7r25A0XcgrK3F02yw9R/vhQw==}
+    engines: {node: '>=0.3.1'}
 
   dijkstrajs@1.0.3:
     resolution: {integrity: sha512-qiSlmBq9+BCdCA/L46dw8Uy93mloxsPSbwnm5yrKn2vMPiy8KyAskTF6zuV/j5BMsmOGZDPs7KjU+mjb670kfA==}
@@ -7359,6 +7366,8 @@ snapshots:
   devtools-protocol@0.0.1624250: {}
 
   dfa@1.2.0: {}
+
+  diff@9.0.0: {}
 
   dijkstrajs@1.0.3: {}
 
