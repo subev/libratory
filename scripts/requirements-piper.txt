@@ -8,7 +8,7 @@ click==8.5.0
     # via huggingface-hub
 colorama==0.4.6 ; sys_platform == 'win32'
     # via tqdm
-filelock==4.0.12
+filelock==4.2.1
     # via huggingface-hub
 flatbuffers==25.12.19
     # via onnxruntime
@@ -25,7 +25,7 @@ httpx2==2.13.1
 httpx2-jsfetch==1.0 ; sys_platform == 'emscripten'
     # via httpx2
 huggingface-hub==2.1.1
-    # via -r scripts/requirements-piper.in
+    # via -r requirements-piper.in
 idna==3.20
     # via
     #   anyio
@@ -34,16 +34,16 @@ ml-dtypes==0.6.0
     # via onnx
 numpy==2.5.3
     # via
-    #   -r scripts/requirements-piper.in
+    #   -r requirements-piper.in
     #   ml-dtypes
     #   onnx
     #   onnxruntime
     #   soundfile
 onnx==1.23.2
-    # via -r scripts/requirements-piper.in
+    # via -r requirements-piper.in
 onnxruntime==1.30.0
     # via
-    #   -r scripts/requirements-piper.in
+    #   -r requirements-piper.in
     #   piper-tts
 packaging==26.3
     # via
@@ -52,7 +52,7 @@ packaging==26.3
 pathvalidate==3.3.1
     # via piper-tts
 piper-tts==1.8.0
-    # via -r scripts/requirements-piper.in
+    # via -r requirements-piper.in
 protobuf==7.36.2
     # via
     #   onnx
@@ -62,7 +62,7 @@ pycparser==3.0 ; implementation_name != 'PyPy'
 pyyaml==6.0.3
     # via huggingface-hub
 soundfile==0.14.0
-    # via -r scripts/requirements-piper.in
+    # via -r requirements-piper.in
 tqdm==4.70.1
     # via huggingface-hub
 truststore==0.10.4 ; sys_platform != 'emscripten'
