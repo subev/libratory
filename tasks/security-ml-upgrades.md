@@ -29,6 +29,9 @@ reads `weight_map` exactly as 1.14.0 does, with no path validation added. The ad
 at `<= 1.14.0`, so the audit would stop flagging a bump to 1.15.0, but that would hide the record,
 not fix it.
 
+Checked again 2026-11-03: still no fix. A Dependabot security PR proposed 1.15.0; the lock stays on
+1.14.0 for the reason above, and every exception now expires 2026-12-05.
+
 Keep raw reports available; do not dismiss these GitHub alerts as fixed or turn off scanning.
 
 ## Routine ML updates deferred on September 9

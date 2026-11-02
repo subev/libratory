@@ -5,11 +5,11 @@
     "@vivliostyle/cli": "11.2.0"
   },
   "overrides": {
-    "dompurify": "^3.4.16",
+    "dompurify": "^3.4.17",
     "prismjs": "^1.30.0",
     "trim": "0.0.3",
     "uuid": "14.0.2",
     "valibot": "^1.4.2",
-    "vite": "^8.2.2"
+    "vite": "^8.2.4"
   }
 }

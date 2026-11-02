@@ -77,6 +77,36 @@ Python audit still reports the same nine OSV
 records covered by the existing expiring exceptions. The larger ML migration remains in
 `tasks/security-ml-upgrades.md`; no alerts were dismissed and no exceptions were broadened.
 
+## November 3 refresh
+
+The weekly audit failed on new advisories in aiohttp, certifi, filelock, Pillow, pyasn1, pypdf,
+setuptools and virtualenv, and on the JavaScript side in DOMPurify, Electron, Vite, Zod, qs,
+glob, minimatch and `@hono/node-server`. Pillow moves to 13.0 (no 12.x fix; none of its removed
+APIs are called), filelock to 4.2 in every environment, pypdf to 6.21.4, pyasn1 to 0.6.5.
+The compatible JavaScript group (the November Dependabot PR) came in with them; its one lint
+error, an impure `new Date()` during render, is fixed. glob 9–14.0.1 is overridden to 14, which
+keeps the `sync` export archiver-utils calls; minimatch 10 is overridden to 11.
+
+Accelerate stays on 1.14.0. A Dependabot security PR offered 1.15.0, which the audit stops
+flagging, but it reads `weight_map` exactly as 1.14.0 does (see the ML task), so the bump would
+hide the record rather than fix it. The 13 ML exceptions are extended to 2026-12-05 unchanged.
+
+Two JavaScript advisories are ignored in `auditConfig`, both outside anything a user's input
+reaches:
+
+- `GHSA-mrhx-c7xc-m3w5` (Zod <4.6.6): the only copy is Zod 3 under the renderer's pinned
+  Puppeteer (`chromium-bidi` 16), which validates protocol messages from its own local Chromium.
+  The app's Zod is 4.6.7. Drop the ignore when Vivliostyle moves to a Puppeteer on
+  `chromium-bidi` 157+, which uses Zod 4.
+- `GHSA-g3hv-75wg-m249` (minimatch <11.0.1, pattern-expansion DoS): what remains is minimatch
+  3, 5 and 9 inside electron-builder's packaging tools, matching this repo's own build globs.
+  There is no backport, and forcing 11 breaks their CommonJS default import.
+
+Validation: lint, typecheck, web build, every unit/integration test, the e2e smoke tier, and real
+runs on the new pins: Surya OCR of the scanned fixture page, plus a sentence each from Kokoro,
+Pocket TTS, Piper and BgTTS-38M. Marker extraction and the Docker image build were not exercised
+locally.
+
 ## Keeping bot PRs manageable
 
 Routine JavaScript updates run monthly in two groups (minor/patch and major), with at most two

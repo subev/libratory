@@ -85,7 +85,7 @@ export function ChatSidebar({
 }) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<ConversationSummary | null>(null);
-  const now = new Date();
+  const [now] = useState(() => new Date());
 
   const bookOptions = filterBookOptions(conversations);
   const shown = filterConversations(conversations, filter);
