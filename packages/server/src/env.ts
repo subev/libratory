@@ -68,6 +68,10 @@ const envSchema = z.object({
   // Settings → "Default AI model": the model key every no-explicit-pick request resolves to.
   // Unset means automatic (V4 Flash when configured, else the first available model).
   DEFAULT_LLM_MODEL: z.string().optional(),
+  // Where auto-discovery looks. A container's localhost is itself, so the Docker install points
+  // these at host.docker.internal.
+  OLLAMA_URL: z.string().default("http://localhost:11434"),
+  LMSTUDIO_URL: z.string().default("http://localhost:1234"),
   LOCAL_LLM_URL: z.string().optional(),
   LOCAL_LLM_MODEL: z.string().optional(),
   LOCAL_LLM_LABEL: z.string().optional(),

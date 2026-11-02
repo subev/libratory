@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { contextExceeded, defaultModelKey, modelKeySchema, canonicalKey, resolveLlm, type LlmModelDef } from "./llm.ts";
+import { contextExceeded, defaultModelKey, localServers, modelKeySchema, canonicalKey, resolveLlm, type LlmModelDef } from "./llm.ts";
 import { env } from "../env.ts";
 import { useTempDataDir } from "../../test/data-dir.ts";
 
@@ -143,6 +143,45 @@ describe("defaultModelKey", () => {
       env.DEFAULT_LLM_MODEL = previousDefault;
       env.ANTHROPIC_API_KEY = previousAnthropic;
       env.DEEPSEEK_API_KEY = previousDeepseek;
+    }
+  });
+});
+
+describe("localServers", () => {
+  it("probes the configured addresses, as a container must to reach servers on its host", async () => {
+    const previous = { ollama: env.OLLAMA_URL, lmstudio: env.LMSTUDIO_URL };
+    env.OLLAMA_URL = "http://host.docker.internal:11434";
+    env.LMSTUDIO_URL = "http://host.docker.internal:1234";
+    const probed: string[] = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: Parameters<typeof globalThis.fetch>[0]) => {
+      const url = String(input);
+      probed.push(url);
+      const body = url.endsWith("/api/tags")
+        ? { models: [{ name: "llama3.2" }] }
+        : url.endsWith("/api/ps")
+          ? { models: [] }
+          : url.endsWith("/api/v0/models")
+            ? { data: [{ id: "qwen3", type: "llm" }] }
+            : { capabilities: ["completion"] };
+      return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+    try {
+      const servers = await localServers(true);
+      expect(probed.every((url) => url.startsWith("http://host.docker.internal:"))).toBe(true);
+      expect(servers.map((s) => [s.name, s.url, s.running])).toEqual([
+        ["Ollama", "http://host.docker.internal:11434", true],
+        ["LM Studio", "http://host.docker.internal:1234", true],
+      ]);
+      expect(servers.flatMap((s) => s.models.map((m) => m.baseUrl))).toEqual([
+        "http://host.docker.internal:11434/v1",
+        "http://host.docker.internal:1234/v1",
+      ]);
+    } finally {
+      globalThis.fetch = realFetch;
+      env.OLLAMA_URL = previous.ollama;
+      env.LMSTUDIO_URL = previous.lmstudio;
+      await localServers(true);
     }
   });
 });

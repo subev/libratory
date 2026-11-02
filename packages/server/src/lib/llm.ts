@@ -185,8 +185,6 @@ function staticModels(): LlmModelDef[] {
 
 // --- Local server auto-discovery: Ollama and LM Studio need no configuration ---
 
-const OLLAMA_URL = "http://localhost:11434";
-const LMSTUDIO_URL = "http://localhost:1234";
 const PROBE_TIMEOUT_MS = 1_500;
 const DISCOVERY_TTL_MS = 30_000;
 
@@ -226,6 +224,7 @@ function fmtK(n: number): string {
 let observedOllamaCtx: number | null = null;
 
 async function discoverOllama(): Promise<LocalServer> {
+  const OLLAMA_URL = env.OLLAMA_URL.replace(/\/+$/, "");
   const server: LocalServer = {
     name: "Ollama",
     url: OLLAMA_URL,
@@ -288,6 +287,7 @@ type LmStudioModel = {
 };
 
 async function discoverLmStudio(): Promise<LocalServer> {
+  const LMSTUDIO_URL = env.LMSTUDIO_URL.replace(/\/+$/, "");
   const server: LocalServer = {
     name: "LM Studio",
     url: LMSTUDIO_URL,

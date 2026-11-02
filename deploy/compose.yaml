@@ -31,6 +31,12 @@ services:
       - "127.0.0.1:3034:3034"
     environment:
       DATABASE_URL: postgres://libratory:libratory@postgres:5432/libratory
+      # Ollama and LM Studio run on the host, which a container reaches by this name; host-gateway
+      # makes the name resolve on Linux too, where Docker does not define it.
+      OLLAMA_URL: http://host.docker.internal:11434
+      LMSTUDIO_URL: http://host.docker.internal:1234
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - data:/data
       - models:/models
