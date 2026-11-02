@@ -23,7 +23,14 @@ SAMPLE_RATE = 24000
 
 CLONING_UNAVAILABLE = (
     "voice cloning weights are unavailable — accept the terms at "
-    "https://huggingface.co/kyutai/pocket-tts, set HF_TOKEN, and re-run scripts/setup.sh"
+    "https://huggingface.co/kyutai/pocket-tts, set HF_TOKEN, and download them from the voice picker"
+)
+
+# load_model swaps in the cloning-free mirror whenever the gated repo refuses, so a token that has
+# not accepted the terms would otherwise "succeed" and leave cloning exactly as unavailable as before.
+TOKEN_REFUSED = (
+    "HF_TOKEN cannot download kyutai/pocket-tts — accept the terms at "
+    "https://huggingface.co/kyutai/pocket-tts with the account that owns the token"
 )
 
 
@@ -60,10 +67,13 @@ def export_voice(audio_path: str, out_path: str, language: str) -> None:
     print(json.dumps({"type": "exported", "path": out_path}), flush=True)
 
 
-def cache_models(language: str) -> None:
+def cache_models(language: str, require_cloning: bool = False) -> None:
     from pocket_tts import TTSModel
 
     model = TTSModel.load_model(language=language)
+    if require_cloning and not getattr(model, "has_voice_cloning", False):
+        print(TOKEN_REFUSED, file=sys.stderr, flush=True)
+        sys.exit(1)
     for voice in catalog_voices():
         try:
             model.get_state_for_audio_prompt(voice)
@@ -84,12 +94,13 @@ def main() -> None:
     parser.add_argument("--chunks-dir", default=None, help="Optional directory to persist per-chunk WAV previews")
     parser.add_argument("--language", default="english", help="Pocket TTS language model to load")
     parser.add_argument("--cache-only", action="store_true", help="Download model and catalog voices, then exit")
+    parser.add_argument("--require-cloning", action="store_true", help="With --cache-only: fail unless the gated cloning weights arrived")
     parser.add_argument("--export-voice", default=None, help="Reference audio to encode into a reusable voice state")
     parser.add_argument("--voice-out", default=None, help="Destination .safetensors path for --export-voice")
     args = parser.parse_args()
 
     if args.cache_only:
-        cache_models(args.language)
+        cache_models(args.language, args.require_cloning)
         return
 
     if args.export_voice:

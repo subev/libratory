@@ -1,18 +1,23 @@
 import { z } from "zod";
 
 import { router, publicProcedure } from "../trpc.ts";
-import { POCKET_VOICES, pocketCloningAvailable, pocketEngineInstalled, pocketLanguageByCode } from "../lib/pocket.ts";
-import { listPocketLanguages, startPocketLanguageDownload } from "../lib/pocket-languages.ts";
+import { POCKET_VOICES, pocketEngineInstalled, pocketLanguageByCode } from "../lib/pocket.ts";
+import {
+  listPocketLanguages,
+  pocketCloningState,
+  startPocketCloningDownload,
+  startPocketLanguageDownload,
+} from "../lib/pocket-languages.ts";
 import { deleteCustomPocketVoice, listCustomPocketVoices } from "../lib/pocket-voices.ts";
 
 export const pocketVoicesRouter = router({
   list: publicProcedure.query(async () => {
-    const [custom, installed, cloningAvailable] = await Promise.all([
+    const [custom, installed, cloning] = await Promise.all([
       listCustomPocketVoices(),
       pocketEngineInstalled(),
-      pocketCloningAvailable(),
+      pocketCloningState(),
     ]);
-    return { voices: POCKET_VOICES, custom, installed, cloningAvailable };
+    return { voices: POCKET_VOICES, custom, installed, cloning };
   }),
 
   languages: publicProcedure.query(() => listPocketLanguages()),
@@ -24,6 +29,8 @@ export const pocketVoicesRouter = router({
       if (!language) throw new Error(`Unknown Pocket TTS language: ${input.code}`);
       return startPocketLanguageDownload(language);
     }),
+
+  downloadCloning: publicProcedure.mutation(() => startPocketCloningDownload()),
 
   deleteCustom: publicProcedure
     .input(z.object({ id: z.string() }))

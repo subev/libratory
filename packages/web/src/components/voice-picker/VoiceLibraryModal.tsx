@@ -19,6 +19,7 @@ import {
 import { trpc } from "../../trpc.ts";
 import { IconArrowRight, IconClose, IconDownload } from "../icons.tsx";
 import { useBodyScrollLock } from "../../lib/use-body-scroll-lock.ts";
+import { PocketCloningNotice } from "./PocketCloningNotice.tsx";
 import { PocketLanguageNotice } from "./PocketLanguageNotice.tsx";
 import { BgttsInstallNotice } from "./BgttsInstallNotice.tsx";
 import { ModelBundleNotice } from "../ModelBundleNotice.tsx";
@@ -111,7 +112,10 @@ export function VoiceLibraryModal({
   const { data: cartesiaVoices = [] } = trpc.cartesiaVoices.list.useQuery(undefined, { staleTime: Infinity });
   const { data: elevenlabsVoices = [] } = trpc.elevenlabsVoices.list.useQuery(undefined, { staleTime: Infinity });
   const { data: elevenlabsQuota } = trpc.elevenlabsVoices.quota.useQuery(undefined, { staleTime: 60_000, enabled: elevenlabsVoices.length > 0 });
-  const { data: pocket, refetch: refetchPocket } = trpc.pocketVoices.list.useQuery(undefined, { staleTime: Infinity });
+  const { data: pocket, refetch: refetchPocket } = trpc.pocketVoices.list.useQuery(undefined, {
+    staleTime: Infinity,
+    refetchInterval: (q) => (q.state.data?.cloning.downloading ? 1500 : false),
+  });
   const { data: pocketLanguages = [] } = trpc.pocketVoices.languages.useQuery(undefined, {
     refetchInterval: (q) => (q.state.data?.some((l) => l.downloading) ? 1500 : false),
   });
@@ -390,13 +394,10 @@ export function VoiceLibraryModal({
                       }
                     />
                   ))}
-                  {pocket?.cloningAvailable ? (
+                  {pocket?.cloning.available ? (
                     <PocketVoiceCloner onAdded={() => void refetchPocket()} />
                   ) : (
-                    <p className="px-3 py-2 text-xs text-(--text-muted)">
-                      Voice cloning unavailable — accept the terms at huggingface.co/kyutai/pocket-tts, set HF_TOKEN
-                      in .env, then re-run <code>pnpm run setup</code>.
-                    </p>
+                    pocket && <PocketCloningNotice cloning={pocket.cloning} />
                   )}
                 </>
               ) : (

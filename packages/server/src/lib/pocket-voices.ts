@@ -51,7 +51,7 @@ export async function listCustomPocketVoices(): Promise<CustomPocketVoice[]> {
 // int16 reader — normalising through ffmpeg first covers both.
 export async function createCustomPocketVoice(sourcePath: string, name: string): Promise<CustomPocketVoice> {
   if (!(await pocketCloningAvailable())) {
-    throw new Error("Voice cloning weights are not installed — accept the terms at huggingface.co/kyutai/pocket-tts, set HF_TOKEN in .env, then re-run pnpm run setup");
+    throw new Error("Voice cloning weights are not installed — download them from Your voices in the voice picker");
   }
 
   const id = randomUUID();

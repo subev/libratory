@@ -68,6 +68,9 @@ const envSchema = z.object({
   // Settings → "Default AI model": the model key every no-explicit-pick request resolves to.
   // Unset means automatic (V4 Flash when configured, else the first available model).
   DEFAULT_LLM_MODEL: z.string().optional(),
+  // Read only to say whether the gated cloning weights can be fetched; downloads inherit it from
+  // process.env, where dotenv put it.
+  HF_TOKEN: z.string().optional(),
   // Where auto-discovery looks. A container's localhost is itself, so the Docker install points
   // these at host.docker.internal.
   OLLAMA_URL: z.string().default("http://localhost:11434"),

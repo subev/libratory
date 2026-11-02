@@ -161,7 +161,7 @@ An Apple Silicon Mac on macOS 14 Sonoma or later (PyTorch no longer ships for 13
 - Docker — [OrbStack](https://orbstack.dev/) or Docker Desktop on a Mac, Docker Engine on Linux (Postgres). The desktop app requires it too.
 - Optional: an AI model for translation, rewrites, cleanup, digests, Ask AI, chat, and LLM chapter detection — [Ollama](https://ollama.com) or LM Studio running locally (auto-discovered, fully offline), or a [DeepSeek](https://platform.deepseek.com/) / OpenAI / Anthropic / Gemini API key.
 - Optional: a [Cartesia](https://cartesia.ai) or [ElevenLabs](https://elevenlabs.io) API key for their cloud voices.
-- Optional: a [HuggingFace](https://huggingface.co) account for Pocket TTS **voice cloning** — accept the terms at [kyutai/pocket-tts](https://huggingface.co/kyutai/pocket-tts) and put a read token in `HF_TOKEN`. The 26 built-in Pocket TTS voices need no account and no token.
+- Optional: a [HuggingFace](https://huggingface.co) account for Pocket TTS **voice cloning** — accept the terms at [kyutai/pocket-tts](https://huggingface.co/kyutai/pocket-tts) and put a read token in `HF_TOKEN` (in `.env`, or the container's environment) — `pnpm run setup` fetches the weights, and every install, Docker and the Mac app included, can download them from **Your voices** in the voice picker after a restart. The 26 built-in Pocket TTS voices need no account and no token.
 
 </details>
 
