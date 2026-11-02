@@ -235,6 +235,23 @@ Every engine covers a different set, so the answer to "does it do language X" de
 The picker leads with the language, not the engine: pick Italian and you get every voice that can read it — 73 here, grouped by engine, with a preview button on each one. Each row says whether the voice times every word (words light up as they are read) or only sentences. ElevenLabs voices appear under every language their model reads; the ones not made for it are marked and preview in that language.
 
 <details>
+<summary><b>Picking a narrator: speed, quality, cost</b></summary>
+
+An AI provider key (DeepSeek, OpenAI, Anthropic, Gemini) drives the text features: cleanup, translation, rewrites, chat. It has no effect on narration. Speed comes from the engine you pick:
+
+| Engine | Where it runs | Good for |
+| --- | --- | --- |
+| Kokoro | The GPU where there is one (Metal on a Mac), else the CPU | The most natural local English voices |
+| Pocket TTS | CPU, ~12x realtime | Six languages, and cloning your own voice |
+| Piper, BgTTS-38M | CPU | Bulgarian |
+| macOS voices | CPU, ~25x realtime | Fast drafts, many languages, Mac only |
+| Cartesia, ElevenLabs | Their servers, billed per character | A slow machine, or a language no local engine reads |
+
+Docker on a Mac cannot reach the GPU, so a container narrates Kokoro on the CPU; the desktop app or a source install uses Metal. Narration that stops partway — a crash, a restart, a container that went down — resumes when the server comes back, from the pieces already made.
+
+</details>
+
+<details>
 <summary><b>Notes on the edges</b></summary>
 
 - **Japanese is not supported**, even though Kokoro ships Japanese voices. They need a MeCab/`fugashi` native stack plus a ~700 MB dictionary, and the extra downgrades a package the Marker/spaCy side depends on. Not worth it for five voices — so they aren't listed in the picker.
