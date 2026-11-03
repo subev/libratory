@@ -1,0 +1,4 @@
+Reviewed: high
+Outcome: Inline review of the 6-commit range (deps, test DB leak, container LLM discovery, cloning download, narrator docs). One finding fixed in d5216c7: Your voices tab unreachable before the first clone. Not exercised: Docker image build, Marker extraction, the actual 370 MB download from the UI.
+By: Petur Subev
+At: 2026-11-03T06:44:16.574Z
