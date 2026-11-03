@@ -293,7 +293,8 @@ export function VoiceLibraryModal({
         <div className="flex flex-1 min-h-0">
           <nav className="w-48 shrink-0 border-r border-(--border) p-2 overflow-y-auto" aria-label="Languages">
             {/* button-ok: a nav item in the language rail, not an action — aria-current marks the open page */}
-            {clonedVoices.length > 0 && (
+            {/* The cloner lives in this tab, so it has to be reachable before the first clone exists */}
+            {(clonedVoices.length > 0 || pocket?.installed) && (
               <button
                 type="button"
                 onClick={() => setChosen(CLONED)}
