@@ -1,0 +1,4 @@
+Reviewed: high
+Outcome: Inline review of c34a0a7 (loudkit engine, attention timings, generalized engine installer, picker card, docs, CI audit step). No defects found; Linux CPU-only speed (~0.3x) documented rather than gated. Verified: unit suites, e2e smoke 31/31, real-pipeline chapter with reader highlight check, installer from cache, pip-audit. Not verified: install card UI with engine absent, listening in non-English languages.
+By: Petur Subev
+At: 2026-11-03T21:59:23.224Z
