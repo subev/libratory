@@ -5,22 +5,22 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { env } from "../env.ts";
 import { DownloadTracker } from "./downloads.ts";
-import { bgttsInstallState } from "./engine-install.ts";
+import { engineInstallState } from "./engine-install.ts";
 import { installedLocalEngines } from "./tts.ts";
 
 const saved = { UV_PATH: env.UV_PATH, BGTTS_ENV_PATH: env.BGTTS_ENV_PATH, LIBRATORY_RUNTIME: env.LIBRATORY_RUNTIME };
 afterEach(() => Object.assign(env, saved));
 
-describe("bgttsInstallState", () => {
+describe("engineInstallState", () => {
   it("is installable with a uv to build with, never inside a container", () => {
     env.UV_PATH = "/bin/sh";
     env.LIBRATORY_RUNTIME = "desktop";
-    expect(bgttsInstallState().installable).toBe(true);
+    expect(engineInstallState("bgtts").installable).toBe(true);
     env.LIBRATORY_RUNTIME = "docker";
-    expect(bgttsInstallState().installable).toBe(false);
+    expect(engineInstallState("bgtts").installable).toBe(false);
     env.LIBRATORY_RUNTIME = "desktop";
     env.UV_PATH = "/nonexistent/uv";
-    expect(bgttsInstallState().installable).toBe(false);
+    expect(engineInstallState("bgtts").installable).toBe(false);
   });
 });
 

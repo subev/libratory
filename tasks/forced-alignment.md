@@ -90,3 +90,47 @@ sentence clipped its last word. Word ends now run on through voiced frames up to
 
 Open for A: the heads are fixed to this checkpoint (`MODEL_REVISION` pins it). A new BgTTS release
 means running `score.py scan` again. The real check on BgTTS's own voice is listening in the reader.
+
+### loudkit self-attention (2026-11-03), works, prototype wired in
+
+loudkit (loudr-1, loudr-1-turbo) is a Llama decoder over `[cond | START text STOP | speech…]`, so the
+same idea as A applies to its self-attention: on each decode step, read the softmax of a few heads over
+the framed text span, average, take a forward-only path, and a word starts on the step the path
+reaches its first token. loudkit's own `Result.chunks[].words` are letter-count estimates and are not
+used. `scripts/loudkit_attention.py` reads the heads off q and k next to the attention call, which is
+left as it is, so the audio is the same with timings as without.
+
+Gold: Apple SpeechTranscriber word onsets on loudkit's own audio (60 ms steps, so ~30 ms is the
+floor of what it can tell apart). Corpus: 24 English chunks (`spikes/loudkit-alignment/corpus-en.txt`,
+prose, dialogue, numbers, currency), two voices each (henry, kathleen), ~160 s of audio per run.
+
+| written word starts (what the synthesizer writes) | median | mean | p90 | ≤100 ms |
+| --- | --- | --- | --- | --- |
+| loudr-1: heads 6.9 10.10, +50 ms | 50–60 ms | 79–81 ms | 170 ms | 70–72% |
+| loudr-1-turbo: heads 6.9 6.10 6.11, +200 ms | 60 ms | 80–82 ms | 160–168 ms | 69–72% |
+| loudr-1, German (thorsten, kerstin; de-DE gold), same heads, +50 ms | 110 ms | 116 ms | 190–200 ms | 45% |
+| … German at +160 ms | 40 ms | 62–63 ms | 130 ms | 82–86% |
+
+- The brief's heads (from the Swift port) were 6.9 9.7 10.10 9.12 for loudr-1 and 6.9 6.10 6.11 10.1
+  for turbo. Scanned head by head, 9.7, 9.12 and 10.1 trace the text too, but 180–340 ms **ahead** of
+  the voice (they read where the model is about to be), so averaging them in pulled every start early.
+  The held-out fold (k best heads chosen on odd chunks, scored on even, and back) never picks them:
+  it picks 6.9 then 10.10 for loudr-1 and 6.10 then 6.9/6.11 for turbo, on both voices.
+- Turbo has 12 layers (192 heads), not 16; flat index is still layer × 16 + head. Its constant shift
+  (+200 ms, the brief's +180) holds on both voices.
+- German needs a larger shift (+160 ms) for the same heads, and with it is tighter than English. It is
+  not settled whether that is the model or the de-DE transcriber's onset convention; it needs a
+  reference that is not ASR (a CTC aligner, ~1 GB) or an ear. One shift (+50) ships for now.
+- A window's first word is put where its voice starts (attention sits on [START] during the leading
+  silence). Pushing every word out of silence made it worse: a word opening on s, f or t reads as
+  silence at -35 dB and moved late (median 70 → 50 ms when limited to window-first words).
+- Cost: none measurable. Speed is set by threads instead: the generator decodes on the CPU, and
+  loudkit 0.1.1's `attention="auto"` picks eager beside an MPS renderer. `sdpa` and 4 threads give
+  3.3× realtime against 1.3× at the defaults (M4 Pro; upstream quotes 3.29× on an M3 Pro). Turbo 6.3×.
+- loudkit's `engine.voice(name)` refuses the HF cache's symlinked voice files; voices load by path.
+
+In Libratory (`loudkit:<voice>`, `scripts/synthesize_loudkit.py`): Frankenstein Letter I (1,233 words,
+56 chunks, OCR noise included) through the real pipeline took 124 s for 7 min 48 s of audio (3.8×),
+peak ~1.4 GB RSS for the python process; all 56 chunks carry words, and the reader's word highlight
+matched the sync map at every sampled time. Heads and shifts are pinned to the model revisions in
+`MODELS`; a new revision means `score.py scan` / `fold` again.

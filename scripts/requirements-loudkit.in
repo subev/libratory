@@ -1,0 +1,6 @@
+# loudkit runs in its own venv (.venv-loudkit): it caps numpy below 2.4 while the other engine envs
+# take 2.5.3. Apache-2.0; only the torch backend is installed, the ONNX/CoreML graphs are not fetched.
+loudkit[torch,hub]==0.1.1
+torch==2.13.0
+numpy==2.3.5
+soundfile==0.14.0

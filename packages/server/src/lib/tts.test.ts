@@ -40,6 +40,14 @@ describe("parseTtsVoice", () => {
     expect(parseTtsVoice("bg-piper:dimitar")).toEqual({ engine: "bg-piper", voice: "dimitar", raw: "bg-piper:dimitar" });
   });
 
+  it("parses loudkit's CC0 voices and refuses the CC-BY readers it ships beside them", () => {
+    expect(parseTtsVoice("loudkit:thorsten")).toEqual({ engine: "loudkit", voice: "thorsten", raw: "loudkit:thorsten" });
+    // LibriVox-derived readers who never agreed to voice cloning; the release has them, Libratory does not
+    for (const voice of ["carmen", "colette", "dante", "henri", "ines"]) {
+      expect(() => parseTtsVoice(`loudkit:${voice}`)).toThrow(/unsupported voice/i);
+    }
+  });
+
   it("names a retired voice instead of calling it unsupported", () => {
     expect(() => parseTtsVoice("bg-mlx:narrator")).toThrow(/retired.*BgTTS-38M/);
     expect(() => parseTtsVoice("kugel:default")).toThrow(/KugelAudio was retired/);

@@ -202,6 +202,7 @@ function serverEnv() {
     POCKET_ENV_PATH: path.join(HOME, "python-pocket/bin"),
     PIPER_ENV_PATH: path.join(HOME, "python-piper/bin"),
     BGTTS_ENV_PATH: path.join(HOME, "python-bgtts/bin"),
+    LOUDKIT_ENV_PATH: path.join(HOME, "python-loudkit/bin"),
     LIBRATORY_RUNTIME: "desktop",
     WEB_DIR: path.join(RESOURCES, "web"),
     MIGRATIONS_DIR: path.join(RESOURCES, "drizzle"),

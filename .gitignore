@@ -8,6 +8,7 @@ dist/
 .venv-pocket/
 .venv-piper/
 .venv-bgtts/
+.venv-loudkit/
 data/
 *.tsbuildinfo
 .turbo/

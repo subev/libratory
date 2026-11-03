@@ -5,9 +5,10 @@ import { env } from "../env.ts";
 import { DownloadTracker } from "./downloads.ts";
 import { scriptPath } from "./paths.ts";
 
-// BgTTS is the one engine the app builds for itself: Piper is built by the desktop first run and
-// the Docker image, while BgTTS's own torch (~1.5 GB) is too much to impose on every install. The
-// venv is read on every synthesis and every engines probe, so a finished install is live at once.
+// The engines the app builds for itself: Piper is built by the desktop first run and the Docker
+// image, while BgTTS's and loudkit's own torch (~1.5 GB each with their models) is too much to
+// impose on every install. The venv is read on every synthesis and every engines probe, so a
+// finished install is live at once.
 export type EngineInstallState = {
   /** A uv to build with, and a runtime where the venv outlives the process — not a container. */
   installable: boolean;
@@ -17,25 +18,34 @@ export type EngineInstallState = {
   error: string | null;
 };
 
+export const INSTALLABLE_ENGINES = ["bgtts", "loudkit"] as const;
+export type InstallableEngine = (typeof INSTALLABLE_ENGINES)[number];
+
+const RECIPES: Record<InstallableEngine, { label: string; script: string; envPath: () => string }> = {
+  bgtts: { label: "BgTTS", script: "install_bgtts.sh", envPath: () => env.BGTTS_ENV_PATH },
+  loudkit: { label: "loudkit", script: "install_loudkit.sh", envPath: () => env.LOUDKIT_ENV_PATH },
+};
+
 const installs = new DownloadTracker();
 
-export function bgttsInstallState(): EngineInstallState {
+export function engineInstallState(engine: InstallableEngine): EngineInstallState {
   return {
     installable: env.LIBRATORY_RUNTIME !== "docker" && existsSync(env.UV_PATH),
-    installing: installs.downloading("bgtts"),
-    progress: installs.progressOf("bgtts"),
-    error: installs.error("bgtts"),
+    installing: installs.downloading(engine),
+    progress: installs.progressOf(engine),
+    error: installs.error(engine),
   };
 }
 
-export function startBgttsInstall(): { started: boolean } {
-  if (!bgttsInstallState().installable) {
-    throw new Error(env.LIBRATORY_RUNTIME === "docker" ? "BgTTS is not in the Docker image" : `No uv at ${env.UV_PATH} — run pnpm run setup --bgtts`);
+export function startEngineInstall(engine: InstallableEngine): { started: boolean } {
+  const recipe = RECIPES[engine];
+  if (!engineInstallState(engine).installable) {
+    throw new Error(env.LIBRATORY_RUNTIME === "docker" ? `${recipe.label} is not in the Docker image` : `No uv at ${env.UV_PATH} — run pnpm run setup`);
   }
-  return installs.start("bgtts", "/bin/sh", [
-    scriptPath("install_bgtts.sh"),
+  return installs.start(engine, "/bin/sh", [
+    scriptPath(recipe.script),
     env.UV_PATH,
-    path.dirname(env.BGTTS_ENV_PATH),
+    path.dirname(recipe.envPath()),
     env.SCRIPTS_DIR,
   ]);
 }

@@ -798,13 +798,13 @@ export function createMcpServer(profileId: string, { origin }: { origin?: string
     "list_voices",
     {
       description:
-        "Every narrator voice this installation can use, with the language each reads: local engines (Kokoro, Pocket TTS, the Bulgarian narrators — BgTTS-38M, Piper, MMS — installed macOS voices) " +
-        "and whether its recordings carry word timing (wordTiming: true — words light up as read, and two-language reading links words; false means sentence level: Kokoro's Mandarin voices, Pocket, MMS and macOS voices; Kokoro's other languages, Piper and BgTTS time words). " +
+        "Every narrator voice this installation can use, with the language each reads: local engines (Kokoro, Pocket TTS, loudkit once downloaded, the Bulgarian narrators — BgTTS-38M, Piper, MMS — installed macOS voices) " +
+        "and whether its recordings carry word timing (wordTiming: true — words light up as read, and two-language reading links words; false means sentence level: Kokoro's Mandarin voices, Pocket, MMS and macOS voices; Kokoro's other languages, Piper, BgTTS and loudkit time words). " +
         "and cloud ones behind a configured key (Cartesia, ElevenLabs — metered). Filter by language code to find a voice for a book; " +
         "with a language filter, native: false marks a voice that reads it in another language's accent (every ElevenLabs voice is listed under every language its model reads) — prefer native ones.",
       inputSchema: {
         language: z.string().trim().min(2).max(8).optional().describe("ISO code, e.g. en, bg"),
-        engine: z.enum(["kokoro", "narrators", "say", "cartesia", "elevenlabs", "pocket"]).optional(),
+        engine: z.enum(["kokoro", "narrators", "say", "cartesia", "elevenlabs", "pocket", "loudkit"]).optional(),
       },
     },
     async (filter) => json(await listAllVoices(filter)),

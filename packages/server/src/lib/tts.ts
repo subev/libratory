@@ -14,13 +14,14 @@ import { cartesiaSynthesize, CartesiaAbortedError, findCartesiaVoice } from "./c
 import { elevenlabsSynthesize, ElevenLabsAbortedError, findElevenLabsVoice } from "./elevenlabs.ts";
 import { POCKET_SCRIPT, parsePocketVoice, pocketLanguageArgs, pocketPython, resolvePocketVoiceArg } from "./pocket.ts";
 import { scriptPath } from "./paths.ts";
-import { ENGINE_PREFIXES, type LocalEngine } from "./voice-catalog.ts";
+import { ENGINE_PREFIXES, loudkitVoiceLanguage, type LocalEngine } from "./voice-catalog.ts";
 
 const CONDA_BIN = env.CONDA_ENV_PATH;
 const BG_MMS_SCRIPT = scriptPath("synthesize_mms_tts.py");
 const SAY_SCRIPT = scriptPath("synthesize_say_tts.py");
 const BGTTS_SCRIPT = scriptPath("synthesize_bgtts.py");
 const PIPER_SCRIPT = scriptPath("synthesize_piper_tts.py");
+const LOUDKIT_SCRIPT = scriptPath("synthesize_loudkit.py");
 
 // Read on every call, not cached: building a venv with setup must show up without a restart.
 export function installedLocalEngines(): Record<LocalEngine, boolean> {
@@ -28,6 +29,7 @@ export function installedLocalEngines(): Record<LocalEngine, boolean> {
     piper: existsSync(path.join(env.PIPER_ENV_PATH, "python")),
     // .installing stays until scripts/install_bgtts.sh finishes, so a half-built venv is not a voice
     bgtts: existsSync(path.join(env.BGTTS_ENV_PATH, "python")) && !existsSync(path.join(env.BGTTS_ENV_PATH, "..", ".installing")),
+    loudkit: existsSync(path.join(env.LOUDKIT_ENV_PATH, "python")) && !existsSync(path.join(env.LOUDKIT_ENV_PATH, "..", ".installing")),
     pocket: existsSync(path.join(env.POCKET_ENV_PATH, "python")),
   };
 }
@@ -48,7 +50,7 @@ type SynthesizeOptions = {
 };
 
 type ParsedTtsVoice = {
-  engine: "kokoro" | "bg-mms" | "bg-bgtts" | "bg-piper" | "say" | "cartesia" | "elevenlabs" | "pocket";
+  engine: "kokoro" | "bg-mms" | "bg-bgtts" | "bg-piper" | "say" | "cartesia" | "elevenlabs" | "pocket" | "loudkit";
   voice: string;
   raw: string;
 };
@@ -71,6 +73,16 @@ const PREVIEW_TEXT_BY_LANGUAGE: Record<string, string> = {
   pt: "Uma serenidade maravilhosa apoderou-se de toda a minha alma, como estas doces manhãs de primavera que desfruto de todo o coração.",
   hi: "एक अद्भुत शांति ने मेरी पूरी आत्मा को अपने वश में कर लिया है, इन मीठी वसंत सुबहों की तरह जिनका मैं पूरे मन से आनंद लेता हूँ।",
   zh: "一种奇妙的宁静占据了我的整个灵魂，就像我全心享受的这些甜美的春日清晨。",
+};
+
+// Languages added after the cache key existed. Outside the hash so that adding one does not throw
+// away every cached preview, a cloud voice's included, which costs credits to make again; editing
+// one of these needs a bump of the key by hand.
+const ADDED_PREVIEW_TEXT_BY_LANGUAGE: Record<string, string> = {
+  pl: "Cudowny spokój ogarnął całą moją duszę, jak te słodkie wiosenne poranki, którymi cieszę się całym sercem.",
+  nl: "Een wonderbare rust heeft bezit genomen van mijn hele ziel, zoals deze zoete lentemorgens die ik met heel mijn hart geniet.",
+  sv: "En underbar sinnesro har tagit hela min själ i besittning, liksom dessa ljuva vårmorgnar som jag njuter av av hela mitt hjärta.",
+  da: "En vidunderlig ro har taget hele min sjæl i besiddelse, ligesom disse søde forårsmorgener, som jeg nyder af hele mit hjerte.",
 };
 
 // Kokoro encodes the language in the voice prefix: a/b English, e Spanish, f French, h Hindi,
@@ -98,11 +110,13 @@ export function previewLanguageFor(voice: string, requested: string | undefined)
 }
 
 function previewTextFor(languageCode: string): string {
-  return PREVIEW_TEXT_BY_LANGUAGE[languageCode] ?? ENGLISH_PREVIEW_TEXT;
+  return PREVIEW_TEXT_BY_LANGUAGE[languageCode] ?? ADDED_PREVIEW_TEXT_BY_LANGUAGE[languageCode] ?? ENGLISH_PREVIEW_TEXT;
 }
 
 // Auditioning a voice on a metered engine spends the credits the book needs, and a free ElevenLabs
-// month is about ten minutes of audio in total. One sentence is enough to judge a narrator.
+// month is about ten minutes of audio in total. One sentence is enough to judge a narrator. loudkit
+// takes it too: it speaks at ~3x realtime after a 2 s model load, so the second sentence was the
+// larger half of every preview's wait.
 function firstSentence(text: string): string {
   return text.match(/^[^.!?]*[.!?]/)?.[0] ?? text;
 }
@@ -201,6 +215,14 @@ export function parseTtsVoice(rawVoice: string): ParsedTtsVoice {
     return { engine: "pocket", voice, raw: rawVoice };
   }
 
+  if (rawVoice.startsWith("loudkit:")) {
+    const voice = rawVoice.slice("loudkit:".length);
+    if (!loudkitVoiceLanguage(voice)) {
+      throw new Error(`Unsupported voice ID: ${rawVoice}`);
+    }
+    return { engine: "loudkit", voice, raw: rawVoice };
+  }
+
   if (rawVoice.includes(":")) {
     throw new Error(`Unsupported voice ID: ${rawVoice}`);
   }
@@ -216,7 +238,7 @@ export async function getPreviewTextForVoice(voice: string, language: string | n
   const resolved = parseTtsVoice(voice);
   if (language) {
     const text = previewTextFor(language);
-    return resolved.engine === "elevenlabs" ? firstSentence(text) : text;
+    return resolved.engine === "elevenlabs" || resolved.engine === "loudkit" ? firstSentence(text) : text;
   }
   if (resolved.engine === "kokoro") {
     return previewTextFor(KOKORO_LANGUAGE_BY_PREFIX[resolved.voice[0] ?? ""] ?? "en");
@@ -224,6 +246,9 @@ export async function getPreviewTextForVoice(voice: string, language: string | n
   if (resolved.engine === "pocket") {
     const parsed = parsePocketVoice(resolved.voice);
     return previewTextFor(parsed?.kind === "catalog" ? parsed.language.code : "en");
+  }
+  if (resolved.engine === "loudkit") {
+    return firstSentence(previewTextFor(loudkitVoiceLanguage(resolved.voice) ?? "en"));
   }
   if (resolved.engine === "say") {
     const sayVoice = await resolveSayVoice(resolved.voice);
@@ -356,6 +381,27 @@ export async function synthesize({ inputText, outputPath, voice, speed, chunkPre
       outputPath,
       voice: resolved.voice,
       speed,
+      chunkPreviewDir,
+      chunkPreviewUrlBase,
+      log,
+      onProgress,
+      signal,
+    });
+    return;
+  }
+
+  if (resolved.engine === "loudkit") {
+    await synthesizeChunkedBackend({
+      backendName: "loudkit",
+      scriptPath: LOUDKIT_SCRIPT,
+      pythonBin: path.join(env.LOUDKIT_ENV_PATH, "python"),
+      missingHint: "loudkit is not installed — download it from the voice picker",
+      inputText,
+      outputPath,
+      voice: resolved.voice,
+      speed,
+      extraArgs: ["--speed", String(speed)],
+      speedLabel: `speed ${speed}x`,
       chunkPreviewDir,
       chunkPreviewUrlBase,
       log,

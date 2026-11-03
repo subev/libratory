@@ -50,6 +50,26 @@ generated audio is a step further removed. Arguable either way. The reason to co
 anyway is lopsided risk/benefit — the downside is a rights dispute over a commercial
 product, the upside is two extra voices out of 26.
 
+## loudkit (loudreader) — prototype 2026-11-03, read from the release's NOTICE and provenance
+
+- **Code and the `loudr` weights**: Apache-2.0 (LoudReader, 2026). The weights are derived from
+  Resemble AI's **Chatterbox** (MIT, © 2025 Resemble AI); the tokenizer and the voice encoder are
+  carried from Chatterbox unchanged and redistributed under MIT. The Polish respelling table is
+  built from **CMUdict** (BSD-style, notice kept in loudkit's `NOTICE`), the number words from
+  **Unicode CLDR** (Unicode licence). Libratory installs loudkit from PyPI and downloads the
+  weights from `loudreader/loudr-1` at a pinned revision; it redistributes neither, so the
+  NOTICE travels with the package and the model repo. A build that bundles them must carry
+  loudkit's `NOTICE` alongside.
+- **Voices**: Libratory offers the 23 **CC0** profiles only: OHF-Voice / NabuCasa donations (joe,
+  kathleen, kerstin, pim, nathalie, dave, paola, tugao, darkman, gosia), Kyutai voice donations
+  (clara, emma, henry, lucy, miles, oliver, oscar, sophie), Thorsten-Voice (thorsten), NST
+  Swedish and Danish (nils, selma, soren, freja). **Left out**: `carmen`, `ines` (CML-TTS) and
+  `dante` (MLS) are CC-BY-4.0 LibriVox readers who never consented to voice cloning, and
+  `colette`, `henri` (Kyutai tts-voices) are CC-BY-4.0; so French has no loudkit voice here.
+- **Output**: no restriction on generated audio beyond Apache-2.0/MIT and the CC0 voice terms.
+  Only English has been checked by ear upstream; treat the other languages as experimental.
+- No voice cloning or enrollment is wired in (the enrollment checkpoint is not downloaded).
+
 ## Other engines — NOT verified, check before relying on any of this
 
 - **Kokoro** (`kokoro:`) — believed Apache-2.0 weights, unverified in this pass.

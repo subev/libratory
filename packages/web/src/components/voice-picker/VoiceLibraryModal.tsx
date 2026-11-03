@@ -21,7 +21,7 @@ import { IconArrowRight, IconClose, IconDownload } from "../icons.tsx";
 import { useBodyScrollLock } from "../../lib/use-body-scroll-lock.ts";
 import { PocketCloningNotice } from "./PocketCloningNotice.tsx";
 import { PocketLanguageNotice } from "./PocketLanguageNotice.tsx";
-import { BgttsInstallNotice } from "./BgttsInstallNotice.tsx";
+import { EngineInstallNotice } from "./EngineInstallNotice.tsx";
 import { ModelBundleNotice } from "../ModelBundleNotice.tsx";
 import { PocketVoiceCloner } from "./PocketVoiceCloner.tsx";
 import { VoiceRow } from "./VoiceRow.tsx";
@@ -191,13 +191,15 @@ export function VoiceLibraryModal({
 
   const { data: engines } = trpc.models.engines.useQuery(undefined, {
     staleTime: 30_000,
-    refetchInterval: (q) => (q.state.data?.install.bgtts.installing ? 1500 : false),
+    refetchInterval: (q) => (Object.values(q.state.data?.install ?? {}).some((i) => i.installing) ? 1500 : false),
   });
-  const bgttsInstall = engines?.install.bgtts;
-  const offerBgtts =
-    engines?.installed.bgtts === false &&
-    bgttsInstall?.installable === true &&
-    allVoices.some((v) => v.requiresEngine === "bgtts" && voiceCoversLanguage(v, language));
+  // An engine the app can build is offered where one of its voices reads the language on screen
+  const offeredInstalls = (["bgtts", "loudkit"] as const).filter(
+    (engine) =>
+      engines?.installed[engine] === false &&
+      engines.install[engine].installable &&
+      allVoices.some((v) => v.requiresEngine === engine && voiceCoversLanguage(v, language)),
+  );
 
   const searched = useMemo(() => {
     const pool =
@@ -404,7 +406,8 @@ export function VoiceLibraryModal({
               ) : (
                 <>
                   {pocketLanguage && !pocketLanguage.installed && <PocketLanguageNotice language={pocketLanguage} />}
-                  {offerBgtts && <BgttsInstallNotice state={bgttsInstall} />}
+                  {engines &&
+                    offeredInstalls.map((engine) => <EngineInstallNotice key={engine} engine={engine} state={engines.install[engine]} />)}
 
                   {byProvider.length > 1 && (
                     <div className="flex flex-wrap gap-1 px-1 pb-2" role="group" aria-label="Providers">

@@ -19,7 +19,7 @@ export type Voice = {
   requiresEngine?: LocalEngine;
 };
 
-export type LocalEngine = "piper" | "bgtts" | "pocket";
+export type LocalEngine = "piper" | "bgtts" | "pocket" | "loudkit";
 
 // The one predicate behind both the sidebar counts and the list itself; when they disagreed, the
 // rail said 48 and the provider chips added up to 49.
@@ -149,7 +149,52 @@ export const narratorVoices: Voice[] = [
   { id: "bg-bgtts:male2", label: "BgTTS-38M male 2", gender: "M", grade: "38M", supportsSpeed: false, note: "BgTTS-38M V2, CPU", requiresEngine: "bgtts" },
 ];
 
-export type VoiceEngine = "kokoro" | "narrators" | "say" | "cartesia" | "elevenlabs" | "pocket";
+// loudkit's CC0 voices (its docs/voices/roster/provenance.json), each in the one language it reads.
+// carmen, colette, dante, henri and ines are left out: CC-BY readers from LibriVox-derived corpora
+// who never agreed to voice cloning. Only English has been checked by ear upstream.
+const LOUDKIT_VOICES: [id: string, label: string, gender: "F" | "M", language: string, source: string][] = [
+  ["clara", "Clara", "F", "en", "Kyutai"],
+  ["emma", "Emma", "F", "en", "Kyutai"],
+  ["kathleen", "Kathleen", "F", "en", "OHF-Voice"],
+  ["lucy", "Lucy", "F", "en", "Kyutai"],
+  ["sophie", "Sophie", "F", "en", "Kyutai"],
+  ["henry", "Henry", "M", "en", "Kyutai"],
+  ["joe", "Joe", "M", "en", "OHF-Voice"],
+  ["miles", "Miles", "M", "en", "Kyutai"],
+  ["oliver", "Oliver", "M", "en", "Kyutai"],
+  ["oscar", "Oscar", "M", "en", "Kyutai"],
+  ["dave", "Dave", "M", "es", "OHF-Voice"],
+  ["kerstin", "Kerstin", "F", "de", "OHF-Voice"],
+  ["thorsten", "Thorsten", "M", "de", "Thorsten-Voice"],
+  ["paola", "Paola", "F", "it", "OHF-Voice"],
+  ["gosia", "Gosia", "F", "pl", "OHF-Voice"],
+  ["darkman", "Darkman", "M", "pl", "OHF-Voice"],
+  ["tugao", "Tugao", "M", "pt", "OHF-Voice, European"],
+  ["nathalie", "Nathalie", "F", "nl", "OHF-Voice"],
+  ["pim", "Pim", "M", "nl", "OHF-Voice"],
+  ["selma", "Selma", "F", "sv", "NST"],
+  ["nils", "Nils", "M", "sv", "NST"],
+  ["freja", "Freja", "F", "da", "NST"],
+  ["soren", "Soren", "M", "da", "NST"],
+];
+
+export const loudkitVoices: Voice[] = LOUDKIT_VOICES.map(([id, label, gender, language, source]) => ({
+  id: `loudkit:${id}`,
+  label,
+  gender,
+  grade: "0.5B",
+  supportsSpeed: true,
+  note: `loudkit, ${source} · CC0${language === "en" ? "" : " · not yet checked by ear"}`,
+  language,
+  engine: "loudkit",
+  requiresEngine: "loudkit",
+}));
+
+export function loudkitVoiceLanguage(voice: string): string | null {
+  return LOUDKIT_VOICES.find(([id]) => id === voice)?.[3] ?? null;
+}
+
+export type VoiceEngine = "kokoro" | "narrators" | "say" | "cartesia" | "elevenlabs" | "pocket" | "loudkit";
 
 export type SpeedRange = { min: number; max: number };
 
@@ -162,6 +207,7 @@ export const ENGINE_PREFIXES: { prefix: string; engine: VoiceEngine; supportsSpe
   { prefix: "cartesia:", engine: "cartesia", supportsSpeed: true, speedRange: { min: 0.6, max: 1.5 } },
   { prefix: "elevenlabs:", engine: "elevenlabs", supportsSpeed: true, speedRange: { min: 0.7, max: 1.2 } },
   { prefix: "pocket:", engine: "pocket", supportsSpeed: false },
+  { prefix: "loudkit:", engine: "loudkit", supportsSpeed: true },
   { prefix: "bg-piper:", engine: "narrators", supportsSpeed: true },
   { prefix: "bg-", engine: "narrators", supportsSpeed: false },
 ];
@@ -187,10 +233,11 @@ const UNSPACED_LANGUAGES = new Set(["zh", "ja"]);
 // level. Cartesia and ElevenLabs return word timestamps with the audio. Kokoro's come from its
 // English tokenizer, and in its espeak languages from its phoneme durations aligned to the words
 // (scripts/phoneme_words.py) — which needs spaces between words, so not Mandarin. Piper's come from
-// its durations the same way, BgTTS's from its own cross-attention (scripts/attention_words.py).
+// its durations the same way, BgTTS's from its own cross-attention (scripts/attention_words.py),
+// loudkit's from its generator's self-attention (scripts/loudkit_attention.py).
 // Pocket, MMS and the macOS voices give chunk boundaries only.
 export function voiceHasWordTiming(voiceId: string, language?: string | null): boolean {
-  if (voiceId.startsWith("bg-piper:") || voiceId.startsWith("bg-bgtts:")) return true;
+  if (voiceId.startsWith("bg-piper:") || voiceId.startsWith("bg-bgtts:") || voiceId.startsWith("loudkit:")) return true;
   const engine = engineForVoiceId(voiceId);
   if (engine === "cartesia") return true;
   // ElevenLabs times characters, and charactersToWords groups them at spaces — a sentence of

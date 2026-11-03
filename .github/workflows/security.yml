@@ -55,6 +55,8 @@ jobs:
       - name: Audit Pocket TTS including its locked transitive dependencies
         # --disable-pip avoids downloading gigabytes of torch merely to inspect package versions.
         run: uv tool run pip-audit==2.10.1 --no-deps --disable-pip -r scripts/requirements-pocket.txt
+      - name: Audit loudkit including its locked transitive dependencies
+        run: uv tool run pip-audit==2.10.1 --no-deps --disable-pip -r scripts/requirements-loudkit.txt
 
   dependency-review:
     if: github.event_name == 'pull_request'

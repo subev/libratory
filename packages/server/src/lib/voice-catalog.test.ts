@@ -15,6 +15,7 @@ describe("voiceHasWordTiming", () => {
     expect(voiceHasWordTiming("bg-mms:bul", "bg")).toBe(false);
     expect(voiceHasWordTiming("bg-piper:dimitar", "bg")).toBe(true);
     expect(voiceHasWordTiming("bg-bgtts:female", "bg")).toBe(true);
+    expect(voiceHasWordTiming("loudkit:gosia", "pl")).toBe(true);
     expect(voiceHasWordTiming("say:daria", "bg")).toBe(false);
     expect(voiceHasWordTiming("pocket:en_female", "en")).toBe(false);
   });

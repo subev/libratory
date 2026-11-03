@@ -4,6 +4,7 @@ import {
   elevenlabsVoiceToEntry,
   kokoroVoiceGroups,
   languageOfStaticVoice,
+  loudkitVoices,
   narratorVoices,
   pocketCustomVoiceToEntry,
   pocketVoiceToEntry,
@@ -75,6 +76,7 @@ export async function listAllVoices(filter: { language?: string; engine?: VoiceE
   const voices = [
     ...kokoroVoiceGroups.flatMap((g) => g.voices).map(tagged("kokoro")),
     ...narratorVoices.map(tagged("narrators")),
+    ...loudkitVoices.map(tagged("loudkit")),
     ...pocketLanguages
       .filter((l) => l.installed)
       .flatMap((l) => POCKET_VOICES.map((v) => pocketVoiceToEntry(v, l.code)))

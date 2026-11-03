@@ -5,6 +5,7 @@ import {
   languageOfStaticVoice,
   kokoroVoiceGroups,
   narratorVoices,
+  loudkitVoices,
   ENGINE_PREFIXES,
   normalizeVoiceId,
   POCKET_CUSTOM_PREFIX,
@@ -21,6 +22,7 @@ export {
   languageOfStaticVoice,
   kokoroVoiceGroups,
   narratorVoices,
+  loudkitVoices,
   engineForVoiceId,
   voiceHasWordTiming,
   normalizeVoiceId,
@@ -36,13 +38,14 @@ export {
 export function providerOfVoice(voice: Pick<Voice, "id">): string {
   if (voice.id.startsWith("bg-")) return "Bulgarian narrators";
   if (voice.id.startsWith("pocket:")) return "Pocket TTS";
+  if (voice.id.startsWith("loudkit:")) return "loudkit";
   if (voice.id.startsWith("say:")) return "macOS system";
   if (voice.id.startsWith("cartesia:")) return "Cartesia";
   if (voice.id.startsWith("elevenlabs:")) return "ElevenLabs";
   return "Kokoro";
 }
 
-export const PROVIDER_ORDER = ["Kokoro", "Pocket TTS", "Bulgarian narrators", "macOS system", "Cartesia", "ElevenLabs"];
+export const PROVIDER_ORDER = ["Kokoro", "Pocket TTS", "loudkit", "Bulgarian narrators", "macOS system", "Cartesia", "ElevenLabs"];
 
 
 export const LANGUAGE_LABELS: Record<string, string> = {
@@ -89,6 +92,7 @@ export function languageLabel(code: string): string {
 const voiceGroups: VoiceGroup[] = [
   ...kokoroVoiceGroups,
   { label: "Bulgarian", voices: narratorVoices },
+  { label: "loudkit", voices: loudkitVoices },
 ];
 
 // Static entries predate the language/engine fields; decorate them once rather than repeating
@@ -100,6 +104,7 @@ function decorate(voice: Voice, engine: VoiceEngine): Voice {
 export const staticVoices: Voice[] = [
   ...kokoroVoiceGroups.flatMap((group) => group.voices).map((v) => decorate(v, "kokoro")),
   ...narratorVoices.map((v) => decorate(v, "narrators")),
+  ...loudkitVoices.map((v) => decorate(v, "loudkit")),
 ];
 
 const voicesById = new Map(voiceGroups.flatMap((group) => group.voices).map((voice) => [voice.id, voice]));
@@ -141,6 +146,7 @@ const ENGINE_SETUP: Record<NonNullable<Voice["requiresEngine"]>, string> = {
   piper: "pnpm run setup",
   bgtts: "pnpm run setup --bgtts",
   pocket: "pnpm run setup",
+  loudkit: "pnpm run setup",
 };
 
 export type EngineInstall = { installable: boolean; installing: boolean };

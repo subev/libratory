@@ -224,6 +224,9 @@ Every engine covers a different set, so the answer to "does it do language X" de
 | --- | --- | --- |
 | English | 27 + 26 | Kokoro, Pocket TTS |
 | Spanish, Italian, German, Portuguese, French | 26 each | Pocket TTS (downloadable from the picker) |
+| German, Polish, Dutch, Swedish, Danish | 2 each | loudkit (opt-in, downloadable from the picker; not yet checked by ear) |
+| English | 10 | loudkit (opt-in) |
+| Spanish, Italian, European Portuguese | 1 each | loudkit (opt-in) |
 | Bulgarian | 5 + system | BgTTS-38M (3 voices, opt-in), Piper Dimitar, MMS Bulgarian, macOS `Daria` |
 | French, Spanish, Italian, Brazilian Portuguese | 2 each | Kokoro |
 | Hindi | 4 | Kokoro |
@@ -243,6 +246,7 @@ An AI provider key (DeepSeek, OpenAI, Anthropic, Gemini) drives the text feature
 | --- | --- | --- |
 | Kokoro | The GPU where there is one (Metal on a Mac), else the CPU | The most natural local English voices |
 | Pocket TTS | CPU, ~12x realtime | Six languages, and cloning your own voice |
+| loudkit | CPU and Metal, ~3x realtime on a Mac (CPU alone, as on Linux, ~0.3x), a 1.3 GB download | Nine languages with every word timed |
 | Piper, BgTTS-38M | CPU | Bulgarian |
 | macOS voices | CPU, ~25x realtime | Fast drafts, many languages, Mac only |
 | Cartesia, ElevenLabs | Their servers, billed per character | A slow machine, or a language no local engine reads |
@@ -303,7 +307,7 @@ Jobs run through [Graphile Worker](https://github.com/graphile/worker) in seven 
 
 **Cloud, optional:** [Cartesia](https://cartesia.ai) Sonic (`CARTESIA_API_KEY`) and [ElevenLabs](https://elevenlabs.io) (`ELEVENLABS_API_KEY`, whose free tier is 10,000 characters a month — synthesis checks what is left and refuses before spending rather than stopping halfway).
 
-During synthesis the server keeps a text↔audio timing map (`chNNN.sync.json`) next to each chapter's M4A — per chunk always, and per word where the engine reports it (Kokoro and Piper from their own phoneme durations — in every language Kokoro reads except Mandarin — BgTTS from its own cross-attention, Cartesia from `add_timestamps`, ElevenLabs from its character alignment). That map powers the web UI's read-along player and the synced EPUB export — and once it is written, the worker deletes the intermediate chunk WAVs to reclaim disk (`pnpm --filter server cleanup:chunks` sweeps leftovers from older runs).
+During synthesis the server keeps a text↔audio timing map (`chNNN.sync.json`) next to each chapter's M4A — per chunk always, and per word where the engine reports it (Kokoro and Piper from their own phoneme durations — in every language Kokoro reads except Mandarin — BgTTS from its own cross-attention, loudkit from its generator's self-attention, Cartesia from `add_timestamps`, ElevenLabs from its character alignment). That map powers the web UI's read-along player and the synced EPUB export — and once it is written, the worker deletes the intermediate chunk WAVs to reclaim disk (`pnpm --filter server cleanup:chunks` sweeps leftovers from older runs).
 
 </details>
 
@@ -347,7 +351,7 @@ data/previews/                    Voice preview M4As
 - The first PDF/EPUB export downloads a rendering browser (~350 MB) into the Vivliostyle cache. In the packaged app the Vivliostyle CLI itself (~230 MB of npm packages) is installed at that same moment, into `VIVLIOSTYLE_DIR` — a compiled binary has no `node_modules` to resolve it from.
 - Python dependencies are a **uv project**: `pyproject.toml` + `uv.lock` at the repo root, installed with `uv sync --frozen` (setup fetches `uv` into `.uv/` if it is missing). 166 packages resolve in under two seconds and install in about thirteen. The one `[tool.uv] override-dependencies` entry is Pillow, which marker and surya still cap below what closes its advisories.
 - **Pocket TTS** runs in its own Python env (`.venv-pocket`) because it needs numpy 2.x while the marker/kokoro stack is pinned to 1.26. `pnpm run setup` builds both. It is CPU-only by design — it leaves the GPU free for Kokoro and search — and has no speed parameter, so the UI disables the slider.
-- Piper and BgTTS-38M run in envs of their own too (`.venv-piper`, `.venv-bgtts`): Piper needs onnxruntime and numpy 2, BgTTS's codec needs a torchaudio older than the main env's torch. The Mac app and the Docker image install Piper themselves; BgTTS needs a source checkout for now.
+- Piper, BgTTS-38M and loudkit run in envs of their own too (`.venv-piper`, `.venv-bgtts`, `.venv-loudkit`): Piper needs onnxruntime and numpy 2, BgTTS's codec needs a torchaudio older than the main env's torch, loudkit caps numpy below 2.4. The Mac app and the Docker image install Piper themselves; BgTTS and loudkit are built from the voice picker's *Download and set up* card, on a Mac or a source checkout (not in Docker).
 - The Bulgarian-capable narrators are BgTTS-38M V2 (three voices), Piper `Dimitar`, `MMS Bulgarian (Meta)`, the macOS `Daria` system voice, and the Bulgarian voices from Cartesia and ElevenLabs. The local model narrators run at fixed speed (UI disables the slider) except Piper; macOS and the cloud engines support the speed control.
 - Best Kokoro voices: `af_heart` (A tier), `af_bella` (A- tier), `bf_emma` (B- tier).
 

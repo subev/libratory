@@ -51,6 +51,7 @@ const envSchema = z.object({
   POCKET_ENV_PATH: z.string().default(path.join(repoRoot, ".venv-pocket", "bin")),
   PIPER_ENV_PATH: z.string().default(path.join(repoRoot, ".venv-piper", "bin")),
   BGTTS_ENV_PATH: z.string().default(path.join(repoRoot, ".venv-bgtts", "bin")),
+  LOUDKIT_ENV_PATH: z.string().default(path.join(repoRoot, ".venv-loudkit", "bin")),
   // The uv that builds an engine's venv from the app (lib/engine-install.ts): the desktop first run
   // fetches it into its home as uv/uv, scripts/setup.sh into the checkout as .uv/uv
   UV_PATH: z.string().default(path.join(repoRoot, process.env.LIBRATORY_HOME ? "uv" : ".uv", "uv")),
