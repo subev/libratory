@@ -1,0 +1,4 @@
+Reviewed: high
+Outcome: Inline review of fa72f16, Dependabot #44 cherry-picked (gh token lacks workflow scope to update the PR branch). Diff is only five action pin bumps (setup-node 7.1.0, login-action 4.7.0, upload-artifact 7.0.2, download-artifact 8.0.2, setup-uv 10.3.3). Verified: each pinned SHA resolves to its tag via the GitHub API; setup-uv 10.3.3 still declares version, python-version, enable-cache. Not verified: workflows run on CI after push.
+By: Petur Subev
+At: 2026-11-05T11:09:46.148Z
