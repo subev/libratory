@@ -1,0 +1,4 @@
+Reviewed: high
+Outcome: Independent review of 649cdeb..4780eed: all desktop and web icons are the supplied raster or plain downscales of it (app-icon.png byte-identical, favicon RMSE 0, built .icns slots transparent outside the tile with interior RMSE 0), SVG tiles and librsvg removed with no dangling references, staleness guard still valid, report docs-only; no blockers, three informational notes
+By: Petur Subev
+At: 2026-11-06T22:47:38.155Z
