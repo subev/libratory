@@ -1,0 +1,4 @@
+Reviewed: high
+Outcome: Independent review of fa72f16..649cdeb: near-black default tiles reproduce the supplied dark vector and rich mark verbatim (textual and pixel checks), ids unique, no external refs, icon_stale guard exercised, reports docs-only; 1 Low (librsvg glow dimmer than supplied raster), rest cosmetic
+By: Petur Subev
+At: 2026-11-06T22:29:11.227Z
