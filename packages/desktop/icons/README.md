@@ -1,23 +1,30 @@
 # Icon assets
 
-Four size masters, each a separate drawing rather than a scale of the last.
+The mark is an open book under three sound waves, one filled outline drawn on a 1024 grid.
+Every file here is that same drawing; only the crop and the colours change.
 
-| Master | Range | Drawing | Body stroke |
-|---|---|---|---|
-| 0 · rich | 128px and up | 3 leaf edges per side, 3 waves per ear, page curl | 2.9 |
-| 1 · detailed | 40–127px | solid page block, 2 waves (1 at 48) | 3.2 / 3.5 / 4.1 |
-| 2 · compact | 25–39px | 3 masses: flat book, head, body + arms | fills only |
-| 3 · tiny | 24px and under | head merged into bust, fat stubs | fills only |
+| Use | Crop | Colours |
+|---|---|---|
+| tile, 64px and up | whole grid, mark at about 60% | the glowing mark on near-black |
+| tile, 48px and under | tighter, mark at about 90% | the rich mark on near-black, no glow |
+| mark | the mark alone, no tile | see below |
 
-Strokes thicken as the size drops so optical weight stays constant.
+Below about 24px the sound waves and page lines blur into the book. There is no simplified
+small drawing yet; dropping the glow and cropping tighter is what keeps the book's outline
+legible in a browser tab.
 
-## Brand pair
-- tangerine `#e2601f` — ground
-- ink `#2a1408` — figure and covers
-- page `#fdf1e4` — pages and waves
+## Colours
+- near-black `#170906` — the tile's ground
+- ember gradient (`#FFC27A` → `#E8690F`) on the waves and a warm page gradient (`#FFC48F` →
+  `#FFF0E0`) on the book — the rich mark
+- the large tiles add a soft orange glow behind the mark and a hot spot at the spine
+- tangerine `#E2601F` and ink `#1E1B14` — the flat pair, still used by `mark/rich-on-light` and
+  `mark/rich-on-tangerine` (ink mark)
 
 ## Folders
-- `app-icon/` — SVG per size, correct master already chosen; `png/` mirrors it
-- `app-icon/app-icon-maskable-512.*` — full-bleed, safe-zone inset, for Android adaptive icons
-- `favicon/` — 16 / 32 / 48, tiny and compact masters
-- `mark/` — the mark alone, no tile. `*-monochrome.svg` inherit `currentColor`
+- `app-icon/` — SVG per size; the tile brings its own rounded corners
+- `app-icon/app-icon-maskable-512.svg` — full-bleed, the mark inside the safe zone, for Android
+  adaptive icons
+- `favicon/` — 16 / 32 / 48
+- `mark/` — the mark alone, no tile. `*-monochrome.svg` inherit `currentColor`; `rich-on-dark`
+  carries the gradients; `rich-on-light` and `rich-on-tangerine` are the ink mark

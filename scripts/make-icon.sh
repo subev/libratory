@@ -3,9 +3,9 @@
 #
 #   scripts/make-icon.sh [packages/desktop/icons/app-icon]
 #
-# Each size renders its own drawing rather than a scale of the last one: below about 40px the
-# leaf edges and sound waves collapse into mush, so icons/app-icon/ carries four masters and
-# names each file by the size it is for. The tile brings its own ground and rounded corners —
+# Each size renders its own file rather than a scale of the last one: below about 48px the mark
+# is cropped tighter so the book still reads, so icons/app-icon/ names each file by the size it
+# is for. The tile brings its own ground and rounded corners —
 # macOS gives an app icon no background, and a transparent glyph in the dock reads as broken.
 set -euo pipefail
 

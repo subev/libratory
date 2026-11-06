@@ -53,7 +53,8 @@ bare `ffmpeg` and `pdftotext` off your `PATH`, so a checkout still wants them in
 does not — it puts its own bundled copies first.)
 
 Delete `packages/desktop/resources/bin` or `packages/desktop/build/icon.icns` to force those steps
-to run again; both are generated and neither is tracked.
+to run again; both are generated and neither is tracked. The icon also re-renders by itself when
+any tile in `packages/desktop/icons/app-icon/` is newer than it.
 
 ## Sharing a library with a checkout
 

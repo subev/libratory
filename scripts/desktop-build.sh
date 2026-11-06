@@ -86,11 +86,16 @@ if ! $LINUX && { [ ! -x "$DESKTOP/resources/bin/vision-words" ] || [ scripts/vis
   bash scripts/build-vision-words.sh "$DESKTOP/resources/bin/vision-words" \
     || echo "    no Swift toolchain — the AI OCR engine will place words with Tesseract's boxes instead" >&2
 fi
+# A rendered icon survives in build/ across checkouts, so re-render when the tiles changed after it.
+icon_stale() { [ ! -f "$1" ] || [ -n "$(find packages/desktop/icons/app-icon scripts/make-icon.sh -newer "$1" -print -quit)" ]; }
 if $LINUX; then
   # Linux draws icons edge to edge; the macOS inset is make-icon.sh's business
-  [ -f "$DESKTOP/build/icon.png" ] || { echo "==> rendering the icon"; rsvg-convert -w 512 -h 512 packages/desktop/icons/app-icon/app-icon-512.svg -o "$DESKTOP/build/icon.png"; }
+  if icon_stale "$DESKTOP/build/icon.png"; then
+    echo "==> rendering the icon"
+    rsvg-convert -w 512 -h 512 packages/desktop/icons/app-icon/app-icon-512.svg -o "$DESKTOP/build/icon.png"
+  fi
 else
-  [ -f "$DESKTOP/build/icon.icns" ] || { echo "==> rendering the icon"; bash scripts/make-icon.sh; }
+  if icon_stale "$DESKTOP/build/icon.icns"; then echo "==> rendering the icon"; bash scripts/make-icon.sh; fi
 fi
 
 echo "==> building the web bundle"
