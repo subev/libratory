@@ -47,14 +47,14 @@ spend an afternoon reading the behaviour of `/Applications/Libratory.app` while 
 expect. It also clears the quarantine flag, which is what right-click → Open does by hand.
 
 Bun and the bundled CLI tools are both fetched on demand and checksummed, so **building the app
-needs no Homebrew ffmpeg or poppler** — only `librsvg` and `imagemagick`, and only when the icon
+needs no Homebrew ffmpeg or poppler** — only `imagemagick`, and only when the icon
 has to be re-rendered. (Running the server *from source* is a different matter: `pnpm dev` spawns
 bare `ffmpeg` and `pdftotext` off your `PATH`, so a checkout still wants them installed. The app
 does not — it puts its own bundled copies first.)
 
 Delete `packages/desktop/resources/bin` or `packages/desktop/build/icon.icns` to force those steps
 to run again; both are generated and neither is tracked. The icon also re-renders by itself when
-any tile in `packages/desktop/icons/app-icon/`, or `scripts/make-icon.sh`, is newer than it.
+`packages/desktop/icons/app-icon/app-icon.png`, or `scripts/make-icon.sh`, is newer than it.
 
 ## Sharing a library with a checkout
 

@@ -71,7 +71,7 @@ jobs:
       # Only for rendering the .icns. ffmpeg and poppler are NOT installed here: they ship inside
       # the DMG, so they are downloaded as a pinned, checksummed bundle rather than taken from
       # whatever Homebrew is current on the runner that day.
-      - run: brew install librsvg imagemagick
+      - run: brew install imagemagick
 
       # Compiles the server, builds the web bundle, bundles the CLI tools, renders the icon — and
       # stops before packaging so the step below can do it once, with signing if we have it.

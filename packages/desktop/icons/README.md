@@ -1,30 +1,14 @@
 # Icon assets
 
-The mark is an open book under three sound waves, one filled outline drawn on a 1024 grid.
-Every file here is that same drawing; only the crop and the colours change.
+The desktop icon is one supplied raster: `app-icon/app-icon.png`, 1024px, opaque, full bleed — the
+glowing book under three sound waves on near-black. It is the artwork itself, not a drawing of
+it; every icon size is a plain downscale of this file, never a redraw.
 
-| Use | Crop | Colours |
-|---|---|---|
-| tile, 64px and up | whole grid, mark at about 60% | the glowing mark on near-black |
-| tile, 48px and under | tighter, mark at about 90% | the rich mark on near-black, no glow |
-| mark | the mark alone, no tile | see below |
+- `app-icon/app-icon.png` — the source. `scripts/make-icon.sh` rounds its corners, insets it to
+  80% for the macOS icon grid and writes the `.icns`; Linux takes it at 512px edge to edge.
+- `packages/web/public/favicon.png` — the same raster at 64px.
+- `mark/` — the mark alone as vectors, no tile. `*-monochrome.svg` inherit `currentColor`;
+  `rich-on-dark` carries the gradients; `rich-on-light` and `rich-on-tangerine` are the ink mark.
+  Nothing in the build uses them; they are for places that need the outline without a tile.
 
-Below about 24px the sound waves and page lines blur into the book. There is no simplified
-small drawing yet; dropping the glow and cropping tighter is what keeps the book's outline
-legible in a browser tab.
-
-## Colours
-- near-black `#170906` — the tile's ground
-- ember gradient (`#FFC27A` → `#E8690F`) on the waves and a warm page gradient (`#FFC48F` →
-  `#FFF0E0`) on the book — the rich mark
-- the large tiles add a soft orange glow behind the mark and a hot spot at the spine
-- tangerine `#E2601F` and ink `#1E1B14` — the flat pair, still used by `mark/rich-on-light` and
-  `mark/rich-on-tangerine` (ink mark)
-
-## Folders
-- `app-icon/` — SVG per size; the tile brings its own rounded corners
-- `app-icon/app-icon-maskable-512.svg` — full-bleed, the mark inside the safe zone, for Android
-  adaptive icons
-- `favicon/` — 16 / 32 / 48
-- `mark/` — the mark alone, no tile. `*-monochrome.svg` inherit `currentColor`; `rich-on-dark`
-  carries the gradients; `rich-on-light` and `rich-on-tangerine` are the ink mark
+Below about 32px the waves and page lines blur into the book; that is the raster at that size.

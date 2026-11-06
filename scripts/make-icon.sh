@@ -1,33 +1,29 @@
 #!/bin/bash
-# Turns the app mark into the .icns the bundle wants.
+# Turns the icon raster into the .icns the bundle wants.
 #
-#   scripts/make-icon.sh [packages/desktop/icons/app-icon]
+#   scripts/make-icon.sh [packages/desktop/icons/app-icon/app-icon.png]
 #
-# Each size renders its own file rather than a scale of the last one: below about 48px the mark
-# is cropped tighter so the book still reads, so icons/app-icon/ names each file by the size it
-# is for. The tile brings its own ground and rounded corners —
-# macOS gives an app icon no background, and a transparent glyph in the dock reads as broken.
+# The source is the supplied 1024px raster, full bleed. Every size is a plain downscale of it,
+# with the corners rounded and the tile inset to 80% — macOS gives an app icon no mask or
+# background, and its art sits inside the icon grid, not edge to edge.
 set -euo pipefail
 
-SRC="${1:-packages/desktop/icons/app-icon}"
+SRC="${1:-packages/desktop/icons/app-icon/app-icon.png}"
 OUT="${2:-packages/desktop/build/icon.icns}"
-[ -d "$SRC" ] || { echo "no icon directory at $SRC"; exit 1; }
-command -v rsvg-convert >/dev/null || { echo "needs rsvg-convert (brew install librsvg)"; exit 1; }
+[ -f "$SRC" ] || { echo "no icon at $SRC"; exit 1; }
 command -v magick >/dev/null || { echo "needs ImageMagick 7 (brew install imagemagick)"; exit 1; }
 
 SET=$(mktemp -d)/icon.iconset
 mkdir -p "$SET" "$(dirname "$OUT")"
 
 render() {  # canvas, outfile
-  # 80%: macOS art sits inside the icon grid, not edge to edge
-  local canvas=$1 inner=$(( $1 * 80 / 100 )) pad
-  pad=$(( (canvas - inner) / 2 ))
-  local tile="$SRC/app-icon-${canvas}.svg"
-  [ -f "$tile" ] || { echo "no master for ${canvas}px at $tile"; exit 1; }
-  rsvg-convert -w "$inner" -h "$inner" "$tile" -o "$SET/.tile.png"
-  magick -size "${canvas}x${canvas}" xc:none \
-    "$SET/.tile.png" -geometry "+${pad}+${pad}" -composite "$2"
-  rm -f "$SET/.tile.png"
+  local canvas=$1 inner=$(( $1 * 80 / 100 )) radius
+  radius=$(( inner * 230 / 1024 ))
+  magick "$SRC" -filter Lanczos -resize "${inner}x${inner}" -alpha set \
+    \( -size "${inner}x${inner}" xc:none -fill white \
+       -draw "roundrectangle 0,0 $(( inner - 1 )),$(( inner - 1 )) $radius,$radius" \) \
+    -compose DstIn -composite \
+    -compose Over -background none -gravity center -extent "${canvas}x${canvas}" "PNG32:$2"
 }
 
 for size in 16 32 128 256 512; do

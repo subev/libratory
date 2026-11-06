@@ -92,7 +92,7 @@ if $LINUX; then
   # Linux draws icons edge to edge; the macOS inset is make-icon.sh's business
   if icon_stale "$DESKTOP/build/icon.png"; then
     echo "==> rendering the icon"
-    rsvg-convert -w 512 -h 512 packages/desktop/icons/app-icon/app-icon-512.svg -o "$DESKTOP/build/icon.png"
+    magick packages/desktop/icons/app-icon/app-icon.png -filter Lanczos -resize 512x512 "$DESKTOP/build/icon.png"
   fi
 else
   if icon_stale "$DESKTOP/build/icon.icns"; then echo "==> rendering the icon"; bash scripts/make-icon.sh; fi
